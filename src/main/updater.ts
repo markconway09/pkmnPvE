@@ -39,6 +39,7 @@ interface ReleaseAsset {
 }
 
 let pendingAsset: ReleaseAsset | null = null
+let latestVersion: string | null = null
 
 /**
  * The swap, run once the game (process `pid`) has exited - a running exe can't be
@@ -49,18 +50,27 @@ let pendingAsset: ReleaseAsset | null = null
 // Windows' own tools folder, spelled out so a script never picks up another tasklist/find.
 const SYS = '%SystemRoot%\\System32\\'
 
-export function applyScript(pid: number, newDir: string, appDir: string): string {
+export function applyScript(pid: number, newDir: string, appDir: string, version = ''): string {
   const newSave = join(newDir, 'save')
   const appSave = join(appDir, 'save')
   return [
     '@echo off',
+    // Shown in a small window of its own: copying the game takes up to a minute, and
+    // without it the game would just vanish - easy to think it failed and reopen the
+    // old one halfway through.
+    `title Updating pkmnPvE${version ? ` to ${version}` : ''}`,
+    'echo Updating pkmnPvE - please wait, the game will reopen by itself.',
+    'echo.',
+    'echo Waiting for the game to close...',
     ':wait',
     // Full paths: whatever PATH this starts with, it must be Windows' own tools. The
     // one-second pause is a ping - timeout.exe refuses to run without a console.
     `"${SYS}tasklist.exe" /FI "PID eq ${pid}" /NH | "${SYS}find.exe" "${pid}" >nul && ("${SYS}PING.EXE" -n 2 127.0.0.1 >nul & goto wait)`,
+    'echo Installing the new version (your saves are kept)...',
     `"${SYS}robocopy.exe" "${newDir}" "${appDir}" /MIR /XD "${appSave}" "${newSave}" /R:5 /W:1 /NFL /NDL /NJH /NJS >nul`,
     `if not exist "${appSave}" mkdir "${appSave}"`,
     `for %%F in ("${join(newSave, '*.json')}") do if /I not "%%~nxF"=="session.json" copy /Y "%%F" "${appSave}" >nul`,
+    'echo Done - starting the game.',
     `start "" "${join(appDir, 'pkmnPvE.exe')}"`,
     ''
   ].join('\r\n')
@@ -79,6 +89,7 @@ export async function checkForUpdate(): Promise<UpdateCheckResult> {
   const asset = release.assets.find((a) => ZIP_ASSET.test(a.name)) ?? null
   const available = !!asset && isNewer(latest, current)
   pendingAsset = available ? asset : null
+  latestVersion = available ? latest : null
   return {
     current,
     latest,
@@ -167,8 +178,9 @@ export async function installUpdate(sender: WebContents): Promise<void> {
   // mirror the new build over the game folder leaving save\ alone entirely, then
   // copy in just the shared game data - never save\players or the remembered login.
   const script = join(work, 'apply-update.cmd')
-  writeFileSync(script, applyScript(process.pid, join(work, 'new'), appDir), 'utf8')
+  writeFileSync(script, applyScript(process.pid, join(work, 'new'), appDir, latestVersion ?? ''), 'utf8')
   sender.send('update:progress', { phase: 'restarting', received, total: asset.size })
-  spawn('cmd.exe', ['/c', script], { detached: true, stdio: 'ignore', windowsHide: true }).unref()
+  // Its own visible console window (see applyScript) - detached so it outlives the game.
+  spawn('cmd.exe', ['/c', script], { detached: true, stdio: 'ignore', windowsHide: false }).unref()
   setTimeout(() => app.quit(), 500)
 }
