@@ -1,0 +1,3411 @@
+:root {
+  color-scheme: dark;
+  font-family: 'Courier New', monospace;
+}
+
+body {
+  margin: 0;
+  background: #10141a;
+  color: #e6e6e6;
+  overflow: hidden;
+}
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  box-sizing: border-box;
+  padding: 16px;
+}
+
+.menu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.menu-header h1 {
+  margin: 0;
+}
+
+.menu-nav {
+  display: flex;
+  gap: 8px;
+}
+
+.menu-nav-cog {
+  font-size: 16px;
+  line-height: 1;
+  padding: 10px 12px;
+}
+
+.big-battle-row {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.big-battle-button {
+  width: 182px;
+  height: 182px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  padding: 16px;
+  font-size: 18px;
+}
+
+.big-battle-icon {
+  width: 94px;
+  height: 94px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.wild-location-row {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.wild-location-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.wild-location-icon {
+  font-size: 20px;
+}
+
+.wild-location-button-active {
+  border-color: #ffd76b;
+  color: #ffd76b;
+}
+
+.wild-levelcap-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.wild-levelcap-slider {
+  width: 260px;
+  height: 4px;
+  accent-color: #ffd76b;
+}
+
+.wild-levelcap-value {
+  font-size: 12px;
+  color: #b7c0cf;
+  white-space: nowrap;
+}
+
+.debug-menu {
+  width: 340px;
+}
+
+.player-trainer-modal {
+  width: 520px;
+}
+
+.debug-menu-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.debug-reset-confirm,
+.confirm-button {
+  border-color: #ff6b6b;
+  color: #ff6b6b;
+}
+
+.wild-drops-modal {
+  width: 560px;
+}
+
+.wild-drops-modal h3 {
+  margin: 16px 0 6px;
+  font-size: 13px;
+  color: #b7c0cf;
+}
+
+.wild-drop-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wild-drop-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  background: #232a36;
+  border: 2px solid #3a4150;
+  font-size: 13px;
+}
+
+.wild-drop-species {
+  flex: 1;
+  min-width: 0;
+}
+
+.wild-drop-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  color: #b7c0cf;
+}
+
+.wild-drop-chance {
+  width: 44px;
+  text-align: right;
+}
+
+.level-cap-display {
+  text-align: center;
+  font-size: 13px;
+  color: #b7c0cf;
+  margin: 8px 0 0;
+}
+
+/* The battle buttons, location picker and slider fold away (see the box's
+   expand button) - animating grid rows 1fr -> 0fr gives a smooth height change,
+   and the box, being flex: 1, grows into the freed space as it goes. */
+.battle-section {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows 0.35s ease,
+    opacity 0.25s ease;
+}
+
+.battle-section-collapsed {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.battle-section-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.box-expand-button {
+  font-size: 11px;
+  padding: 2px 8px;
+  line-height: 1.4;
+  transition: transform 0.35s ease;
+}
+
+.box-expand-button-flipped {
+  transform: rotate(180deg);
+}
+
+.battle-row-hint {
+  text-align: center;
+  margin-top: 6px;
+}
+
+.choose-starter-button {
+  margin-top: 12px;
+  border-color: #6bb0ff;
+  color: #6bb0ff;
+  width: fit-content;
+}
+
+.progression-inline-input {
+  width: 48px;
+  margin: 0 4px;
+  font-family: inherit;
+  font-size: 12px;
+  background: #232a36;
+  color: #e6e6e6;
+  border: 2px solid #3a4150;
+  padding: 2px 4px;
+}
+
+.starter-picker {
+  width: 480px;
+}
+
+.starter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+  max-height: 55vh;
+  overflow-y: auto;
+  padding: 4px;
+  border: 2px solid #3a4150;
+  background: #171b22;
+  margin-top: 8px;
+}
+
+.starter-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+}
+
+.starter-img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.starter-name {
+  font-size: 10px;
+  text-align: center;
+}
+
+.starter-random-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  color: #6bb0ff;
+}
+
+.team-row {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.team-slot {
+  width: 99px;
+  height: 114px;
+  flex-shrink: 0;
+  border: 2px dashed #3a4150;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #171b22;
+}
+
+.team-slot-filled {
+  border-style: solid;
+}
+
+.team-slot-empty {
+  font-size: 14px;
+  color: #4a5468;
+}
+
+.box-grid {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 10px;
+  border: 2px solid #3a4150;
+  background: #171b22;
+}
+
+.box-empty-hint {
+  color: #4a5468;
+  font-size: 13px;
+}
+
+.box-icon {
+  position: relative;
+  width: 88px;
+}
+
+.box-icon-fill {
+  width: 100%;
+  height: 100%;
+}
+
+.box-icon-draggable {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 8px 5px;
+  cursor: grab;
+  border: 2px solid #3a4150;
+  background: #232a36;
+}
+
+.box-icon-fill .box-icon-draggable {
+  border: none;
+  background: transparent;
+}
+
+.box-icon-img {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+.box-icon-name {
+  font-size: 13px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.exp-bar-track {
+  width: 100%;
+  height: 5px;
+  background: #2a3140;
+  border: 1px solid #3a4150;
+  margin-top: 2px;
+  pointer-events: none;
+}
+
+.exp-bar-fill {
+  height: 100%;
+  background: #6bb0ff;
+}
+
+.box-icon-remove {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 21px;
+  height: 21px;
+  padding: 0;
+  line-height: 1;
+  font-size: 16px;
+  border: 1px solid #3a4150;
+  background: #232a36;
+  color: #ff6b6b;
+  z-index: 1;
+}
+
+.box-icon-remove:hover {
+  background: #3a1e1e;
+  border-color: #ff6b6b;
+}
+
+.box-icon-item {
+  position: absolute;
+  bottom: 18px;
+  right: 3px;
+  transform: scale(0.78);
+  transform-origin: bottom right;
+  background: #10141a;
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+/* Favorite ⭐ / shiny ✨ markers, tucked in the top-left corner (the held item sits bottom-right). */
+.box-icon-badges {
+  position: absolute;
+  top: 3px;
+  left: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 12px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.box-icon-dragging {
+  opacity: 0.3;
+}
+
+.box-icon-overlay {
+  cursor: grabbing;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.6);
+  transform: scale(1.1);
+  border-color: #6bb0ff;
+}
+
+.team-slot-over {
+  border-color: #6bb0ff;
+  background: #1a2942;
+}
+
+.box-grid-over {
+  border-color: #6bb0ff;
+}
+
+.options-heading {
+  font-size: 14px;
+  color: #b7c0cf;
+  margin: 16px 0 8px;
+}
+
+.team-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 16px 0 8px;
+}
+
+.team-heading-row .options-heading {
+  margin: 0;
+}
+
+.loadouts-button {
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+.loadouts-modal {
+  width: 480px;
+}
+
+.loadout-save-row {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.loadout-save-row input {
+  flex: 1;
+}
+
+.loadout-preview {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.loadout-preview-slot {
+  width: 32px;
+  height: 32px;
+  background: #232a36;
+  border: 1px solid #3a4150;
+  flex-shrink: 0;
+}
+
+.loadout-preview-slot img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.loadout-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.loadout-row {
+  padding: 8px 10px;
+  background: #232a36;
+  border: 2px solid #3a4150;
+}
+
+.loadout-row-header {
+  margin-bottom: 6px;
+}
+
+.loadout-row-name {
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.loadout-row-name:hover {
+  color: #6bb0ff;
+}
+
+.loadout-row-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.sprite-style-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  max-width: 520px;
+}
+
+.sprite-style-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px;
+}
+
+.sprite-style-selected {
+  border-color: #6bb0ff;
+  background: #223049;
+}
+
+.sprite-style-preview {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.trainer-sprite-current {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  max-width: 320px;
+}
+
+.trainer-sprite-current-img {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  flex-shrink: 0;
+}
+
+.trainer-sprite-current-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.trainer-sprite-change-hint {
+  font-size: 11px;
+  color: #8a94a6;
+}
+
+.trainer-picker {
+  width: 720px;
+  max-width: 90vw;
+}
+
+.trainer-picker-search {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 13px;
+  background: #232a36;
+  color: #e6e6e6;
+  border: 2px solid #3a4150;
+  padding: 8px 10px;
+  margin-top: 8px;
+}
+
+.trainer-picker-search:focus {
+  outline: none;
+  border-color: #6bb0ff;
+}
+
+.trainer-picker-count {
+  font-size: 11px;
+  color: #8a94a6;
+  margin: 8px 0 4px;
+}
+
+.trainer-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: 4px;
+  max-height: 55vh;
+  overflow-y: auto;
+  padding: 4px;
+  border: 2px solid #3a4150;
+  background: #171b22;
+}
+
+.trainer-picker-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: 2px solid transparent;
+  background: transparent;
+}
+
+.trainer-picker-option:hover:not(:disabled) {
+  border-color: #6b7688;
+  background: #232a36;
+}
+
+.trainer-picker-selected {
+  border-color: #6bb0ff;
+  background: #223049;
+}
+
+.trainer-picker-img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+.battle-huds {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 8px;
+  background: #10141a;
+  border: 2px solid #3a4150;
+  border-bottom: none;
+}
+
+.trainer-hud {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.trainer-hud-right {
+  flex-direction: row-reverse;
+  text-align: right;
+  /* A divider between the two teams, with room either side of it. */
+  border-left: 1px solid #3a4150;
+  padding-left: 16px;
+}
+
+.trainer-hud-sprite {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  flex-shrink: 0;
+}
+
+.trainer-hud-info {
+  min-width: 0;
+}
+
+.trainer-hud-name {
+  font-size: 12px;
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trainer-hud-balls {
+  display: flex;
+  gap: 4px;
+}
+
+.pokeball-icon {
+  /* A flex row this cramped (six of these, at either size) would otherwise
+     squash them thinner than the sprite sheet crop expects. */
+  flex-shrink: 0;
+}
+
+/* Deliberately NOT flex-direction: row-reverse here (it used to be) - that
+   only reordered the balls visually, while each ball's hover title and
+   healthy/statused/fainted look stayed tied to its team-order index. The two
+   fell out of sync, so hovering the leftmost ball could name a Pokemon from
+   the other end of the roster. Left-to-right now always matches team order
+   on both sides. */
+.trainer-hud-right .trainer-hud-balls {
+  justify-content: flex-end;
+}
+
+/* The bigger panel under the move buttons - sprite on one side, name and ball
+   grid on the other, same arrangement as the compact bar above (just scaled
+   up - see pokeballStyle's own scale argument for how the pokeballs stay
+   crisp at this size). The ball grid wraps if it has to, but the column now
+   gives it plenty of width to stay in one or two rows instead. */
+.trainer-hud-large {
+  flex: 1;
+  min-width: 220px;
+  gap: 16px;
+  padding: 10px 14px;
+  background: #1a2230;
+  border: 2px solid #3a4150;
+}
+
+.trainer-hud-large .trainer-hud-sprite {
+  width: 88px;
+  height: 88px;
+}
+
+.trainer-hud-large .trainer-hud-info {
+  flex: 1;
+}
+
+.trainer-hud-large .trainer-hud-name {
+  font-size: 16px;
+  white-space: normal;
+}
+
+.trainer-hud-large .trainer-hud-balls {
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.battle-huds-large {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.battle-field {
+  position: relative;
+  min-height: 280px;
+  padding: 8px 24px;
+  background: linear-gradient(#1a2230, #10141a);
+  border: 2px solid #3a4150;
+}
+
+/* A wash over the whole field at the moment a hit lands, tinted by the
+   move's type (--flash-color, set inline by AnimationLayer from
+   TYPE_COLORS) - toggled on .battle-field itself, not a separate element,
+   so it always covers exactly the field regardless of layout. */
+.field-flash-active::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background: radial-gradient(circle, var(--flash-color, #fff) 0%, transparent 70%);
+  animation: field-flash-kf 320ms ease-out;
+}
+
+@keyframes field-flash-kf {
+  0% {
+    opacity: 0.45;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* A strong hit (see BIG_HIT_POWER in moveAnimations.ts) shakes the whole
+   field, not just the target. */
+.battle-field-shake {
+  animation: battle-field-shake-kf 360ms ease-out;
+}
+
+@keyframes battle-field-shake-kf {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  15% {
+    transform: translate(-6px, 3px);
+  }
+  30% {
+    transform: translate(5px, -3px);
+  }
+  45% {
+    transform: translate(-4px, 2px);
+  }
+  60% {
+    transform: translate(3px, -2px);
+  }
+  75% {
+    transform: translate(-2px, 1px);
+  }
+  90% {
+    transform: translate(1px, -1px);
+  }
+}
+
+/* AnimationLayer's generic move animation - see AnimationLayer.tsx,
+   moveAnimations.ts and moveParticleShapes.tsx. A particle's shape comes
+   from moveParticleShapes (one per type); its color comes from the
+   .anim-particle.type-X rules further down (next to .move-button's matching
+   type colors). Both a flung projectile and a status move's burst ring use
+   the same fly animation - the burst's "to" point is just computed as an
+   outward ring in AnimationLayer instead of a straight line at a target. */
+.anim-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.anim-particle {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 0 5px currentcolor);
+  animation-name: anim-particle-fly-kf;
+  animation-timing-function: ease-out;
+  /* "both", not just "forwards" - a staggered trail spark has an
+     animation-delay before it starts, and without "backwards" too it would
+     sit at the browser's default (0,0) during that wait instead of its own
+     start position. */
+  animation-fill-mode: both;
+}
+
+.anim-particle svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* A shot's trailing sparks - smaller, fainter, same shape and path. */
+.anim-particle-trail {
+  width: 11px;
+  height: 11px;
+  opacity: 0.7;
+}
+
+/* Passes through --mid-x/-y at 50% rather than interpolating straight from
+   --from to --to - for a projectile that point is bowed to one side (see
+   arcMidpoint in AnimationLayer.tsx), so it arcs in instead of flying a dead
+   straight line; a burst-ring particle gets the plain midpoint, so it still
+   travels straight outward. */
+@keyframes anim-particle-fly-kf {
+  0% {
+    left: var(--from-x);
+    top: var(--from-y);
+    opacity: 0.9;
+    transform: translate(-50%, -50%) scale(0.7) rotate(0deg);
+  }
+  20% {
+    transform: translate(-50%, -50%) scale(1) rotate(20deg);
+  }
+  50% {
+    left: var(--mid-x);
+    top: var(--mid-y);
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    left: var(--to-x);
+    top: var(--to-y);
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.85) rotate(-10deg);
+  }
+}
+
+/* A contact move: the attacker's own sprite dashes into its target and back,
+   rather than anything being flung - --lunge-x/-y/-duration/-reps are set
+   inline per use (see AnimationLayer). Applied directly to the real sprite
+   element, not a clone. Asymmetric (a fast 35% dash out, a slower ease back)
+   with a touch of motion blur at the peak, for a punchier "dash" read than a
+   plain symmetric back-and-forth. */
+.anim-melee-lunge {
+  animation-name: anim-melee-lunge-kf;
+  animation-duration: var(--lunge-duration, 380ms);
+  animation-iteration-count: var(--lunge-reps, 1);
+  animation-timing-function: ease-out;
+}
+
+@keyframes anim-melee-lunge-kf {
+  0% {
+    transform: translate(0, 0);
+    filter: blur(0);
+  }
+  35% {
+    transform: translate(var(--lunge-x, 0), var(--lunge-y, 0));
+    filter: blur(1.5px);
+  }
+  55% {
+    filter: blur(0);
+  }
+  100% {
+    transform: translate(0, 0);
+    filter: blur(0);
+  }
+}
+
+/* Layered behind the sprites (.sprite-slot is z-index 1), bottom to top:
+   backdrop, terrain, weather. */
+.field-backdrop,
+.field-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.field-backdrop {
+  opacity: 0.9;
+}
+
+.field-overlay {
+  animation: field-overlay-in 0.4s ease-out;
+}
+
+@keyframes field-overlay-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* The turns-left readout - Showdown's version sits in the top-left of the
+   scene as coloured text with a white outline. */
+.field-badges {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  z-index: 2;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.field-badge {
+  font-size: 13px;
+  font-weight: bold;
+  text-shadow:
+    #fff 1px 1px 0,
+    #fff 1px -1px 0,
+    #fff -1px 1px 0,
+    #fff -1px -1px 0;
+}
+
+.sprite-slot {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 180px;
+}
+
+.sprite-slot.right {
+  top: 12px;
+  right: 24px;
+  align-items: flex-end;
+}
+
+.sprite-slot.left {
+  bottom: 12px;
+  left: 24px;
+  align-items: flex-start;
+}
+
+.sprite-slot.right.sprite-slot-second {
+  right: 210px;
+}
+
+.sprite-slot.left.sprite-slot-second {
+  left: 210px;
+}
+
+/* A strip of floor along the bottom of the sprite. Like Showdown's, the pieces
+   are semi-transparent (see SideHazards) and drawn over the Pokemon, so they
+   never hide it. */
+.side-hazards {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 40px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.side-hazard-piece {
+  position: absolute;
+  transform: translateX(-50%);
+  pointer-events: none;
+  image-rendering: auto;
+}
+
+.sprite-image-wrap {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  flex-shrink: 0;
+}
+
+/* The player's own Pokemon (back view, bottom-left) reads as closer to the
+   camera, so it's rendered larger than the opponent's (front view) - matching
+   the perspective convention of the mainline games' battle screens. */
+.sprite-slot.left .sprite-image-wrap {
+  width: 158px;
+  height: 158px;
+}
+
+.sprite-slot.right .sprite-image-wrap {
+  width: 124px;
+  height: 124px;
+}
+
+/* Two Pokemon a side share the field, so each is drawn smaller. */
+.battle-field-doubles .sprite-slot.left .sprite-image-wrap {
+  width: 112px;
+  height: 112px;
+}
+
+.battle-field-doubles .sprite-slot.right .sprite-image-wrap {
+  width: 88px;
+  height: 88px;
+}
+
+.sprite {
+  image-rendering: pixelated;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: opacity 0.4s ease;
+}
+
+/* A floating "Missed"/"Immune"/"Protected"-style result over a sprite - see
+   BattleSprite's shownFeedback. */
+.feedback-label {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: bold;
+  text-shadow:
+    0 0 3px #000,
+    0 0 3px #000,
+    0 1px 2px #000;
+  pointer-events: none;
+  animation: feedback-pop 900ms ease-out forwards;
+  z-index: 3;
+}
+
+.feedback-good {
+  color: #4caf50;
+}
+
+.feedback-bad {
+  color: #e0453b;
+}
+
+.feedback-neutral {
+  color: #e8ecf2;
+}
+
+@keyframes feedback-pop {
+  0% {
+    opacity: 0;
+    top: -2px;
+  }
+  15% {
+    opacity: 1;
+    top: -14px;
+  }
+  75% {
+    opacity: 1;
+    top: -20px;
+  }
+  100% {
+    opacity: 0;
+    top: -28px;
+  }
+}
+
+.shiny-sparkle {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.shiny-spark {
+  position: absolute;
+  color: #fff6b0;
+  text-shadow:
+    0 0 4px #fff6b0,
+    0 0 8px #ffd83d;
+  opacity: 0;
+  animation: shiny-spark-pop 750ms ease-out forwards;
+}
+
+.shiny-spark::before {
+  content: '✦';
+}
+
+.shiny-spark:nth-child(1) {
+  top: 8%;
+  left: 15%;
+  font-size: 12px;
+  animation-delay: 0ms;
+}
+.shiny-spark:nth-child(2) {
+  top: 18%;
+  left: 72%;
+  font-size: 16px;
+  animation-delay: 60ms;
+}
+.shiny-spark:nth-child(3) {
+  top: 55%;
+  left: 5%;
+  font-size: 10px;
+  animation-delay: 130ms;
+}
+.shiny-spark:nth-child(4) {
+  top: 62%;
+  left: 82%;
+  font-size: 14px;
+  animation-delay: 190ms;
+}
+.shiny-spark:nth-child(5) {
+  top: 35%;
+  left: 45%;
+  font-size: 18px;
+  animation-delay: 100ms;
+}
+.shiny-spark:nth-child(6) {
+  top: 78%;
+  left: 38%;
+  font-size: 11px;
+  animation-delay: 160ms;
+}
+.shiny-spark:nth-child(7) {
+  top: 2%;
+  left: 50%;
+  font-size: 13px;
+  animation-delay: 230ms;
+}
+
+@keyframes shiny-spark-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.2) rotate(0deg);
+  }
+  35% {
+    opacity: 1;
+    transform: scale(1.15) rotate(20deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.6) rotate(40deg);
+  }
+}
+
+.sprite-shake {
+  animation: sprite-shake 0.4s ease;
+}
+
+.sprite-fainted {
+  opacity: 0;
+  transform: translateY(16px);
+}
+
+/* A quick white flash over the target's sprite at the moment a move actually
+   lands - toggled directly on .sprite-image-wrap by AnimationLayer (a melee
+   hit at the midpoint of its lunge, a projectile on arrival). Layered above
+   the sprite image but below the feedback label text. */
+.impact-flash::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 70%);
+  animation: impact-flash-kf 260ms ease-out;
+}
+
+@keyframes impact-flash-kf {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* A bit of recoil on the target itself at the same moment - toggled
+   alongside .impact-flash on .sprite-image-wrap. */
+.impact-shake {
+  animation: impact-shake-kf 320ms ease-out;
+}
+
+@keyframes impact-shake-kf {
+  0% {
+    transform: translate(0, 0);
+  }
+  20% {
+    transform: translate(5px, 0);
+  }
+  40% {
+    transform: translate(-4px, 0);
+  }
+  60% {
+    transform: translate(3px, 0);
+  }
+  80% {
+    transform: translate(-2px, 0);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+/* Substitute is up - the real sprite fades behind its doll (see
+   SubstituteDoll.tsx and .substitute-doll below). */
+.sprite-substituted {
+  opacity: 0.25;
+}
+
+.substitute-doll {
+  position: absolute;
+  inset: 8% 15%;
+  width: 70%;
+  height: 90%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+  z-index: 2;
+}
+
+/* Protect (or a variant of it) is up - stays on screen for the rest of the
+   turn (see ProtectShield.tsx and the protecting flag in battle-runtime.ts),
+   not just a one-off flash. A translucent 16:9 panel, nudged off from dead
+   center so it doesn't land exactly on top of a screen panel (see
+   .side-screen-rect below) when both are up - they can overlap, just not at
+   the exact same spot. Gently pulses so a static panel doesn't look like
+   part of the background. */
+.protect-shield-rect {
+  position: absolute;
+  left: 50%;
+  bottom: 10%;
+  width: 72%;
+  aspect-ratio: 16 / 9;
+  transform: translate(-64%, 10%);
+  z-index: 2;
+  pointer-events: none;
+  background: #4fa0ff;
+  opacity: 0.35;
+  border: 2px solid #8fc4ff;
+  animation: protect-shield-pulse-kf 1.8s ease-in-out infinite;
+}
+
+@keyframes protect-shield-pulse-kf {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Reflect/Light Screen/Aurora Veil - side-wide (see SideScreens.tsx and
+   SideHazards' own comment for why this only renders once per side). */
+.side-screens {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* Same 16:9 panel shape as the Protect one above - each instance sets its
+   own `transform` (see SideScreens.tsx's SCREEN_OFFSETS) so several screens
+   at once stack with a visible nudge instead of exactly overlapping. */
+.side-screen-rect {
+  position: absolute;
+  left: 50%;
+  bottom: 10%;
+  width: 72%;
+  aspect-ratio: 16 / 9;
+  opacity: 0.35;
+  border: 2px solid;
+}
+
+@keyframes sprite-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(5px);
+  }
+  60% {
+    transform: translateX(-4px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+
+.sprite-recalling {
+  animation: sprite-recall 0.35s ease-in forwards;
+}
+
+.sprite-sending-out {
+  animation: sprite-sendout 0.35s ease-out;
+}
+
+@keyframes sprite-recall {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+    filter: brightness(1);
+  }
+  60% {
+    transform: scale(0.4);
+    opacity: 0.8;
+    filter: brightness(2.5);
+  }
+  100% {
+    transform: scale(0.05);
+    opacity: 0;
+    filter: brightness(3);
+  }
+}
+
+@keyframes sprite-sendout {
+  0% {
+    transform: scale(0.05);
+    opacity: 0;
+    filter: brightness(3);
+  }
+  40% {
+    transform: scale(0.3);
+    opacity: 0.6;
+    filter: brightness(2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+    filter: brightness(1);
+  }
+}
+
+.sprite-info {
+  width: 170px;
+  box-sizing: border-box;
+  padding: 4px 6px;
+  /* Sits over whatever backdrop is behind it, so it needs its own panel. */
+  background: rgba(16, 20, 26, 0.85);
+  border: 1px solid #3a4150;
+}
+
+.sprite-name-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.sprite-name {
+  font-size: 12px;
+  color: #b7c0cf;
+}
+
+.sprite-shiny {
+  font-size: 13px;
+  line-height: 1;
+  color: #ffd84a;
+  text-shadow: 0 0 4px rgba(255, 216, 74, 0.7);
+}
+
+.sprite-level {
+  font-size: 11px;
+  color: #8a94a6;
+}
+
+.status-badge {
+  font-size: 10px;
+  font-weight: bold;
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: #10141a;
+}
+
+.status-par {
+  background: #e0c22e;
+}
+
+.status-brn {
+  background: #e0682e;
+}
+
+.status-psn,
+.status-tox {
+  background: #a25fd1;
+}
+
+.status-slp {
+  background: #9aa3b0;
+}
+
+.status-frz {
+  background: #7fd1e0;
+}
+
+/* Shown above the HP bar only while a move or ability has changed the Pokemon's types. */
+.sprite-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 3px;
+}
+
+.sprite-types .type-badge {
+  padding: 0 5px;
+  font-size: 9px;
+  line-height: 14px;
+}
+
+.boost-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.boost-badge {
+  font-size: 10px;
+  padding: 1px 4px;
+  border: 1px solid #3a4150;
+}
+
+.boost-up {
+  color: #4caf50;
+}
+
+.boost-down {
+  color: #e0453b;
+}
+
+.hp-bar-track {
+  position: relative;
+  width: 100%;
+  height: 12px;
+  background: #2a3140;
+  border: 1px solid #3a4150;
+  margin-top: 2px;
+}
+
+.hp-bar-fill {
+  height: 100%;
+  transition:
+    width 0.5s ease,
+    background-color 0.3s ease;
+}
+
+.hp-bar-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  line-height: 1;
+  color: #f0f2f5;
+  text-shadow:
+    0 0 2px #000,
+    0 0 2px #000;
+}
+
+.hp-high {
+  background: #4caf50;
+}
+
+.hp-mid {
+  background: #e0a92e;
+}
+
+.hp-low {
+  background: #e0453b;
+}
+
+/* Three columns: the switch list, the battle stage, and the log. A grid
+   instead of a flex row so the two side columns are always exactly equal
+   width (1fr each) - that's what keeps the stage perfectly centered no
+   matter how wide the window is, rather than drifting off-center whenever
+   the switch list and the log don't happen to match.
+
+   The side columns get their own floor (minmax(_, 1fr), not bare 1fr) so
+   they're guaranteed real room before the center track is allowed to grow -
+   without it, a narrow window (e.g. this game's own 900px default) lets the
+   center's minmax(420px,760px) claim its preferred size first and starves
+   the sides down to a sliver instead. With the floor, the center is what
+   shrinks under pressure, and the sides only shrink past their floor if the
+   window is narrower than the whole layout can fit at all. */
+.battle-screen {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(420px, 760px) minmax(200px, 1fr);
+  gap: 12px;
+}
+
+.switch-column {
+  min-width: 0;
+  overflow-y: auto;
+}
+
+/* One column, however wide the panel gets - each card just grows into the
+   room instead of a second column appearing (see .team-member's own sizing). */
+.switch-column .team-panel {
+  grid-template-columns: 1fr;
+}
+
+.battle-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.log {
+  min-width: 0;
+  overflow-y: auto;
+  border: 2px solid #3a4150;
+  padding: 12px;
+  background: #171b22;
+  white-space: pre-wrap;
+}
+
+.log-minor {
+  color: #8a94a6;
+  font-size: 13px;
+}
+
+/* The move grid gets an explicit 2x2 (rather than wrapping by width), and
+   bigger buttons to fill the extra room the switch list moving out freed up -
+   see .move-button and its corner labels below. */
+.menu-panel {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.team-panel {
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+}
+
+.team-member-slot {
+  display: flex;
+}
+
+.team-member {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+  padding: 10px 14px;
+}
+
+.team-member-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Bigger now that the switch column is a full 1fr grid track instead of a
+   fixed 230px sliver - see .battle-screen and .switch-column (was bumped
+   +33% on top of that, then back down 10%). */
+.team-member-icon {
+  /* 5% under the original 68px. */
+  width: 65px;
+  height: 65px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  flex-shrink: 0;
+}
+
+.team-member-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.team-member-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.team-member-name {
+  display: block;
+  font-size: 17px;
+  font-weight: bold;
+}
+
+.team-member-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #8a94a6;
+}
+
+.team-member-item-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.team-member-hp {
+  width: 100%;
+  height: 8px;
+  margin-top: 0;
+}
+
+.team-member-active {
+  border-color: #6bb0ff;
+}
+
+.team-member-fainted {
+  opacity: 0.4;
+}
+
+.gimmick-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+}
+
+/* The gimmick toggle (if any) and the Run/Cancel button share this row, above
+   the moves grid - the button pins to the right whether or not the toggle is
+   there (see its own margin-left). */
+.battle-action-slot-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.run-cancel-button {
+  margin-left: auto;
+  border-color: #ff6b6b;
+  color: #ff6b6b;
+}
+
+.battle-action-slots {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.battle-action-slot {
+  flex: 1;
+  min-width: 0;
+}
+
+.battle-action-slot-label {
+  margin-top: 12px;
+  font-size: 12px;
+  font-weight: bold;
+  color: #b7c0cf;
+}
+
+.target-picker-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.target-picker {
+  background: #171b22;
+  border: 2px solid #3a4150;
+  padding: 16px 20px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 220px;
+}
+
+.target-picker-title {
+  font-size: 13px;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.gimmick-toggle-on {
+  border-color: #6bb0ff;
+  background: #223049;
+}
+
+button {
+  padding: 10px 14px;
+  background: #232a36;
+  color: #e6e6e6;
+  border: 2px solid #3a4150;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+button:hover:not(:disabled) {
+  border-color: #6b7688;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.move-pp {
+  display: block;
+  font-size: 13px;
+  color: inherit;
+  opacity: 0.75;
+  margin-top: 6px;
+}
+
+.move-button-slot {
+  display: flex;
+}
+
+/* Bigger now that the move grid is a plain 2x2 instead of wrapping by
+   width - see .menu-panel. */
+.move-button {
+  position: relative;
+  width: 100%;
+  min-height: 78px;
+  /* Room for the corner badges: power and type up top, effectiveness and STAB below. */
+  padding: 28px 10px 28px;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.move-type-corner {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 0.02em;
+  opacity: 0.85;
+}
+
+/* The move's power right now, top-left of a battle move button (type is top-right). */
+.move-power-corner {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  font-size: 14px;
+  font-weight: bold;
+  letter-spacing: 0.02em;
+  opacity: 0.85;
+}
+
+/* Power that depends on the situation (Reversal, Heavy Slam, ...) is underlined. */
+.move-power-live {
+  text-decoration: underline dotted;
+  opacity: 1;
+}
+
+.move-button.type-normal {
+  background: #a4acaf;
+  color: #10141a;
+  border-color: #7c8386;
+}
+.move-button.type-fire {
+  background: #f08030;
+  color: #10141a;
+  border-color: #b8611f;
+}
+.move-button.type-water {
+  background: #6890f0;
+  color: #10141a;
+  border-color: #4a6bc4;
+}
+.move-button.type-electric {
+  background: #f8d030;
+  color: #10141a;
+  border-color: #c4a521;
+}
+.move-button.type-grass {
+  background: #78c850;
+  color: #10141a;
+  border-color: #5a9a3c;
+}
+.move-button.type-ice {
+  background: #98d8d8;
+  color: #10141a;
+  border-color: #6bafaf;
+}
+.move-button.type-fighting {
+  background: #c03028;
+  color: #f0f2f5;
+  border-color: #8f231d;
+}
+.move-button.type-poison {
+  background: #a040a0;
+  color: #f0f2f5;
+  border-color: #7a2f7a;
+}
+.move-button.type-ground {
+  background: #e0c068;
+  color: #10141a;
+  border-color: #b3993f;
+}
+.move-button.type-flying {
+  background: #a890f0;
+  color: #10141a;
+  border-color: #8065c4;
+}
+.move-button.type-psychic {
+  background: #f85888;
+  color: #10141a;
+  border-color: #c43e68;
+}
+.move-button.type-bug {
+  background: #a8b820;
+  color: #10141a;
+  border-color: #818e19;
+}
+.move-button.type-rock {
+  background: #b8a038;
+  color: #10141a;
+  border-color: #8f7c29;
+}
+.move-button.type-ghost {
+  background: #705898;
+  color: #f0f2f5;
+  border-color: #4f3e6d;
+}
+.move-button.type-dragon {
+  background: #7038f8;
+  color: #f0f2f5;
+  border-color: #4f26b8;
+}
+.move-button.type-dark {
+  background: #705848;
+  color: #f0f2f5;
+  border-color: #4f3e33;
+}
+.move-button.type-steel {
+  background: #b8b8d0;
+  color: #10141a;
+  border-color: #8f8fa8;
+}
+.move-button.type-fairy {
+  background: #ee99ac;
+  color: #10141a;
+  border-color: #c26f83;
+}
+
+/* A generic attack's particle - tinted (fill=currentColor, see
+   moveParticleShapes.tsx) by the move's type, reusing the same palette as
+   the move buttons above so it reads as "the same move" rather than a
+   mismatched color. */
+.anim-particle.type-normal {
+  color: #a4acaf;
+}
+.anim-particle.type-fire {
+  color: #f08030;
+}
+.anim-particle.type-water {
+  color: #6890f0;
+}
+.anim-particle.type-electric {
+  color: #f8d030;
+}
+.anim-particle.type-grass {
+  color: #78c850;
+}
+.anim-particle.type-ice {
+  color: #98d8d8;
+}
+.anim-particle.type-fighting {
+  color: #c03028;
+}
+.anim-particle.type-poison {
+  color: #a040a0;
+}
+.anim-particle.type-ground {
+  color: #e0c068;
+}
+.anim-particle.type-flying {
+  color: #a890f0;
+}
+.anim-particle.type-psychic {
+  color: #f85888;
+}
+.anim-particle.type-bug {
+  color: #a8b820;
+}
+.anim-particle.type-rock {
+  color: #b8a038;
+}
+.anim-particle.type-ghost {
+  color: #705898;
+}
+.anim-particle.type-dragon {
+  color: #7038f8;
+}
+.anim-particle.type-dark {
+  color: #705848;
+}
+.anim-particle.type-steel {
+  color: #b8b8d0;
+}
+.anim-particle.type-fairy {
+  color: #ee99ac;
+}
+
+.tooltip-portal {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* What winning the battle pays out - stacked under the opponent's Pokemon tooltip. */
+.rewards-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 1px 0;
+}
+
+.rewards-name {
+  flex: 1;
+}
+
+.rewards-source {
+  font-size: 10px;
+  color: #8a93a3;
+}
+
+.rewards-chance {
+  min-width: 36px;
+  text-align: right;
+  font-weight: bold;
+  color: #ffd76b;
+}
+
+.rewards-money {
+  flex: 1;
+  color: #9be38a;
+  font-weight: bold;
+}
+
+.rewards-random-icon {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: #8a93a3;
+}
+
+.tooltip-panel {
+  width: 220px;
+  background: #1a2230;
+  border: 2px solid #4a5468;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  text-align: left;
+  white-space: normal;
+}
+
+.tooltip-title {
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.tooltip-level {
+  font-weight: normal;
+  color: #8a94a6;
+  font-size: 11px;
+}
+
+.tooltip-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 2px;
+}
+
+.tooltip-row-item {
+  align-items: center;
+}
+
+.tooltip-category {
+  color: #b7c0cf;
+}
+
+.tooltip-desc {
+  margin-top: 4px;
+  color: #c7cedb;
+}
+
+.tooltip-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px 8px;
+  margin: 6px 0;
+  color: #c7cedb;
+}
+
+.tooltip-moves {
+  margin-top: 4px;
+  border-top: 1px solid #3a4150;
+  padding-top: 4px;
+}
+
+.tooltip-move-line {
+  color: #c7cedb;
+}
+
+.type-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: bold;
+  color: #fff;
+  background: #6b7688;
+}
+
+.type-normal {
+  background: #a4acaf;
+}
+.type-fire {
+  background: #f08030;
+}
+.type-water {
+  background: #6890f0;
+}
+.type-electric {
+  background: #f8d030;
+  color: #10141a;
+}
+.type-grass {
+  background: #78c850;
+}
+.type-ice {
+  background: #98d8d8;
+  color: #10141a;
+}
+.type-fighting {
+  background: #c03028;
+}
+.type-poison {
+  background: #a040a0;
+}
+.type-ground {
+  background: #e0c068;
+  color: #10141a;
+}
+.type-flying {
+  background: #a890f0;
+}
+.type-psychic {
+  background: #f85888;
+}
+.type-bug {
+  background: #a8b820;
+}
+.type-rock {
+  background: #b8a038;
+}
+.type-ghost {
+  background: #705898;
+}
+.type-dragon {
+  background: #7038f8;
+}
+.type-dark {
+  background: #705848;
+}
+.type-steel {
+  background: #b8b8d0;
+  color: #10141a;
+}
+.type-fairy {
+  background: #ee99ac;
+  color: #10141a;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.context-menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+}
+
+.context-menu {
+  position: fixed;
+  min-width: 180px;
+  background: #171b22;
+  border: 2px solid #3a4150;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+}
+
+.context-menu-title {
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: bold;
+  color: #8a94a6;
+  background: #1a2230;
+  border-bottom: 2px solid #3a4150;
+}
+
+.context-menu-item {
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 12px;
+  background: none;
+  border: none;
+  color: #e6e6e6;
+  cursor: pointer;
+}
+
+.context-menu-item:hover {
+  background: #232a36;
+}
+
+.context-menu-item:disabled {
+  color: #5a6478;
+  cursor: default;
+}
+
+.context-menu-item:disabled:hover {
+  background: none;
+}
+
+.modal-row {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  max-height: 90vh;
+}
+
+.modal-panel {
+  background: #171b22;
+  border: 2px solid #3a4150;
+  padding: 16px 20px;
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+.battle-result-modal {
+  width: 340px;
+}
+
+.catch-row {
+  margin: 12px 0;
+}
+
+.catch-row button {
+  width: 100%;
+  padding: 10px;
+  font-weight: bold;
+}
+
+.exp-gain-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.exp-gain-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+  background: #1a2230;
+  border: 1px solid #3a4150;
+  font-size: 12px;
+}
+
+.exp-gain-species {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: bold;
+}
+
+.exp-gain-detail {
+  color: #b7c0cf;
+}
+
+.item-drop-icon {
+  flex-shrink: 0;
+}
+
+.bag-modal {
+  width: 480px;
+}
+
+/* Holds every category, so the whole bag scrolls as one list. */
+.bag-scroll {
+  margin: 12px 0;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.bag-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0 12px;
+}
+
+.bag-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 76px;
+  padding: 8px 4px;
+  background: #1a2230;
+  border: 1px solid #3a4150;
+}
+
+.bag-item-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.bag-item-name {
+  font-size: 10px;
+  text-align: center;
+}
+
+.bag-item-qty {
+  font-size: 11px;
+  color: #6bb0ff;
+}
+
+.bag-message {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #7be08a;
+}
+
+.galar-prompt {
+  width: 440px;
+}
+
+.galar-partner-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.galar-partner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  text-align: left;
+  background: #1a2230;
+  border: 2px solid #3a4150;
+  font-size: 13px;
+}
+
+.galar-partner:disabled {
+  opacity: 0.5;
+}
+
+.galar-partner-selected {
+  border-color: #6bb0ff;
+  background: #1a2942;
+}
+
+.galar-partner-name {
+  flex: 1;
+}
+
+.galar-partner-result {
+  color: #ffd76b;
+}
+
+.galar-partner-qty {
+  width: 80px;
+  white-space: nowrap;
+  text-align: right;
+  color: #6bb0ff;
+}
+
+.money-display {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  font-weight: bold;
+  color: #ffd76b;
+}
+
+.shop-modal {
+  width: 480px;
+}
+
+.shop-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.shop-header h2 {
+  margin: 0;
+}
+
+.shop-search {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 10px;
+}
+
+.shop-category-heading {
+  margin: 14px 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #b7c0cf;
+}
+
+.shop-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.shop-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 92px;
+  padding: 8px 4px;
+  background: #1a2230;
+  border: 1px solid #3a4150;
+}
+
+.shop-item-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.shop-item-name {
+  font-size: 10px;
+  text-align: center;
+}
+
+.shop-item-price {
+  font-size: 11px;
+  color: #ffd76b;
+}
+
+.shop-prices-modal {
+  width: 600px;
+}
+
+.shop-item-changed {
+  border-color: #ffd76b;
+}
+
+.shop-price-input {
+  width: 76px;
+  box-sizing: border-box;
+  text-align: center;
+  font-size: 11px;
+}
+
+.shop-price-default {
+  font-size: 10px;
+  color: #7f8896;
+}
+
+.shop-price-reset {
+  padding: 1px 4px;
+  font-size: 10px;
+}
+
+.item-drop-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.item-drop-picker select {
+  flex: 1;
+  min-width: 0;
+}
+
+.item-drop-chance {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.item-drop-chance input {
+  width: 56px;
+}
+
+.pokemon-editor {
+  width: 420px;
+  flex-shrink: 0;
+}
+
+.roster-modal {
+  width: 600px;
+}
+
+.trainer-editor-modal {
+  width: 600px;
+}
+
+.selector-panel {
+  width: 360px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: #171b22;
+  border: 2px solid #3a4150;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.selector-panel-header {
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: bold;
+  color: #b7c0cf;
+  background: #1a2230;
+  border-bottom: 2px solid #3a4150;
+  flex-shrink: 0;
+}
+
+.selector-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.selector-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  border: none;
+  border-bottom: 1px solid #232a36;
+  background: transparent;
+  font-family: inherit;
+}
+
+.selector-row:hover:not(:disabled) {
+  background: #232a36;
+  border-color: #232a36;
+}
+
+.selector-row-disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.learned-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: bold;
+  color: #10141a;
+  background: #6bb0ff;
+}
+
+.selector-row-clear {
+  color: #8a94a6;
+  font-style: italic;
+}
+
+.selector-row-icon {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  flex-shrink: 0;
+}
+
+.selector-row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.selector-row-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: bold;
+  flex-wrap: wrap;
+}
+
+.selector-row-sub {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #8a94a6;
+}
+
+.selector-row-stats {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #c7cedb;
+}
+
+.selector-row-desc {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #c7cedb;
+  line-height: 1.4;
+}
+
+.pokemon-editor h2 {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+
+.editor-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 14px;
+}
+
+.editor-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #b7c0cf;
+}
+
+.editor-field-checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.editor-cap-offset .editor-field-checkbox {
+  display: flex;
+}
+
+.editor-cap-offset-detail {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.editor-cap-offset-detail input[type='number'] {
+  width: 56px;
+}
+
+.editor-field-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.editor-field-with-icon input {
+  flex: 1;
+  min-width: 0;
+}
+
+.editor-field input,
+.editor-field select {
+  font-family: inherit;
+  font-size: 13px;
+  background: #232a36;
+  color: #e6e6e6;
+  border: 2px solid #3a4150;
+  padding: 6px 8px;
+}
+
+.editor-field input:focus,
+.editor-field select:focus {
+  outline: none;
+  border-color: #6bb0ff;
+}
+
+.editor-section {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+}
+
+.editor-field-full {
+  grid-column: 1 / -1;
+}
+
+.editor-section h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: #b7c0cf;
+}
+
+.editor-hint {
+  font-weight: normal;
+  color: #6b7688;
+  font-size: 11px;
+}
+
+.editor-moves-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.editor-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+
+.editor-stat-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: #b7c0cf;
+}
+
+.editor-stat-field input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.editor-ev-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.editor-ev-label {
+  width: 32px;
+  font-size: 11px;
+  color: #b7c0cf;
+}
+
+.editor-ev-row input[type='range'] {
+  flex: 1;
+  accent-color: #6bb0ff;
+}
+
+.editor-ev-value {
+  width: 28px;
+  text-align: right;
+  font-size: 11px;
+  color: #c7cedb;
+}
+
+/* Base stat on the left of each slider, the resulting stat on the right. */
+.editor-ev-base {
+  width: 28px;
+  text-align: right;
+  font-size: 11px;
+  color: #8a93a3;
+}
+
+.editor-ev-stat {
+  width: 34px;
+  text-align: right;
+  font-size: 13px;
+  font-weight: bold;
+  color: #e6ebf3;
+}
+
+/* Raised / lowered by the nature. */
+.editor-ev-stat-up {
+  color: #ff8a7a;
+}
+
+.editor-ev-stat-down {
+  color: #7ab8ff;
+}
+
+.editor-ev-header {
+  margin-bottom: 2px;
+}
+
+.editor-ev-header span {
+  font-size: 10px;
+  font-weight: normal;
+  color: #8a93a3;
+}
+
+.editor-ev-spacer {
+  flex: 1;
+}
+
+.editor-error {
+  color: #ff6b6b;
+  margin: 10px 0 0;
+}
+
+.editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.trainer-name-row {
+  display: flex;
+  gap: 6px;
+}
+
+.trainer-name-row input {
+  flex: 1;
+}
+
+.trainer-add-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  max-width: 420px;
+}
+
+.trainer-add-row input {
+  flex: 1;
+  font-family: inherit;
+  font-size: 13px;
+  background: #232a36;
+  color: #e6e6e6;
+  border: 2px solid #3a4150;
+  padding: 8px 10px;
+}
+
+/* The list is its own scroll region, so the title, buttons and search stay in
+   view however long it gets. */
+.trainer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  max-width: 640px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.list-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  max-width: 640px;
+}
+
+.list-search input {
+  flex: 1;
+  font-family: inherit;
+  font-size: 13px;
+  background: #232a36;
+  color: #e6e6e6;
+  border: 2px solid #3a4150;
+  padding: 8px 10px;
+}
+
+.list-search input:focus {
+  outline: none;
+  border-color: #6bb0ff;
+}
+
+.list-search-count {
+  font-size: 12px;
+  color: #8a94a6;
+  white-space: nowrap;
+}
+
+.trainer-list-row {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 2px solid #3a4150;
+  background: #171b22;
+}
+
+.trainer-list-sprite {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  flex-shrink: 0;
+}
+
+.trainer-list-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.trainer-list-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: bold;
+}
+
+.trainer-list-meta {
+  font-size: 11px;
+  color: #8a94a6;
+}
+
+.trainer-boss-badge {
+  font-size: 10px;
+  font-weight: bold;
+  color: #10141a;
+  background: #ffd83d;
+  padding: 2px 6px;
+}
+
+.level-cap-badge {
+  font-size: 10px;
+  font-weight: bold;
+  color: #10141a;
+  background: #6bb0ff;
+  padding: 2px 6px;
+}
+
+.double-battle-badge {
+  font-size: 10px;
+  font-weight: bold;
+  color: #10141a;
+  background: #ff9f4d;
+  padding: 2px 6px;
+}
+
+.premade-team-name-input {
+  flex: 1;
+  font-family: inherit;
+  font-size: 13px;
+  background: transparent;
+  color: #e6e6e6;
+  border: 2px solid transparent;
+  padding: 6px 8px;
+}
+
+.premade-team-name-input:hover,
+.premade-team-name-input:focus {
+  border-color: #3a4150;
+  background: #232a36;
+  outline: none;
+}
+
+/* ---- Login ---- */
+.login-screen {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 300px;
+  text-align: left;
+}
+
+.login-form .editor-error,
+.login-form .editor-hint {
+  margin: 0;
+}
+
+.login-remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #b7c0cf;
+  cursor: pointer;
+}
+
+.login-players {
+  width: 300px;
+  margin-top: 8px;
+}
+
+.login-player-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+
+.login-player {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.challenge-row {
+  margin-top: 8px;
+}
+
+/* Trainer profile: the road to the League - 8 gyms, the Elite Four and the
+   Champion as one notched bar, each notch with its trainer underneath. */
+.league-bar {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr) 10px repeat(4, 1fr) 10px 1fr;
+  gap: 3px;
+  margin-top: 6px;
+}
+
+/* The gaps between the gyms, the Elite Four and the Champion. */
+.league-notch:nth-child(9) {
+  grid-column: 10;
+}
+
+.league-notch:nth-child(13) {
+  grid-column: 15;
+}
+
+.league-notch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  cursor: default;
+}
+
+.league-notch-fill {
+  width: 100%;
+  height: 12px;
+  background: #232a36;
+  border: 1px solid #3a4150;
+  box-sizing: border-box;
+}
+
+.league-notch:first-child .league-notch-fill {
+  border-radius: 6px 0 0 6px;
+}
+
+.league-notch:last-child .league-notch-fill {
+  border-radius: 0 6px 6px 0;
+}
+
+.league-notch-done.league-notch-gym .league-notch-fill {
+  background: #ffd76b;
+  border-color: #ffd76b;
+}
+
+.league-notch-done.league-notch-eliteFour .league-notch-fill {
+  background: #b98bff;
+  border-color: #b98bff;
+}
+
+.league-notch-done.league-notch-champion .league-notch-fill {
+  background: #ff8a5c;
+  border-color: #ff8a5c;
+}
+
+.league-notch-sprite {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: grayscale(1);
+  opacity: 0.35;
+}
+
+.league-notch-done .league-notch-sprite {
+  filter: none;
+  opacity: 1;
+}
+
+.league-summary {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #b7c0cf;
+  text-align: center;
+}
+
+.profile-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.profile-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px;
+  background: #1e242e;
+  border: 1px solid #3a4150;
+}
+
+.profile-stat-value {
+  font-size: 20px;
+  font-weight: bold;
+  color: #e6ebf3;
+}
+
+.profile-stat-label {
+  font-size: 11px;
+  color: #8a93a3;
+}
+
+.challenge-doubles {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+/* A stat that is currently raised (green) or lowered (red) in battle. */
+.tooltip-stats .stat-up {
+  color: #5fe07a;
+}
+
+.tooltip-stats .stat-down {
+  color: #ff6b6b;
+}
+
+/* ---- Type effectiveness (move buttons and the doubles target picker) ---- */
+
+/* Bottom-left of a move button, one chip per foe out, left to right as on screen. */
+.move-eff-corner {
+  position: absolute;
+  bottom: 5px;
+  left: 6px;
+  display: flex;
+  gap: 3px;
+}
+
+.eff-chip {
+  display: inline-block;
+  padding: 0 5px;
+  border-radius: 3px;
+  font-size: 13px;
+  font-weight: bold;
+  line-height: 19px;
+  color: #fff;
+  background: #3a4150;
+  text-shadow: none;
+}
+
+.eff-super {
+  background: #2e8b3e;
+}
+
+.eff-resisted {
+  background: #a8452f;
+}
+
+.eff-immune {
+  background: #111;
+  color: #9aa3b2;
+}
+
+.eff-neutral {
+  background: #4b5363;
+}
+
+/* The doubles target picker: targets side by side, left to right as on screen. */
+.target-picker-options {
+  display: flex;
+  gap: 8px;
+}
+
+.target-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 110px;
+  padding: 8px;
+}
+
+.target-option-sprite {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.target-option-name {
+  font-size: 13px;
+  font-weight: bold;
+}
+
+/* ---- Terastallizing and Mega Evolution ---- */
+
+/* The crystal badge under a Terastallized Pokemon's name. */
+.tera-badge {
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.55);
+}
+
+/* A short burst over the sprite - see BattleSprite's shownGimmick. */
+.gimmick-burst {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.gimmick-ring,
+.gimmick-flash {
+  position: absolute;
+  width: 70%;
+  height: 70%;
+}
+
+.gimmick-flash {
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0) 70%);
+  animation: gimmick-flash 1.1s ease-out forwards;
+}
+
+/* Tera: a crystal in the Tera type's colour that spins, grows and shatters away. */
+.gimmick-tera .gimmick-ring {
+  clip-path: polygon(50% 0%, 90% 30%, 75% 100%, 25% 100%, 10% 30%);
+  opacity: 0.85;
+  animation: gimmick-tera-crystal 1.1s ease-out forwards;
+}
+
+/* Mega: a rainbow ring bursting outward. */
+.gimmick-mega .gimmick-ring {
+  border-radius: 50%;
+  background: conic-gradient(#ff5b5b, #ffd76b, #6be38a, #6bb0ff, #b98bff, #ff5b5b);
+  -webkit-mask: radial-gradient(circle, transparent 58%, #000 60%, #000 70%, transparent 72%);
+  mask: radial-gradient(circle, transparent 58%, #000 60%, #000 70%, transparent 72%);
+  animation: gimmick-mega-ring 1.1s ease-out forwards;
+}
+
+@keyframes gimmick-flash {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+@keyframes gimmick-tera-crystal {
+  0% {
+    opacity: 0;
+    transform: scale(0.2) rotate(0deg);
+  }
+  35% {
+    opacity: 0.9;
+    transform: scale(1) rotate(180deg);
+  }
+  70% {
+    opacity: 0.7;
+    transform: scale(1.15) rotate(300deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.8) rotate(360deg);
+  }
+}
+
+@keyframes gimmick-mega-ring {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) rotate(0deg);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1) rotate(90deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2) rotate(240deg);
+  }
+}
+
+/* Mega / Tera badges under a Pokemon's name, each with its icon. */
+.gimmick-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.gimmick-badge-icon {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
+
+/* The Tera icon has a lot of empty canvas round the crystal - drawn larger to match. */
+.tera-badge-icon {
+  width: 20px;
+  height: 20px;
+  margin: -3px -2px;
+}
+
+.mega-badge {
+  background: linear-gradient(90deg, #ff6b9a, #ffd76b, #6be38a, #6bb0ff, #b98bff);
+  color: #10141a;
+}
+
+/* The Pokemon editor's Auto-fill: a set dropdown and Apply, and what had to change. */
+.auto-set-row {
+  display: flex;
+  gap: 6px;
+}
+
+.auto-set-row select {
+  flex: 1;
+  min-width: 0;
+}
+
+.auto-set-notes {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 11px;
+  color: #ffd76b;
+}
+
+/* Physical / Special / Status, next to the move's type (Serebii's category icons). */
+.move-category-icon {
+  width: 28px;
+  height: 14px;
+  image-rendering: pixelated;
+}
+
+/* Same-type attack bonus, bottom-right of a move button - gold for STAB, violet when
+   the Tera type is behind it. */
+.move-stab-corner {
+  position: absolute;
+  bottom: 5px;
+  right: 6px;
+  padding: 0 5px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: bold;
+  line-height: 19px;
+  color: #10141a;
+  background: #ffd76b;
+}
+
+.move-stab-tera {
+  color: #fff;
+  background: linear-gradient(90deg, #6bb0ff, #b98bff);
+}
+
+/* The switch list: how well each team member's types hit the foes out. */
+.team-member-matchups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 3px;
+}
+
+.matchup-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  /* The ⚔ / 🛡 in front of each group. */
+  font-size: 16px;
+}
+
+/* Immune to the foe's types - the best defensive result. */
+.eff-def-immune {
+  background: #1f7a8c;
+}
+
+/* Options → Updates. */
+.update-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.update-available {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 520px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid #3a4150;
+  background: #1e242e;
+}
+
+.update-notes {
+  max-height: 140px;
+  overflow-y: auto;
+  margin: 0;
+  font-size: 12px;
+  white-space: pre-wrap;
+  color: #b7c0cf;
+}
+
+.update-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}

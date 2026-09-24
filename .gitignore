@@ -1,0 +1,10 @@
+node_modules
+out
+dist
+*.log
+.DS_Store
+*.tsbuildinfo
+
+# Player saves stay out of the repo - only the shared game data in save/ is committed.
+save/players/
+save/session.json

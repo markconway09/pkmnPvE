@@ -1,0 +1,71 @@
+{
+  "name": "pkmnpve",
+  "version": "0.0.1",
+  "private": true,
+  "description": "A menu-driven, single-player Pokemon PvE game built on the Pokemon Showdown battle engine",
+  "main": "./out/main/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "dist": "electron-vite build && electron-builder --win",
+    "release": "npm run dist && node scripts/release.mjs"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "pokemon-showdown": "^0.11.11",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^33.2.1",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^2.3.0",
+    "typescript": "^5.7.2",
+    "vite": "^5.4.11"
+  },
+  "allowScripts": {
+    "electron@33.4.11": true,
+    "esbuild@0.21.5": true,
+    "esbuild@0.25.12": true
+  },
+  "build": {
+    "appId": "com.pkmnpve.game",
+    "productName": "pkmnPvE",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**/*",
+      "resources/**/*",
+      "package.json",
+      "!**/*.map",
+      "!node_modules/pokemon-showdown/{data,sim,lib,server,tools,translations,config,databases,build}/**",
+      "!node_modules/pokemon-showdown/*.md",
+      "!node_modules/{better-sqlite3,sqlite3,sqlite,pg,pg-*,mysql2,esbuild,@esbuild,sockjs,nodemailer,githubhook,probe-image-size,cloud-env,permessage-deflate,sql-template-strings}/**"
+    ],
+    "extraFiles": [
+      {
+        "from": "save",
+        "to": "save",
+        "filter": [
+          "**/*",
+          "!session.json"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        "dir",
+        "zip"
+      ]
+    },
+    "npmRebuild": false
+  },
+  "updateRepo": "markconway09/pkmnPvE"
+}
