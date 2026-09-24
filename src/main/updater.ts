@@ -1,7 +1,7 @@
-import { createWriteStream, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { open } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
 import { dirname, join } from 'node:path'
-import { Readable } from 'node:stream'
-import { pipeline } from 'node:stream/promises'
 import { spawn, spawnSync } from 'node:child_process'
 import { app, type WebContents } from 'electron'
 import type { UpdateCheckResult } from '../shared/battle-types'
@@ -34,6 +34,8 @@ interface ReleaseAsset {
   name: string
   size: number
   browser_download_url: string
+  // "sha256:<hex>" - GitHub publishes one for every release file.
+  digest?: string | null
 }
 
 let pendingAsset: ReleaseAsset | null = null
@@ -102,20 +104,42 @@ export async function installUpdate(sender: WebContents): Promise<void> {
   rmSync(work, { recursive: true, force: true })
   mkdirSync(join(work, 'new'), { recursive: true })
 
-  // Download, reporting how far along it is.
+  // Download, reporting how far along it is. Each chunk is copied before it's
+  // written: the buffers fetch hands out can be reused for the next chunk, which
+  // silently corrupted the file when they were written straight from the stream.
   const zipPath = join(work, asset.name)
   const res = await fetch(asset.browser_download_url, { headers: { 'User-Agent': 'pkmnPvE-updater' } })
   if (!res.ok || !res.body) throw new Error(`Download failed (${res.status})`)
+  const file = await open(zipPath, 'w')
+  const hash = createHash('sha256')
   let received = 0
   let lastReported = 0
-  const counted = Readable.fromWeb(res.body as import('node:stream/web').ReadableStream).on('data', (chunk: Buffer) => {
-    received += chunk.length
-    if (received - lastReported > 2_000_000 || received === asset.size) {
-      lastReported = received
-      sender.send('update:progress', { phase: 'downloading', received, total: asset.size })
+  try {
+    const reader = res.body.getReader()
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      const chunk = Buffer.from(value)
+      hash.update(chunk)
+      await file.write(chunk)
+      received += chunk.length
+      if (received - lastReported > 2_000_000) {
+        lastReported = received
+        sender.send('update:progress', { phase: 'downloading', received, total: asset.size })
+      }
     }
-  })
-  await pipeline(counted, createWriteStream(zipPath))
+  } finally {
+    await file.close()
+  }
+  sender.send('update:progress', { phase: 'downloading', received, total: asset.size })
+
+  // Nothing gets installed unless it's exactly the file GitHub has: same size, and
+  // the same SHA-256 as the one GitHub publishes for it.
+  if (received !== asset.size) throw new Error('The download was cut short - try again')
+  const digest = hash.digest('hex')
+  if (asset.digest && asset.digest.toLowerCase() !== `sha256:${digest}`) {
+    throw new Error('The download came through damaged (checksum mismatch) - try again')
+  }
 
   // Unpack with .NET's zip reader, which every Windows has (through PowerShell).
   // Not Windows' tar.exe: it fails partway through electron-builder's zips. The
