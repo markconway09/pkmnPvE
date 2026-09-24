@@ -55,17 +55,19 @@ export function applyScript(pid: number, newDir: string, appDir: string, version
   const appSave = join(appDir, 'save')
   return [
     '@echo off',
-    // Shown in a small window of its own: copying the game takes up to a minute, and
-    // without it the game would just vanish - easy to think it failed and reopen the
-    // old one halfway through.
+    // Shown in a small window of its own, so the game doesn't just vanish for the few
+    // seconds the swap takes - easy to think it failed and reopen the old one mid-copy.
     `title Updating pkmnPvE${version ? ` to ${version}` : ''}`,
     'echo Updating pkmnPvE - please wait, the game will reopen by itself.',
     'echo.',
     'echo Waiting for the game to close...',
-    ':wait',
-    // Full paths: whatever PATH this starts with, it must be Windows' own tools. The
-    // one-second pause is a ping - timeout.exe refuses to run without a console.
-    `"${SYS}tasklist.exe" /FI "PID eq ${pid}" /NH | "${SYS}find.exe" "${pid}" >nul && ("${SYS}PING.EXE" -n 2 127.0.0.1 >nul & goto wait)`,
+    // Wait for every one of the game's processes to exit (not just the main one - its
+    // helpers can hold files open a moment longer). PowerShell's Wait-Process just
+    // blocks until they're gone; a tasklist | find polling loop hung when run from a
+    // detached process. The exe's path comes in through an environment variable so
+    // nothing in it can break the quoting.
+    `set "PKMN_EXE=${join(appDir, 'pkmnPvE.exe')}"`,
+    `"${SYS}WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -NonInteractive -Command "Wait-Process -Id ${pid} -ErrorAction SilentlyContinue; Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $env:PKMN_EXE } | Wait-Process -ErrorAction SilentlyContinue"`,
     'echo Installing the new version (your saves are kept)...',
     `"${SYS}robocopy.exe" "${newDir}" "${appDir}" /MIR /XD "${appSave}" "${newSave}" /R:5 /W:1 /NFL /NDL /NJH /NJS >nul`,
     `if not exist "${appSave}" mkdir "${appSave}"`,
