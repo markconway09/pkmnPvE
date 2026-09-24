@@ -15,7 +15,15 @@ const pkg = JSON.parse(readFileSync('package.json', 'utf8'))
 const version = pkg.version
 const repo = pkg.updateRepo
 const zip = `dist/pkmnPvE-${version}-win.zip`
-const notes = process.argv.slice(2).join(' ').trim() || `pkmnPvE ${version}`
+// npm on Windows hands arguments over through cmd.exe, escaping every character
+// with ^ on the way - undo that so the notes read as typed.
+const notes =
+  process.argv
+    .slice(2)
+    .join(' ')
+    .replace(/\^(.)/g, '$1')
+    .replace(/\^$/, '')
+    .trim() || `pkmnPvE ${version}`
 
 if (!repo) throw new Error('Set "updateRepo" in package.json first')
 if (!existsSync(zip)) throw new Error(`${zip} not found - run npm run dist first`)

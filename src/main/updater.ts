@@ -117,13 +117,26 @@ export async function installUpdate(sender: WebContents): Promise<void> {
   })
   await pipeline(counted, createWriteStream(zipPath))
 
-  // Unpack with Windows' own tar (it reads zips too).
+  // Unpack with .NET's zip reader, which every Windows has (through PowerShell).
+  // Not Windows' tar.exe: it fails partway through electron-builder's zips. The
+  // paths go in as environment variables so nothing in them can break the quoting.
   sender.send('update:progress', { phase: 'unpacking', received, total: asset.size })
-  const tar = spawnSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe'), ['-xf', zipPath, '-C', join(work, 'new')], {
-    windowsHide: true
-  })
-  if (tar.status !== 0 || !existsSync(join(work, 'new', 'pkmnPvE.exe'))) {
-    throw new Error('Could not unpack the update: ' + (tar.stderr?.toString() || 'the download looks incomplete'))
+  const unzip = spawnSync(
+    'powershell.exe',
+    [
+      '-NoProfile',
+      '-NonInteractive',
+      '-Command',
+      'Add-Type -AssemblyName System.IO.Compression.FileSystem; ' +
+        '[System.IO.Compression.ZipFile]::ExtractToDirectory($env:PKMN_UPDATE_ZIP, $env:PKMN_UPDATE_DEST)'
+    ],
+    {
+      windowsHide: true,
+      env: { ...process.env, PKMN_UPDATE_ZIP: zipPath, PKMN_UPDATE_DEST: join(work, 'new') }
+    }
+  )
+  if (unzip.status !== 0 || !existsSync(join(work, 'new', 'pkmnPvE.exe'))) {
+    throw new Error('Could not unpack the update: ' + (unzip.stderr?.toString().trim() || 'the download looks incomplete'))
   }
 
   // The swap, run once this process has exited (a running exe can't be replaced):
