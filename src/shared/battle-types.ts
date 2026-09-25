@@ -290,6 +290,9 @@ export interface BoxPokemonView extends PokemonSummary {
   canUseShinyPatch?: boolean
   itemSpritenum?: number | null
   favorite?: boolean
+  // Its colour on the Random Pokemon roulette (see speciesRarityTier) - the box and
+  // team squares are bordered with it.
+  rarityTier?: RarityTier
 }
 
 export interface BoxState {

@@ -20,7 +20,9 @@ interface SlotProps {
 
 function TeamSlot({ slot, mon, onEdit, onRemove, onContextMenu }: SlotProps): React.JSX.Element {
   const { setNodeRef, isOver } = useDroppable({ id: `team-slot-${slot}` })
-  const classes = ['team-slot', mon && 'team-slot-filled', isOver && 'team-slot-over'].filter(Boolean).join(' ')
+  const classes = ['team-slot', mon && 'team-slot-filled', mon?.rarityTier && `rarity-${mon.rarityTier}`, isOver && 'team-slot-over']
+    .filter(Boolean)
+    .join(' ')
 
   return (
     <div ref={setNodeRef} className={classes}>

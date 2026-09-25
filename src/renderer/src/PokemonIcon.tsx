@@ -27,7 +27,7 @@ function PokemonIcon({ mon, fill, onEdit, onRemove, draggable = false, onContext
     >
       <div
         ref={setNodeRef}
-        className={`box-icon-draggable ${isDragging ? 'box-icon-dragging' : ''}`}
+        className={`box-icon-draggable ${isDragging ? 'box-icon-dragging' : ''}${mon.rarityTier ? ` rarity-${mon.rarityTier}` : ''}`}
         onDoubleClick={() => onEdit?.(mon.id)}
         onContextMenu={onContextMenu ? (e) => onContextMenu(e, mon) : undefined}
         onPointerDownCapture={tap.onPointerDownCapture}

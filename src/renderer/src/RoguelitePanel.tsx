@@ -125,7 +125,7 @@ function RunMonCard({ mon, index, onClick, onContextMenu, selectable }: RunMonCa
         {...drag.attributes}
         {...drag.listeners}
         style={transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 5 } : undefined}
-        className={`team-slot team-slot-filled run-mon-card${selectable ? ' run-mon-card-selectable' : ''}${
+        className={`team-slot team-slot-filled run-mon-card${mon.rarityTier ? ` rarity-${mon.rarityTier}` : ''}${selectable ? ' run-mon-card-selectable' : ''}${
           drop.isOver && !drag.isDragging ? ' team-slot-over' : ''
         }${drag.isDragging ? ' run-mon-card-dragging' : ''}`}
         // Not disabled even when there's nothing to click for - a disabled button gets no

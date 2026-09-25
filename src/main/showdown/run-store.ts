@@ -34,6 +34,7 @@ import {
   megaStonesFor,
   toID,
   runEvolutionOptions,
+  speciesRarityTier,
   type PokemonSet
 } from './sim-access'
 import { totalExpForSpeciesLevel, expProgressForLevel } from './exp'
@@ -286,6 +287,7 @@ function toView(mon: RunMon): RunMonView {
     expPercent: percent,
     itemSpritenum: mon.set.item ? getItemSpritenum(mon.set.item) : null,
     eligibleEvolutions: runEvolutionOptions(mon.set),
+    rarityTier: speciesRarityTier(mon.set.species),
     ...buildPokemonSummary(mon.set.species, mon.set),
     hpPercent: Math.round(mon.hp * 100),
     status: mon.status

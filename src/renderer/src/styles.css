@@ -4151,3 +4151,42 @@ button:disabled {
   transform: scale(2.4);
   image-rendering: pixelated;
 }
+
+/* Box and team squares bordered with the Pokemon's roulette rarity (see
+   speciesRarityTier): grey, blue, purple, pink, gold - same as the case opening. */
+.box-icon-draggable.rarity-common,
+.team-slot.rarity-common {
+  border-color: #6b7483;
+}
+
+.box-icon-draggable.rarity-uncommon,
+.team-slot.rarity-uncommon {
+  border-color: #4b8bff;
+}
+
+.box-icon-draggable.rarity-rare,
+.team-slot.rarity-rare {
+  border-color: #8847ff;
+}
+
+.box-icon-draggable.rarity-epic,
+.team-slot.rarity-epic {
+  border-color: #eb4b9b;
+}
+
+.box-icon-draggable.rarity-legendary,
+.team-slot.rarity-legendary {
+  border-color: #ffd23f;
+  box-shadow: 0 0 6px rgba(255, 210, 63, 0.35);
+}
+
+/* A slot being dragged over still lights up for the drop. */
+.team-slot.team-slot-over {
+  border-color: #6bb0ff;
+}
+
+/* A run card waiting to be picked (an item to give) keeps its rarity border and gets
+   a ring around it instead. */
+.team-slot.run-mon-card-selectable {
+  box-shadow: 0 0 0 2px #b48cff, 0 0 10px rgba(180, 140, 255, 0.6);
+}

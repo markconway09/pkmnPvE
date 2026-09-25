@@ -15,6 +15,7 @@ import {
   rollGiftShiny,
   buildPokemonSummary,
   dexBaseSpecies,
+  speciesRarityTier,
   nationalDexSpecies,
   evolutionOptionsFor,
   evolveSet,
@@ -143,6 +144,7 @@ function toView(mon: StoredMon): BoxPokemonView {
     canUseShinyPatch,
     itemSpritenum,
     favorite: !!mon.favorite,
+    rarityTier: speciesRarityTier(mon.set.species),
     ...buildPokemonSummary(mon.set.species, mon.set)
   }
 }
