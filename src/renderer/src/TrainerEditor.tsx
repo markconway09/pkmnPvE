@@ -14,6 +14,7 @@ import { randomTrainerName } from './trainerNames'
 import TrainerSpritePicker from './TrainerSpritePicker'
 import PremadeTeamRoster from './PremadeTeamRoster'
 import ItemDropPicker from './ItemDropPicker'
+import { formatMoney } from './money'
 
 interface Props {
   trainer: Trainer | null
@@ -164,7 +165,7 @@ function TrainerEditor({ trainer, onClose, onSaved }: Props): React.JSX.Element 
           )}
 
           <p className="editor-hint">
-            Prize money: {isBoss ? `₽${BOSS_PRIZE}` : `₽${TRAINER_PRIZE_PER_POKEMON} per Pokemon on their team`}, plus the level cap as a percentage on top
+            Prize money: {isBoss ? `${formatMoney(BOSS_PRIZE)}` : `${formatMoney(TRAINER_PRIZE_PER_POKEMON)} per Pokemon on their team`}, plus the level cap as a percentage on top
           </p>
 
           {drops.map((drop, i) => (

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { DEFAULT_POKEBALL_ID, POKEBALL_PRICE } from '../../shared/battle-types'
 import type { ExpGainResult, ItemDropResult } from '../../shared/battle-types'
 import ItemSprite from './ItemSprite'
+import { formatMoney } from './money'
 
 interface Props {
   winner: string | null
@@ -77,7 +78,7 @@ function BattleResultModal({
       ? 'Catch it for your run'
       : hasPokeballs
       ? `Catch (${pokeballs} Poke Ball${pokeballs === 1 ? '' : 's'})`
-      : `Buy Poke Ball (₽${pokeballPrice})`
+      : `Buy Poke Ball (${formatMoney(pokeballPrice)})`
 
   // Only a defeated shiny you could still have caught is worth a warning.
   const leaveNeedsConfirm = canCatch && opponentShiny && !caught
@@ -121,7 +122,7 @@ function BattleResultModal({
           <div className="exp-gain-list">
             <div className="exp-gain-row">
               <span className="exp-gain-species">Reward</span>
-              <span className="exp-gain-detail">+₽{moneyGained}</span>
+              <span className="exp-gain-detail">+{formatMoney(moneyGained)}</span>
             </div>
           </div>
         )}

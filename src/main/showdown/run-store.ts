@@ -296,7 +296,7 @@ function itemOfferView(ids: string[]): RunItemOffer[] {
   const catalog = new Map(getEditorOptions().items.map((i) => [i.id, i]))
   return ids.flatMap((id) => {
     const item = catalog.get(id)
-    return item ? [{ itemId: item.id, itemName: item.name, spritenum: item.spritenum }] : []
+    return item ? [{ itemId: item.id, itemName: item.name, spritenum: item.spritenum, description: item.description }] : []
   })
 }
 

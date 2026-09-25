@@ -16,7 +16,9 @@ const SYNTHETIC_SPRITES: Record<number, string> = {
   '-5': './sprites/misc/expcandys.png', // Exp. Candy S
   '-6': './sprites/misc/expcandym.png', // Exp. Candy M
   '-7': './sprites/misc/expcandyl.png', // Exp. Candy L
-  '-8': './sprites/misc/shinypatch.png' // Shiny Patch (Serebii's Ability Patch icon)
+  '-8': './sprites/misc/shinypatch.png', // Shiny Patch (Serebii's Ability Patch icon)
+  '-9': './sprites/misc/lockcapsule.png', // Lock Capsule (Serebii)
+  '-10': './sprites/misc/gsball.png' // Random Pokemon (Serebii's GS Ball)
 }
 
 function ItemSprite({ spritenum, className }: Props): React.JSX.Element {

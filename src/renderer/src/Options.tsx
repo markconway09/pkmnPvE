@@ -27,7 +27,7 @@ function Options({
   const [loggingOut, setLoggingOut] = useState(false)
 
   return (
-    <div className="screen">
+    <div className="screen options-screen">
       <h1>Options</h1>
 
       <h2 className="options-heading">Account</h2>

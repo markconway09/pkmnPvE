@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { FOSSIL_RESTORE_COST } from '../../shared/battle-types'
-import type { BagItemView, RestoreFossilResult } from '../../shared/battle-types'
+import type { BagItemView, OpenItemResult, RestoreFossilResult } from '../../shared/battle-types'
 import ItemSprite from './ItemSprite'
 import GalarFossilPrompt from './GalarFossilPrompt'
 import ContextMenuPanel from './ContextMenuPanel'
+import CaseOpening from './CaseOpening'
+import { formatMoney } from './money'
 
 interface Props {
   onClose: () => void
@@ -39,6 +41,8 @@ function BagModal({ onClose, onChanged }: Props): React.JSX.Element {
   const [menu, setMenu] = useState<MenuState | null>(null)
   const [galarFossil, setGalarFossil] = useState<BagItemView | null>(null)
   const [busy, setBusy] = useState(false)
+  // A Random Pokemon / Random Legendary being opened, shown as a spinning case.
+  const [opening, setOpening] = useState<{ itemName: string; result: OpenItemResult } | null>(null)
 
   async function refresh(): Promise<void> {
     try {
@@ -74,16 +78,24 @@ function BagModal({ onClose, onChanged }: Props): React.JSX.Element {
   function sell(item: BagItemView): Promise<void> {
     return act(async () => {
       const result = await window.api.sellItem(item.id)
-      return `Sold ${item.name} for ₽${result.sold}.`
+      return `Sold ${item.name} for ${formatMoney(result.sold)}.`
     })
   }
 
-  function openItem(item: BagItemView): Promise<void> {
-    return act(async () => {
-      const result = await window.api.openBagItem(item.id)
-      const got = result.shiny ? `a ✨shiny✨ ${result.species}` : result.species
-      return `Opened ${item.name}: you got ${got} (Lv ${result.level}) - it's waiting in your box.`
-    })
+  // Not through act(): the case animation reveals what came out, so the message - and
+  // the refresh that would show the new Pokemon in the box behind it - wait until it's closed.
+  async function openItem(item: BagItemView): Promise<void> {
+    setMenu(null)
+    setBusy(true)
+    setError(null)
+    setMessage(null)
+    try {
+      setOpening({ itemName: item.name, result: await window.api.openBagItem(item.id) })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
   }
 
   function useExpCandy(item: BagItemView): Promise<void> {
@@ -181,28 +193,28 @@ function BagModal({ onClose, onChanged }: Props): React.JSX.Element {
                 <button
                   className="context-menu-item"
                   disabled={busy || !canAffordRestore}
-                  title={canAffordRestore ? undefined : `Restoring costs ₽${FOSSIL_RESTORE_COST}`}
+                  title={canAffordRestore ? undefined : `Restoring costs ${formatMoney(FOSSIL_RESTORE_COST)}`}
                   onClick={() => void restoreSingle(menu.item)}
                 >
-                  Restore into {menu.item.restoresTo} (₽{FOSSIL_RESTORE_COST})
+                  Restore into {menu.item.restoresTo} ({formatMoney(FOSSIL_RESTORE_COST)})
                 </button>
               )}
               {menu.item.fossil === 'galar' && (
                 <button
                   className="context-menu-item"
                   disabled={busy || !canAffordRestore}
-                  title={canAffordRestore ? undefined : `Restoring costs ₽${FOSSIL_RESTORE_COST}`}
+                  title={canAffordRestore ? undefined : `Restoring costs ${formatMoney(FOSSIL_RESTORE_COST)}`}
                   onClick={() => {
                     setGalarFossil(menu.item)
                     setMenu(null)
                   }}
                 >
-                  Restore with another fossil... (₽{FOSSIL_RESTORE_COST})
+                  Restore with another fossil... ({formatMoney(FOSSIL_RESTORE_COST)})
                 </button>
               )}
               {menu.item.sellPrice !== null ? (
                 <button className="context-menu-item" disabled={busy} onClick={() => void sell(menu.item)}>
-                  Sell for ₽{menu.item.sellPrice}
+                  Sell for {formatMoney(menu.item.sellPrice)}
                 </button>
               ) : (
                 <button className="context-menu-item" disabled title="The shop doesn't buy this">
@@ -213,6 +225,24 @@ function BagModal({ onClose, onChanged }: Props): React.JSX.Element {
           </div>
         )}
 
+        {opening && (
+          <CaseOpening
+            itemName={opening.itemName}
+            result={opening.result}
+            onClose={() => {
+              const { itemName, result } = opening
+              if (result.kind === 'item') {
+                setMessage(`Opened ${itemName}: you got ${result.name} - it's in your bag.`)
+              } else {
+                const got = result.shiny ? `a ✨shiny✨ ${result.name}` : result.name
+                setMessage(`Opened ${itemName}: you got ${got} (Lv ${result.level}) - it's waiting in your box.`)
+              }
+              setOpening(null)
+              void refresh()
+              onChanged()
+            }}
+          />
+        )}
         {galarFossil && (
           <GalarFossilPrompt
             fossil={galarFossil}

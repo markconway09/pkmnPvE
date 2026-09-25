@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ShopPriceEntry } from '../../shared/battle-types'
 import ItemSprite from './ItemSprite'
+import { formatMoney } from './money'
 
 interface Props {
   onClose: () => void
@@ -105,7 +106,7 @@ function ShopPricesModal({ onClose }: Props): React.JSX.Element {
                     />
                     {changed ? (
                       <button type="button" className="shop-price-reset" onClick={() => void save(item, null)}>
-                        Reset (₽{item.defaultPrice})
+                        Reset ({formatMoney(item.defaultPrice)})
                       </button>
                     ) : (
                       <span className="shop-price-default">default</span>

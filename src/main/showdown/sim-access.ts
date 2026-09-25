@@ -13,10 +13,12 @@ import {
   POKEBALL_PRICE,
   RANDOM_LEGENDARY_ITEM_ID,
   RANDOM_POKEMON_ITEM_ID,
+  LOCK_CAPSULE_ITEM_ID,
   RARE_CANDY_ITEM_ID,
   SHINY_PATCH_ITEM_ID
 } from '../../shared/battle-types'
 import type {
+  RarityTier,
   EditablePokemonSet,
   EditorOptions,
   ItemOptionEntry,
@@ -729,14 +731,24 @@ const PEAT_BLOCK_ITEM: ItemOptionEntry = {
 }
 
 // The two "open it for a Pokemon" shop items. Not real Dex items, so - like the
-// Link Cable - they're made up here; they borrow the Ultra Ball's and Master
-// Ball's icons from the item sheet.
+// Link Cable - they're made up here. Random Legendary borrows the Master
+// Ball's icon from the item sheet.
+// -10 is the GS Ball (Serebii's icon - see ItemSprite).
 const RANDOM_POKEMON_ITEM: ItemOptionEntry = {
   id: RANDOM_POKEMON_ITEM_ID,
   name: 'Random Pokemon',
   description: 'Open it from the bag for a random unevolved Pokemon in your box - a legendary is possible.',
-  spritenum: Dex.items.get('ultraball').spritenum ?? 0
+  spritenum: -10
 }
+
+// -9 is Serebii's Lock Capsule icon (see ItemSprite).
+const LOCK_CAPSULE_ITEM: ItemOptionEntry = {
+  id: LOCK_CAPSULE_ITEM_ID,
+  name: 'Lock Capsule',
+  description: 'Open it from the bag for a random item from the shop - the pricier the item, the rarer it is.',
+  spritenum: -9
+}
+const LOCK_CAPSULE_PRICE = 1000
 
 const RANDOM_LEGENDARY_ITEM: ItemOptionEntry = {
   id: RANDOM_LEGENDARY_ITEM_ID,
@@ -789,6 +801,7 @@ export function getEditorOptions(): EditorOptions {
       PEAT_BLOCK_ITEM,
       RANDOM_POKEMON_ITEM,
       RANDOM_LEGENDARY_ITEM,
+      LOCK_CAPSULE_ITEM,
       SHINY_PATCH_ITEM,
       ...EXP_CANDY_ITEMS
     ])
@@ -870,14 +883,14 @@ function isUneatableByHolder(dexItem: ReturnType<typeof Dex.items.get>): boolean
 // always leads.
 const SHOP_CATEGORY_ORDER = [
   'Recommended',
+  'Items',
+  'Evolution Items',
   'Berries',
   'Fossils',
   'Z-Crystals',
   'Plates',
   'Memories',
-  'Drives',
-  'Evolution Items',
-  'Items'
+  'Drives'
 ]
 
 function shopCategoryFor(dexItem: ReturnType<typeof Dex.items.get>): string {
@@ -1052,6 +1065,7 @@ export function getDefaultShopCatalog(): ShopItemEntry[] {
       if (item.id === RARE_CANDY_ITEM_ID) return { ...item, price: RARE_CANDY_PRICE, category: 'Recommended' }
       if (item.id === RANDOM_POKEMON_ITEM_ID) return { ...item, price: RANDOM_POKEMON_PRICE, category: 'Recommended' }
       if (item.id === RANDOM_LEGENDARY_ITEM_ID) return { ...item, price: RANDOM_LEGENDARY_PRICE, category: 'Recommended' }
+      if (item.id === LOCK_CAPSULE_ITEM_ID) return { ...item, price: LOCK_CAPSULE_PRICE, category: 'Recommended' }
       if (item.id in EXP_CANDY_PRICE) return { ...item, price: EXP_CANDY_PRICE[item.id], category: 'Recommended' }
       if (item.id === SHINY_PATCH_ITEM_ID) return { ...item, price: SHINY_PATCH_PRICE, category: 'Recommended' }
       if (evolutionOnlyIds.has(item.id)) return { ...item, price: COMPETITIVE_ITEM_PRICE, category: 'Evolution Items' }
@@ -1371,6 +1385,21 @@ function pickFrom(species: ReturnType<typeof Dex.species.get>[]): string {
 export const RANDOM_POKEMON_LEGENDARY_CHANCE = 0.05
 
 /** Any unevolved Pokemon - a legendary/mythical/ultra beast/paradox one only RANDOM_POKEMON_LEGENDARY_CHANCE of the time. */
+/**
+ * How rare a species reads on the case-opening reel: restricted legendaries are gold,
+ * the other special Pokemon (mythicals, sub-legendaries, Ultra Beasts, paradoxes)
+ * pink, and everything else by its base stat total.
+ */
+export function speciesRarityTier(speciesName: string): RarityTier {
+  const species = Dex.species.get(speciesName)
+  if (species.tags.includes('Restricted Legendary')) return 'legendary'
+  if (isLegendaryClass(species)) return 'epic'
+  const bst = bstOf(species.name)
+  if (bst >= 500) return 'rare'
+  if (bst >= 400) return 'uncommon'
+  return 'common'
+}
+
 export function pickRandomUnevolvedAnySpecies(): string {
   const all = unevolvedSpecies()
   const wantLegendary = Math.random() < RANDOM_POKEMON_LEGENDARY_CHANCE
@@ -1755,14 +1784,38 @@ export function liveMovePower(battle: Battle, source: Pokemon, foes: Pokemon[], 
   }
 }
 
+// What a defender's ability does to a move of a type, as a multiplier on its
+// effectiveness (0 = immune) - the abilities that change how well a move lands, not
+// the ones that merely react to it.
+const DEFENDER_TYPE_ABILITIES: Record<string, Record<string, number>> = {
+  levitate: { Ground: 0 },
+  eartheater: { Ground: 0 },
+  flashfire: { Fire: 0 },
+  wellbakedbody: { Fire: 0 },
+  waterabsorb: { Water: 0 },
+  stormdrain: { Water: 0 },
+  dryskin: { Water: 0, Fire: 1.25 },
+  voltabsorb: { Electric: 0 },
+  lightningrod: { Electric: 0 },
+  motordrive: { Electric: 0 },
+  sapsipper: { Grass: 0 },
+  thickfat: { Fire: 0.5, Ice: 0.5 },
+  heatproof: { Fire: 0.5 },
+  waterbubble: { Fire: 0.5 },
+  purifyingsalt: { Ghost: 0.5 },
+  fluffy: { Fire: 2 }
+}
+// Attackers whose ability gets past the defender's (Mold Breaker and its kin).
+const ABILITY_IGNORING_ABILITIES = new Set(['moldbreaker', 'teravolt', 'turboblaze', 'myceliummight'])
+
 /**
- * How effective a move is against a target right now, by type alone - the same
- * public information the battle screen shows (the target's current types, Tera
- * included; never a hidden ability like Levitate): 0 for an immunity, else
- * 0.25 / 0.5 / 1 / 2 / 4. The move's own type rules count (Weather Ball, Tera
- * Blast, Ivy Cudgel...), and so do moves that treat a type specially (Freeze-Dry
- * on Water, Flying Press adding Flying). Null when type doesn't matter: status
- * moves, and fixed damage (Seismic Toss) unless the target is immune to it.
+ * How well a move would land on a target right now, as the battle screen shows it (a
+ * multiplier; 0 = no effect), or null where that doesn't apply (status moves, fixed
+ * damage). The move's type after any change it makes to itself (Weather Ball, Ivy
+ * Cudgel...), the target's current types, and both Pokemon's abilities: the target's
+ * immunities and damage-changing abilities (Levitate, Flash Fire, Thick Fat, Filter,
+ * Wonder Guard...) - unless Mold Breaker or the move gets past them - and the
+ * attacker's Scrappy / Mind's Eye and Tinted Lens.
  */
 export function moveTypeEffectiveness(battle: Battle, source: Pokemon, target: Pokemon, moveId: string): number | null {
   const base = battle.dex.moves.get(moveId)
@@ -1773,11 +1826,30 @@ export function moveTypeEffectiveness(battle: Battle, source: Pokemon, target: P
   } catch {
     // needs battle context the preview can't give - its printed type stands
   }
+  const sourceAbility = source.ignoringAbility() ? '' : toID(source.ability)
+  const targetAbility =
+    target.ignoringAbility() || move.ignoreAbility || ABILITY_IGNORING_ABILITIES.has(sourceAbility)
+      ? ''
+      : toID(target.ability)
+
   const targetTypes = target.getTypes()
   const ignores = move.ignoreImmunity
   const ignoresType = ignores === true || (!!ignores && typeof ignores === 'object' && !!ignores[move.type])
-  if (!ignoresType && !battle.dex.getImmunity(move.type, targetTypes)) return 0
+  // Scrappy / Mind's Eye: Normal and Fighting moves hit Ghost types.
+  const hitsGhosts = ['scrappy', 'mindseye'].includes(sourceAbility) && ['Normal', 'Fighting'].includes(move.type)
+  const immunityTypes = hitsGhosts ? targetTypes.filter((t) => t !== 'Ghost') : targetTypes
+  if (!ignoresType && !battle.dex.getImmunity(move.type, immunityTypes)) return 0
+  // Off the ground some other way - an Air Balloon, Magnet Rise, Telekinesis (Levitate
+  // is the ability table's, so Mold Breaker can get past it).
+  if (move.type === 'Ground' && !ignoresType && target.isGrounded() === false) return 0
+  // Moves an ability shuts out completely by what they are, not their type.
+  if (targetAbility === 'bulletproof' && move.flags.bullet) return 0
+  if (targetAbility === 'soundproof' && move.flags.sound) return 0
+  if (targetAbility === 'windrider' && move.flags.wind) return 0
+  const typeAbility = DEFENDER_TYPE_ABILITIES[targetAbility]?.[move.type]
+  if (typeAbility === 0 && !(move.type === 'Ground' && ignoresType)) return 0
   if (move.damage !== undefined || move.damageCallback) return null
+
   let typeMod = 0
   for (const type of targetTypes) {
     let mod = battle.dex.getEffectiveness(move.type, type)
@@ -1791,7 +1863,16 @@ export function moveTypeEffectiveness(battle: Battle, source: Pokemon, target: P
     }
     typeMod += mod
   }
-  return Math.pow(2, typeMod)
+  let multiplier = Math.pow(2, typeMod)
+
+  // Wonder Guard: only super effective moves get through.
+  if (targetAbility === 'wonderguard' && multiplier <= 1) return 0
+  // Tera Shell: anything at all is not very effective while it's at full HP.
+  if (targetAbility === 'terashell' && target.hp >= target.maxhp && multiplier > 0) multiplier = 0.5
+  if (typeAbility !== undefined && typeAbility > 0) multiplier *= typeAbility
+  if (['filter', 'solidrock', 'prismarmor'].includes(targetAbility) && multiplier > 1) multiplier *= 0.75
+  if (sourceAbility === 'tintedlens' && multiplier > 0 && multiplier < 1) multiplier *= 2
+  return multiplier
 }
 
 // A few moves boost their own power in a separate handler rather than a power

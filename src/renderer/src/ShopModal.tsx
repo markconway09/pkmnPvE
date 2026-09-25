@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ShopItemEntry } from '../../shared/battle-types'
 import ItemSprite from './ItemSprite'
+import { formatMoney } from './money'
 
 interface Props {
   onClose: () => void
@@ -59,7 +60,7 @@ function ShopModal({ onClose, onMoneyChange }: Props): React.JSX.Element {
       <div className="modal-panel shop-modal" onMouseDown={(e) => e.stopPropagation()}>
         <div className="shop-header">
           <h2>Shop</h2>
-          {money !== null && <span className="money-display">₽{money}</span>}
+          {money !== null && <span className="money-display">{formatMoney(money)}</span>}
         </div>
         <input
           type="text"
@@ -79,7 +80,7 @@ function ShopModal({ onClose, onMoneyChange }: Props): React.JSX.Element {
                 <div key={item.id} className="shop-item" title={item.description}>
                   <ItemSprite spritenum={item.spritenum} className="shop-item-icon" />
                   <span className="shop-item-name">{item.name}</span>
-                  <span className="shop-item-price">₽{item.price}</span>
+                  <span className="shop-item-price">{formatMoney(item.price)}</span>
                   <button
                     type="button"
                     disabled={busyId === item.id || (money !== null && money < item.price)}

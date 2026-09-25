@@ -2411,7 +2411,7 @@ button:disabled {
 }
 
 .shop-modal {
-  width: 480px;
+  width: 710px;
 }
 
 .shop-header {
@@ -2439,9 +2439,10 @@ button:disabled {
   color: #b7c0cf;
 }
 
+/* Six items to a row. */
 .shop-grid {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
   margin: 0 0 12px;
 }
@@ -2451,7 +2452,7 @@ button:disabled {
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  width: 92px;
+  min-width: 0;
   padding: 8px 4px;
   background: #1a2230;
   border: 1px solid #3a4150;
@@ -3985,4 +3986,168 @@ button:disabled {
   grid-template-rows: auto;
   align-content: center;
   min-height: 0;
+}
+
+/* Options: the whole screen scrolls (it outgrew the window). */
+.options-screen {
+  overflow-y: auto;
+}
+
+/* Every text on a screen gets a shadow, so it stays readable over a custom background
+   picture (Options → Background). Pop-ups sit outside the screens and keep plain text. */
+.screen {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 2px rgba(0, 0, 0, 0.8);
+}
+
+.options-screen > * {
+  flex-shrink: 0;
+}
+
+/* The dim hint lines are too dark to read over a background picture, even shadowed -
+   brighter wherever they sit straight on a screen. */
+.screen .box-empty-hint,
+.screen .editor-hint {
+  color: #a3adbd;
+}
+
+/* ---- Case opening (Random Pokemon / Random Legendary) ---- */
+.case-modal {
+  width: 760px;
+  max-width: 94vw;
+  text-align: center;
+  cursor: pointer;
+}
+
+.case-viewport {
+  position: relative;
+  overflow: hidden;
+  height: 150px;
+  margin: 12px 0;
+  border: 2px solid #3a4150;
+  background: #10141a;
+  /* Fades the strip out at both ends. */
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+
+.case-strip {
+  display: flex;
+  gap: 8px;
+  height: 100%;
+  padding: 10px 0;
+  box-sizing: border-box;
+  will-change: transform;
+}
+
+.case-card {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 6px 4px 8px;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, #232a36 55%, var(--tier-color) 180%);
+  border-bottom: 4px solid var(--tier-color);
+}
+
+.case-card-sprite {
+  max-width: 80px;
+  max-height: 80px;
+  margin: auto 0;
+  image-rendering: pixelated;
+}
+
+.case-card-name {
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.case-tier-common {
+  --tier-color: #8a94a6;
+}
+
+.case-tier-uncommon {
+  --tier-color: #4b8bff;
+}
+
+.case-tier-rare {
+  --tier-color: #8847ff;
+}
+
+.case-tier-epic {
+  --tier-color: #eb4b9b;
+}
+
+.case-tier-legendary {
+  --tier-color: #ffd23f;
+}
+
+.case-card-won {
+  box-shadow: 0 0 18px var(--tier-color);
+  outline: 2px solid var(--tier-color);
+  animation: case-won 0.6s ease;
+}
+
+@keyframes case-won {
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+/* The line the winner stops under. */
+.case-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 3px;
+  margin-left: -1px;
+  background: #ffd23f;
+  box-shadow: 0 0 8px #ffd23f;
+  pointer-events: none;
+}
+
+.case-result {
+  cursor: default;
+}
+
+.case-result-name {
+  margin: 4px 0;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.case-tier-text-common {
+  color: #c9d1dc;
+}
+
+.case-tier-text-uncommon {
+  color: #6ea3ff;
+}
+
+.case-tier-text-rare {
+  color: #a57bff;
+}
+
+.case-tier-text-epic {
+  color: #ff6fb5;
+}
+
+.case-tier-text-legendary {
+  color: #ffd23f;
+}
+
+.case-skip-hint {
+  margin: 4px 0 0;
+}
+
+/* An item on the case strip: its little icon, blown up. */
+.case-card-item {
+  margin: auto 0;
+  transform: scale(2.4);
+  image-rendering: pixelated;
 }

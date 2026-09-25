@@ -27,6 +27,7 @@ import BossRematchModal from './BossRematchModal'
 import RoguelitePanel, { RUN_MON_DRAG_PREFIX, RUN_SLOT_DROP_PREFIX, RUN_STARTER_SLOT_ID } from './RoguelitePanel'
 import { loadMenuMode, saveMenuMode, type MenuMode } from './menuMode'
 import { trainerSpriteUrl } from './trainerSprite'
+import { formatMoney } from './money'
 
 interface Props {
   onFight: () => void
@@ -386,7 +387,7 @@ function MainMenu({
       <div className="menu-header">
         <h1>pkmnPvE</h1>
         <div className="menu-nav">
-          {money !== null && <span className="money-display">₽{money}</span>}
+          {money !== null && <span className="money-display">{formatMoney(money)}</span>}
           <button
             className={`mode-toggle mode-toggle-${mode}`}
             title="Switch between the classic game and Roguelite runs"

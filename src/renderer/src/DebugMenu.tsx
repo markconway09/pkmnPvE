@@ -44,7 +44,7 @@ function DebugMenu({
           <button disabled={addRandomBusy} onClick={onAddRandom}>
             Add Random Pokemon (temporary)
           </button>
-          <button onClick={onAddMoney}>Add ₽1000</button>
+          <button onClick={onAddMoney}>Add ₽1,000</button>
           {confirming === 'boss' ? (
             <button
               className="debug-reset-confirm"

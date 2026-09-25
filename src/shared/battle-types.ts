@@ -21,7 +21,9 @@ export const PEAT_BLOCK_ITEM_ID = 'peatblock'
 // beast/paradox one. Not real Dex items - see getEditorOptions() in sim-access.ts.
 export const RANDOM_POKEMON_ITEM_ID = 'randompokemon'
 export const RANDOM_LEGENDARY_ITEM_ID = 'randomlegendary'
-export const OPENABLE_ITEM_IDS = new Set([RANDOM_POKEMON_ITEM_ID, RANDOM_LEGENDARY_ITEM_ID])
+// Opened from the bag for a random item from the shop - the pricier, the rarer.
+export const LOCK_CAPSULE_ITEM_ID = 'lockcapsule'
+export const OPENABLE_ITEM_IDS = new Set([RANDOM_POKEMON_ITEM_ID, RANDOM_LEGENDARY_ITEM_ID, LOCK_CAPSULE_ITEM_ID])
 
 // Used from the bag to give every Pokemon on the team this much exp. Not real
 // Dex items - see getEditorOptions() in sim-access.ts.
@@ -759,10 +761,31 @@ export interface TrainerProfile {
   league: LeagueMilestone[]
 }
 
+// How rare a Pokemon looks on the case-opening reel, like a CS case: grey, blue,
+// purple, pink, gold.
+export type RarityTier = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary'
+
+// One card on the case-opening strip: a Pokemon (species) or an item (spritenum).
+export interface ReelEntry {
+  name: string
+  species?: string
+  spritenum?: number
+  tier: RarityTier
+}
+
 export interface OpenItemResult {
-  species: string
+  // A Random Pokemon / Random Legendary gives a Pokemon, a Lock Capsule an item.
+  kind: 'pokemon' | 'item'
+  // The Pokemon's species, or the item's name.
+  name: string
+  // Pokemon only (0 for an item).
   level: number
   shiny: boolean
+  tier: RarityTier
+  // The case-opening animation's strip: other picks from the same pool, with the one
+  // actually won at reel[winnerIndex].
+  reel: ReelEntry[]
+  winnerIndex: number
 }
 
 export interface SellResult {
@@ -979,6 +1002,8 @@ export interface RunItemOffer {
   itemId: string
   itemName: string
   spritenum: number
+  // What it does, for its tooltip.
+  description: string
 }
 
 export interface RunView {

@@ -1082,7 +1082,7 @@ export class WildBattle {
   }
 
   // The other way round: the worst multiplier each foe's types get against each team
-  // member - by type alone, like everything else here (no Levitate and such).
+  // member - by type alone (the move buttons are where abilities like Levitate count).
   private teamDefense(team: ActivePokemonView[]): (number | null)[][] {
     const foes = [this.active.p2a, this.active.p2b]
     return team.map((member) =>

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { FOSSIL_RESTORE_COST } from '../../shared/battle-types'
 import type { BagItemView, GalarFossilPartner, RestoreFossilResult } from '../../shared/battle-types'
 import ItemSprite from './ItemSprite'
+import { formatMoney } from './money'
 
 interface Props {
   fossil: BagItemView
@@ -73,13 +74,13 @@ function GalarFossilPrompt({ fossil, money, onClose, onRestored }: Props): React
         {partners && !anyOwned && (
           <p className="editor-error">You don&apos;t have a second fossil to combine this one with.</p>
         )}
-        {!canAfford && <p className="editor-error">Restoring costs ₽{FOSSIL_RESTORE_COST} - you don&apos;t have enough.</p>}
+        {!canAfford && <p className="editor-error">Restoring costs {formatMoney(FOSSIL_RESTORE_COST)} - you don&apos;t have enough.</p>}
         {error && <p className="editor-error">{error}</p>}
 
         <div className="editor-actions">
           <button onClick={onClose}>Cancel</button>
           <button disabled={!selected || !canAfford || busy} onClick={() => void restore()}>
-            {selected ? `Restore ${selected.species} (₽${FOSSIL_RESTORE_COST})` : `Restore (₽${FOSSIL_RESTORE_COST})`}
+            {selected ? `Restore ${selected.species} (${formatMoney(FOSSIL_RESTORE_COST)})` : `Restore (${formatMoney(FOSSIL_RESTORE_COST)})`}
           </button>
         </div>
       </div>

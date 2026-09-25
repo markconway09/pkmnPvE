@@ -331,15 +331,25 @@ function RoguelitePanel({
           </p>
           <div className="run-item-row">
             {offer.map((item) => (
-              <button
+              <Tooltip
                 key={item.itemId}
-                className={`run-item-button${chosenItem === item.itemId ? ' run-item-button-chosen' : ''}`}
-                disabled={busy}
-                onClick={() => setChosenItem(item.itemId)}
+                placement="below"
+                content={
+                  <div className="tooltip-panel">
+                    <div className="tooltip-title">{item.itemName}</div>
+                    {item.description && <div className="tooltip-desc">{item.description}</div>}
+                  </div>
+                }
               >
-                <ItemSprite spritenum={item.spritenum} />
-                <span>{item.itemName}</span>
-              </button>
+                <button
+                  className={`run-item-button${chosenItem === item.itemId ? ' run-item-button-chosen' : ''}`}
+                  disabled={busy}
+                  onClick={() => setChosenItem(item.itemId)}
+                >
+                  <ItemSprite spritenum={item.spritenum} />
+                  <span>{item.itemName}</span>
+                </button>
+              </Tooltip>
             ))}
             {run.canRerollItems && (
               <button
