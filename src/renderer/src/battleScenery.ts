@@ -38,7 +38,9 @@ const LOCATION_BACKDROP_IDS: Record<WildLocationId, string[]> = {
   industry: ['aquacordetown', 'darkcity'],
   cemetery: ['library', 'elite4drake'],
   ocean: ['beach', 'darkbeach', 'deepsea', 'orassea', 'leaderwallace'],
-  all: BACKDROP_IDS
+  all: BACKDROP_IDS,
+  // No lab backdrop exists - the library is the closest indoor, bookish room.
+  lab: ['library']
 }
 
 // `location` is only known for a wild battle - everything else (trainer,

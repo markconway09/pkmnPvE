@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'node:path'
 import type {
   BattleEligibility,
+  BossRematchInfo,
   BossStep,
   EditablePokemonSet,
   ItemDropConfig,
@@ -16,6 +17,7 @@ import {
   addStarter,
   evolveMon,
   getBoxState,
+  getPokedex,
   getMonSet,
   getTeamPokemonSets,
   highestLevelOf,
@@ -33,6 +35,7 @@ import { getBagState, resetBag } from './showdown/bag-store'
 import { applyLoadout, deleteLoadout, listLoadouts, renameLoadout, saveLoadout, updateLoadout } from './showdown/loadout-store'
 import {
   generateRandomTrainerTeam,
+  generateLabWildMon,
   generateRandomWildMon,
   getEditorOptions,
   getSpeciesEditInfo
@@ -60,6 +63,7 @@ import { resetStatsCounters } from './showdown/stats-store'
 import { getTrainerProfile } from './showdown/trainer-profile'
 import { buildAutoSet, listAutoSets } from './showdown/auto-sets'
 import { checkForUpdate, installUpdate } from './updater'
+import { chooseBackground, clearBackground, getBackground } from './showdown/background-store'
 import { getWildDropFor, listWildDrops, setWildDrop } from './showdown/wild-drops-store'
 import { buyItem, listShop, listShopPrices, sellItem, setShopPrice } from './showdown/shop-store'
 import { getGalarFossilPartners, restoreFossil } from './showdown/fossil-store'
@@ -128,7 +132,10 @@ ipcMain.handle('battle:start', async (_event, locationId?: WildLocationId, level
   const effectiveLevelCap =
     levelCapOverride != null ? Math.min(Math.max(15, Math.floor(levelCapOverride)), levelCap) : levelCap
   const location = WILD_LOCATIONS.find((l) => l.id === locationId) ?? null
-  const wildMon = generateRandomWildMon(effectiveLevelCap, location)
+  if (location?.requiresAllBosses && !allBossesDefeated()) {
+    throw new Error(`${location.label} opens once every boss is beaten`)
+  }
+  const wildMon = location?.id === 'lab' ? generateLabWildMon(effectiveLevelCap) : generateRandomWildMon(effectiveLevelCap, location)
   if (!wildMon) throw new Error('Could not find a wild Pokemon for your current level cap in that location')
   const wildDrop = getWildDropFor(wildMon.species)
   activeBattle = new WildBattle(p1team, 'gen9customgame', 'gen9randombattle', {
@@ -141,14 +148,24 @@ ipcMain.handle('battle:start', async (_event, locationId?: WildLocationId, level
   return activeBattle.getInitialView()
 })
 
-ipcMain.handle('battle:startTrainer', async (_event, boss: boolean) => {
+ipcMain.handle('battle:startTrainer', async (_event, boss: boolean, rematchTrainerId?: string) => {
   const p1team = getTeamPokemonSets()
   if (p1team.length === 0) throw new Error('Your team is empty - add Pokemon and assign them to your team first')
   const progression = getProgression()
   const levelCap = progression.levelCap
 
   let trainer: Trainer | null = null
-  if (boss) {
+  if (boss && rematchTrainerId) {
+    // A rematch from the boss menu: any boss in the order the player has already beaten.
+    // It pays out like any boss fight, but can't move progression along (recordTrainerWin
+    // only counts the next unbeaten boss).
+    const inOrder = progression.bossOrder.some((step) => step.trainerId === rematchTrainerId)
+    if (!inOrder || !progression.bossesDefeated.includes(rematchTrainerId)) {
+      throw new Error('Only a boss you have already beaten can be rematched')
+    }
+    trainer = listTrainers().find((t) => t.id === rematchTrainerId) ?? null
+    if (!trainer) throw new Error('That boss trainer no longer exists')
+  } else if (boss) {
     const next = getNextBoss()
     if (!next) throw new Error('No boss trainer is queued up yet - add one in the Progression editor')
     if (progression.trainerWinsSinceLastBoss < next.requiredTrainerWins) {
@@ -256,7 +273,34 @@ ipcMain.handle('battle:eligibility', (): BattleEligibility => {
     }
   }
 
-  return { rocketEvent: isRocketEventActive(), hasTrainer, hasBoss: !!nextBoss?.ready, nextBoss }
+  return {
+    rocketEvent: isRocketEventActive(),
+    hasTrainer,
+    hasBoss: !!nextBoss?.ready,
+    nextBoss,
+    allBossesDefeated: allBossesDefeated()
+  }
+})
+
+// Every boss in the order is beaten: Boss Battle becomes the rematch menu and the
+// Professor's Lab opens up as a wild location.
+function allBossesDefeated(): boolean {
+  return getProgression().bossOrder.length > 0 && !getNextBoss()
+}
+
+ipcMain.handle('battle:bossRematchList', (): BossRematchInfo[] => {
+  const { bossOrder, bossesDefeated } = getProgression()
+  const trainers = listTrainers()
+  return bossOrder.map((step, i) => {
+    const trainer = trainers.find((t) => t.id === step.trainerId)
+    return {
+      number: i + 1,
+      trainerId: step.trainerId,
+      trainerName: trainer?.name ?? 'Unknown trainer',
+      spriteId: trainer?.spriteId ?? '',
+      defeated: bossesDefeated.includes(step.trainerId)
+    }
+  })
 })
 
 ipcMain.handle('dex:move', (_event, id: string) => getMoveInfo(id))
@@ -417,8 +461,12 @@ ipcMain.handle('stats:reset', () => {
 })
 
 ipcMain.handle('profile:get', () => getTrainerProfile())
+ipcMain.handle('profile:pokedex', () => getPokedex())
 
 ipcMain.handle('update:check', () => checkForUpdate())
+ipcMain.handle('background:get', () => getBackground())
+ipcMain.handle('background:choose', (event) => chooseBackground(BrowserWindow.fromWebContents(event.sender)))
+ipcMain.handle('background:clear', () => clearBackground())
 ipcMain.handle('update:install', (event) => installUpdate(event.sender))
 
 ipcMain.handle('autoSets:list', (_event, species: string) => listAutoSets(species))

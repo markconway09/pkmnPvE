@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { BoxPokemonView, BoxState, EditablePokemonSet, ExpGainResult } from '../../shared/battle-types'
+import type { BoxPokemonView, BoxState, EditablePokemonSet, ExpGainResult, PokedexEntry } from '../../shared/battle-types'
 import {
   EXP_CANDY_EXP,
   FRIENDSHIP_PER_BATTLE,
@@ -14,6 +14,8 @@ import {
   buildBasicSet,
   rollGiftShiny,
   buildPokemonSummary,
+  dexBaseSpecies,
+  nationalDexSpecies,
   evolutionOptionsFor,
   evolveSet,
   generateRandomSingle,
@@ -39,6 +41,10 @@ interface StoredMon {
 interface StoredBox {
   mons: StoredMon[]
   team: (string | null)[]
+  // Every species (as the Pokedex counts them - forms together) this player has
+  // ever had in their box, kept even after that Pokemon evolves or is released.
+  // A wild one of these gets a Poke Ball by its name in battle.
+  registered?: string[]
 }
 
 function emptyBox(): StoredBox {
@@ -91,7 +97,33 @@ function getState(): StoredBox {
 }
 
 function persist(): void {
+  registerOwnedSpecies()
   writeFileSync(playerPathFor('box.json'), JSON.stringify(getState()), 'utf8')
+}
+
+// Adds everything currently in the box to the registered species. Run on every
+// save - which covers catches, gifts, starters and evolutions alike - and on first
+// load, so boxes from before this was tracked count what they already hold.
+function registerOwnedSpecies(): void {
+  const box = getState()
+  const registered = new Set(box.registered ?? [])
+  for (const mon of box.mons) registered.add(dexBaseSpecies(mon.set.species))
+  box.registered = [...registered].sort()
+}
+
+/** Whether the player has ever had this species (any form of it) in their box. */
+export function hasRegisteredSpecies(speciesName: string): boolean {
+  const box = getState()
+  if (!box.registered) registerOwnedSpecies()
+  return box.registered!.includes(dexBaseSpecies(speciesName))
+}
+
+/** The trainer profile's Pokedex: every species in National Dex order, marked if registered. */
+export function getPokedex(): PokedexEntry[] {
+  const box = getState()
+  if (!box.registered) registerOwnedSpecies()
+  const registered = new Set(box.registered)
+  return nationalDexSpecies().map(({ num, species }) => ({ num, species, registered: registered.has(species) }))
 }
 
 function toView(mon: StoredMon): BoxPokemonView {

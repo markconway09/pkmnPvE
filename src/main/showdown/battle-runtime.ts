@@ -24,13 +24,22 @@ import {
   type PokemonSet
 } from './sim-access'
 import { effectiveStatsFor } from './effective-stats'
+import {
+  PARTIAL_TRAP_MOVES,
+  SINGLE_MOVE_IDS,
+  SINGLE_TURN_IDS,
+  badgeFor,
+  effectId,
+  withBadge,
+  withoutBadge
+} from './volatile-badges'
 import type { Pokemon as SimPokemon } from 'pokemon-showdown/dist/sim/pokemon.js'
 import { AIPlayer, type AiMovePower } from './battle-ai'
 
 // Moves that only work on the user's first turn after coming out.
 const FIRST_TURN_ONLY_MOVES = new Set(['fakeout', 'firstimpression', 'matblock'])
 import { getProgression, recordTrainerWin } from './progression-store'
-import { addCaughtMon, awardExpToTeam, awardFriendshipToTeam } from './box-store'
+import { addCaughtMon, awardExpToTeam, awardFriendshipToTeam, hasRegisteredSpecies } from './box-store'
 import { addItem, getItemQuantity, hasItem, removeItem } from './bag-store'
 import { addMoney, getMoney, spendMoney } from './money-store'
 import { countStat } from './stats-store'
@@ -544,7 +553,7 @@ export class WildBattle {
     // Each Pokemon's current stats are worked out here, at the moment of the
     // snapshot, so they match that log line's boosts, status, item and field.
     const clone = (v: ActivePokemonView | null, side: 'p1' | 'p2'): ActivePokemonView | null =>
-      v ? { ...v, boosts: { ...v.boosts }, effectiveStats: effectiveStatsFor(v, side, this.effects) } : null
+      v ? { ...v, boosts: { ...v.boosts }, volatiles: [...v.volatiles], effectiveStats: effectiveStatsFor(v, side, this.effects) } : null
     return {
       p1: [clone(this.active.p1a, 'p1'), clone(this.active.p1b, 'p1')],
       p2: [clone(this.active.p2a, 'p2'), clone(this.active.p2b, 'p2')],
@@ -574,6 +583,7 @@ export class WildBattle {
       // A Mega that switches back in is already one - its species name says so.
       megaEvolved: MEGA_FORME.test(species),
       boosts: {},
+      volatiles: [],
       switchSeq
     }
   }
@@ -716,7 +726,9 @@ export class WildBattle {
     if (cmd === 'turn') {
       for (const key of ['p1a', 'p1b', 'p2a', 'p2b'] as SlotKey[]) {
         const mon = this.active[key]
-        if (mon) mon.protecting = false
+        if (!mon) continue
+        mon.protecting = false
+        mon.volatiles = mon.volatiles.filter((b) => !SINGLE_TURN_IDS.has(b.id))
       }
       return
     }
@@ -745,6 +757,11 @@ export class WildBattle {
       '-start',
       '-end',
       '-singleturn',
+      '-singlemove',
+      '-activate',
+      '-mustrecharge',
+      'move',
+      'cant',
       '-terastallize',
       '-mega',
       '-burst',
@@ -765,6 +782,8 @@ export class WildBattle {
       this.switchSeq[slotKey]++
       this.addedType[slotKey] = null
       this.active[slotKey] = this.buildActiveView(species, hpPercent, fainted, status, set, this.switchSeq[slotKey])
+      // A wild battle is the one with no trainer (trainerId) on the other side.
+      if (side === 'p2' && !this.opponent?.trainerId) this.active[slotKey]!.caughtBefore = hasRegisteredSpecies(species)
       // Terastallizing lasts the whole battle: one that switches back in says so in its details.
       const tera = /(?:^|, )tera:([A-Za-z]+)/.exec(parts[2])?.[1]
       if (tera) {
@@ -809,6 +828,7 @@ export class WildBattle {
     } else if (cmd === 'faint') {
       current.hpPercent = 0
       current.fainted = true
+      current.volatiles = []
     } else if (cmd === '-status') {
       current.status = parts[2]
     } else if (cmd === '-curestatus') {
@@ -855,14 +875,40 @@ export class WildBattle {
         this.addedType[slotKey] = parts[3]
       } else if (parts[2] === 'Substitute') {
         current.substituted = true
+      } else {
+        const badge = badgeFor(parts[2], parts[3])
+        if (badge) current.volatiles = withBadge(current.volatiles, badge)
       }
     } else if (cmd === '-end') {
       if (parts[2] === 'Substitute') current.substituted = false
+      // A trap ends under the move's name ("Wrap"), tagged [partiallytrapped].
+      current.volatiles = parts.includes('[partiallytrapped]')
+        ? withoutBadge(current.volatiles, 'partiallytrapped')
+        : withoutBadge(current.volatiles, parts[2])
+    } else if (cmd === '-singlemove') {
+      const badge = badgeFor(parts[2])
+      if (badge) current.volatiles = withBadge(current.volatiles, badge)
+    } else if (cmd === '-activate') {
+      // Wrap, Fire Spin and the like announce their trap this way; Mean Look & co. as "trapped".
+      const id = effectId(parts[2])
+      const badge = PARTIAL_TRAP_MOVES.has(id) ? badgeFor('partiallytrapped') : id === 'trapped' ? badgeFor('trapped') : null
+      if (badge) current.volatiles = withBadge(current.volatiles, badge)
+    } else if (cmd === '-mustrecharge') {
+      current.volatiles = withBadge(current.volatiles, badgeFor('mustrecharge')!)
+    } else if (cmd === 'cant') {
+      if (parts[2] === 'recharge') current.volatiles = withoutBadge(current.volatiles, 'mustrecharge')
+    } else if (cmd === 'move') {
+      // Destiny Bond, Grudge and the like only last until its next move.
+      current.volatiles = current.volatiles.filter((b) => !SINGLE_MOVE_IDS.has(b.id))
     } else if (cmd === '-singleturn') {
       // Every Protect-family move announces this the same way, whichever one
       // it actually was - either "Protect" (Spiky Shield, King's Shield, ...)
       // or "move: Protect" (Protect/Detect themselves).
       if (parts[2] === 'Protect' || parts[2] === 'move: Protect') current.protecting = true
+      else {
+        const badge = badgeFor(parts[2])
+        if (badge) current.volatiles = withBadge(current.volatiles, badge)
+      }
     } else if (cmd === '-mega' || cmd === '-burst' || cmd === '-primal') {
       current.megaEvolved = true
     } else if (cmd === '-terastallize') {

@@ -19,6 +19,8 @@ import type {
   PremadeTeamSummary,
   ProgressionState,
   TrainerProfile,
+  BossRematchInfo,
+  PokedexEntry,
   UpdateCheckResult,
   UpdateProgress,
   SessionInfo,
@@ -41,7 +43,9 @@ const api = {
     ipcRenderer.invoke('battle:startPlayer', username, doubles),
   startBattle: (location?: WildLocationId, levelCap?: number): Promise<BattleView> =>
     ipcRenderer.invoke('battle:start', location, levelCap),
-  startTrainerBattle: (boss: boolean): Promise<BattleView> => ipcRenderer.invoke('battle:startTrainer', boss),
+  startTrainerBattle: (boss: boolean, rematchTrainerId?: string): Promise<BattleView> =>
+    ipcRenderer.invoke('battle:startTrainer', boss, rematchTrainerId),
+  getBossRematchList: (): Promise<BossRematchInfo[]> => ipcRenderer.invoke('battle:bossRematchList'),
   submitChoice: (choice: string): Promise<BattleView> => ipcRenderer.invoke('battle:choose', choice),
   catchWildPokemon: (): Promise<CatchResult> => ipcRenderer.invoke('battle:catch'),
   runFromBattle: (): Promise<void> => ipcRenderer.invoke('battle:run'),
@@ -68,7 +72,12 @@ const api = {
   useExpCandy: (itemId: string): Promise<ExpGainResult[]> => ipcRenderer.invoke('bag:useExpCandy', itemId),
   getMoney: (): Promise<number> => ipcRenderer.invoke('money:get'),
   getTrainerProfile: (): Promise<TrainerProfile> => ipcRenderer.invoke('profile:get'),
+  getPokedex: (): Promise<PokedexEntry[]> => ipcRenderer.invoke('profile:pokedex'),
   checkForUpdate: (): Promise<UpdateCheckResult> => ipcRenderer.invoke('update:check'),
+  // The player's own background picture as a data: URL (null = the plain one).
+  getBackground: (): Promise<string | null> => ipcRenderer.invoke('background:get'),
+  chooseBackground: (): Promise<string | null> => ipcRenderer.invoke('background:choose'),
+  clearBackground: (): Promise<void> => ipcRenderer.invoke('background:clear'),
   installUpdate: (): Promise<void> => ipcRenderer.invoke('update:install'),
   // Download/unpack progress while an update installs; returns a function to stop listening.
   onUpdateProgress: (listener: (progress: UpdateProgress) => void): (() => void) => {

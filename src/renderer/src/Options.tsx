@@ -1,18 +1,29 @@
 import { useState } from 'react'
 import { SPRITE_STYLES, SPRITE_STYLE_LABELS, spriteUrl, type SpriteStyle } from './spriteStyle'
 import UpdatesSection from './UpdatesSection'
+import BackgroundSection from './BackgroundSection'
 
 interface Props {
   username: string
   onLogout: () => Promise<void>
   spriteStyle: SpriteStyle
   onChangeSpriteStyle: (style: SpriteStyle) => void
+  background: string | null
+  onChangeBackground: (background: string | null) => void
   onBack: () => void
 }
 
 const PREVIEW_SPECIES_ID = 'pikachu'
 
-function Options({ username, onLogout, spriteStyle, onChangeSpriteStyle, onBack }: Props): React.JSX.Element {
+function Options({
+  username,
+  onLogout,
+  spriteStyle,
+  onChangeSpriteStyle,
+  background,
+  onChangeBackground,
+  onBack
+}: Props): React.JSX.Element {
   const [loggingOut, setLoggingOut] = useState(false)
 
   return (
@@ -50,6 +61,8 @@ function Options({ username, onLogout, spriteStyle, onChangeSpriteStyle, onBack 
           </button>
         ))}
       </div>
+
+      <BackgroundSection background={background} onChange={onChangeBackground} />
 
       <UpdatesSection />
 

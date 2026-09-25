@@ -3,6 +3,7 @@ import type {
   BattleView,
   FeedbackEvent,
   FieldEffectView,
+  ActivePokemonView,
   FieldSnapshot,
   GimmickEvent,
   MoveEvent,
@@ -101,6 +102,67 @@ function getGimmickOption(active: GimmickFlags): GimmickOption | null {
   return null
 }
 
+// Mega X/Y count as the same gimmick as Mega - a side gets one of each kind.
+function gimmickKind(suffix: string): string {
+  return suffix.startsWith('mega') ? 'mega' : suffix
+}
+
+// The gimmick a submitted choice uses ("move 2 terastallize 1" -> "terastallize"), if any.
+function gimmickKindInChoice(choice: string | null): string | null {
+  const suffix = choice?.split(' ').find((word) => /^(mega[xy]?|ultra|zmove|terastallize)$/.test(word))
+  return suffix ? gimmickKind(suffix) : null
+}
+
+// The team list and the Poke Balls at the top show where things stand at the point
+// the log has reached, not the end of the turn the server already sent - otherwise a
+// faint or a status would show up there before the animation for it plays.
+interface MonState {
+  hpPercent?: number
+  fainted: boolean
+  status: string | null
+}
+
+interface SettledTeams {
+  // How long the log was when this was the latest state - a longer log than what's
+  // revealed means it belongs to an earlier battle.
+  logLength: number
+  team: Map<string, MonState>
+  roster: Map<string, MonState>
+}
+
+// The same Pokemon across a forme change: "Charizard" and "Charizard-Mega-X".
+function sameMon(a: string, b: string): boolean {
+  return a === b || a.startsWith(`${b}-`) || b.startsWith(`${a}-`)
+}
+
+function lookupState(states: Map<string, MonState>, species: string): MonState | undefined {
+  const exact = states.get(species)
+  if (exact) return exact
+  for (const [name, state] of states) if (sameMon(name, species)) return state
+  return undefined
+}
+
+// Each side's state as of `upTo` log lines: the last settled state, moved forward by
+// every Pokemon seen on the field in the lines since (so one that switched out
+// mid-turn keeps the damage it took before leaving).
+function replayStates(
+  base: Map<string, MonState>,
+  snapshots: FieldSnapshot[],
+  from: number,
+  upTo: number,
+  side: 'p1' | 'p2'
+): Map<string, MonState> {
+  const states = new Map(base)
+  for (let i = from; i < upTo; i++) {
+    for (const mon of snapshots[i]?.[side] ?? []) {
+      if (!mon) continue
+      for (const name of [...states.keys()]) if (name !== mon.species && sameMon(name, mon.species)) states.delete(name)
+      states.set(mon.species, { hpPercent: mon.hpPercent, fainted: mon.fainted, status: mon.status })
+    }
+  }
+  return states
+}
+
 function renderLogLine(line: string): ReactNode {
   const parts = line.split('**')
   return parts.map((part, i) => (i % 2 === 1 ? <strong key={i}>{part}</strong> : part))
@@ -164,6 +226,29 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
     setSpriteStyle(style)
     saveSpriteStyle(style)
   }
+
+  // The player's own background picture (Options → Background), shown behind every
+  // screen - dimmed a little so the panels on top stay readable.
+  const [background, setBackground] = useState<string | null>(null)
+
+  useEffect(() => {
+    window.api.getBackground().then(setBackground, () => setBackground(null))
+  }, [])
+
+  useEffect(() => {
+    const body = document.body.style
+    if (background) {
+      body.backgroundImage = `linear-gradient(rgba(16, 20, 26, 0.55), rgba(16, 20, 26, 0.55)), url("${background}")`
+      body.backgroundSize = 'cover'
+      body.backgroundPosition = 'center'
+      body.backgroundAttachment = 'fixed'
+    } else {
+      body.backgroundImage = ''
+    }
+    return () => {
+      body.backgroundImage = ''
+    }
+  }, [background])
 
   function changeTrainerSprite(id: string): void {
     setTrainerSprite(id)
@@ -236,6 +321,36 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
   const caughtUp = !view || visibleLogCount >= view.log.length
   const isDoubles = !!view?.logStates.some((s) => s.p1[1] || s.p2[1])
   const activeFlags = view?.request?.side.pokemon.map((p) => p.active) ?? []
+
+  // Snapshot of both teams once the log is fully played out - the starting point the
+  // next turn's list is rewound to while that turn plays.
+  const [settled, setSettled] = useState<SettledTeams | null>(null)
+  useEffect(() => {
+    if (!view || !caughtUp) return
+    const toStates = (mons: { species: string; hpPercent?: number; fainted: boolean; status: string | null }[]) =>
+      new Map(mons.map((m) => [m.species, { hpPercent: m.hpPercent, fainted: m.fainted, status: m.status }]))
+    setSettled({ logLength: view.log.length, team: toStates(view.team), roster: toStates(view.opponentRoster) })
+  }, [view, caughtUp])
+  // A new battle starts its log from nothing - the last battle's teams mean nothing to it.
+  useEffect(() => {
+    if (revealedCount === 0) setSettled(null)
+  }, [revealedCount])
+  // Only while this turn's lines are still playing, and only for this battle.
+  const rewinding = !!view && !caughtUp && !!settled && settled.logLength <= visibleLogCount
+  const teamStates = rewinding ? replayStates(settled.team, view.logStates, settled.logLength, visibleLogCount, 'p1') : null
+  const rosterStates = rewinding ? replayStates(settled.roster, view.logStates, settled.logLength, visibleLogCount, 'p2') : null
+  const displayedTeam: ActivePokemonView[] = (view?.team ?? []).map((mon) => {
+    const state = teamStates && lookupState(teamStates, mon.species)
+    return state ? { ...mon, hpPercent: state.hpPercent ?? mon.hpPercent, fainted: state.fainted, status: state.status } : mon
+  })
+  const displayedRoster = (view?.opponentRoster ?? []).map((mon) => {
+    const state = rosterStates && lookupState(rosterStates, mon.species)
+    return state ? { ...mon, fainted: state.fainted, status: state.status } : mon
+  })
+  // Who's marked as out on the field - from the field itself while the turn plays.
+  const displayedActiveFlags = rewinding
+    ? displayedTeam.map((mon) => field.p1.some((a) => !!a && !a.fainted && sameMon(a.species, mon.species)))
+    : activeFlags
   // Only the line just revealed carries a result to flash - see BattleSprite,
   // which keeps it on screen for a bit after this goes back to null.
   const currentFeedback = visibleLogCount > 0 ? (view?.feedback[visibleLogCount - 1] ?? null) : null
@@ -272,11 +387,11 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
     }
   }
 
-  async function startTrainerBattle(boss: boolean): Promise<void> {
+  async function startTrainerBattle(boss: boolean, rematchTrainerId?: string): Promise<void> {
     setError(null)
     setBusy(true)
     try {
-      const initial = await skipTeamPreview(await window.api.startTrainerBattle(boss))
+      const initial = await skipTeamPreview(await window.api.startTrainerBattle(boss, rematchTrainerId))
       setBackdrop(randomBackdropId())
       setView(initial)
       setRevealedCount(0)
@@ -357,7 +472,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
     const slots = view?.request && 'active' in view.request ? (view.request.active ?? []) : []
     const kindOf = (i: number): string | null => {
       const option = slots[i] ? getGimmickOption(slots[i]) : null
-      return option ? (option.suffix.startsWith('mega') ? 'mega' : option.suffix) : null
+      return option ? gimmickKind(option.suffix) : null
     }
     setPendingGimmick((prev) => {
       const next = [...prev]
@@ -528,6 +643,8 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
         onLogout={onLogout}
         spriteStyle={spriteStyle}
         onChangeSpriteStyle={changeSpriteStyle}
+        background={background}
+        onChangeBackground={setBackground}
         onBack={() => setScreen('menu')}
       />
     )
@@ -555,6 +672,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
         onChangeWildLevelCap={setWildLevelCap}
         onTrainerFight={() => void startTrainerBattle(false)}
         onBossFight={() => void startTrainerBattle(true)}
+        onBossRematch={(trainerId) => void startTrainerBattle(true, trainerId)}
         onOptions={() => setScreen('options')}
         onTrainers={() => setScreen('trainers')}
         onProgression={() => setScreen('progression')}
@@ -584,8 +702,8 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
       <div className="switch-column">
         {switchTarget && (
           <TeamPanel
-            team={view!.team}
-            activeFlags={activeFlags}
+            team={displayedTeam}
+            activeFlags={displayedActiveFlags}
             selectable
             disabled={switchTarget.disabled}
             matchups={teamMatchupChips()}
@@ -604,7 +722,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
             <TrainerHud
               name="You"
               spriteId={trainerSprite}
-              roster={(view.team ?? []).map((m) => ({ species: m.species, fainted: m.fainted, status: m.status }))}
+              roster={displayedTeam.map((m) => ({ species: m.species, fainted: m.fainted, status: m.status }))}
               align="left"
               size="large"
             />
@@ -612,7 +730,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
               <TrainerHud
                 name={view.opponentTrainer.name}
                 spriteId={view.opponentTrainer.spriteId}
-                roster={view.opponentRoster}
+                roster={displayedRoster}
                 align="right"
                 size="large"
                 rewards={view.rewards}
@@ -690,7 +808,15 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
               // Doubles picks one Pokemon at a time - only its panel is on screen.
               if (slotIndex !== activeSelectSlot) return null
               const gimmick = getGimmickOption(active)
-              const gimmickOn = pendingGimmick[slotIndex] ?? false
+              // Doubles locks in one Pokemon at a time, so the gimmick may already be spoken
+              // for by a partner's locked-in move this turn - only one of each kind per turn
+              // (the sim rejects the whole turn otherwise).
+              const gimmickTaken =
+                !!gimmick &&
+                pendingChoices.some(
+                  (choice, i) => i !== slotIndex && gimmickKindInChoice(choice) === gimmickKind(gimmick.suffix)
+                )
+              const gimmickOn = (pendingGimmick[slotIndex] ?? false) && !gimmickTaken
               const chosen = pendingChoices[slotIndex] != null
               const slotMon = field.p1[slotIndex]
               // Its STAB types: once Terastallized, its original types still count and the
@@ -715,7 +841,8 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
                       {gimmick && (
                         <button
                           className={`gimmick-toggle ${gimmickOn ? 'gimmick-toggle-on' : ''}`}
-                          disabled={!caughtUp || busy || chosen}
+                          disabled={!caughtUp || busy || chosen || gimmickTaken}
+                          title={gimmickTaken ? 'Your other Pokemon is already using this this turn' : undefined}
                           onClick={() => togglePendingGimmick(slotIndex)}
                         >
                           {gimmickOn ? '☑' : '☐'} {gimmick.label}

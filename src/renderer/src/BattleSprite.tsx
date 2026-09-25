@@ -8,6 +8,7 @@ import SubstituteDoll from './SubstituteDoll'
 import ProtectShield from './ProtectShield'
 import SideScreens from './SideScreens'
 import { spriteCandidates, type SpriteStyle } from './spriteStyle'
+import ItemSprite from './ItemSprite'
 
 interface Props {
   pokemon: ActivePokemonView | null
@@ -67,6 +68,9 @@ function typesChanged(pokemon: ActivePokemonView): boolean {
   const sorted = (types: string[]): string => [...types].sort().join('/')
   return sorted(pokemon.types) !== sorted(pokemon.baseTypes)
 }
+
+// The Poke Ball item icon, shown by a wild Pokemon's name when that species has been caught before.
+const POKE_BALL_SPRITENUM = 345
 
 function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, hazards, screens, feedback, slot, gimmick }: Props): React.JSX.Element {
   const slotClass = `sprite-slot ${align}${slotIndex === 1 ? ' sprite-slot-second' : ''}`
@@ -207,6 +211,11 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
       <div className="sprite-info">
         <div className="sprite-name-row">
           <span className="sprite-name">{displayed.species}</span>
+          {displayed.caughtBefore && (
+            <span className="sprite-caught" title="Caught before">
+              <ItemSprite spritenum={POKE_BALL_SPRITENUM} />
+            </span>
+          )}
           {displayed.shiny && (
             <span className="sprite-shiny" title="Shiny">
               ★
@@ -253,7 +262,7 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
           <div className={`hp-bar-fill ${hpClass}`} style={{ width: `${displayed.hpPercent}%` }} />
           <span className="hp-bar-text">{displayed.hpPercent}%</span>
         </div>
-        {Object.keys(displayed.boosts).length > 0 && (
+        {(Object.keys(displayed.boosts).length > 0 || displayed.volatiles.length > 0) && (
           <div className="boost-row">
             {(Object.entries(displayed.boosts) as [BoostStat, number][])
               .filter(([, amount]) => amount !== 0)
@@ -264,6 +273,12 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
                   {amount}
                 </span>
               ))}
+            {/* Confused, Taunted, Leech Seed, Perish 2... - like Showdown's status line. */}
+            {displayed.volatiles.map((badge) => (
+              <span key={badge.id} className={`boost-badge volatile-badge volatile-${badge.kind}`}>
+                {badge.label}
+              </span>
+            ))}
           </div>
         )}
       </div>

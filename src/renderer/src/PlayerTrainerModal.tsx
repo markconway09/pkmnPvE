@@ -4,6 +4,7 @@ import { MAX_USERNAME_LENGTH } from '../../shared/battle-types'
 import type { LeagueMilestone, TrainerProfile } from '../../shared/battle-types'
 import { trainerSpriteUrl } from './trainerSprite'
 import TrainerSpritePicker from './TrainerSpritePicker'
+import PokedexModal from './PokedexModal'
 
 interface Props {
   username: string
@@ -22,6 +23,7 @@ function PlayerTrainerModal({
   onClose
 }: Props): React.JSX.Element {
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [pokedexOpen, setPokedexOpen] = useState(false)
   const [opponent, setOpponent] = useState('')
   const [players, setPlayers] = useState<string[]>([])
   const [challenging, setChallenging] = useState(false)
@@ -68,6 +70,9 @@ function PlayerTrainerModal({
             <span>{trainerSprite}</span>
             <span className="trainer-sprite-change-hint">Click to change</span>
           </div>
+        </button>
+        <button className="pokedex-button" onClick={() => setPokedexOpen(true)}>
+          Pokédex
         </button>
 
         {profile && (
@@ -156,6 +161,8 @@ function PlayerTrainerModal({
           <button onClick={onClose}>Close</button>
         </div>
       </div>
+
+      {pokedexOpen && <PokedexModal onClose={() => setPokedexOpen(false)} />}
 
       {pickerOpen && (
         <TrainerSpritePicker

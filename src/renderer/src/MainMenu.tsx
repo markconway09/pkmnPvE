@@ -23,6 +23,7 @@ import ShopModal from './ShopModal'
 import WildDropsModal from './WildDropsModal'
 import ShopPricesModal from './ShopPricesModal'
 import LoadoutsModal from './LoadoutsModal'
+import BossRematchModal from './BossRematchModal'
 import { trainerSpriteUrl } from './trainerSprite'
 
 interface Props {
@@ -33,6 +34,7 @@ interface Props {
   onChangeWildLevelCap: (levelCap: number) => void
   onTrainerFight: () => void
   onBossFight: () => void
+  onBossRematch: (trainerId: string) => void
   onOptions: () => void
   onTrainers: () => void
   onProgression: () => void
@@ -50,6 +52,19 @@ const EMPTY_TEAM: (string | null)[] = [null, null, null, null, null, null]
 // anything - the slider simply doesn't go lower.
 const WILD_LEVEL_CAP_MIN = 15
 
+// The box search: every word typed has to match something about the Pokemon - its
+// species, a type, its ability, item or nature, or one of its moves ("fire", "u-turn").
+function matchesBoxSearch(mon: BoxPokemonView, search: string): boolean {
+  const words = search.toLowerCase().split(/s+/).filter(Boolean)
+  if (words.length === 0) return true
+  const squash = (text: string): string => text.toLowerCase().replace(/[^a-z0-9]/g, '')
+  const haystack = [mon.species, ...mon.types, mon.ability, mon.item, mon.nature, ...mon.moveIds].map(squash)
+  return words.every((word) => {
+    const w = squash(word)
+    return !w || haystack.some((field) => field.includes(w))
+  })
+}
+
 function MainMenu({
   onFight,
   wildLocation,
@@ -58,6 +73,7 @@ function MainMenu({
   onChangeWildLevelCap,
   onTrainerFight,
   onBossFight,
+  onBossRematch,
   onOptions,
   onTrainers,
   onProgression,
@@ -82,6 +98,9 @@ function MainMenu({
   const [loadoutsOpen, setLoadoutsOpen] = useState(false)
   // Folds the battle buttons away so the box gets the rest of the window.
   const [boxExpanded, setBoxExpanded] = useState(false)
+  const [rematchOpen, setRematchOpen] = useState(false)
+  // Only there while the box is expanded - collapsing it clears the search.
+  const [boxSearch, setBoxSearch] = useState('')
   const [playerTrainerOpen, setPlayerTrainerOpen] = useState(false)
   const [starterOpen, setStarterOpen] = useState(false)
   const [bagOpen, setBagOpen] = useState(false)
@@ -260,6 +279,7 @@ function MainMenu({
   // Favorites first; otherwise the box keeps its usual (arrival) order.
   const boxMons = (boxState?.mons ?? [])
     .filter((m) => !team.includes(m.id))
+    .filter((m) => matchesBoxSearch(m, boxSearch))
     .sort((a, b) => Number(!!b.favorite) - Number(!!a.favorite))
   const teamCount = team.filter(Boolean).length
   const teamEmpty = teamCount === 0
@@ -279,6 +299,15 @@ function MainMenu({
     const remaining = nextBoss.requiredTrainerWins - nextBoss.trainerWinsSinceLastBoss
     bossHint = `Beat ${remaining} more trainer${remaining === 1 ? '' : 's'} to challenge ${nextBoss.trainerName}`
   } else bossHint = `Ready: ${nextBoss.trainerName}`
+  // Every boss beaten: Boss Battle becomes the rematch menu.
+  const allBossesDefeated = !!eligibility?.allBossesDefeated
+  if (allBossesDefeated) bossHint = 'Every boss is beaten - pick one to fight again'
+
+  // The Professor's Lab closes again if boss progress is reset - back to All.
+  const selectedLocation = WILD_LOCATIONS.find((l) => l.id === wildLocation)
+  useEffect(() => {
+    if (eligibility && selectedLocation?.requiresAllBosses && !eligibility.allBossesDefeated) onChangeWildLocation('all')
+  }, [eligibility, selectedLocation, onChangeWildLocation])
 
   return (
     <div className="screen">
@@ -322,22 +351,22 @@ function MainMenu({
             </button>
             <button
               className="big-battle-button"
-              disabled={fightBusy || teamEmpty || !eligibility?.hasBoss}
+              disabled={fightBusy || teamEmpty || !(eligibility?.hasBoss || allBossesDefeated)}
               title={bossHint}
-              onClick={onBossFight}
+              onClick={allBossesDefeated ? () => setRematchOpen(true) : onBossFight}
             >
               <img
                 className="big-battle-icon"
                 src={trainerSpriteUrl(nextBoss?.spriteId || 'giovanni')}
                 alt=""
               />
-              <span>Boss Battle</span>
+              <span>{allBossesDefeated ? 'Boss Rematch' : 'Boss Battle'}</span>
             </button>
           </div>
           {nextBoss && <p className="box-empty-hint battle-row-hint">{bossHint}</p>}
 
           <div className="wild-location-row">
-            {WILD_LOCATIONS.map((loc) => (
+            {WILD_LOCATIONS.filter((loc) => !loc.requiresAllBosses || allBossesDefeated).map((loc) => (
               <button
                 key={loc.id}
                 className={`wild-location-button${wildLocation === loc.id ? ' wild-location-button-active' : ''}`}
@@ -384,12 +413,32 @@ function MainMenu({
           <button
             className={`box-expand-button${boxExpanded ? ' box-expand-button-flipped' : ''}`}
             title={boxExpanded ? 'Show the battle buttons again' : 'Hide the battle buttons for a bigger box'}
-            onClick={() => setBoxExpanded((v) => !v)}
+            onClick={() => {
+              if (boxExpanded) setBoxSearch('')
+              setBoxExpanded((v) => !v)
+            }}
           >
             ▲
           </button>
+          {boxExpanded && (
+            <input
+              className="box-search"
+              type="search"
+              placeholder="Search name, type, move, ability, item…"
+              value={boxSearch}
+              autoFocus
+              onChange={(e) => setBoxSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setBoxSearch('')
+              }}
+            />
+          )}
         </div>
-        <BoxGrid mons={boxMons} onContextMenu={handleContextMenu} />
+        <BoxGrid
+          mons={boxMons}
+          onContextMenu={handleContextMenu}
+          emptyHint={boxSearch.trim() ? 'No Pokemon in the box match that search.' : undefined}
+        />
 
         <DragOverlay dropAnimation={{ duration: 200, easing: 'ease' }}>
           {activeDragMon && (
@@ -435,6 +484,16 @@ function MainMenu({
 
       {wildDropsOpen && <WildDropsModal onClose={() => setWildDropsOpen(false)} />}
       {shopPricesOpen && <ShopPricesModal onClose={() => setShopPricesOpen(false)} />}
+
+      {rematchOpen && (
+        <BossRematchModal
+          onClose={() => setRematchOpen(false)}
+          onRematch={(trainerId) => {
+            setRematchOpen(false)
+            onBossRematch(trainerId)
+          }}
+        />
+      )}
 
       {loadoutsOpen && (
         <LoadoutsModal

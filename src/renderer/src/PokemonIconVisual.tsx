@@ -29,6 +29,11 @@ function PokemonIconVisual({ mon }: Props): React.JSX.Element {
           {mon.shiny && <span title="Shiny">✨</span>}
         </span>
       )}
+      {mon.eligibleEvolutions && mon.eligibleEvolutions.length > 0 && (
+        <span className="box-icon-evo">
+          ▲
+        </span>
+      )}
       <span className="box-icon-name">{mon.species}</span>
       {mon.expPercent !== undefined && (
         <div className="exp-bar-track" title={`${mon.expPercent}% to next level`}>

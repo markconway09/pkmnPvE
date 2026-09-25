@@ -631,6 +631,56 @@ export function generateRandomWildMon(
   return null
 }
 
+// The Professor's Lab (a wild location once every boss is beaten) has its own table:
+// an unevolved regional starter 70% of the time, a fully evolved Pokemon that evolves
+// with an item (or a trade) 20%, and a Mythical, Ultra Beast or Paradox Pokemon the
+// last 10%, split evenly between them. Never a proper legendary.
+const LAB_STARTER_CHANCE = 0.7
+const LAB_ITEM_EVO_CHANCE = 0.2
+const LAB_RARE_TAGS = new Set(['Mythical', 'Ultra Beast', 'Paradox'])
+// Paradox Pokemon from the DLC that this Showdown version doesn't tag as Paradox.
+const UNTAGGED_PARADOX_IDS = new Set(['gougingfire', 'ragingbolt', 'ironboulder', 'ironcrown'])
+
+let cachedLabPools: { itemEvos: string[]; rare: string[] } | null = null
+
+function labPools(): { itemEvos: string[]; rare: string[] } {
+  if (!cachedLabPools) {
+    const usable = Dex.species
+      .all()
+      .filter(
+        (s) =>
+          s.exists &&
+          s.num > 0 &&
+          (!s.isNonstandard || s.isNonstandard === 'Past') &&
+          !isBattleOnlyForme(s) &&
+          isPlainSpecies(s)
+      )
+    cachedLabPools = {
+      itemEvos: usable
+        .filter((s) => s.evos.length === 0 && !!s.prevo && !!evolutionItemsFor(s))
+        .filter((s) => !s.tags.some((tag) => LEGENDARY_TAGS.has(tag)))
+        .map((s) => s.name),
+      rare: usable
+        .filter((s) => s.tags.some((tag) => LAB_RARE_TAGS.has(tag)) || UNTAGGED_PARADOX_IDS.has(s.id))
+        .filter((s) => !s.tags.includes('Restricted Legendary') && !s.tags.includes('Sub-Legendary'))
+        .map((s) => s.name)
+    }
+  }
+  return cachedLabPools
+}
+
+export function generateLabWildMon(levelCap: number): PokemonSet {
+  const min = Math.max(1, levelCap - 14)
+  const max = Math.max(min, levelCap - 4)
+  const level = min + Math.floor(Math.random() * (max - min + 1))
+  const { itemEvos, rare } = labPools()
+  const roll = Math.random()
+  const pool =
+    roll < LAB_STARTER_CHANCE ? REGIONAL_STARTER_SPECIES : roll < LAB_STARTER_CHANCE + LAB_ITEM_EVO_CHANCE ? itemEvos : rare
+  const species = pool[Math.floor(Math.random() * pool.length)]
+  return { ...buildBasicSet(species, level), shiny: Math.random() < 1 / WILD_SHINY_ODDS, nature: randomNatureName() }
+}
+
 const TERA_TYPES = [
   'Normal', 'Fire', 'Water', 'Electric', 'Grass', 'Ice', 'Fighting', 'Poison', 'Ground',
   'Flying', 'Psychic', 'Bug', 'Rock', 'Ghost', 'Dragon', 'Dark', 'Steel', 'Fairy', 'Stellar'
@@ -1391,6 +1441,26 @@ function evolutionItemsFor(evoSpecies: ReturnType<typeof Dex.species.get>): stri
   }
   if (evoSpecies.evoType === 'trade') return [evoSpecies.evoItem ? toID(evoSpecies.evoItem) : LINK_CABLE_ITEM_ID]
   return null
+}
+
+let cachedNationalDex: { num: number; species: string }[] | null = null
+
+/** Every species in National Dex order, one per number (base forms only). */
+export function nationalDexSpecies(): { num: number; species: string }[] {
+  if (!cachedNationalDex) {
+    const byNum = new Map<number, string>()
+    for (const s of Dex.species.all()) {
+      if (s.num > 0 && s.name === s.baseSpecies && !byNum.has(s.num)) byNum.set(s.num, s.name)
+    }
+    cachedNationalDex = [...byNum].sort((a, b) => a[0] - b[0]).map(([num, species]) => ({ num, species }))
+  }
+  return cachedNationalDex
+}
+
+/** The species a form belongs to, as the Pokedex counts it ("Vulpix-Alola" -> "Vulpix"). */
+export function dexBaseSpecies(speciesName: string): string {
+  const species = Dex.species.get(speciesName)
+  return species.exists ? species.baseSpecies : speciesName
 }
 
 export function evolutionOptionsFor(set: PokemonSet): EvolutionOption[] {

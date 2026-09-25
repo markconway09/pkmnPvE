@@ -85,7 +85,7 @@ export function prizeMoneyFor(isBoss: boolean, teamSize: number, levelCap: numbe
 // no type filtering at all (the old, pre-location behavior); `eggGroups`
 // works the same way when omitted. Exceptions match on base species name, so
 // every stage of a line is included by naming just one of them.
-export type WildLocationId = 'cave' | 'mountain' | 'forest' | 'city' | 'industry' | 'cemetery' | 'ocean' | 'all'
+export type WildLocationId = 'cave' | 'mountain' | 'forest' | 'city' | 'industry' | 'cemetery' | 'ocean' | 'all' | 'lab'
 
 export interface WildLocationConfig {
   id: WildLocationId
@@ -94,6 +94,9 @@ export interface WildLocationConfig {
   types: string[] | null
   eggGroups?: string[]
   exceptionBaseSpecies: string[]
+  // Only there once every boss is beaten, with an encounter table of its own
+  // (the Professor's Lab - see generateLabWildMon) instead of the type filters.
+  requiresAllBosses?: boolean
 }
 
 export const WILD_LOCATIONS: WildLocationConfig[] = [
@@ -161,6 +164,14 @@ export const WILD_LOCATIONS: WildLocationConfig[] = [
     icon: '🌐',
     types: null,
     exceptionBaseSpecies: []
+  },
+  {
+    id: 'lab',
+    label: "Professor's Lab",
+    icon: '🧪',
+    types: null,
+    exceptionBaseSpecies: [],
+    requiresAllBosses: true
   }
 ]
 
@@ -210,6 +221,14 @@ export interface PokemonSummary {
   shiny: boolean
 }
 
+export interface VolatileBadge {
+  // The effect's id ("taunt", "perish") - one badge per id.
+  id: string
+  label: string
+  // Colours it: good for its side (Aqua Ring), bad (Taunted) or neither (Uproar).
+  kind: 'good' | 'bad' | 'neutral'
+}
+
 export interface ActivePokemonView extends PokemonSummary {
   /**
    * What its types are without any change made in battle - "types" (from
@@ -235,6 +254,12 @@ export interface ActivePokemonView extends PokemonSummary {
   // in the same place as the Tera one.
   megaEvolved: boolean
   boosts: Partial<Record<BoostStat, number>>
+  // A wild Pokemon of a species the player has caught (had in their box) before -
+  // a Poke Ball shows by its name, like the games do.
+  caughtBefore?: boolean
+  // Temporary conditions on it (Confused, Taunted, Leech Seed, Perish 2, ...), shown as
+  // badges under its HP bar like Showdown does - see volatile-badges.ts.
+  volatiles: VolatileBadge[]
   /**
    * The stats it has at this moment - the base stats above with its stat stages
    * and the effect of its item, ability, status and the field applied. Only set
@@ -430,6 +455,17 @@ export interface NextBossInfo {
   ready: boolean
 }
 
+// One boss in the rematch menu (Boss Battle once every boss is beaten), in boss order.
+export interface BossRematchInfo {
+  // Its place in the boss order, from 1 - the same number the trainer list shows.
+  number: number
+  trainerId: string
+  trainerName: string
+  spriteId: string
+  // Only a boss already beaten can be rematched.
+  defeated: boolean
+}
+
 export interface BattleEligibility {
   // True while a Team Rocket event boss is queued: the Trainer Battle button is
   // Team Rocket only.
@@ -437,6 +473,8 @@ export interface BattleEligibility {
   hasTrainer: boolean
   hasBoss: boolean
   nextBoss: NextBossInfo | null
+  // Every boss in the order is beaten - the Boss Battle button opens the rematch menu.
+  allBossesDefeated: boolean
 }
 
 export const POKEMON_TYPES: string[] = [
@@ -672,6 +710,14 @@ export interface LeagueMilestone {
   spriteId: string
   // Null when that trainer isn't in the trainer list (so it can never be beaten).
   defeated: boolean | null
+}
+
+// One National Dex number in the trainer profile's Pokedex.
+export interface PokedexEntry {
+  num: number
+  species: string
+  // Had in the box at some point (see box-store's registered species).
+  registered: boolean
 }
 
 export interface TrainerProfile {

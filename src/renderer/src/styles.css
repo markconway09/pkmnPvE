@@ -436,6 +436,26 @@ body {
   pointer-events: none;
 }
 
+/* Evolution available: a green arrow on the right edge, below the team's remove button. */
+.box-icon-evo {
+  position: absolute;
+  top: 28px;
+  right: 4px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #2f9e4f;
+  border: 1px solid #7ee29a;
+  color: #fff;
+  font-size: 9px;
+  line-height: 1;
+  box-shadow: 0 0 6px rgba(126, 226, 154, 0.55);
+  pointer-events: none;
+}
+
 .box-icon-dragging {
   opacity: 0.3;
 }
@@ -3408,4 +3428,217 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+/* Options → Background: a small preview of the chosen picture next to its buttons. */
+.background-option-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.background-preview {
+  width: 128px;
+  height: 72px;
+  border: 1px solid #3a4150;
+  border-radius: 4px;
+  background: #10141a center / cover no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #7d8799;
+}
+
+/* Temporary conditions (Confused, Taunted, Aqua Ring...), after the stat stages. */
+.volatile-badge {
+  border-radius: 2px;
+}
+
+.volatile-bad {
+  color: #ff8a80;
+  background: rgba(224, 69, 59, 0.16);
+  border-color: #7a3a36;
+}
+
+.volatile-good {
+  color: #8be08f;
+  background: rgba(76, 175, 80, 0.14);
+  border-color: #3b6b3e;
+}
+
+.volatile-neutral {
+  color: #c9d1dc;
+  background: rgba(150, 160, 180, 0.12);
+}
+
+/* The box search - shown next to the Box heading only while the box is expanded. */
+.box-search {
+  width: 280px;
+  max-width: 50vw;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: #e6e6e6;
+  background: #10141a;
+  border: 1px solid #3a4150;
+  border-radius: 3px;
+  animation: box-search-in 0.25s ease;
+}
+
+.box-search:focus {
+  outline: none;
+  border-color: #6bb0ff;
+}
+
+@keyframes box-search-in {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+}
+
+/* A wild Pokemon of a species already caught - a little Poke Ball after its name. */
+.sprite-caught {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.sprite-caught > * {
+  transform: scale(0.75);
+  transform-origin: top left;
+}
+
+/* Trainer profile → Pokédex */
+.pokedex-button {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.pokedex-modal {
+  width: 900px;
+  display: flex;
+  flex-direction: column;
+}
+
+.pokedex-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.pokedex-header h2 {
+  margin: 0;
+}
+
+.pokedex-count {
+  color: #b7c0cf;
+  font-size: 13px;
+}
+
+.pokedex-search {
+  margin-left: auto;
+}
+
+.pokedex-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 6px;
+  max-height: 65vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.pokedex-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 88px;
+  padding: 4px 2px;
+  background: #232a36;
+  border: 1px solid #3a4150;
+  border-radius: 3px;
+}
+
+.pokedex-cell-unknown {
+  background: #1a1f28;
+}
+
+.pokedex-sprite {
+  max-width: 64px;
+  max-height: 56px;
+  image-rendering: pixelated;
+  margin: auto 0;
+}
+
+.pokedex-unknown {
+  margin: auto 0;
+  font-size: 30px;
+  font-weight: bold;
+  color: #4a5366;
+}
+
+.pokedex-name {
+  font-size: 11px;
+  text-align: center;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.pokedex-cell-unknown .pokedex-name {
+  color: #7d8799;
+}
+
+/* Boss Battle → rematch menu, once every boss is beaten. */
+.boss-rematch-modal {
+  width: 760px;
+}
+
+.boss-rematch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  max-height: 65vh;
+  overflow-y: auto;
+  margin: 10px 0;
+}
+
+.boss-rematch-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+}
+
+.boss-rematch-cell:disabled .boss-rematch-sprite {
+  filter: grayscale(1) brightness(0.5);
+}
+
+.boss-rematch-number {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  font-size: 11px;
+  color: #7d8799;
+}
+
+.boss-rematch-sprite {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.boss-rematch-name {
+  font-size: 12px;
+  text-align: center;
 }
