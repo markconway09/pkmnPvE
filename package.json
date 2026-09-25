@@ -1,6 +1,6 @@
 {
   "name": "pkmnpve",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "private": true,
   "description": "A menu-driven, single-player Pokemon PvE game built on the Pokemon Showdown battle engine",
   "main": "./out/main/index.js",

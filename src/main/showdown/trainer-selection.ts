@@ -23,6 +23,6 @@ export function isRocketEventActive(): boolean {
 export function eligibleRandomTrainers(levelCap: number, playerTeamSize: number): Trainer[] {
   const rocketOnly = isRocketEventActive()
   return listTrainers().filter(
-    (t) => !t.isBoss && (!rocketOnly || t.teamRocket) && isTrainerEligible(t, levelCap, playerTeamSize)
+    (t) => !t.isBoss && !t.rogueliteBoss && (!rocketOnly || t.teamRocket) && isTrainerEligible(t, levelCap, playerTeamSize)
   )
 }

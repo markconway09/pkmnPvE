@@ -326,7 +326,9 @@ body {
   margin-top: 8px;
   padding: 10px;
   border: 2px solid #3a4150;
-  background: #171b22;
+  /* See-through, so a custom background (Options → Background) shows behind it. */
+  background: rgba(23, 27, 34, 0.7);
+  backdrop-filter: blur(3px);
 }
 
 .box-empty-hint {
@@ -762,7 +764,8 @@ body {
   min-width: 220px;
   gap: 16px;
   padding: 10px 14px;
-  background: #1a2230;
+  background: rgba(26, 34, 48, 0.7);
+  backdrop-filter: blur(3px);
   border: 2px solid #3a4150;
 }
 
@@ -1601,7 +1604,8 @@ body {
   overflow-y: auto;
   border: 2px solid #3a4150;
   padding: 12px;
-  background: #171b22;
+  background: rgba(23, 27, 34, 0.7);
+  backdrop-filter: blur(3px);
   white-space: pre-wrap;
 }
 
@@ -3641,4 +3645,344 @@ button:disabled {
 .boss-rematch-name {
   font-size: 12px;
   text-align: center;
+}
+
+/* ---- Roguelite mode ---- */
+.mode-toggle-roguelite {
+  border-color: #b48cff;
+  color: #d9c7ff;
+}
+
+.run-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding-top: 8px;
+}
+
+.run-panel > .box-empty-hint {
+  max-width: 560px;
+  text-align: center;
+}
+
+.run-result {
+  margin: 0;
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.run-result-won {
+  color: #8be08f;
+  background: rgba(76, 175, 80, 0.14);
+  border: 1px solid #3b6b3e;
+}
+
+.run-result-lost {
+  color: #ff8a80;
+  background: rgba(224, 69, 59, 0.14);
+  border: 1px solid #7a3a36;
+}
+
+.run-starter-row {
+  display: flex;
+  justify-content: center;
+}
+
+.run-starter-slot {
+  width: 120px;
+  height: 138px;
+  border-color: #b48cff;
+}
+
+.run-start-button {
+  font-size: 16px;
+  padding: 8px 28px;
+  border-color: #b48cff;
+}
+
+.run-status-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  font-size: 14px;
+  color: #b7c0cf;
+}
+
+.run-status-row strong {
+  color: #e6e6e6;
+}
+
+.run-forfeit-button {
+  font-size: 12px;
+  padding: 3px 10px;
+}
+
+.run-mon-card-wrap {
+  display: block;
+}
+
+.run-mon-card {
+  position: relative;
+  flex-direction: column;
+  justify-content: flex-start;
+  height: 140px;
+  padding: 0 0 4px;
+  cursor: default;
+  font: inherit;
+  color: inherit;
+}
+
+.run-mon-card:disabled {
+  opacity: 1;
+}
+
+.run-mon-card .box-icon {
+  height: 110px;
+}
+
+.run-mon-card-selectable {
+  cursor: pointer;
+  border-color: #b48cff;
+  box-shadow: 0 0 8px rgba(180, 140, 255, 0.5);
+}
+
+.run-mon-hp {
+  width: 86%;
+  height: 6px;
+  background: #2a3140;
+  border: 1px solid #3a4150;
+}
+
+.run-mon-hp .hp-bar-fill {
+  height: 100%;
+}
+
+.run-mon-meta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+  margin-top: 3px;
+}
+
+.run-node-emoji {
+  font-size: 64px;
+  line-height: 94px;
+}
+
+.run-boss-silhouette {
+  filter: brightness(0);
+  opacity: 0.8;
+}
+
+.run-node-boss {
+  border-color: #e0453b;
+}
+
+.run-item-offer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.run-item-row {
+  display: flex;
+  gap: 10px;
+}
+
+.run-item-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+}
+
+.run-item-button-chosen {
+  border-color: #b48cff;
+  background: #2a2340;
+}
+
+.run-fainted-detail {
+  color: #ff8a80;
+}
+
+.trainer-roguelite-badge {
+  border-color: #b48cff;
+  color: #d9c7ff;
+}
+
+.run-reward-heading {
+  margin: 0;
+  color: #ffd76b;
+  font-size: 15px;
+}
+
+.run-item-skip {
+  color: #b7c0cf;
+}
+
+.run-mon-card {
+  touch-action: none;
+}
+
+.run-mon-card-dragging {
+  opacity: 0.85;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.6);
+}
+
+.run-reward-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* A run floor's options: up to five, three to a row. */
+.run-choice-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  max-width: calc(3 * 150px + 2 * 12px);
+}
+
+.run-choice-grid .run-node-button {
+  width: 150px;
+  height: 150px;
+  gap: 6px;
+  padding: 10px;
+  font-size: 15px;
+}
+
+.run-choice-grid .big-battle-icon {
+  width: 76px;
+  height: 76px;
+}
+
+.run-choice-grid .run-node-emoji {
+  font-size: 52px;
+  line-height: 76px;
+}
+
+.run-node-sub {
+  font-size: 11px;
+  color: #7d8799;
+}
+
+.run-node-lab {
+  border-color: #b48cff;
+  box-shadow: 0 0 10px rgba(180, 140, 255, 0.45);
+}
+
+/* Premade team roster: adding a chosen species. */
+.add-specific-button {
+  min-width: 200px;
+  align-self: flex-start;
+}
+
+.add-specific-row input {
+  flex: 1;
+}
+
+/* Roguelite: the next run's difficulty and generation, beside the starter slot. */
+.run-starter-row {
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.run-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 420px;
+}
+
+.run-difficulty-row {
+  display: flex;
+  gap: 6px;
+}
+
+.run-difficulty-button {
+  flex: 1;
+  padding: 6px 4px;
+}
+
+.run-difficulty-selected {
+  background: #2a2340;
+  border-color: #b48cff;
+}
+
+.run-difficulty-easy.run-difficulty-selected {
+  border-color: #4caf50;
+}
+
+.run-difficulty-hard.run-difficulty-selected {
+  border-color: #ff9f43;
+}
+
+.run-difficulty-extreme.run-difficulty-selected {
+  border-color: #e0453b;
+}
+
+.run-difficulty-text {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #b7c0cf;
+}
+
+.run-generation-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.run-difficulty-tag {
+  padding: 1px 8px;
+  border: 1px solid #3a4150;
+  border-radius: 3px;
+}
+
+.run-difficulty-tag.run-difficulty-easy {
+  color: #8be08f;
+}
+
+.run-difficulty-tag.run-difficulty-hard {
+  color: #ffb86b;
+}
+
+.run-difficulty-tag.run-difficulty-extreme {
+  color: #ff8a80;
+}
+
+.run-result p {
+  margin: 0;
+}
+
+.run-reward-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.run-reward-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #e6e6e6;
+}
+
+/* A run in progress has the whole menu to itself (no team or box below): it fills the
+   space under the header and sits in the middle of it. */
+.battle-section-run {
+  flex: 1;
+  grid-template-rows: auto;
+  align-content: center;
+  min-height: 0;
 }

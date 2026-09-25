@@ -35,7 +35,7 @@ import {
 import { loadLegacyTrainerSprite } from './trainerSprite'
 import Login from './Login'
 
-type Screen = 'menu' | 'battle' | 'options' | 'trainers' | 'premadeTeams' | 'progression'
+type Screen = 'menu' | 'battle' | 'options' | 'trainers' | 'rogueliteBosses' | 'premadeTeams' | 'progression'
 
 const REVEAL_DELAY_MS = 350
 const EMPTY_FIELD: FieldSnapshot = { p1: [], p2: [], effects: [] }
@@ -193,6 +193,8 @@ interface GameProps {
 
 function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onLogout }: GameProps): React.JSX.Element {
   const [screen, setScreen] = useState<Screen>('menu')
+  // Which trainer list the premade teams screen was opened from, to go back to.
+  const [premadeTeamsBack, setPremadeTeamsBack] = useState<Screen>('trainers')
   const [view, setView] = useState<BattleView | null>(null)
   const [revealedCount, setRevealedCount] = useState(0)
   const [busy, setBusy] = useState(false)
@@ -405,6 +407,17 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
 
   // Another player's saved team. Unlike the other fights, a failure is thrown back to
   // whoever asked (the challenge box shows it) rather than set on the main menu.
+  // A Roguelite floor's fight, already started by the run menu. A failure goes back to
+  // the run menu, which shows it.
+  async function startRunBattle(started: BattleView, location?: WildLocationId): Promise<void> {
+    setError(null)
+    const initial = await skipTeamPreview(started)
+    setBackdrop(randomBackdropId(location))
+    setView(initial)
+    setRevealedCount(0)
+    setScreen('battle')
+  }
+
   async function startPlayerBattle(name: string, doubles: boolean): Promise<void> {
     setBusy(true)
     try {
@@ -651,11 +664,32 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
   }
 
   if (screen === 'trainers') {
-    return <TrainerList onBack={() => setScreen('menu')} onPremadeTeams={() => setScreen('premadeTeams')} />
+    return (
+      <TrainerList
+        onBack={() => setScreen('menu')}
+        onPremadeTeams={() => {
+          setPremadeTeamsBack('trainers')
+          setScreen('premadeTeams')
+        }}
+      />
+    )
+  }
+
+  if (screen === 'rogueliteBosses') {
+    return (
+      <TrainerList
+        roguelite
+        onBack={() => setScreen('menu')}
+        onPremadeTeams={() => {
+          setPremadeTeamsBack('rogueliteBosses')
+          setScreen('premadeTeams')
+        }}
+      />
+    )
   }
 
   if (screen === 'premadeTeams') {
-    return <PremadeTeamsList onBack={() => setScreen('trainers')} />
+    return <PremadeTeamsList onBack={() => setScreen(premadeTeamsBack)} />
   }
 
   if (screen === 'progression') {
@@ -675,6 +709,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
         onBossRematch={(trainerId) => void startTrainerBattle(true, trainerId)}
         onOptions={() => setScreen('options')}
         onTrainers={() => setScreen('trainers')}
+        onRogueliteBosses={() => setScreen('rogueliteBosses')}
         onProgression={() => setScreen('progression')}
         fightBusy={busy}
         fightError={error}
@@ -683,6 +718,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
         username={username}
         isAdmin={isAdmin}
         onChallengePlayer={startPlayerBattle}
+        onRunBattle={startRunBattle}
       />
     )
   }
@@ -798,6 +834,9 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
             canCatch={view.winner === 'You' && !view.opponentTrainer}
             isWildBattle={!view.opponentTrainer}
             opponentShiny={!!view.p2[0]?.shiny}
+            runBattle={view.runBattle}
+            runFainted={view.runFainted}
+            runItemReward={view.runItemReward}
             onClose={() => setScreen('menu')}
           />
         )}

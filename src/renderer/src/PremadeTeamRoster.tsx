@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   DndContext,
@@ -35,6 +35,18 @@ function PremadeTeamRoster({ team, items, onClose, onTeamsChange }: Props): Reac
   const [dropChance, setDropChance] = useState(team.drop.chance)
   const [isDoubleBattle, setIsDoubleBattle] = useState(team.isDoubleBattle)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+  // "Add Specific Pokemon": the species being typed, and every species to pick from.
+  const [adding, setAdding] = useState(false)
+  const [speciesQuery, setSpeciesQuery] = useState('')
+  const [speciesNames, setSpeciesNames] = useState<string[]>([])
+
+  useEffect(() => {
+    if (!adding || speciesNames.length > 0) return
+    window.api
+      .getEditorOptions()
+      .then((opts) => setSpeciesNames(opts.species.map((s) => s.name)))
+      .catch(() => {})
+  }, [adding, speciesNames.length])
 
   async function saveDrop(itemId: string | null, chance: number): Promise<void> {
     try {
@@ -53,10 +65,19 @@ function PremadeTeamRoster({ team, items, onClose, onTeamsChange }: Props): Reac
     }
   }
 
-  async function addRandomMon(): Promise<void> {
+  // Adds the typed species, then opens it in the editor to set up its moves and the rest.
+  async function addSpecificMon(): Promise<void> {
+    const species = speciesQuery.trim()
+    if (!species) return
     setBusy(true)
+    setError(null)
     try {
-      onTeamsChange(await window.api.addRandomTeamMon(team.id))
+      const teams = await window.api.addSpeciesToTeam(team.id, species)
+      onTeamsChange(teams)
+      const added = teams.find((t) => t.id === team.id)?.mons.at(-1)
+      setAdding(false)
+      setSpeciesQuery('')
+      if (added) setEditingMonId(added.id)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -150,9 +171,43 @@ function PremadeTeamRoster({ team, items, onClose, onTeamsChange }: Props): Reac
             void saveDrop(dropItemId, chance)
           }}
         />
-        <button disabled={busy || team.mons.length >= MAX_TEAM_SIZE} onClick={() => void addRandomMon()}>
-          Add Random Pokemon
-        </button>
+        {adding ? (
+          <form
+            className="trainer-add-row add-specific-row"
+            onSubmit={(e) => {
+              e.preventDefault()
+              void addSpecificMon()
+            }}
+          >
+            <input
+              type="text"
+              list="premade-species-options"
+              placeholder="Species (e.g. Garchomp)"
+              value={speciesQuery}
+              autoFocus
+              onChange={(e) => setSpeciesQuery(e.target.value)}
+            />
+            <datalist id="premade-species-options">
+              {speciesNames.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
+            <button type="submit" disabled={busy || !speciesQuery.trim()}>
+              Add
+            </button>
+            <button type="button" onClick={() => setAdding(false)}>
+              Cancel
+            </button>
+          </form>
+        ) : (
+          <button
+            className="add-specific-button"
+            disabled={busy || team.mons.length >= MAX_TEAM_SIZE}
+            onClick={() => setAdding(true)}
+          >
+            Add Specific Pokemon
+          </button>
+        )}
         {error && <p className="editor-error">{error}</p>}
         <p className="box-empty-hint">
           Right-click a Pokemon to edit it. Drag to reorder. Click × to remove it.

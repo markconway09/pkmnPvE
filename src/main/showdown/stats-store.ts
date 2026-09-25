@@ -7,10 +7,10 @@ import { onPlayerChange } from './player-session'
 // counted here - the progression's own list of beaten bosses already says that.
 type StoredStats = Omit<PlayerStats, 'bossesDefeated'>
 
-const COUNTERS: (keyof StoredStats)[] = ['trainersDefeated', 'wildDefeated', 'wildCaught']
+const COUNTERS: (keyof StoredStats)[] = ['trainersDefeated', 'wildDefeated', 'wildCaught', 'bestFloor']
 
 function emptyStats(): StoredStats {
-  return { trainersDefeated: 0, wildDefeated: 0, wildCaught: 0 }
+  return { trainersDefeated: 0, wildDefeated: 0, wildCaught: 0, bestFloor: 0 }
 }
 
 function load(): StoredStats {
@@ -48,7 +48,14 @@ export function getStats(): StoredStats {
   return { ...getState() }
 }
 
-export function countStat(key: keyof StoredStats): void {
+/** Roguelite: keeps the furthest floor a run has reached. */
+export function recordBestFloor(floor: number): void {
+  if (floor <= getState().bestFloor) return
+  getState().bestFloor = floor
+  persist()
+}
+
+export function countStat(key: Exclude<keyof StoredStats, 'bestFloor'>): void {
   getState()[key] += 1
   persist()
 }

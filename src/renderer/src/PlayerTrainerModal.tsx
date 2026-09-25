@@ -117,6 +117,10 @@ function PlayerTrainerModal({
                 <span className="profile-stat-value">{profile.stats.wildCaught.toLocaleString('en-US')}</span>
                 <span className="profile-stat-label">Wild Pokémon caught</span>
               </div>
+              <div className="profile-stat">
+                <span className="profile-stat-value">{profile.stats.bestFloor || '—'}</span>
+                <span className="profile-stat-label">Roguelite best floor</span>
+              </div>
             </div>
           </div>
         )}

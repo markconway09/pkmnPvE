@@ -1097,6 +1097,8 @@ export function pokeballPrice(): number {
  * isLateGameItem), so a dropped evolution item can always be sold.
  */
 export function sellPriceFor(itemId: string): number | null {
+  // Random Pokemon / Random Legendary can't be sold back - too easy to lose one by accident.
+  if (OPENABLE_ITEM_IDS.has(itemId)) return null
   const item = getShopCatalog().find((i) => i.id === itemId)
   return item ? Math.floor(item.price / 2) : null
 }
@@ -1313,6 +1315,11 @@ function naturalMoveset(speciesId: string, level: number): string[] {
     .map(([id]) => id)
 }
 
+/** The moves a Pokemon of this species knows from levelling up alone, at this level. */
+export function levelUpMoveset(speciesName: string, level: number): string[] {
+  return naturalMoveset(Dex.species.get(speciesName).id, level)
+}
+
 export function buildBasicSet(speciesName: string, level: number): PokemonSet {
   const species = Dex.species.get(speciesName)
   const ability = species.abilities[0]
@@ -1457,6 +1464,25 @@ export function nationalDexSpecies(): { num: number; species: string }[] {
   return cachedNationalDex
 }
 
+/** A species' proper name ("garchomp" -> "Garchomp"), or null if there's no such Pokemon. */
+export function canonicalSpeciesName(name: string): string | null {
+  const species = Dex.species.get(name)
+  return species.exists && species.num > 0 ? species.name : null
+}
+
+/** The Mega Stones that Mega Evolve this exact species (Charizard: X and Y), by item id. */
+export function megaStonesFor(speciesName: string): string[] {
+  const name = Dex.species.get(speciesName).name
+  return Dex.items
+    .all()
+    .filter((item) => {
+      const stone = item.megaStone as Record<string, string> | string | undefined
+      if (!stone || item.isNonstandard === 'CAP') return false
+      return typeof stone === 'string' ? !!item.itemUser?.includes(name) : Object.keys(stone).includes(name)
+    })
+    .map((item) => item.id)
+}
+
 /** The species a form belongs to, as the Pokedex counts it ("Vulpix-Alola" -> "Vulpix"). */
 export function dexBaseSpecies(speciesName: string): string {
   const species = Dex.species.get(speciesName)
@@ -1486,6 +1512,27 @@ export function evolutionOptionsFor(set: PokemonSet): EvolutionOption[] {
     }
   }
   return options
+}
+
+/**
+ * Roguelite: what a run Pokemon can evolve into. There's no bag in a run, so an
+ * evolution needs no item, trade or friendship - only the level the wild generator
+ * would plausibly meet that stage at (its own level for a level-up evolution; 30, or
+ * 10 after the previous stage, for anything else - see stageReachLevel).
+ */
+export function runEvolutionOptions(set: PokemonSet): string[] {
+  return Dex.species
+    .get(set.species)
+    .evos.map((name) => Dex.species.get(name))
+    .filter(
+      (evo) =>
+        evo.exists &&
+        !isBattleOnlyForme(evo) &&
+        stageReachLevel(evo) <= set.level &&
+        // A one-gender evolution (Gallade, Froslass...) needs a Pokemon of that gender.
+        (!evo.gender || !set.gender || evo.gender === set.gender)
+    )
+    .map((evo) => evo.name)
 }
 
 export function evolveSet(set: PokemonSet, targetSpecies: string): PokemonSet {

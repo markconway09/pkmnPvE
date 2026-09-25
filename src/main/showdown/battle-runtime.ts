@@ -44,6 +44,13 @@ import { addItem, getItemQuantity, hasItem, removeItem } from './bag-store'
 import { addMoney, getMoney, spendMoney } from './money-store'
 import { countStat } from './stats-store'
 import { expYieldFor } from './exp'
+import {
+  addRunCatch,
+  finishRunBattleFled,
+  finishRunBattleLost,
+  finishRunBattleWon,
+  type RunBattleOutcome
+} from './run-store'
 import { DEFAULT_POKEBALL_ID, prizeMoneyFor } from '../../shared/battle-types'
 import type {
   ActivePokemonView,
@@ -63,6 +70,7 @@ import type {
   LiveMovePower,
   MoveEvent,
   RosterSlotView,
+  RunNodeKind,
   TrainerBattleInfo
 } from '../../shared/battle-types'
 
@@ -209,6 +217,10 @@ export interface OpponentConfig {
   // A friendly match (another player's saved team): winning gives no exp, money,
   // friendship, item drops or boss progress.
   noRewards?: boolean
+  // A Roguelite run's battle (see run-store): the run's team goes in with the HP and
+  // status it had (one entry per team member, in order), and how it ends goes back
+  // to the run - never to the box, bag, money, stats or boss progress.
+  run?: { conditions: { hp: number; status: string | null }[]; kind: RunNodeKind }
 }
 
 class HumanPlayer extends BattlePlayer {
@@ -279,6 +291,10 @@ export class WildBattle {
   private itemDrops: ItemDropResult[] = []
   private moneyGained = 0
   private caught = false
+  // Roguelite: the run Pokemon that fainted in this battle, and so left the run's team.
+  private runFainted: string[] = []
+  // Roguelite: a won trainer or boss battle left an item to pick back on the run menu.
+  private runItemReward = false
 
   constructor(
     p1team: PokemonSet[],
@@ -303,11 +319,61 @@ export class WildBattle {
     const p1spec = { name: 'You', team: packTeam(this.p1team) }
     const p2spec = { name: opponent?.name ?? 'Wild', team: packTeam(this.p2team) }
 
-    void this.streams.omniscient.write(
-      `>start ${JSON.stringify(spec)}\n` +
-        `>player p1 ${JSON.stringify(p1spec)}\n` +
-        `>player p2 ${JSON.stringify(p2spec)}`
-    )
+    // Straight to the battle stream, which handles each write as it comes: with only
+    // p1 in, their Pokemon exist but the battle hasn't started, so a run's carried-over
+    // HP and status can be set before anyone is sent out.
+    void this.battleStream.write(`>start ${JSON.stringify(spec)}\n>player p1 ${JSON.stringify(p1spec)}`)
+    if (opponent?.run) this.applyRunConditions(opponent.run.conditions)
+    void this.battleStream.write(`>player p2 ${JSON.stringify(p2spec)}`)
+  }
+
+  private applyRunConditions(conditions: { hp: number; status: string | null }[]): void {
+    const battle = this.battleStream.battle
+    const side = battle?.sides[0]
+    if (!battle || !side) return
+    side.pokemon.forEach((mon, i) => {
+      const condition = conditions[i]
+      if (!condition) return
+      mon.hp = Math.max(1, Math.min(mon.maxhp, Math.round(condition.hp * mon.maxhp)))
+      if (condition.status) {
+        mon.status = condition.status as typeof mon.status
+        mon.statusState = battle.initEffectState({ id: condition.status, target: mon })
+        // Asleep: a couple of turns left, rather than a fresh roll.
+        if (condition.status === 'slp') {
+          mon.statusState.startTime = 2
+          mon.statusState.time = 2
+        }
+      }
+    })
+  }
+
+  // How each of the player's Pokemon ended up, in team order (the sim reorders its
+  // own list as Pokemon switch, but each keeps the set it was built from).
+  private p1Outcome(): RunBattleOutcome[] {
+    const side = this.battleStream.battle?.sides[0]
+    if (!side) return []
+    return side.team.map((set) => {
+      const mon = side.pokemon.find((p) => p.set === set)
+      if (!mon) return { hp: 1, status: null, fainted: false }
+      return {
+        hp: mon.maxhp > 0 ? mon.hp / mon.maxhp : 0,
+        status: mon.status || null,
+        fainted: mon.fainted || mon.hp <= 0
+      }
+    })
+  }
+
+  // A run battle's end goes to the run instead of the regular rewards.
+  private finishRunBattle(): void {
+    if (this.winner === 'You') {
+      const { expGains, fainted, itemReward } = finishRunBattleWon(this.p1Outcome(), this.opponent!.run!.kind)
+      this.expGains = expGains
+      this.runFainted = fainted
+      this.runItemReward = itemReward
+    } else {
+      this.runFainted = this.p1team.map((mon) => mon.species)
+      finishRunBattleLost()
+    }
   }
 
   private async drainOmniscient(): Promise<void> {
@@ -358,7 +424,9 @@ export class WildBattle {
         if (line.startsWith('|win|')) {
           this.ended = true
           this.winner = line.slice('|win|'.length)
-          if (this.winner === 'You' && !this.opponent?.noRewards) {
+          if (this.opponent?.run) {
+            this.finishRunBattle()
+          } else if (this.winner === 'You' && !this.opponent?.noRewards) {
             if (this.opponent?.trainerId) {
               // The cap the fight was held under - read before a boss win raises it.
               const levelCap = getProgression().levelCap
@@ -381,6 +449,8 @@ export class WildBattle {
         } else if (line === '|tie') {
           this.ended = true
           this.winner = null
+          // Both sides down at once: the run's whole team is gone too.
+          if (this.opponent?.run) this.finishRunBattle()
           this.wake()
         }
       }
@@ -654,6 +724,12 @@ export class WildBattle {
     if (!this.ended || this.winner !== 'You') throw new Error('You have not won this battle yet')
     if (this.opponent?.trainerId) throw new Error('Only a wild Pokemon can be caught')
     if (this.caught) throw new Error('This Pokemon has already been caught')
+    if (this.opponent?.run) {
+      // A run catch is free and joins the run's team, not the box.
+      addRunCatch(this.p2team[0])
+      this.caught = true
+      return { money: getMoney(), pokeballs: getItemQuantity(DEFAULT_POKEBALL_ID) }
+    }
     if (hasItem(DEFAULT_POKEBALL_ID)) {
       removeItem(DEFAULT_POKEBALL_ID, 1)
     } else {
@@ -670,6 +746,12 @@ export class WildBattle {
   // battle you walked away from, and the battle is simply abandoned.
   assertCanRun(): void {
     if (this.opponent?.trainerId) throw new Error("You can't run from a trainer battle")
+  }
+
+  /** Runs away. In a run, the floor still counts as cleared, and the team keeps the damage it took. */
+  runAway(): void {
+    this.assertCanRun()
+    if (this.opponent?.run && !this.ended) finishRunBattleFled(this.p1Outcome())
   }
 
   // Which slot(s) a spread move hits, given who's actually out and alive right
@@ -1075,7 +1157,10 @@ export class WildBattle {
       moveEffectiveness: this.moveEffectivenessView(),
       opponentTrainer,
       opponentRoster: this.opponentRoster(),
-      rewards: this.rewardsView()
+      rewards: this.rewardsView(),
+      runBattle: !!this.opponent?.run,
+      runFainted: this.runFainted,
+      runItemReward: this.runItemReward
     }
   }
 
@@ -1083,7 +1168,7 @@ export class WildBattle {
   // with each chance - shown when hovering the opponent.
   private rewardsView(): BattleRewardsView | null {
     const opponent = this.opponent
-    if (opponent?.noRewards) return null
+    if (opponent?.noRewards || opponent?.run) return null
     const catalog = new Map(getEditorOptions().items.map((i) => [i.id, i]))
     const items: RewardItemView[] = []
     const add = (drop: ItemDropConfig | undefined, source: RewardItemView['source']): void => {

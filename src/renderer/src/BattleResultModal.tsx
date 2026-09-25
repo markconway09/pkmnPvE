@@ -12,6 +12,12 @@ interface Props {
   canCatch: boolean
   isWildBattle: boolean
   opponentShiny: boolean
+  // A Roguelite run's battle: catching is free and joins the run's team, and the
+  // Pokemon that fainted have left the run.
+  runBattle?: boolean
+  runFainted?: string[]
+  // A run's trainer or boss beaten: a held item to pick waits on the run menu.
+  runItemReward?: boolean
   onClose: () => void
 }
 
@@ -23,6 +29,9 @@ function BattleResultModal({
   canCatch,
   isWildBattle,
   opponentShiny,
+  runBattle = false,
+  runFainted = [],
+  runItemReward = false,
   onClose
 }: Props): React.JSX.Element {
   const [confirmingLeave, setConfirmingLeave] = useState(false)
@@ -34,7 +43,7 @@ function BattleResultModal({
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!canCatch) return
+    if (!canCatch || runBattle) return
     Promise.all([window.api.listBag(), window.api.getMoney(), window.api.listShop()])
       .then(([bag, m, shop]) => {
         setPokeballs(bag.find((i) => i.id === DEFAULT_POKEBALL_ID)?.quantity ?? 0)
@@ -42,7 +51,7 @@ function BattleResultModal({
         setPokeballPrice(shop.find((i) => i.id === DEFAULT_POKEBALL_ID)?.price ?? POKEBALL_PRICE)
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
-  }, [canCatch])
+  }, [canCatch, runBattle])
 
   async function catchPokemon(): Promise<void> {
     setBusy(true)
@@ -61,10 +70,12 @@ function BattleResultModal({
 
   const hasPokeballs = (pokeballs ?? 0) > 0
   const canAfford = (money ?? 0) >= pokeballPrice
-  const catchDisabled = busy || caught || pokeballs === null || (!hasPokeballs && !canAfford)
+  const catchDisabled = runBattle ? busy || caught : busy || caught || pokeballs === null || (!hasPokeballs && !canAfford)
   const catchLabel = caught
     ? 'Caught!'
-    : hasPokeballs
+    : runBattle
+      ? 'Catch it for your run'
+      : hasPokeballs
       ? `Catch (${pokeballs} Poke Ball${pokeballs === 1 ? '' : 's'})`
       : `Buy Poke Ball (₽${pokeballPrice})`
 
@@ -74,6 +85,7 @@ function BattleResultModal({
   let heading = 'The battle ended in a tie.'
   if (winner === 'You') heading = 'You won the battle!'
   else if (winner) heading = isWildBattle ? 'You lost to the wild pokemon!' : `${winner} won the battle!`
+  if (runBattle && winner !== 'You') heading = 'Your run is over!'
 
   return createPortal(
     <div className="modal-overlay">
@@ -87,6 +99,24 @@ function BattleResultModal({
           </div>
         )}
         {error && <p className="editor-error">{error}</p>}
+        {runItemReward && (
+          <div className="exp-gain-list">
+            <div className="exp-gain-row">
+              <span className="exp-gain-species">Reward</span>
+              <span className="exp-gain-detail">Pick a held item back on the run menu</span>
+            </div>
+          </div>
+        )}
+        {runBattle && winner === 'You' && runFainted.length > 0 && (
+          <div className="exp-gain-list">
+            {runFainted.map((species, i) => (
+              <div key={i} className="exp-gain-row">
+                <span className="exp-gain-species">{species}</span>
+                <span className="exp-gain-detail run-fainted-detail">Fainted - left the run</span>
+              </div>
+            ))}
+          </div>
+        )}
         {moneyGained > 0 && (
           <div className="exp-gain-list">
             <div className="exp-gain-row">

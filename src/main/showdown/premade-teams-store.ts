@@ -4,8 +4,9 @@ import type { EditablePokemonSet, ItemDropConfig, PremadeTeamSummary } from '../
 import {
   applyEditableSet,
   bstOf,
+  buildBasicSet,
   buildPokemonSummary,
-  generateRandomSingle,
+  canonicalSpeciesName,
   maxBstForLevelCap,
   toEditableSet,
   type PokemonSet
@@ -202,10 +203,20 @@ export function deleteTeamsForTrainer(trainerId: string): void {
   persist()
 }
 
-export function addRandomMonToTeam(teamId: string): PremadeTeamSummary[] {
+// A Pokemon added to an empty team starts at this level (otherwise at the team's highest).
+const NEW_TEAM_MON_LEVEL = 50
+
+/**
+ * Adds a chosen species to a team - at the level of its strongest member, with its
+ * first ability and the moves it knows from levelling up - ready to be edited.
+ */
+export function addSpeciesToTeam(teamId: string, species: string): PremadeTeamSummary[] {
   const team = findTeam(teamId)
   if (team.mons.length >= MAX_TEAM_SIZE) throw new Error(`A team can have at most ${MAX_TEAM_SIZE} Pokemon`)
-  team.mons.push({ id: randomUUID(), set: generateRandomSingle('gen9randombattle') })
+  const name = canonicalSpeciesName(species)
+  if (!name) throw new Error(`There's no Pokemon called "${species}"`)
+  const level = team.mons.length > 0 ? Math.max(...team.mons.map((m) => m.set.level)) : NEW_TEAM_MON_LEVEL
+  team.mons.push({ id: randomUUID(), set: buildBasicSet(name, level) })
   persist()
   return listPremadeTeamsForTrainer(team.trainerId)
 }

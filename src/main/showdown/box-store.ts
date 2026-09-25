@@ -192,6 +192,13 @@ export function setTeam(team: (string | null)[]): BoxState {
   return getBoxState()
 }
 
+/** A detached copy of a box Pokemon's set - for a Roguelite run, which must never change the original. */
+export function copyBoxMonSet(id: string): PokemonSet {
+  const mon = getState().mons.find((m) => m.id === id)
+  if (!mon) throw new Error(`Unknown Pokemon id: ${id}`)
+  return structuredClone(mon.set)
+}
+
 export function getMonSet(id: string): EditablePokemonSet {
   const mon = getState().mons.find((m) => m.id === id)
   if (!mon) throw new Error(`Unknown Pokemon id: ${id}`)

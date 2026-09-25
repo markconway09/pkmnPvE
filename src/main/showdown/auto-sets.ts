@@ -64,6 +64,70 @@ export function listAutoSets(speciesName: string): AutoSetOption[] {
   return options
 }
 
+/**
+ * Every move Smogon's sets give a species, best set first and in each set's slot
+ * order (Showdown's Random Battle movepools for a species Smogon has no sets for).
+ * Roguelite's "Update moves" takes the first of these it can learn.
+ */
+export function recommendedMoveIds(speciesName: string): string[] {
+  const species = Dex.species.get(speciesName)
+  const smogon = SMOGON[species.id] ?? []
+  const moves =
+    smogon.length > 0
+      ? smogon.flatMap((set) => set.moves.flatMap((slot) => list(slot)))
+      : (randomSets[species.id]?.sets ?? []).flatMap((set) => set.movepool)
+  return [...new Set(moves.map((m) => toID(m)))]
+}
+
+/**
+ * A species' recommended moves it can learn at this level, best first: the one
+ * Smogon set it can learn the most of (slot by slot, each slot's first option it
+ * can learn), then every other recommended move it can learn. Keeping to one set
+ * keeps its moves working together - not two setup moves from two different sets.
+ */
+export function recommendedLearnableMoves(speciesName: string, level: number): string[] {
+  const species = Dex.species.get(speciesName)
+  const learnable = new Set(learnableMoveIds(species.id, level))
+  let best: string[] = []
+  for (const set of SMOGON[species.id] ?? []) {
+    const picks: string[] = []
+    for (const slot of set.moves) {
+      const option = list(slot)
+        .map((m) => toID(m))
+        .find((id) => learnable.has(id) && !picks.includes(id))
+      if (option) picks.push(option)
+    }
+    if (picks.length > best.length) best = picks
+  }
+  const rest = recommendedMoveIds(speciesName).filter((id) => learnable.has(id) && !best.includes(id))
+  return [...best, ...rest]
+}
+
+// At most this many status moves in a filled-in moveset: early on a Pokemon often
+// can't learn its sets' attacks yet, and four utility moves can't win a fight.
+const MAX_STATUS_MOVES = 2
+
+/**
+ * Four moves for a Pokemon at its level: Smogon's picks it can already learn first,
+ * then the fallback moves given (newest level-up ones), attacks before status moves -
+ * never more than MAX_STATUS_MOVES status moves while an attack is still available.
+ */
+export function fillMoveset(preferred: string[], fallback: string[]): string[] {
+  const isStatus = (id: string): boolean => Dex.moves.get(id).category === 'Status'
+  const picks: string[] = []
+  const add = (id: string, allowStatus: boolean): void => {
+    if (picks.length >= 4 || picks.includes(id)) return
+    if (isStatus(id) && (!allowStatus || picks.filter(isStatus).length >= MAX_STATUS_MOVES)) return
+    picks.push(id)
+  }
+  for (const id of preferred) add(id, true)
+  for (const id of fallback) if (!isStatus(id)) add(id, false)
+  for (const id of fallback) add(id, true)
+  // Still short (a Pokemon with barely any moves): whatever's left, status or not.
+  for (const id of [...preferred, ...fallback]) if (picks.length < 4 && !picks.includes(id)) picks.push(id)
+  return picks
+}
+
 // How good an attacking move is for this Pokemon, roughly: power, accuracy, STAB,
 // and whether it uses its better attacking stat. Null for moves not worth picking
 // automatically (status moves, fixed damage, recharging, charging, self-KO, removed

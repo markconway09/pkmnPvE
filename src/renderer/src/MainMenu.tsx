@@ -9,7 +9,7 @@ import {
   type DragStartEvent
 } from '@dnd-kit/core'
 import { WILD_LOCATIONS } from '../../shared/battle-types'
-import type { BattleEligibility, BoxPokemonView, BoxState, WildLocationId } from '../../shared/battle-types'
+import type { BattleEligibility, BattleView, BoxPokemonView, BoxState, RunView, WildLocationId } from '../../shared/battle-types'
 import TeamRow from './TeamRow'
 import BoxGrid from './BoxGrid'
 import PokemonEditor from './PokemonEditor'
@@ -24,6 +24,8 @@ import WildDropsModal from './WildDropsModal'
 import ShopPricesModal from './ShopPricesModal'
 import LoadoutsModal from './LoadoutsModal'
 import BossRematchModal from './BossRematchModal'
+import RoguelitePanel, { RUN_MON_DRAG_PREFIX, RUN_SLOT_DROP_PREFIX, RUN_STARTER_SLOT_ID } from './RoguelitePanel'
+import { loadMenuMode, saveMenuMode, type MenuMode } from './menuMode'
 import { trainerSpriteUrl } from './trainerSprite'
 
 interface Props {
@@ -37,6 +39,7 @@ interface Props {
   onBossRematch: (trainerId: string) => void
   onOptions: () => void
   onTrainers: () => void
+  onRogueliteBosses: () => void
   onProgression: () => void
   fightBusy: boolean
   fightError: string | null
@@ -45,6 +48,8 @@ interface Props {
   username: string
   isAdmin: boolean
   onChallengePlayer: (username: string, doubles: boolean) => Promise<void>
+  // A Roguelite floor's fight has started - App takes it from here like any battle.
+  onRunBattle: (view: BattleView, location?: WildLocationId) => Promise<void>
 }
 
 const EMPTY_TEAM: (string | null)[] = [null, null, null, null, null, null]
@@ -76,6 +81,7 @@ function MainMenu({
   onBossRematch,
   onOptions,
   onTrainers,
+  onRogueliteBosses,
   onProgression,
   fightBusy,
   fightError,
@@ -83,9 +89,20 @@ function MainMenu({
   onChangeTrainerSprite,
   username,
   isAdmin,
-  onChallengePlayer
+  onChallengePlayer,
+  onRunBattle
 }: Props): React.JSX.Element {
   const [boxState, setBoxState] = useState<BoxState | null>(null)
+  // Classic or Roguelite menu - remembered per player. Switching never touches a run.
+  const [mode, setMode] = useState<MenuMode>(() => loadMenuMode(username))
+  const [run, setRun] = useState<RunView | null>(null)
+  // The box Pokemon dragged onto the run's starter slot - nothing moves, it's only a pick.
+  const [runPickId, setRunPickId] = useState<string | null>(null)
+  const [runBusy, setRunBusy] = useState(false)
+  const [runError, setRunError] = useState<string | null>(null)
+  const [bestFloor, setBestFloor] = useState<number | null>(null)
+  // A run in progress takes the whole menu: the regular team and box are hidden.
+  const runInProgress = mode === 'roguelite' && run?.status === 'active'
   const [levelCap, setLevelCap] = useState<number | null>(null)
   const [eligibility, setEligibility] = useState<BattleEligibility | null>(null)
   const [busy, setBusy] = useState(false)
@@ -138,7 +155,52 @@ function MainMenu({
       .catch(() => setMoney(null))
   }
 
+  function refreshRun(): void {
+    window.api
+      .getRun()
+      .then(setRun)
+      .catch(() => setRun(null))
+    window.api
+      .getTrainerProfile()
+      .then((profile) => setBestFloor(profile.stats.bestFloor))
+      .catch(() => setBestFloor(null))
+  }
+
+  // Every run action goes through here: one at a time, and a failure is shown.
+  async function runAction(action: () => Promise<void>): Promise<void> {
+    setRunBusy(true)
+    setRunError(null)
+    try {
+      await action()
+    } catch (e) {
+      setRunError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setRunBusy(false)
+    }
+  }
+
+  // Moves a run Pokemon to another place in the run's team (shown straight away).
+  function reorderRun(runMonId: string, toIndex: number): void {
+    if (!run) return
+    const ids = run.team.map((m) => m.id)
+    const from = ids.indexOf(runMonId)
+    if (from === -1 || from === toIndex) return
+    ids.splice(toIndex, 0, ...ids.splice(from, 1))
+    const byId = new Map(run.team.map((m) => [m.id, m]))
+    setRun({ ...run, team: ids.map((id) => byId.get(id)!) })
+    void runAction(async () => {
+      setRun(await window.api.reorderRunTeam(ids))
+    })
+  }
+
+  function toggleMode(): void {
+    const next: MenuMode = mode === 'classic' ? 'roguelite' : 'classic'
+    setMode(next)
+    saveMenuMode(username, next)
+  }
+
   function refreshAll(): void {
+    refreshRun()
     refreshBox()
     refreshProgression()
     refreshEligibility()
@@ -267,7 +329,17 @@ function MainMenu({
     if (!over) return
     const draggedId = String(active.id)
     const overId = String(over.id)
-    if (overId === 'box-drop-zone') {
+    // A run team card: only ever reorders the run's team.
+    if (draggedId.startsWith(RUN_MON_DRAG_PREFIX)) {
+      if (overId.startsWith(RUN_SLOT_DROP_PREFIX)) {
+        reorderRun(draggedId.slice(RUN_MON_DRAG_PREFIX.length), Number(overId.slice(RUN_SLOT_DROP_PREFIX.length)))
+      }
+      return
+    }
+    if (overId.startsWith(RUN_SLOT_DROP_PREFIX)) return
+    if (overId === RUN_STARTER_SLOT_ID) {
+      setRunPickId(draggedId)
+    } else if (overId === 'box-drop-zone') {
       handleBoxDrop(draggedId)
     } else if (overId.startsWith('team-slot-')) {
       handleTeamDrop(Number(overId.slice('team-slot-'.length)), draggedId)
@@ -315,9 +387,21 @@ function MainMenu({
         <h1>pkmnPvE</h1>
         <div className="menu-nav">
           {money !== null && <span className="money-display">₽{money}</span>}
+          <button
+            className={`mode-toggle mode-toggle-${mode}`}
+            title="Switch between the classic game and Roguelite runs"
+            onClick={toggleMode}
+          >
+            {mode === 'classic' ? '⚔ Classic' : '🎲 Roguelite'}
+          </button>
           <button onClick={() => setPlayerTrainerOpen(true)}>{username}</button>
-          <button onClick={() => setBagOpen(true)}>Bag</button>
-          <button onClick={() => setShopOpen(true)}>Shop</button>
+          {/* A run has no bag or shop of its own - these are the classic game's. */}
+          <button disabled={mode === 'roguelite'} onClick={() => setBagOpen(true)}>
+            Bag
+          </button>
+          <button disabled={mode === 'roguelite'} onClick={() => setShopOpen(true)}>
+            Shop
+          </button>
           {isAdmin && <button onClick={() => setDebugOpen(true)}>Debug</button>}
           <button className="menu-nav-cog" title="Options" onClick={onOptions}>
             ⚙
@@ -327,8 +411,79 @@ function MainMenu({
 
       {fightError && <p style={{ color: '#ff6b6b' }}>{fightError}</p>}
       {loadError && <p style={{ color: '#ff6b6b' }}>Failed to load your box: {loadError}</p>}
+      {mode === 'roguelite' && runError && <p style={{ color: '#ff6b6b' }}>{runError}</p>}
 
-      <div className={`battle-section${boxExpanded ? ' battle-section-collapsed' : ''}`}>
+      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <div
+        className={`battle-section${boxExpanded && !runInProgress ? ' battle-section-collapsed' : ''}${
+          runInProgress ? ' battle-section-run' : ''
+        }`}
+      >
+        {mode === 'roguelite' ? (
+          <div className="battle-section-inner">
+            <RoguelitePanel
+              run={run}
+              picked={runPickId ? monsById.get(runPickId) : undefined}
+              busy={runBusy || fightBusy}
+              bestFloor={bestFloor}
+              onStart={(difficulty, generation) =>
+                void runAction(async () => {
+                  if (!runPickId) return
+                  setRun(await window.api.startRun(runPickId, difficulty, generation))
+                  setRunPickId(null)
+                })
+              }
+              onChoose={(index) =>
+                void runAction(async () => {
+                  const result = await window.api.chooseRunNode(index)
+                  if ('battle' in result) await onRunBattle(result.battle, result.location)
+                  else setRun(result.run)
+                })
+              }
+              onGiveItem={(itemId, runMonId) =>
+                void runAction(async () => {
+                  setRun(await window.api.giveRunItem(itemId, runMonId))
+                })
+              }
+              onEvolve={(runMonId, target) =>
+                void runAction(async () => {
+                  setRun(await window.api.evolveRunMon(runMonId, target))
+                })
+              }
+              onRelearnMoves={(runMonId) =>
+                void runAction(async () => {
+                  setRun(await window.api.relearnRunMoves(runMonId))
+                })
+              }
+              onMoveItem={(fromMonId, toMonId) =>
+                void runAction(async () => {
+                  setRun(await window.api.moveRunItem(fromMonId, toMonId))
+                })
+              }
+              onPlaceDisplacedItem={(runMonId) =>
+                void runAction(async () => {
+                  setRun(await window.api.placeDisplacedItem(runMonId))
+                })
+              }
+              onRerollItems={() =>
+                void runAction(async () => {
+                  setRun(await window.api.rerollRunItems())
+                })
+              }
+              onSkipItem={() =>
+                void runAction(async () => {
+                  setRun(await window.api.skipRunItem())
+                })
+              }
+              onForfeit={() =>
+                void runAction(async () => {
+                  setRun(await window.api.forfeitRun())
+                  refreshRun()
+                })
+              }
+            />
+          </div>
+        ) : (
         <div className="battle-section-inner">
           {levelCap !== null && <p className="level-cap-display">Level Cap: {levelCap}</p>}
 
@@ -391,15 +546,17 @@ function MainMenu({
             <span className="wild-levelcap-value">Wild Level Cap: {effectiveWildLevelCap}</span>
           </div>
         </div>
+        )}
       </div>
 
-      {boxEmpty && (
+      {boxEmpty && !runInProgress && (
         <button className="choose-starter-button" onClick={() => setStarterOpen(true)}>
           Choose Starter
         </button>
       )}
 
-      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        {!runInProgress && (
+        <>
         <div className="team-heading-row">
           <h2 className="options-heading">Team</h2>
           <button className="loadouts-button" onClick={() => setLoadoutsOpen(true)}>
@@ -439,6 +596,8 @@ function MainMenu({
           onContextMenu={handleContextMenu}
           emptyHint={boxSearch.trim() ? 'No Pokemon in the box match that search.' : undefined}
         />
+        </>
+        )}
 
         <DragOverlay dropAnimation={{ duration: 200, easing: 'ease' }}>
           {activeDragMon && (
@@ -465,6 +624,7 @@ function MainMenu({
         <DebugMenu
           onClose={() => setDebugOpen(false)}
           onTrainers={onTrainers}
+          onRogueliteBosses={onRogueliteBosses}
           onProgression={onProgression}
           onAddRandom={() => void addRandom()}
           onWildDrops={() => {

@@ -3,6 +3,9 @@ import { join } from 'node:path'
 import type {
   BattleEligibility,
   BossRematchInfo,
+  RunChoiceResult,
+  RunDifficulty,
+  RunView,
   BossStep,
   EditablePokemonSet,
   ItemDropConfig,
@@ -43,7 +46,7 @@ import {
 import { addTrainer, deleteTrainer, listTrainers, updateTrainer } from './showdown/trainer-store'
 import {
   addPremadeTeam,
-  addRandomMonToTeam,
+  addSpeciesToTeam,
   deletePremadeTeam,
   deleteTeamsForTrainer,
   getTeamMonSet,
@@ -64,6 +67,24 @@ import { getTrainerProfile } from './showdown/trainer-profile'
 import { buildAutoSet, listAutoSets } from './showdown/auto-sets'
 import { checkForUpdate, installUpdate } from './updater'
 import { chooseBackground, clearBackground, getBackground } from './showdown/background-store'
+import {
+  completeRunGenerations,
+  runChoiceAt,
+  evolveRunMon,
+  forfeitRun,
+  getRunView,
+  giveRunItem,
+  moveRunItem,
+  placeDisplacedItem,
+  relearnRunMoves,
+  rerollRunItems,
+  reorderRunTeam,
+  skipRunItem,
+  startRun,
+  takeHealNode,
+  takeItemNode
+} from './showdown/run-store'
+import { createRunBattle } from './showdown/run-battles'
 import { getWildDropFor, listWildDrops, setWildDrop } from './showdown/wild-drops-store'
 import { buyItem, listShop, listShopPrices, sellItem, setShopPrice } from './showdown/shop-store'
 import { getGalarFossilPartners, restoreFossil } from './showdown/fossil-store'
@@ -243,7 +264,7 @@ ipcMain.handle('battle:choose', async (_event, choice: string) => {
 
 ipcMain.handle('battle:run', () => {
   if (!activeBattle) throw new Error('No active battle')
-  activeBattle.assertCanRun()
+  activeBattle.runAway()
   activeBattle = null
 })
 
@@ -287,6 +308,31 @@ ipcMain.handle('battle:eligibility', (): BattleEligibility => {
 function allBossesDefeated(): boolean {
   return getProgression().bossOrder.length > 0 && !getNextBoss()
 }
+
+// ---- Roguelite runs (see run-store.ts) ----
+ipcMain.handle('run:get', (): RunView | null => getRunView())
+ipcMain.handle('run:generations', () => completeRunGenerations())
+ipcMain.handle('run:start', (_event, boxMonId: string, difficulty: RunDifficulty, generation: number | null) =>
+  startRun(boxMonId, difficulty, generation)
+)
+ipcMain.handle('run:forfeit', () => forfeitRun())
+ipcMain.handle('run:giveItem', (_event, itemId: string, runMonId: string) => giveRunItem(itemId, runMonId))
+ipcMain.handle('run:skipItem', () => skipRunItem())
+ipcMain.handle('run:rerollItems', () => rerollRunItems())
+ipcMain.handle('run:evolve', (_event, runMonId: string, targetSpecies: string) => evolveRunMon(runMonId, targetSpecies))
+ipcMain.handle('run:relearnMoves', (_event, runMonId: string) => relearnRunMoves(runMonId))
+ipcMain.handle('run:placeDisplacedItem', (_event, runMonId: string | null) => placeDisplacedItem(runMonId))
+ipcMain.handle('run:moveItem', (_event, fromMonId: string, toMonId: string) => moveRunItem(fromMonId, toMonId))
+ipcMain.handle('run:reorder', (_event, runMonIds: string[]) => reorderRunTeam(runMonIds))
+// A floor's choice: a heal or an item floor answers with the run as it now stands, a
+// fight starts the battle.
+ipcMain.handle('run:choose', async (_event, index: number): Promise<RunChoiceResult> => {
+  const choice = runChoiceAt(index)
+  if (choice.kind === 'heal') return { run: takeHealNode() }
+  if (choice.kind === 'item') return { run: takeItemNode() }
+  activeBattle = createRunBattle(choice)
+  return { battle: await activeBattle.getInitialView(), location: choice.location }
+})
 
 ipcMain.handle('battle:bossRematchList', (): BossRematchInfo[] => {
   const { bossOrder, bossesDefeated } = getProgression()
@@ -388,9 +434,9 @@ ipcMain.handle('premadeTeams:delete', (_event, id: string) => {
   requireAdmin()
   return deletePremadeTeam(id)
 })
-ipcMain.handle('premadeTeams:addRandomMon', (_event, teamId: string) => {
+ipcMain.handle('premadeTeams:addSpecies', (_event, teamId: string, species: string) => {
   requireAdmin()
-  return addRandomMonToTeam(teamId)
+  return addSpeciesToTeam(teamId, species)
 })
 ipcMain.handle('premadeTeams:removeMon', (_event, teamId: string, monId: string) => {
   requireAdmin()

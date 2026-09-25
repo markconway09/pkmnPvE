@@ -2,15 +2,19 @@ import { useEffect, useState } from 'react'
 import type { PremadeTeamSummary, Trainer } from '../../shared/battle-types'
 import { trainerSpriteUrl } from './trainerSprite'
 import TrainerEditor from './TrainerEditor'
+import RogueliteBossEditor from './RogueliteBossEditor'
 
 interface Props {
   onBack: () => void
   onPremadeTeams: () => void
+  // The Roguelite bosses' own list (Debug → Edit Roguelite Bosses) instead of the
+  // normal game's trainers - each list only ever shows its own.
+  roguelite?: boolean
 }
 
 const DIFFICULTY_LABELS: Record<string, string> = { easy: 'Easy', normal: 'Normal', hard: 'Hard' }
 
-function TrainerList({ onBack, onPremadeTeams }: Props): React.JSX.Element {
+function TrainerList({ onBack, onPremadeTeams, roguelite = false }: Props): React.JSX.Element {
   const [trainers, setTrainers] = useState<Trainer[] | null>(null)
   const [premadeTeams, setPremadeTeams] = useState<PremadeTeamSummary[]>([])
   const [editingTrainer, setEditingTrainer] = useState<Trainer | 'new' | null>(null)
@@ -51,7 +55,8 @@ function TrainerList({ onBack, onPremadeTeams }: Props): React.JSX.Element {
 
   // Matches the name, or "boss" / "#12" / the difficulty (so typing "boss", "#12" or "hard" filters by those too).
   const needle = query.trim().toLowerCase()
-  const visible = (trainers ?? []).filter(
+  const listed = (trainers ?? []).filter((t) => !!t.rogueliteBoss === roguelite)
+  const visible = listed.filter(
     (t) =>
       !needle ||
       `${t.name} ${t.isBoss ? bossLabel(t) : ''} ${DIFFICULTY_LABELS[t.difficulty]}`.toLowerCase().includes(needle)
@@ -59,10 +64,16 @@ function TrainerList({ onBack, onPremadeTeams }: Props): React.JSX.Element {
 
   return (
     <div className="screen">
-      <h1>Trainers</h1>
+      <h1>{roguelite ? 'Roguelite Bosses' : 'Trainers'}</h1>
+      {roguelite && (
+        <p className="editor-hint">
+          A run&apos;s boss floors pick from these at random. Their premade teams are set to the floor&apos;s level and
+          trimmed to the boss&apos;s size.
+        </p>
+      )}
       <button onClick={onBack}>Back</button>
       <button onClick={onPremadeTeams}>Manage Premade Teams</button>
-      <button onClick={() => setEditingTrainer('new')}>Add Trainer</button>
+      <button onClick={() => setEditingTrainer('new')}>{roguelite ? 'Add Roguelite Boss' : 'Add Trainer'}</button>
       {error && <p style={{ color: '#ff6b6b' }}>{error}</p>}
       <div className="list-search">
         <input
@@ -71,7 +82,7 @@ function TrainerList({ onBack, onPremadeTeams }: Props): React.JSX.Element {
           placeholder="Search trainers..."
           onChange={(e) => setQuery(e.target.value)}
         />
-        {trainers && <span className="list-search-count">{needle ? `${visible.length} of ${trainers.length}` : trainers.length}</span>}
+        {trainers && <span className="list-search-count">{needle ? `${visible.length} of ${listed.length}` : listed.length}</span>}
       </div>
 
       <div className="trainer-list">
@@ -89,6 +100,11 @@ function TrainerList({ onBack, onPremadeTeams }: Props): React.JSX.Element {
                     {bossLabel(t)}
                   </span>
                 )}
+                {t.rogueliteBoss && (
+                  <span className="trainer-boss-badge trainer-roguelite-badge" title="Fought on a Roguelite run's boss floors">
+                    Roguelite Boss
+                  </span>
+                )}
               </div>
               <div className="trainer-list-meta">
                 {DIFFICULTY_LABELS[t.difficulty]} · {teamLabel(t)}
@@ -98,19 +114,28 @@ function TrainerList({ onBack, onPremadeTeams }: Props): React.JSX.Element {
             <button onClick={() => void deleteTrainer(t.id)}>Delete</button>
           </div>
         ))}
-        {trainers && trainers.length === 0 && <p className="box-empty-hint">No trainers yet.</p>}
-        {trainers && trainers.length > 0 && visible.length === 0 && (
+        {trainers && listed.length === 0 && (
+          <p className="box-empty-hint">{roguelite ? 'No Roguelite bosses yet.' : 'No trainers yet.'}</p>
+        )}
+        {trainers && listed.length > 0 && visible.length === 0 && (
           <p className="box-empty-hint">No trainers match &quot;{query}&quot;.</p>
         )}
       </div>
 
-      {editingTrainer && (
-        <TrainerEditor
-          trainer={editingTrainer === 'new' ? null : editingTrainer}
-          onClose={() => setEditingTrainer(null)}
-          onSaved={refresh}
-        />
-      )}
+      {editingTrainer &&
+        (roguelite ? (
+          <RogueliteBossEditor
+            trainer={editingTrainer === 'new' ? null : editingTrainer}
+            onClose={() => setEditingTrainer(null)}
+            onSaved={refresh}
+          />
+        ) : (
+          <TrainerEditor
+            trainer={editingTrainer === 'new' ? null : editingTrainer}
+            onClose={() => setEditingTrainer(null)}
+            onSaved={refresh}
+          />
+        ))}
     </div>
   )
 }

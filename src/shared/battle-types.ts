@@ -384,6 +384,29 @@ export interface WildDropEntry {
   drop: ItemDropConfig
 }
 
+export type RogueliteBossClass = 'gymLeader' | 'eliteFour' | 'champion'
+
+export const ROGUELITE_BOSS_CLASSES: { id: RogueliteBossClass; label: string }[] = [
+  { id: 'gymLeader', label: 'Gym Leader' },
+  { id: 'eliteFour', label: 'Elite Four' },
+  { id: 'champion', label: 'Champion' }
+]
+
+/** The class of a run's n-th boss (0 = the first): Gym Leaders, the Elite Four, then the Champion. */
+export function rogueliteBossClassAt(bossIndex: number): RogueliteBossClass {
+  if (bossIndex < ROGUELITE_GYM_LEADERS) return 'gymLeader'
+  if (bossIndex < ROGUELITE_GYM_LEADERS + ROGUELITE_ELITE_FOUR) return 'eliteFour'
+  return 'champion'
+}
+
+/** "Gym Leader 3/8", "Elite Four 2/4", "Champion" - the n-th boss (0 = the first). */
+export function rogueliteBossLabelAt(bossIndex: number): string {
+  const bossClass = rogueliteBossClassAt(bossIndex)
+  if (bossClass === 'gymLeader') return `Gym Leader ${bossIndex + 1}/${ROGUELITE_GYM_LEADERS}`
+  if (bossClass === 'eliteFour') return `Elite Four ${bossIndex - ROGUELITE_GYM_LEADERS + 1}/${ROGUELITE_ELITE_FOUR}`
+  return 'Champion'
+}
+
 export interface Trainer {
   id: string
   name: string
@@ -401,6 +424,15 @@ export interface Trainer {
   // waits until every member is within the stat ceiling for the cap, which keeps a
   // late-game team from showing up at level 15.
   alwaysAvailable?: boolean
+  // One of the Roguelite mode's bosses: picked at random for a run's boss floors, and
+  // never fought in the normal game (neither as a boss nor as a random trainer).
+  rogueliteBoss?: boolean
+  // What kind of boss a Roguelite boss is: a run meets 8 Gym Leaders, the Elite Four,
+  // then the Champion.
+  rogueliteClass?: RogueliteBossClass
+  // The generation a Roguelite boss is from (1-9) - a run set to a generation only
+  // meets that generation's bosses.
+  rogueliteGeneration?: number
   // Bosses only: while this boss is the next one queued, the Trainer Battle button
   // only fights Team Rocket members, and shows a grunt. On for Giovanni's fights.
   rocketEvent?: boolean
@@ -701,6 +733,8 @@ export interface PlayerStats {
   // Pokemon is caught from the win screen, so every catch is also a knockout).
   wildDefeated: number
   wildCaught: number
+  // Roguelite: the furthest floor any run has reached (0 before the first run).
+  bestFloor: number
 }
 
 // One notch on the profile's league progress bar.
@@ -809,10 +843,177 @@ export interface BattleView {
   teamDefense: (number | null)[][]
   opponentTrainer: TrainerBattleInfo | null
   opponentRoster: RosterSlotView[]
+  // A Roguelite run's battle: catching is free and fills the run's team, and there's
+  // no money or items. Set with the Pokemon that fainted - they leave the run's team.
+  runBattle: boolean
+  runFainted: string[]
+  // Won a run's trainer or boss battle: an item reward waits on the run menu.
+  runItemReward: boolean
   // What winning this battle can pay out, for the opponent's hover tooltip - null
   // for a friendly match against another player's team, which pays nothing.
   rewards: BattleRewardsView | null
 }
+
+// ---- Roguelite mode ----
+
+// A run's floors: every ROGUELITE_BOSS_EVERY-th one is a boss - 8 Gym Leaders, then
+// the Elite Four, then the Champion on the final floor, whose defeat wins the run.
+export const ROGUELITE_BOSS_EVERY = 5
+export const ROGUELITE_GYM_LEADERS = 8
+export const ROGUELITE_ELITE_FOUR = 4
+export const ROGUELITE_BOSS_COUNT = ROGUELITE_GYM_LEADERS + ROGUELITE_ELITE_FOUR + 1
+export const ROGUELITE_FINAL_FLOOR = ROGUELITE_BOSS_EVERY * ROGUELITE_BOSS_COUNT
+export const ROGUELITE_START_LEVEL = 5
+export const ROGUELITE_MAX_TEAM = 6
+
+export type RunNodeKind = 'wild' | 'trainer' | 'item' | 'heal' | 'boss'
+
+export type RunDifficulty = 'easy' | 'normal' | 'hard' | 'extreme'
+
+// What each boss beaten is worth once the run ends (won, lost or given up) - the same
+// for every boss unless a class is named. Paid into the classic game's bag and money.
+export interface RunBossReward {
+  money: number
+  // Exp. Candy item id (S / M / L).
+  expCandy: string
+  // Only for bosses of these classes (all bosses when left out).
+  randomPokemon?: RogueliteBossClass[] | 'all'
+  randomLegendary?: RogueliteBossClass[] | 'all'
+}
+
+export interface RunDifficultyInfo {
+  id: RunDifficulty
+  label: string
+  // What changes in the run itself.
+  rules: string
+  // The rewards, in words.
+  rewardText: string
+  reward: RunBossReward
+  // Every opponent's AI is set to this (null keeps each trainer's own).
+  aiOverride: AiDifficulty | null
+  // Extra Pokemon on every trainer's and boss's team (up to 6).
+  extraOpponentMons: number
+  // Every boss brings a full team of 6.
+  fullBossTeams: boolean
+  // No Rest floors and no heal after beating a boss.
+  noHealing: boolean
+}
+
+export const RUN_DIFFICULTIES: RunDifficultyInfo[] = [
+  {
+    id: 'easy',
+    label: 'Easy',
+    rules: 'Every opponent uses the Normal AI.',
+    rewardText: 'Per boss: Exp. Candy S and ₽1,000. Beating the Champion: a Random Pokémon.',
+    reward: { money: 1000, expCandy: 'expcandys', randomPokemon: ['champion'] },
+    aiOverride: 'normal',
+    extraOpponentMons: 0,
+    fullBossTeams: false,
+    noHealing: false
+  },
+  {
+    id: 'normal',
+    label: 'Normal',
+    rules: 'No changes.',
+    rewardText: 'Per boss: Exp. Candy M and ₽5,000. Each Elite Four member and the Champion: a Random Pokémon.',
+    reward: { money: 5000, expCandy: 'expcandym', randomPokemon: ['eliteFour', 'champion'] },
+    aiOverride: null,
+    extraOpponentMons: 0,
+    fullBossTeams: false,
+    noHealing: false
+  },
+  {
+    id: 'hard',
+    label: 'Hard',
+    rules: 'Every opponent uses the Hard AI, and every team has one more Pokémon.',
+    rewardText: 'Per boss: a Random Pokémon, Exp. Candy M and ₽10,000. Beating the Champion: a Random Legendary.',
+    reward: { money: 10000, expCandy: 'expcandym', randomPokemon: 'all', randomLegendary: ['champion'] },
+    aiOverride: 'hard',
+    extraOpponentMons: 1,
+    fullBossTeams: false,
+    noHealing: false
+  },
+  {
+    id: 'extreme',
+    label: 'Extreme',
+    rules: 'Everything in Hard, every boss brings 6 Pokémon, and there is no healing at all.',
+    rewardText: 'Per boss: a Random Legendary, Exp. Candy L and ₽20,000.',
+    reward: { money: 20000, expCandy: 'expcandyl', randomLegendary: 'all' },
+    aiOverride: 'hard',
+    extraOpponentMons: 1,
+    fullBossTeams: true,
+    noHealing: true
+  }
+]
+
+export function runDifficultyInfo(id: RunDifficulty | undefined): RunDifficultyInfo {
+  return RUN_DIFFICULTIES.find((d) => d.id === id) ?? RUN_DIFFICULTIES[1]
+}
+
+// The generations a boss can be from.
+export const POKEMON_GENERATIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+// One reward line paid out when a run ends.
+export interface RunRewardLine {
+  itemId: string | null
+  label: string
+  spritenum: number | null
+  quantity: number
+}
+
+// One of a floor's options. A wild one says where (Cave, Ocean... or the Professor's
+// Lab); an older run's wild option may not, and draws from everywhere.
+export interface RunChoice {
+  kind: RunNodeKind
+  location?: WildLocationId
+}
+
+// A Pokemon on the run's team: a copy, never the one in the box.
+export interface RunMonView extends BoxPokemonView {
+  // Carried between battles (heal nodes and beaten bosses top it back up).
+  hpPercent: number
+  status: string | null
+}
+
+export interface RunItemOffer {
+  itemId: string
+  itemName: string
+  spritenum: number
+}
+
+export interface RunView {
+  // 'active' while the run goes on; a finished run stays around (as 'lost' or 'won')
+  // only so the menu can say how it went, until the next one starts.
+  status: 'active' | 'lost' | 'won'
+  floor: number
+  bossesBeaten: number
+  // The most any run Pokemon can level to - it only goes up by beating a boss.
+  levelCap: number
+  // The level this floor's opponents are fielded at (bosses a little above).
+  opponentLevel: number
+  // Who the next boss is, by class: "Gym Leader 3/8", "Elite Four 1/4", "Champion".
+  nextBossLabel: string
+  team: RunMonView[]
+  // What this floor offers - a boss floor offers only the boss.
+  choices: RunChoice[]
+  // Set after picking an item node: choose one of these to give to a team member.
+  itemOffer: RunItemOffer[] | null
+  // An item floor, or the reward for beating a trainer or boss.
+  itemOfferReason: 'floor' | 'reward' | null
+  // An item floor's offer that hasn't been rerolled yet (once per floor).
+  canRerollItems: boolean
+  // An item a newly given one replaced, waiting for a new holder before the run goes on.
+  displacedItem: { itemName: string; spritenum: number; fromMonId: string } | null
+  // The species the run started with, for the result banner.
+  starterSpecies: string
+  difficulty: RunDifficulty
+  // Only bosses from this generation (null = any).
+  generation: number | null
+  // What the run paid out when it ended (empty while it's still going).
+  rewards: RunRewardLine[]
+}
+
+export type RunChoiceResult = { run: RunView } | { battle: BattleView; location?: WildLocationId }
 
 export function toSpriteId(species: string): string {
   return species.toLowerCase().replace(/[^a-z0-9]/g, '')

@@ -20,6 +20,9 @@ import type {
   ProgressionState,
   TrainerProfile,
   BossRematchInfo,
+  RunChoiceResult,
+  RunDifficulty,
+  RunView,
   PokedexEntry,
   UpdateCheckResult,
   UpdateProgress,
@@ -46,6 +49,23 @@ const api = {
   startTrainerBattle: (boss: boolean, rematchTrainerId?: string): Promise<BattleView> =>
     ipcRenderer.invoke('battle:startTrainer', boss, rematchTrainerId),
   getBossRematchList: (): Promise<BossRematchInfo[]> => ipcRenderer.invoke('battle:bossRematchList'),
+  getRun: (): Promise<RunView | null> => ipcRenderer.invoke('run:get'),
+  // Generations with a Roguelite boss of every class - the ones a run can be set to.
+  getRunGenerations: (): Promise<number[]> => ipcRenderer.invoke('run:generations'),
+  startRun: (boxMonId: string, difficulty: RunDifficulty, generation: number | null): Promise<RunView> =>
+    ipcRenderer.invoke('run:start', boxMonId, difficulty, generation),
+  forfeitRun: (): Promise<RunView> => ipcRenderer.invoke('run:forfeit'),
+  // A floor's option, by its place in the run's list of choices.
+  chooseRunNode: (index: number): Promise<RunChoiceResult> => ipcRenderer.invoke('run:choose', index),
+  giveRunItem: (itemId: string, runMonId: string): Promise<RunView> => ipcRenderer.invoke('run:giveItem', itemId, runMonId),
+  skipRunItem: (): Promise<RunView> => ipcRenderer.invoke('run:skipItem'),
+  rerollRunItems: (): Promise<RunView> => ipcRenderer.invoke('run:rerollItems'),
+  evolveRunMon: (runMonId: string, targetSpecies: string): Promise<RunView> =>
+    ipcRenderer.invoke('run:evolve', runMonId, targetSpecies),
+  relearnRunMoves: (runMonId: string): Promise<RunView> => ipcRenderer.invoke('run:relearnMoves', runMonId),
+  placeDisplacedItem: (runMonId: string | null): Promise<RunView> => ipcRenderer.invoke('run:placeDisplacedItem', runMonId),
+  moveRunItem: (fromMonId: string, toMonId: string): Promise<RunView> => ipcRenderer.invoke('run:moveItem', fromMonId, toMonId),
+  reorderRunTeam: (runMonIds: string[]): Promise<RunView> => ipcRenderer.invoke('run:reorder', runMonIds),
   submitChoice: (choice: string): Promise<BattleView> => ipcRenderer.invoke('battle:choose', choice),
   catchWildPokemon: (): Promise<CatchResult> => ipcRenderer.invoke('battle:catch'),
   runFromBattle: (): Promise<void> => ipcRenderer.invoke('battle:run'),
@@ -132,8 +152,8 @@ const api = {
   renamePremadeTeam: (id: string, name: string): Promise<PremadeTeamSummary[]> =>
     ipcRenderer.invoke('premadeTeams:rename', id, name),
   deletePremadeTeam: (id: string): Promise<PremadeTeamSummary[]> => ipcRenderer.invoke('premadeTeams:delete', id),
-  addRandomTeamMon: (teamId: string): Promise<PremadeTeamSummary[]> =>
-    ipcRenderer.invoke('premadeTeams:addRandomMon', teamId),
+  addSpeciesToTeam: (teamId: string, species: string): Promise<PremadeTeamSummary[]> =>
+    ipcRenderer.invoke('premadeTeams:addSpecies', teamId, species),
   removeTeamMon: (teamId: string, monId: string): Promise<PremadeTeamSummary[]> =>
     ipcRenderer.invoke('premadeTeams:removeMon', teamId, monId),
   reorderTeamMons: (teamId: string, monIds: string[]): Promise<PremadeTeamSummary[]> =>
