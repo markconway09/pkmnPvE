@@ -4,12 +4,16 @@ import type { OpenItemResult, RarityTier } from '../../shared/battle-types'
 import { toSpriteId } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
 import ItemSprite from './ItemSprite'
+import { formatMoney } from './money'
 
 interface Props {
   // What the Random Pokemon / Random Legendary was, and what it gave.
   itemName: string
   result: OpenItemResult
-  onClose: () => void
+  // soldFor: the item won was sold right from the result, for this much.
+  onClose: (soldFor?: number) => void
+  // Opens the next one of the same item, when there are more in the bag.
+  onOpenAnother: (soldFor?: number) => void
 }
 
 // Each card's width plus the gap after it - the strip moves in steps of this.
@@ -47,12 +51,29 @@ function playTick(audio: AudioContext): void {
  * stop on the one won
  * (the game has already picked it - this only shows it). Click to skip to the end.
  */
-function CaseOpening({ itemName, result, onClose }: Props): React.JSX.Element {
+function CaseOpening({ itemName, result, onClose, onOpenAnother }: Props): React.JSX.Element {
   const viewportRef = useRef<HTMLDivElement>(null)
   const stripRef = useRef<HTMLDivElement>(null)
   const [offset, setOffset] = useState(0)
   const [spinning, setSpinning] = useState(false)
   const [done, setDone] = useState(false)
+  // An item won can be sold on the spot (see the result below).
+  const [soldFor, setSoldFor] = useState<number | null>(null)
+  const [selling, setSelling] = useState(false)
+  const [sellError, setSellError] = useState<string | null>(null)
+
+  async function sell(): Promise<void> {
+    if (!result.itemId) return
+    setSelling(true)
+    setSellError(null)
+    try {
+      setSoldFor((await window.api.sellItem(result.itemId)).sold)
+    } catch (e) {
+      setSellError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setSelling(false)
+    }
+  }
   // Lands somewhere inside the winning card, not dead centre every time.
   const [jitter] = useState(() => (Math.random() - 0.5) * (CARD_WIDTH * 0.7))
 
@@ -160,20 +181,50 @@ function CaseOpening({ itemName, result, onClose }: Props): React.JSX.Element {
               {result.shiny && '✨ '}
               {result.shiny ? `Shiny ${result.name}` : result.name}
               {result.shiny && ' ✨'}
+              {result.kind === 'item' && !!result.sellPrice && (
+                <span className="case-result-price">{formatMoney(result.sellPrice)}</span>
+              )}
             </p>
             <p className="box-empty-hint">
               {result.kind === 'item'
-                ? `${TIER_LABELS[winner.tier]} · it's in your bag`
+                ? soldFor !== null
+                  ? `${TIER_LABELS[winner.tier]} · sold for ${formatMoney(soldFor)}`
+                  : `${TIER_LABELS[winner.tier]} · it's in your bag`
                 : `${TIER_LABELS[winner.tier]} · Lv ${result.level} · it's waiting in your box`}
             </p>
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onClose()
-              }}
-            >
-              Nice!
-            </button>
+            {sellError && <p className="editor-error">{sellError}</p>}
+            <div className="case-result-actions">
+              {result.kind === 'item' && !!result.sellPrice && soldFor === null && (
+                <button
+                  disabled={selling}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    void sell()
+                  }}
+                >
+                  Sell ({formatMoney(result.sellPrice)})
+                </button>
+              )}
+              {result.remaining > 0 && (
+                <button
+                  disabled={selling}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onOpenAnother(soldFor ?? undefined)
+                  }}
+                >
+                  Open another ({result.remaining} left)
+                </button>
+              )}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onClose(soldFor ?? undefined)
+                }}
+              >
+                {soldFor !== null ? 'Done' : 'Nice!'}
+              </button>
+            </div>
           </div>
         ) : (
           <p className="box-empty-hint case-skip-hint">Click to skip</p>

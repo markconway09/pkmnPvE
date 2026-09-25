@@ -13,8 +13,6 @@ import {
   runTrainerTeamSize
 } from './run-store'
 
-// Bosses a couple of levels above the floor's regular opponents.
-const BOSS_EXTRA_LEVELS = 2
 // Wild Pokemon come in anywhere from this many levels under the floor's level up to it.
 const WILD_LEVEL_SPREAD = 10
 
@@ -92,7 +90,8 @@ export function createRunBattle(choice: RunChoice): WildBattle {
     const boss = pickOne(fresh.length > 0 ? fresh : pool)
     markRunBossUsed(boss.id)
     const selection = pickRandomPremadeTeam(boss.id, 100, 6, { anyLevel: true })
-    const level = opponentLevel + BOSS_EXTRA_LEVELS
+    // A boss floor's opponent level is the boss's own (see runOpponentLevel).
+    const level = opponentLevel
     const full = selection ? scaleTeamToLevel(selection.sets, level) : generateRandomTrainerTeam({ count: 6, levelCap: level })
     opponent = {
       team: full.slice(0, rules.fullBossTeams ? ROGUELITE_MAX_TEAM : sized(runBossTeamSize(bossesBeaten))),

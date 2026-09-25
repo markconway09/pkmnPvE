@@ -4190,3 +4190,49 @@ button:disabled {
 .team-slot.run-mon-card-selectable {
   box-shadow: 0 0 0 2px #b48cff, 0 0 10px rgba(180, 140, 255, 0.6);
 }
+
+/* Win screen: a full run team choosing who the new catch replaces. */
+.run-replace {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.run-replace-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  width: 100%;
+}
+
+.run-replace-grid button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 4px;
+  font-size: 12px;
+}
+
+.run-replace-sprite {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.case-result-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* What the shop would pay for the item a Lock Capsule gave, beside its name. */
+.case-result-price {
+  margin-left: 10px;
+  font-size: 14px;
+  font-weight: normal;
+  color: #ffd76b;
+}

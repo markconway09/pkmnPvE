@@ -62,12 +62,12 @@ const api = {
   rerollRunItems: (): Promise<RunView> => ipcRenderer.invoke('run:rerollItems'),
   evolveRunMon: (runMonId: string, targetSpecies: string): Promise<RunView> =>
     ipcRenderer.invoke('run:evolve', runMonId, targetSpecies),
-  relearnRunMoves: (runMonId: string): Promise<RunView> => ipcRenderer.invoke('run:relearnMoves', runMonId),
   placeDisplacedItem: (runMonId: string | null): Promise<RunView> => ipcRenderer.invoke('run:placeDisplacedItem', runMonId),
   moveRunItem: (fromMonId: string, toMonId: string): Promise<RunView> => ipcRenderer.invoke('run:moveItem', fromMonId, toMonId),
   reorderRunTeam: (runMonIds: string[]): Promise<RunView> => ipcRenderer.invoke('run:reorder', runMonIds),
   submitChoice: (choice: string): Promise<BattleView> => ipcRenderer.invoke('battle:choose', choice),
-  catchWildPokemon: (): Promise<CatchResult> => ipcRenderer.invoke('battle:catch'),
+  // replaceRunMonId: in a run with a full team, who the new Pokemon replaces.
+  catchWildPokemon: (replaceRunMonId?: string): Promise<CatchResult> => ipcRenderer.invoke('battle:catch', replaceRunMonId),
   runFromBattle: (): Promise<void> => ipcRenderer.invoke('battle:run'),
   getBattleEligibility: (): Promise<BattleEligibility> => ipcRenderer.invoke('battle:eligibility'),
   getMoveInfo: (id: string): Promise<MoveInfo | null> => ipcRenderer.invoke('dex:move', id),

@@ -42,7 +42,7 @@ function BagModal({ onClose, onChanged }: Props): React.JSX.Element {
   const [galarFossil, setGalarFossil] = useState<BagItemView | null>(null)
   const [busy, setBusy] = useState(false)
   // A Random Pokemon / Random Legendary being opened, shown as a spinning case.
-  const [opening, setOpening] = useState<{ itemName: string; result: OpenItemResult } | null>(null)
+  const [opening, setOpening] = useState<{ item: BagItemView; result: OpenItemResult; seq: number } | null>(null)
 
   async function refresh(): Promise<void> {
     try {
@@ -84,13 +84,30 @@ function BagModal({ onClose, onChanged }: Props): React.JSX.Element {
 
   // Not through act(): the case animation reveals what came out, so the message - and
   // the refresh that would show the new Pokemon in the box behind it - wait until it's closed.
+  // The bag message for the case just closed (or just moved on from).
+  function reportOpening(soldFor?: number): void {
+    if (!opening) return
+    const itemName = opening.item.name
+    const { result } = opening
+    if (result.kind === 'item' && soldFor !== undefined) {
+      setMessage(`Opened ${itemName}: you got ${result.name} and sold it for ${formatMoney(soldFor)}.`)
+    } else if (result.kind === 'item') {
+      setMessage(`Opened ${itemName}: you got ${result.name} - it's in your bag.`)
+    } else {
+      const got = result.shiny ? `a ✨shiny✨ ${result.name}` : result.name
+      setMessage(`Opened ${itemName}: you got ${got} (Lv ${result.level}) - it's waiting in your box.`)
+    }
+  }
+
   async function openItem(item: BagItemView): Promise<void> {
     setMenu(null)
     setBusy(true)
     setError(null)
     setMessage(null)
     try {
-      setOpening({ itemName: item.name, result: await window.api.openBagItem(item.id) })
+      const result = await window.api.openBagItem(item.id)
+      // A fresh case each time (seq), even when opening the same item again.
+      setOpening((prev) => ({ item, result, seq: (prev?.seq ?? 0) + 1 }))
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -228,19 +245,18 @@ function BagModal({ onClose, onChanged }: Props): React.JSX.Element {
 
         {opening && (
           <CaseOpening
-            itemName={opening.itemName}
+            key={opening.seq}
+            itemName={opening.item.name}
             result={opening.result}
-            onClose={() => {
-              const { itemName, result } = opening
-              if (result.kind === 'item') {
-                setMessage(`Opened ${itemName}: you got ${result.name} - it's in your bag.`)
-              } else {
-                const got = result.shiny ? `a ✨shiny✨ ${result.name}` : result.name
-                setMessage(`Opened ${itemName}: you got ${got} (Lv ${result.level}) - it's waiting in your box.`)
-              }
+            onClose={(soldFor) => {
+              reportOpening(soldFor)
               setOpening(null)
               void refresh()
               onChanged()
+            }}
+            onOpenAnother={(soldFor) => {
+              reportOpening(soldFor)
+              void openItem(opening.item)
             }}
           />
         )}

@@ -32,6 +32,7 @@ import {
   getItemSpritenum,
   levelUpMoveset,
   megaStonesFor,
+  signatureItemsFor,
   toID,
   runEvolutionOptions,
   speciesRarityTier,
@@ -98,22 +99,37 @@ export function runLevelCap(bossesBeaten: number): number {
   return Math.round(FIRST_LEVEL_CAP + ((100 - FIRST_LEVEL_CAP) * Math.min(bossesBeaten, steps)) / steps)
 }
 
-// How strong this floor's opponents are: Lv 5 on the first floor, rising evenly to 98
-// on the final one (the Champion, 2 above that, fights at 100). What the cap doesn't set.
-const FIRST_OPPONENT_LEVEL = 5
-const LAST_OPPONENT_LEVEL = 98
+// How strong this floor's opponents are (Lv 8 on the first floor). Each stretch between bosses is a climb of its
+// own: the floor after a boss starts at that boss's level, and the next ones rise
+// quickly (front-loaded) to a level under the next boss. A boss fights at the level
+// cap its stretch had (the Champion at 100) - as strong as your team can be.
+const FIRST_OPPONENT_LEVEL = 8
+// Under 1 makes the first floors of a stretch climb faster than the last.
+const STRETCH_CURVE = 0.8
+
+/** The n-th boss's level (0 = the first). */
+export function runBossLevel(bossIndex: number): number {
+  return runLevelCap(bossIndex)
+}
 
 export function runOpponentLevel(floor: number): number {
-  const progress = (Math.min(floor, ROGUELITE_FINAL_FLOOR) - 1) / (ROGUELITE_FINAL_FLOOR - 1)
-  return Math.round(FIRST_OPPONENT_LEVEL + (LAST_OPPONENT_LEVEL - FIRST_OPPONENT_LEVEL) * progress)
+  const f = Math.min(Math.max(floor, 1), ROGUELITE_FINAL_FLOOR)
+  const bossIndex = Math.floor((f - 1) / ROGUELITE_BOSS_EVERY)
+  const place = f - bossIndex * ROGUELITE_BOSS_EVERY
+  const bossLevel = runBossLevel(bossIndex)
+  if (place === ROGUELITE_BOSS_EVERY) return bossLevel
+  const start = bossIndex === 0 ? FIRST_OPPONENT_LEVEL : runBossLevel(bossIndex - 1)
+  const end = bossLevel - 1
+  const t = (place - 1) / (ROGUELITE_BOSS_EVERY - 2)
+  return Math.round(start + (end - start) * Math.pow(t, STRETCH_CURVE))
 }
 
 // Levels every team member gains on each floor, up to the cap: a won battle (a boss
 // is worth more), and a little for an item or rest floor too. Anyone below the
 // team's strongest gains double, so a fresh catch catches up.
-const LEVELS_PER_WILD_WIN = 3
+const LEVELS_PER_WILD_WIN = 2
 const LEVELS_PER_TRAINER_WIN = 4
-const LEVELS_PER_BOSS_WIN = 5
+const LEVELS_PER_BOSS_WIN = 4
 const LEVELS_PER_QUIET_FLOOR = 1
 
 // How many Pokemon a regular trainer sends out: 1 for the first 9 floors, one more
@@ -174,19 +190,37 @@ const HELD_ITEM_POOL = [
 ]
 const ITEM_OFFER_SIZE = 3
 // How often an offer includes a Mega Stone for a team member that can Mega Evolve with
-// one (and isn't holding it yet): item floors often, trainer rewards now and then.
-const MEGA_CHANCE_ITEM_FLOOR = 0.4
-const MEGA_CHANCE_REWARD = 0.1
+// one (and isn't holding it yet), and - rolled separately, just as often - one of the
+// other items made for one species (Rusted Shield, Light Ball, Soul Dew...): now and
+// then on item floors, rarely as a trainer's reward.
+const MEGA_CHANCE_ITEM_FLOOR = 0.15
+const MEGA_CHANCE_REWARD = 0.04
+const SIGNATURE_CHANCE_ITEM_FLOOR = 0.15
+const SIGNATURE_CHANCE_REWARD = 0.04
+
+// How often an offer includes each kind of item made for someone on the team.
+interface SpecialItemChances {
+  mega: number
+  signature: number
+}
+const ITEM_FLOOR_CHANCES: SpecialItemChances = { mega: MEGA_CHANCE_ITEM_FLOOR, signature: SIGNATURE_CHANCE_ITEM_FLOOR }
+const REWARD_CHANCES: SpecialItemChances = { mega: MEGA_CHANCE_REWARD, signature: SIGNATURE_CHANCE_REWARD }
 
 // Three held items to choose from - with a chance one of them is a Mega Stone that one
 // of the team could actually use.
-function rollItemOffer(current: StoredRun, megaChance: number): string[] {
+// Three held items, with a chance of a Mega Stone and (separately, rarer) one of the
+// other items made for one species (Rusted Shield, Light Ball...) - each for someone
+// on the team who isn't holding it yet, in a slot of its own.
+function rollItemOffer(current: StoredRun, chances: SpecialItemChances): string[] {
   const offer = pickRandom(HELD_ITEM_POOL, ITEM_OFFER_SIZE)
   const held = new Set(current.team.map((m) => toID(m.set.item ?? '')))
-  const stones = current.team.flatMap((m) => megaStonesFor(m.set.species)).filter((id) => !held.has(id))
-  if (stones.length > 0 && Math.random() < megaChance) {
-    offer[Math.floor(Math.random() * offer.length)] = pickRandom(stones, 1)[0]
-  }
+  const forTeam = (list: (species: string) => string[]): string[] =>
+    [...new Set(current.team.flatMap((m) => list(m.set.species)))].filter((id) => !held.has(id))
+  const stones = forTeam(megaStonesFor)
+  const signature = forTeam(signatureItemsFor).filter((id) => !stones.includes(id))
+  const slots = pickRandom([...offer.keys()], offer.length)
+  if (stones.length > 0 && Math.random() < chances.mega) offer[slots.pop()!] = pickRandom(stones, 1)[0]
+  if (signature.length > 0 && Math.random() < chances.signature) offer[slots.pop()!] = pickRandom(signature, 1)[0]
   return offer
 }
 
@@ -354,6 +388,8 @@ export function startRun(boxMonId: string, difficulty: RunDifficulty = 'normal',
   }
   const source = copyBoxMonSet(boxMonId)
   const set: PokemonSet = { ...source, level: ROGUELITE_START_LEVEL, item: '' }
+  // The copy gets a run moveset straight away instead of the box Pokemon's own moves.
+  refreshMoves(set)
   run = {
     status: 'active',
     floor: 1,
@@ -467,7 +503,7 @@ export function takeHealNode(): RunView {
 /** An item floor: offers a few held items to choose from. */
 export function takeItemNode(): RunView {
   const current = activeRun()
-  current.itemOffer = rollItemOffer(current, MEGA_CHANCE_ITEM_FLOOR)
+  current.itemOffer = rollItemOffer(current, ITEM_FLOOR_CHANCES)
   current.itemOfferReason = 'floor'
   persist()
   return getRunView()!
@@ -478,7 +514,7 @@ export function rerollRunItems(): RunView {
   const current = activeRun()
   if (!current.itemOffer || current.itemOfferReason !== 'floor') throw new Error('Only an item floor can be rerolled')
   if (current.itemRerolled) throw new Error('This floor has already been rerolled')
-  current.itemOffer = rollItemOffer(current, MEGA_CHANCE_ITEM_FLOOR)
+  current.itemOffer = rollItemOffer(current, ITEM_FLOOR_CHANCES)
   current.itemRerolled = true
   persist()
   return getRunView()!
@@ -584,28 +620,27 @@ export function evolveRunMon(runMonId: string, targetSpecies: string): RunView {
   }
   mon.set = evolveSet(mon.set, targetSpecies)
   mon.exp = totalExpForSpeciesLevel(mon.set.species, mon.set.level)
+  refreshMoves(mon.set)
   persist()
   return getRunView()!
 }
 
-// Smogon's picks it can learn at its level, filled out with its newest level-up moves.
+// In a run every Pokemon can learn every move it could ever learn, whatever its level:
+// Smogon's picks for its species, filled out with its strongest level-up moves.
+const RUN_MOVE_LEVEL = 100
+
 function bestRunMoveset(set: PokemonSet): string[] {
-  return fillMoveset(recommendedLearnableMoves(set.species, set.level), levelUpMoveset(set.species, set.level))
+  return fillMoveset(
+    recommendedLearnableMoves(set.species, RUN_MOVE_LEVEL),
+    levelUpMoveset(set.species, RUN_MOVE_LEVEL)
+  )
 }
 
-/**
- * Gives a run Pokemon a fresh moveset for its level: moves from Smogon's sets for its
- * species first (those it can learn by now), then the newest ones it learns by
- * levelling up to fill the rest.
- */
-export function relearnRunMoves(runMonId: string): RunView {
-  const current = activeRun()
-  const mon = runMon(current, runMonId)
-  const moves = bestRunMoveset(mon.set)
-  if (moves.length === 0) throw new Error(`${mon.set.species} has no moves it can learn yet`)
-  mon.set.moves = moves
-  persist()
-  return getRunView()!
+// A run Pokemon's moves follow its species on their own: it starts the run, joins it
+// and evolves with the best moveset for what it is (see bestRunMoveset).
+function refreshMoves(set: PokemonSet): void {
+  const moves = bestRunMoveset(set)
+  if (moves.length > 0) set.moves = moves
 }
 
 /** The run's team for a battle, with each Pokemon's carried-over HP and status. */
@@ -697,7 +732,7 @@ export function finishRunBattleWon(
     persist()
     return { expGains, fainted, itemReward: false }
   }
-  current.itemOffer = rollItemOffer(current, MEGA_CHANCE_REWARD)
+  current.itemOffer = rollItemOffer(current, REWARD_CHANCES)
   current.itemOfferReason = 'reward'
   persist()
   return { expGains, fainted, itemReward: true }
@@ -716,23 +751,30 @@ export function finishRunBattleFled(outcome: RunBattleOutcome[]): void {
   persist()
 }
 
-/** A wild Pokemon caught after a won run battle joins the run's team (never the box). */
-export function addRunCatch(set: PokemonSet): void {
+/**
+ * A wild Pokemon caught after a won run battle joins the run's team (never the box). A
+ * full team has to let someone go for it: `replaceRunMonId` is who, and the newcomer
+ * takes their place in the line-up.
+ */
+export function addRunCatch(set: PokemonSet, replaceRunMonId?: string): void {
   const current = getRun()
   // The battle's win already moved the run on (or ended it, if that was the last floor).
   if (!current) throw new Error('No run is in progress')
-  if (current.team.length >= ROGUELITE_MAX_TEAM) throw new Error(`Your run team is full (${ROGUELITE_MAX_TEAM})`)
+  const full = current.team.length >= ROGUELITE_MAX_TEAM
+  const replaceAt = replaceRunMonId ? current.team.findIndex((m) => m.id === replaceRunMonId) : -1
+  if (full && replaceAt === -1) throw new Error(`Your run team is full - choose who to replace`)
   const caught: PokemonSet = { ...structuredClone(set), item: '' }
-  // It arrives with the same moveset Update moves would give it (Smogon first).
-  const moves = bestRunMoveset(caught)
-  if (moves.length > 0) caught.moves = moves
-  current.team.push({
+  // It arrives with a run moveset (Smogon first).
+  refreshMoves(caught)
+  const newcomer: RunMon = {
     id: randomUUID(),
     set: caught,
     exp: totalExpForSpeciesLevel(caught.species, caught.level),
     hp: 1,
     status: null
-  })
+  }
+  if (replaceAt >= 0) current.team[replaceAt] = newcomer
+  else current.team.push(newcomer)
   persist()
 }
 

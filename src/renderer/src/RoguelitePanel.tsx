@@ -38,7 +38,6 @@ interface Props {
   onSkipItem: () => void
   onRerollItems: () => void
   onEvolve: (runMonId: string, targetSpecies: string) => void
-  onRelearnMoves: (runMonId: string) => void
   onMoveItem: (fromMonId: string, toMonId: string) => void
   // The item a new one replaced: give it to this Pokemon, or let it go (null).
   onPlaceDisplacedItem: (runMonId: string | null) => void
@@ -172,7 +171,6 @@ function RoguelitePanel({
   onSkipItem,
   onRerollItems,
   onEvolve,
-  onRelearnMoves,
   onMoveItem,
   onPlaceDisplacedItem,
   onForfeit
@@ -228,7 +226,7 @@ function RoguelitePanel({
         )}
         <p className="box-empty-hint">
           Drag a Pokémon from your team or box onto the slot. The run uses a Lv {ROGUELITE_START_LEVEL} copy of it
-          (no held item) - the original stays exactly as it is.
+          (no held item, with a fresh moveset) - the original stays exactly as it is.
           {bestFloor ? ` Best floor so far: ${bestFloor}.` : ''}
         </p>
         <div className="run-starter-row">
@@ -449,7 +447,7 @@ function RoguelitePanel({
         </p>
       ) : (
         <p className="box-empty-hint">
-          Drag to reorder (the first one leads). Click to evolve, update moves or move its item.
+          Drag to reorder (the first one leads). Click to evolve or move its item - moves update on their own when they evolve.
         </p>
       )}
 
@@ -467,10 +465,6 @@ function RoguelitePanel({
           onEvolve={(target) => {
             setMenu(null)
             onEvolve(menu.mon.id, target)
-          }}
-          onRelearnMoves={() => {
-            setMenu(null)
-            onRelearnMoves(menu.mon.id)
           }}
           onClose={() => setMenu(null)}
         />

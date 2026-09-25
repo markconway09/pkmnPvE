@@ -1,7 +1,8 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import type { BagItemView } from '../../shared/battle-types'
 import { EXP_CANDY_EXP, OPENABLE_ITEM_IDS } from '../../shared/battle-types'
-import { BAG_CATEGORY_ORDER, bagCategoryFor, getEditorOptions, sellPriceFor } from './sim-access'
+import { BAG_CATEGORY_ORDER, RETIRED_ITEMS, bagCategoryFor, getEditorOptions, sellPriceFor } from './sim-access'
+import { addMoney } from './money-store'
 import { fossilKindOf, singleFossilSpecies } from './fossils'
 import { playerPathFor } from './save-paths'
 import { onPlayerChange } from './player-session'
@@ -21,12 +22,31 @@ function load(): StoredBag {
     const raw = readFileSync(path, 'utf8')
     const parsed = JSON.parse(raw) as StoredBag
     if (!parsed.items || typeof parsed.items !== 'object') return emptyBag()
+    if (retireItems(parsed)) writeFileSync(path, JSON.stringify(parsed), 'utf8')
     return parsed
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code
     if (code !== 'ENOENT') console.error('[bag-store] failed to load bag.json:', e)
     return emptyBag()
   }
+}
+
+// Items taken out of the game (see RETIRED_ITEMS) leave the bag: a Gen 2 berry becomes
+// its modern twin, anything else is refunded. True if anything changed.
+function retireItems(bag: StoredBag): boolean {
+  let refund = 0
+  let changed = false
+  for (const [id, quantity] of Object.entries(bag.items)) {
+    const retired = RETIRED_ITEMS[id]
+    if (!retired) continue
+    delete bag.items[id]
+    changed = true
+    if (quantity <= 0) continue
+    if (retired.replacement) bag.items[retired.replacement] = (bag.items[retired.replacement] ?? 0) + quantity
+    else refund += (retired.refund ?? 0) * quantity
+  }
+  if (refund > 0) addMoney(refund)
+  return changed
 }
 
 let state: StoredBag | null = null

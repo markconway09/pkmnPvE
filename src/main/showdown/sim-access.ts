@@ -785,6 +785,42 @@ const EXP_CANDY_PRICE: Record<string, number> = {
   expcandyl: 10000
 }
 
+/**
+ * Items taken out of the game entirely - out of the shop, drops, capsules and every item
+ * picker. The Gen 2 berries are duplicates of the modern ones, so any a player still has
+ * (in the bag or held) turn into their modern twin; the rest (the incenses and the other
+ * Gen 2 items) are refunded at what they sold for.
+ */
+export const RETIRED_ITEMS: Record<string, { replacement?: string; refund?: number }> = {
+  berry: { replacement: 'oranberry' },
+  goldberry: { replacement: 'sitrusberry' },
+  bitterberry: { replacement: 'persimberry' },
+  burntberry: { replacement: 'aspearberry' },
+  iceberry: { replacement: 'rawstberry' },
+  mintberry: { replacement: 'chestoberry' },
+  miracleberry: { replacement: 'lumberry' },
+  mysteryberry: { replacement: 'leppaberry' },
+  przcureberry: { replacement: 'cheriberry' },
+  psncureberry: { replacement: 'pechaberry' },
+  fullincense: { refund: 2500 },
+  laxincense: { refund: 1500 },
+  oddincense: { refund: 2500 },
+  rockincense: { refund: 2500 },
+  roseincense: { refund: 2500 },
+  seaincense: { refund: 2500 },
+  waveincense: { refund: 2500 },
+  berserkgene: { refund: 1500 },
+  pinkbow: {},
+  polkadotbow: {}
+}
+
+/** A held item after the retirement: its modern twin's name, '' if it's gone, or itself. */
+export function unretiredHeldItem(itemName: string): string {
+  const retired = RETIRED_ITEMS[toID(itemName)]
+  if (!retired) return itemName
+  return retired.replacement ? Dex.items.get(retired.replacement).name : ''
+}
+
 let cachedEditorOptions: EditorOptions | null = null
 
 export function getEditorOptions(): EditorOptions {
@@ -792,7 +828,7 @@ export function getEditorOptions(): EditorOptions {
   const byName = <T extends { name: string }>(a: T, b: T): number => a.name.localeCompare(b.name)
   const items = Dex.items
     .all()
-    .filter((i) => i.exists)
+    .filter((i) => i.exists && !(i.id in RETIRED_ITEMS))
     .map((i) => ({ id: i.id, name: i.name, description: i.shortDesc || i.desc || '', spritenum: i.spritenum ?? 0 }))
     .concat([
       LINK_CABLE_ITEM,
@@ -904,20 +940,11 @@ function shopCategoryFor(dexItem: ReturnType<typeof Dex.items.get>): string {
   return 'Items'
 }
 
-// The bag groups items the way the shop does, plus two groups for things the shop
-// doesn't sell: mega stones and the evolution items it no longer stocks.
-export const BAG_CATEGORY_ORDER = [
-  'Recommended',
-  'Berries',
-  'Fossils',
-  'Z-Crystals',
-  'Plates',
-  'Memories',
-  'Drives',
-  'Mega Stones',
-  'Evolution Items',
-  'Items'
-]
+// The bag groups items in the shop's order, plus a group for mega stones (which the
+// shop doesn't sell) right after the evolution items.
+export const BAG_CATEGORY_ORDER = SHOP_CATEGORY_ORDER.flatMap((category) =>
+  category === 'Evolution Items' ? [category, 'Mega Stones'] : [category]
+)
 
 let cachedShopCategoryById: Map<string, string> | null = null
 
@@ -1510,6 +1537,35 @@ export function megaStonesFor(speciesName: string): string[] {
       return typeof stone === 'string' ? !!item.itemUser?.includes(name) : Object.keys(stone).includes(name)
     })
     .map((item) => item.id)
+}
+
+/**
+ * The items made for this species specifically: its Mega Stones, plus anything else
+ * the Dex names it (or another form of it) as the user of - Rusted Sword/Shield, Light
+ * Ball, Thick Club, Leek, Soul Dew, the Adamant/Lustrous/Griseous orbs, Red/Blue Orb,
+ * Ogerpon's masks, Genesect's drives, Silvally's memories, species Z-Crystals...
+ * An Origin Forme's item (Adamant Crystal, Lustrous Globe, Griseous Core) is only for
+ * that Origin Forme, and it's all the Origin Forme gets - the plain Dialga, Palkia and
+ * Giratina have their orbs instead, which do the same thing.
+ */
+export function signatureItemsFor(speciesName: string): string[] {
+  const self = Dex.species.get(speciesName)
+  const base = self.baseSpecies
+  const forThisLine = Dex.items
+    .all()
+    .filter(
+      (item) =>
+        !item.megaStone &&
+        item.isNonstandard !== 'CAP' &&
+        !!item.itemUser?.some((user) => {
+          const userSpecies = Dex.species.get(user)
+          if (userSpecies.name === self.name) return true
+          // An Origin Forme only takes its own item; the plain forme never takes that one.
+          return self.forme !== 'Origin' && userSpecies.forme !== 'Origin' && userSpecies.baseSpecies === base
+        })
+    )
+    .map((item) => item.id)
+  return [...new Set([...megaStonesFor(speciesName), ...forThisLine])]
 }
 
 /** The species a form belongs to, as the Pokedex counts it ("Vulpix-Alola" -> "Vulpix"). */

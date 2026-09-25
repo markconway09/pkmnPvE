@@ -720,13 +720,13 @@ export class WildBattle {
   // defeated wild Pokemon (no held item) joins the box. Only a genuine wild
   // encounter (no trainerId) that the player just won can be caught, and
   // only once per battle.
-  catchWildPokemon(): CatchResult {
+  catchWildPokemon(replaceRunMonId?: string): CatchResult {
     if (!this.ended || this.winner !== 'You') throw new Error('You have not won this battle yet')
     if (this.opponent?.trainerId) throw new Error('Only a wild Pokemon can be caught')
     if (this.caught) throw new Error('This Pokemon has already been caught')
     if (this.opponent?.run) {
       // A run catch is free and joins the run's team, not the box.
-      addRunCatch(this.p2team[0])
+      addRunCatch(this.p2team[0], replaceRunMonId)
       this.caught = true
       return { money: getMoney(), pokeballs: getItemQuantity(DEFAULT_POKEBALL_ID) }
     }

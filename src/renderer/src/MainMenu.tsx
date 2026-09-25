@@ -451,11 +451,6 @@ function MainMenu({
                   setRun(await window.api.evolveRunMon(runMonId, target))
                 })
               }
-              onRelearnMoves={(runMonId) =>
-                void runAction(async () => {
-                  setRun(await window.api.relearnRunMoves(runMonId))
-                })
-              }
               onMoveItem={(fromMonId, toMonId) =>
                 void runAction(async () => {
                   setRun(await window.api.moveRunItem(fromMonId, toMonId))

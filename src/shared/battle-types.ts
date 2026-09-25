@@ -789,6 +789,12 @@ export interface OpenItemResult {
   // actually won at reel[winnerIndex].
   reel: ReelEntry[]
   winnerIndex: number
+  // How many more of the opened item are left in the bag - for "open another".
+  remaining: number
+  // An item won (Lock Capsule): its id, and what the shop would pay for it (null if it
+  // can't be sold) - so it can be sold straight from the result.
+  itemId?: string
+  sellPrice?: number | null
 }
 
 export interface SellResult {
@@ -889,7 +895,7 @@ export const ROGUELITE_GYM_LEADERS = 8
 export const ROGUELITE_ELITE_FOUR = 4
 export const ROGUELITE_BOSS_COUNT = ROGUELITE_GYM_LEADERS + ROGUELITE_ELITE_FOUR + 1
 export const ROGUELITE_FINAL_FLOOR = ROGUELITE_BOSS_EVERY * ROGUELITE_BOSS_COUNT
-export const ROGUELITE_START_LEVEL = 5
+export const ROGUELITE_START_LEVEL = 10
 export const ROGUELITE_MAX_TEAM = 6
 
 export type RunNodeKind = 'wild' | 'trainer' | 'item' | 'heal' | 'boss'

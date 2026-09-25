@@ -15,6 +15,7 @@ import {
   rollGiftShiny,
   buildPokemonSummary,
   dexBaseSpecies,
+  unretiredHeldItem,
   speciesRarityTier,
   nationalDexSpecies,
   evolutionOptionsFor,
@@ -62,6 +63,8 @@ function load(): StoredBox {
     // Saves from before exp tracking existed have no `exp` field - treat
     // those Pokemon as freshly arrived at whatever level they're already at.
     for (const mon of parsed.mons) {
+      // A held item taken out of the game becomes its modern twin (or goes).
+      if (mon.set.item) mon.set.item = unretiredHeldItem(mon.set.item)
       if (typeof mon.exp !== 'number') mon.exp = totalExpForSpeciesLevel(mon.set.species, mon.set.level)
       // Exp once kept piling up past the level cap (the level stopped, the exp
       // didn't). Anything beyond the Pokemon's current level is trimmed back to

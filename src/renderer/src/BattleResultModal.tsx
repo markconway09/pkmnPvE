@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { DEFAULT_POKEBALL_ID, POKEBALL_PRICE } from '../../shared/battle-types'
-import type { ExpGainResult, ItemDropResult } from '../../shared/battle-types'
+import { DEFAULT_POKEBALL_ID, POKEBALL_PRICE, ROGUELITE_MAX_TEAM, toSpriteId } from '../../shared/battle-types'
+import type { ExpGainResult, ItemDropResult, RunMonView } from '../../shared/battle-types'
 import ItemSprite from './ItemSprite'
+import SpriteImage from './SpriteImage'
 import { formatMoney } from './money'
 
 interface Props {
@@ -40,6 +41,8 @@ function BattleResultModal({
   const [money, setMoney] = useState<number | null>(null)
   const [pokeballPrice, setPokeballPrice] = useState(POKEBALL_PRICE)
   const [caught, setCaught] = useState(false)
+  // A run whose team is full picks who the catch replaces - the team, while choosing.
+  const [replacing, setReplacing] = useState<RunMonView[] | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -54,11 +57,19 @@ function BattleResultModal({
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
   }, [canCatch, runBattle])
 
-  async function catchPokemon(): Promise<void> {
+  async function catchPokemon(replaceRunMonId?: string): Promise<void> {
     setBusy(true)
     setError(null)
     try {
-      const result = await window.api.catchWildPokemon()
+      if (runBattle && !replaceRunMonId) {
+        const team = (await window.api.getRun())?.team ?? []
+        if (team.length >= ROGUELITE_MAX_TEAM) {
+          setReplacing(team)
+          return
+        }
+      }
+      const result = await window.api.catchWildPokemon(replaceRunMonId)
+      setReplacing(null)
       setPokeballs(result.pokeballs)
       setMoney(result.money)
       setCaught(true)
@@ -92,10 +103,27 @@ function BattleResultModal({
     <div className="modal-overlay">
       <div className="modal-panel battle-result-modal">
         <h2>{heading}</h2>
-        {canCatch && (
+        {canCatch && !replacing && (
           <div className="catch-row">
             <button type="button" disabled={catchDisabled} onClick={() => void catchPokemon()}>
               {catchLabel}
+            </button>
+          </div>
+        )}
+        {replacing && (
+          <div className="run-replace">
+            <p className="box-empty-hint">Your run team is full - who should make room?</p>
+            <div className="run-replace-grid">
+              {replacing.map((mon) => (
+                <button key={mon.id} disabled={busy} onClick={() => void catchPokemon(mon.id)}>
+                  <SpriteImage style="2d-static" className="run-replace-sprite" spriteId={toSpriteId(mon.species)} shiny={mon.shiny} alt="" />
+                  <span>{mon.species}</span>
+                  <span className="box-empty-hint">Lv {mon.level}</span>
+                </button>
+              ))}
+            </div>
+            <button type="button" disabled={busy} onClick={() => setReplacing(null)}>
+              Keep my team
             </button>
           </div>
         )}

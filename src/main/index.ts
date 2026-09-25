@@ -76,7 +76,6 @@ import {
   giveRunItem,
   moveRunItem,
   placeDisplacedItem,
-  relearnRunMoves,
   rerollRunItems,
   reorderRunTeam,
   skipRunItem,
@@ -268,9 +267,9 @@ ipcMain.handle('battle:run', () => {
   activeBattle = null
 })
 
-ipcMain.handle('battle:catch', () => {
+ipcMain.handle('battle:catch', (_event, replaceRunMonId?: string) => {
   if (!activeBattle) throw new Error('No active battle')
-  return activeBattle.catchWildPokemon()
+  return activeBattle.catchWildPokemon(replaceRunMonId)
 })
 
 ipcMain.handle('battle:eligibility', (): BattleEligibility => {
@@ -320,7 +319,6 @@ ipcMain.handle('run:giveItem', (_event, itemId: string, runMonId: string) => giv
 ipcMain.handle('run:skipItem', () => skipRunItem())
 ipcMain.handle('run:rerollItems', () => rerollRunItems())
 ipcMain.handle('run:evolve', (_event, runMonId: string, targetSpecies: string) => evolveRunMon(runMonId, targetSpecies))
-ipcMain.handle('run:relearnMoves', (_event, runMonId: string) => relearnRunMoves(runMonId))
 ipcMain.handle('run:placeDisplacedItem', (_event, runMonId: string | null) => placeDisplacedItem(runMonId))
 ipcMain.handle('run:moveItem', (_event, fromMonId: string, toMonId: string) => moveRunItem(fromMonId, toMonId))
 ipcMain.handle('run:reorder', (_event, runMonIds: string[]) => reorderRunTeam(runMonIds))

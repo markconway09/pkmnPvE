@@ -6,6 +6,7 @@ import {
   pickRandomUnevolvedAnySpecies,
   randomNatureName,
   rollGiftShiny,
+  sellPriceFor,
   speciesRarityTier
 } from './sim-access'
 import { addItem, getItemQuantity, removeItem } from './bag-store'
@@ -56,7 +57,8 @@ export function openBagItem(itemId: string): OpenItemResult {
     shiny,
     tier: winner.tier,
     reel: buildReel(winner, () => asEntry(pickSpecies())),
-    winnerIndex: REEL_WINNER_INDEX
+    winnerIndex: REEL_WINNER_INDEX,
+    remaining: getItemQuantity(itemId)
   }
 }
 
@@ -114,10 +116,13 @@ function openLockCapsule(): OpenItemResult {
   return {
     kind: 'item',
     name: item.name,
+    itemId: item.id,
+    sellPrice: sellPriceFor(item.id),
     level: 0,
     shiny: false,
     tier: winner.tier,
     reel: buildReel(winner, () => asEntry(pickCapsuleItem(pool))),
-    winnerIndex: REEL_WINNER_INDEX
+    winnerIndex: REEL_WINNER_INDEX,
+    remaining: getItemQuantity(LOCK_CAPSULE_ITEM_ID)
   }
 }

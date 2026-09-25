@@ -8,15 +8,14 @@ interface Props {
   // What it can evolve into right now (see runEvolutionOptions on the main side).
   evolutions: string[]
   onEvolve: (targetSpecies: string) => void
-  onRelearnMoves: () => void
   // What it holds - "Move item" only shows when it holds something.
   heldItem: string | null
   onMoveItem: () => void
   onClose: () => void
 }
 
-// Clicking (or right-clicking) a run Pokemon: evolve it, give it a fresh moveset, or move its held item.
-function RunMonContextMenu({ x, y, species, evolutions, onEvolve, onRelearnMoves, heldItem, onMoveItem, onClose }: Props): React.JSX.Element {
+// Clicking (or right-clicking) a run Pokemon: evolve it or move its held item.
+function RunMonContextMenu({ x, y, species, evolutions, onEvolve, heldItem, onMoveItem, onClose }: Props): React.JSX.Element {
   return createPortal(
     <div
       className="context-menu-overlay"
@@ -33,13 +32,6 @@ function RunMonContextMenu({ x, y, species, evolutions, onEvolve, onRelearnMoves
             Evolve into {target}
           </button>
         ))}
-        <button
-          className="context-menu-item"
-          title="Moves from Smogon's sets it can learn at its level first, then its newest level-up moves"
-          onClick={onRelearnMoves}
-        >
-          Update moves
-        </button>
         {heldItem && (
           <button className="context-menu-item" onClick={onMoveItem}>
             Move item ({heldItem})
