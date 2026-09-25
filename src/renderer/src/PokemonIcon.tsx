@@ -3,6 +3,7 @@ import type { BoxPokemonView } from '../../shared/battle-types'
 import PokemonTooltipContent from './PokemonTooltipContent'
 import PokemonIconVisual from './PokemonIconVisual'
 import Tooltip from './Tooltip'
+import { useTapGuard } from './useTapGuard'
 
 interface Props {
   mon: BoxPokemonView
@@ -15,6 +16,8 @@ interface Props {
 
 function PokemonIcon({ mon, fill, onEdit, onRemove, draggable = false, onContextMenu }: Props): React.JSX.Element {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: mon.id, disabled: !draggable })
+  // A left click opens the same menu as a right click - but not a drag that ends where it began.
+  const tap = useTapGuard()
 
   return (
     <Tooltip
@@ -27,6 +30,8 @@ function PokemonIcon({ mon, fill, onEdit, onRemove, draggable = false, onContext
         className={`box-icon-draggable ${isDragging ? 'box-icon-dragging' : ''}`}
         onDoubleClick={() => onEdit?.(mon.id)}
         onContextMenu={onContextMenu ? (e) => onContextMenu(e, mon) : undefined}
+        onPointerDownCapture={tap.onPointerDownCapture}
+        onClick={onContextMenu ? (e) => tap.isTap() && onContextMenu(e, mon) : undefined}
         {...attributes}
         {...listeners}
       >

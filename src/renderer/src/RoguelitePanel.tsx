@@ -15,6 +15,7 @@ import PokemonTooltipContent from './PokemonTooltipContent'
 import Tooltip from './Tooltip'
 import ItemSprite from './ItemSprite'
 import RunMonContextMenu from './RunMonContextMenu'
+import { useTapGuard } from './useTapGuard'
 import { trainerSpriteUrl } from './trainerSprite'
 
 // The droppable id MainMenu's drag handler looks for.
@@ -112,6 +113,7 @@ function RunMonCard({ mon, index, onClick, onContextMenu, selectable }: RunMonCa
   const drag = useDraggable({ id: `${RUN_MON_DRAG_PREFIX}${mon.id}` })
   const drop = useDroppable({ id: `${RUN_SLOT_DROP_PREFIX}${index}` })
   const { transform } = drag
+  const tap = useTapGuard()
   return (
     <Tooltip className="run-mon-card-wrap" placement="above" content={<PokemonTooltipContent pokemon={mon} />}>
       <button
@@ -127,8 +129,15 @@ function RunMonCard({ mon, index, onClick, onContextMenu, selectable }: RunMonCa
           drop.isOver && !drag.isDragging ? ' team-slot-over' : ''
         }${drag.isDragging ? ' run-mon-card-dragging' : ''}`}
         // Not disabled even when there's nothing to click for - a disabled button gets no
-        // right-clicks, and the context menu needs them.
-        onClick={selectable ? onClick : undefined}
+        // right-clicks, and the context menu needs them. A left click picks it as a target
+        // when something is being given, and otherwise opens the same menu (a drag that
+        // ends where it began doesn't count).
+        onPointerDownCapture={tap.onPointerDownCapture}
+        onClick={(e) => {
+          if (!tap.isTap()) return
+          if (selectable) onClick?.()
+          else onContextMenu?.(e)
+        }}
         onContextMenu={onContextMenu}
       >
         <div className="box-icon box-icon-fill">
@@ -440,7 +449,7 @@ function RoguelitePanel({
         </p>
       ) : (
         <p className="box-empty-hint">
-          Drag to reorder (the first one leads). Right-click to evolve, update moves or move its item.
+          Drag to reorder (the first one leads). Click to evolve, update moves or move its item.
         </p>
       )}
 

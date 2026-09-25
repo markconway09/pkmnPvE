@@ -134,7 +134,7 @@ function BagModal({ onClose, onChanged }: Props): React.JSX.Element {
     <div className="modal-overlay" onMouseDown={onClose}>
       <div className="modal-panel bag-modal" onMouseDown={(e) => e.stopPropagation()}>
         <h2>Bag</h2>
-        <p className="box-empty-hint">Right-click an item to use, sell or open it, or restore a fossil.</p>
+        <p className="box-empty-hint">Click an item to use, sell or open it, or restore a fossil.</p>
         {error && <p className="editor-error">{error}</p>}
         {message && <p className="bag-message">{message}</p>}
         {!items && !error && <p>Loading...</p>}
@@ -151,6 +151,7 @@ function BagModal({ onClose, onChanged }: Props): React.JSX.Element {
                       className="bag-item"
                       title={item.description}
                       onContextMenu={(e) => openMenu(e, item)}
+                      onClick={(e) => openMenu(e, item)}
                     >
                       <ItemSprite spritenum={item.spritenum} className="bag-item-icon" />
                       <span className="bag-item-name">{item.name}</span>

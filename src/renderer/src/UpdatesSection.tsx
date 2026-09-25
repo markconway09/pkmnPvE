@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { UpdateCheckResult, UpdateProgress } from '../../shared/battle-types'
 
 function megabytes(bytes: number): string {
@@ -16,6 +16,15 @@ function UpdatesSection(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => window.api.onUpdateProgress(setProgress), [])
+
+  // Keeps the update box in sight as it changes - the notes can push the button, the
+  // progress bar or an error past the bottom of the window, where an update in
+  // progress looked like nothing was happening at all.
+  const panelRef = useRef<HTMLDivElement>(null)
+  const phase = progress?.phase ?? null
+  useEffect(() => {
+    panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [check?.available, installing, phase, error])
 
   async function runCheck(): Promise<void> {
     setChecking(true)
@@ -44,7 +53,7 @@ function UpdatesSection(): React.JSX.Element {
   const percent = progress && progress.total > 0 ? Math.round((progress.received / progress.total) * 100) : 0
 
   return (
-    <>
+    <div ref={panelRef}>
       <h2 className="options-heading">Updates</h2>
       <p className="editor-hint">
         Version {check?.current ?? '…'} - your saves are kept when updating; trainers and other game data come from
@@ -88,7 +97,7 @@ function UpdatesSection(): React.JSX.Element {
         </div>
       )}
       {error && <p className="editor-error">{error}</p>}
-    </>
+    </div>
   )
 }
 

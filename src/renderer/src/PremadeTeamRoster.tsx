@@ -210,7 +210,7 @@ function PremadeTeamRoster({ team, items, onClose, onTeamsChange }: Props): Reac
         )}
         {error && <p className="editor-error">{error}</p>}
         <p className="box-empty-hint">
-          Right-click a Pokemon to edit it. Drag to reorder. Click × to remove it.
+          Click a Pokemon to edit it. Drag to reorder. Click × to remove it.
         </p>
 
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>

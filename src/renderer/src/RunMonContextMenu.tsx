@@ -15,7 +15,7 @@ interface Props {
   onClose: () => void
 }
 
-// Right-click on a run Pokemon: evolve it, give it a fresh moveset, or move its held item.
+// Clicking (or right-clicking) a run Pokemon: evolve it, give it a fresh moveset, or move its held item.
 function RunMonContextMenu({ x, y, species, evolutions, onEvolve, onRelearnMoves, heldItem, onMoveItem, onClose }: Props): React.JSX.Element {
   return createPortal(
     <div
