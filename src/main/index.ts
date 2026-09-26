@@ -5,6 +5,7 @@ import type {
   BossRematchInfo,
   RunChoiceResult,
   RunDifficulty,
+  RunMonEdit,
   RunView,
   BossStep,
   EditablePokemonSet,
@@ -37,6 +38,7 @@ import {
 import { getBagState, resetBag } from './showdown/bag-store'
 import { applyLoadout, deleteLoadout, listLoadouts, renameLoadout, saveLoadout, updateLoadout } from './showdown/loadout-store'
 import {
+  listAllAbilities,
   generateRandomTrainerTeam,
   generateLabWildMon,
   generateRandomWildMon,
@@ -81,7 +83,16 @@ import {
   skipRunItem,
   startRun,
   takeHealNode,
-  takeItemNode
+  takeItemNode,
+  takePickNode,
+  previewStarterMoves,
+  previewEvolutionMoves,
+  getRunMonEditInfo,
+  runSmogonSet,
+  updateRunMon,
+  giveRunAbility,
+  teachRunMove,
+  skipRunPick
 } from './showdown/run-store'
 import { createRunBattle } from './showdown/run-battles'
 import { getWildDropFor, listWildDrops, setWildDrop } from './showdown/wild-drops-store'
@@ -311,14 +322,29 @@ function allBossesDefeated(): boolean {
 // ---- Roguelite runs (see run-store.ts) ----
 ipcMain.handle('run:get', (): RunView | null => getRunView())
 ipcMain.handle('run:generations', () => completeRunGenerations())
-ipcMain.handle('run:start', (_event, boxMonId: string, difficulty: RunDifficulty, generation: number | null) =>
-  startRun(boxMonId, difficulty, generation)
+ipcMain.handle('run:start', (_event, boxMonId: string, difficulty: RunDifficulty, generation: number | null, keepMoves = false) =>
+  startRun(boxMonId, difficulty, generation, keepMoves)
 )
+ipcMain.handle('run:previewStarterMoves', (_event, boxMonId: string) => previewStarterMoves(boxMonId))
+ipcMain.handle('run:previewEvolution', (_event, runMonId: string, targetSpecies: string) =>
+  previewEvolutionMoves(runMonId, targetSpecies)
+)
+ipcMain.handle('run:editInfo', (_event, runMonId: string) => getRunMonEditInfo(runMonId))
+ipcMain.handle('run:smogonSet', (_event, runMonId: string, optionId: string) => runSmogonSet(runMonId, optionId))
+ipcMain.handle('run:updateMon', (_event, runMonId: string, input: RunMonEdit) => updateRunMon(runMonId, input))
 ipcMain.handle('run:forfeit', () => forfeitRun())
 ipcMain.handle('run:giveItem', (_event, itemId: string, runMonId: string) => giveRunItem(itemId, runMonId))
 ipcMain.handle('run:skipItem', () => skipRunItem())
+ipcMain.handle('run:giveAbility', (_event, abilityId: string, runMonId: string) => giveRunAbility(abilityId, runMonId))
+ipcMain.handle('run:teachMove', (_event, moveId: string, runMonId: string, replaceMoveId: string | null) =>
+  teachRunMove(moveId, runMonId, replaceMoveId)
+)
+ipcMain.handle('run:skipPick', () => skipRunPick())
+ipcMain.handle('dex:abilities', () => listAllAbilities())
 ipcMain.handle('run:rerollItems', () => rerollRunItems())
-ipcMain.handle('run:evolve', (_event, runMonId: string, targetSpecies: string) => evolveRunMon(runMonId, targetSpecies))
+ipcMain.handle('run:evolve', (_event, runMonId: string, targetSpecies: string, newMoves = true) =>
+  evolveRunMon(runMonId, targetSpecies, newMoves)
+)
 ipcMain.handle('run:placeDisplacedItem', (_event, runMonId: string | null) => placeDisplacedItem(runMonId))
 ipcMain.handle('run:moveItem', (_event, fromMonId: string, toMonId: string) => moveRunItem(fromMonId, toMonId))
 ipcMain.handle('run:reorder', (_event, runMonIds: string[]) => reorderRunTeam(runMonIds))
@@ -328,6 +354,7 @@ ipcMain.handle('run:choose', async (_event, index: number): Promise<RunChoiceRes
   const choice = runChoiceAt(index)
   if (choice.kind === 'heal') return { run: takeHealNode() }
   if (choice.kind === 'item') return { run: takeItemNode() }
+  if (choice.kind === 'ability' || choice.kind === 'move') return { run: takePickNode(choice.kind) }
   activeBattle = createRunBattle(choice)
   return { battle: await activeBattle.getInitialView(), location: choice.location }
 })

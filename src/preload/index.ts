@@ -22,6 +22,9 @@ import type {
   BossRematchInfo,
   RunChoiceResult,
   RunDifficulty,
+  RunMonEdit,
+  RunMonEditInfo,
+  RunMovesPreview,
   RunView,
   PokedexEntry,
   UpdateCheckResult,
@@ -52,16 +55,29 @@ const api = {
   getRun: (): Promise<RunView | null> => ipcRenderer.invoke('run:get'),
   // Generations with a Roguelite boss of every class - the ones a run can be set to.
   getRunGenerations: (): Promise<number[]> => ipcRenderer.invoke('run:generations'),
-  startRun: (boxMonId: string, difficulty: RunDifficulty, generation: number | null): Promise<RunView> =>
-    ipcRenderer.invoke('run:start', boxMonId, difficulty, generation),
+  startRun: (boxMonId: string, difficulty: RunDifficulty, generation: number | null, keepMoves: boolean): Promise<RunView> =>
+    ipcRenderer.invoke('run:start', boxMonId, difficulty, generation, keepMoves),
+  previewStarterMoves: (boxMonId: string): Promise<RunMovesPreview> => ipcRenderer.invoke('run:previewStarterMoves', boxMonId),
+  previewEvolutionMoves: (runMonId: string, targetSpecies: string): Promise<RunMovesPreview> =>
+    ipcRenderer.invoke('run:previewEvolution', runMonId, targetSpecies),
+  getRunMonEditInfo: (runMonId: string): Promise<RunMonEditInfo> => ipcRenderer.invoke('run:editInfo', runMonId),
+  runSmogonSet: (runMonId: string, optionId: string): Promise<string[]> =>
+    ipcRenderer.invoke('run:smogonSet', runMonId, optionId),
+  updateRunMon: (runMonId: string, input: RunMonEdit): Promise<RunView> => ipcRenderer.invoke('run:updateMon', runMonId, input),
   forfeitRun: (): Promise<RunView> => ipcRenderer.invoke('run:forfeit'),
   // A floor's option, by its place in the run's list of choices.
   chooseRunNode: (index: number): Promise<RunChoiceResult> => ipcRenderer.invoke('run:choose', index),
   giveRunItem: (itemId: string, runMonId: string): Promise<RunView> => ipcRenderer.invoke('run:giveItem', itemId, runMonId),
   skipRunItem: (): Promise<RunView> => ipcRenderer.invoke('run:skipItem'),
+  giveRunAbility: (abilityId: string, runMonId: string): Promise<RunView> =>
+    ipcRenderer.invoke('run:giveAbility', abilityId, runMonId),
+  teachRunMove: (moveId: string, runMonId: string, replaceMoveId: string | null): Promise<RunView> =>
+    ipcRenderer.invoke('run:teachMove', moveId, runMonId, replaceMoveId),
+  skipRunPick: (): Promise<RunView> => ipcRenderer.invoke('run:skipPick'),
+  listAllAbilities: (): Promise<{ id: string; name: string }[]> => ipcRenderer.invoke('dex:abilities'),
   rerollRunItems: (): Promise<RunView> => ipcRenderer.invoke('run:rerollItems'),
-  evolveRunMon: (runMonId: string, targetSpecies: string): Promise<RunView> =>
-    ipcRenderer.invoke('run:evolve', runMonId, targetSpecies),
+  evolveRunMon: (runMonId: string, targetSpecies: string, newMoves: boolean): Promise<RunView> =>
+    ipcRenderer.invoke('run:evolve', runMonId, targetSpecies, newMoves),
   placeDisplacedItem: (runMonId: string | null): Promise<RunView> => ipcRenderer.invoke('run:placeDisplacedItem', runMonId),
   moveRunItem: (fromMonId: string, toMonId: string): Promise<RunView> => ipcRenderer.invoke('run:moveItem', fromMonId, toMonId),
   reorderRunTeam: (runMonIds: string[]): Promise<RunView> => ipcRenderer.invoke('run:reorder', runMonIds),

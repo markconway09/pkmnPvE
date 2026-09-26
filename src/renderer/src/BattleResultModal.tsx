@@ -132,7 +132,7 @@ function BattleResultModal({
           <div className="exp-gain-list">
             <div className="exp-gain-row">
               <span className="exp-gain-species">Reward</span>
-              <span className="exp-gain-detail">Pick a held item back on the run menu</span>
+              <span className="exp-gain-detail">Pick your reward back on the run menu</span>
             </div>
           </div>
         )}

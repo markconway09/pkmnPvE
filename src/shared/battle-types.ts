@@ -435,6 +435,9 @@ export interface Trainer {
   // What kind of boss a Roguelite boss is: a run meets 8 Gym Leaders, the Elite Four,
   // then the Champion.
   rogueliteClass?: RogueliteBossClass
+  // A Roguelite boss's reward: beating it offers this ability (id) to one of the run's
+  // Pokemon, instead of the usual item pick.
+  rogueliteRewardAbility?: string
   // The generation a Roguelite boss is from (1-9) - a run set to a generation only
   // meets that generation's bosses.
   rogueliteGeneration?: number
@@ -898,7 +901,41 @@ export const ROGUELITE_FINAL_FLOOR = ROGUELITE_BOSS_EVERY * ROGUELITE_BOSS_COUNT
 export const ROGUELITE_START_LEVEL = 10
 export const ROGUELITE_MAX_TEAM = 6
 
-export type RunNodeKind = 'wild' | 'trainer' | 'item' | 'heal' | 'boss'
+export type RunNodeKind = 'wild' | 'trainer' | 'item' | 'heal' | 'boss' | 'ability' | 'move'
+
+// Keep or change moves: a starter's own moves against a run moveset, or an evolving
+// Pokemon's moves against what it would get as its new species (locked moves kept).
+export interface RunMovesPreview {
+  current: MoveInfo[]
+  proposed: MoveInfo[]
+}
+
+// Everything the run's own moves editor needs: what it can learn (its whole learnset),
+// Smogon's sets for it, and the moves it has now.
+export interface RunMonEditInfo {
+  species: string
+  learnable: MoveInfo[]
+  autoSets: AutoSetOption[]
+  moves: string[]
+  lockedMoves: string[]
+}
+
+// What the run's moves editor saves: moves (ids, up to 4) and the ones locked.
+export interface RunMonEdit {
+  moves: string[]
+  lockedMoves: string[]
+}
+
+// One of the four choices a New Ability / New Move floor offers.
+export interface RunPickOption {
+  id: string
+  name: string
+  description: string
+  // Moves only.
+  type?: string
+  category?: string
+  basePower?: number
+}
 
 export type RunDifficulty = 'easy' | 'normal' | 'hard' | 'extreme'
 
@@ -1005,6 +1042,11 @@ export interface RunMonView extends BoxPokemonView {
   // Carried between battles (heal nodes and beaten bosses top it back up).
   hpPercent: number
   status: string | null
+  // Its moves by name, and which were taught on a New Move floor - those stay put
+  // when its moves update.
+  moveList: { id: string; name: string; locked: boolean }[]
+  // Its ability came from a New Ability floor (and stays through evolution).
+  abilityLocked: boolean
 }
 
 export interface RunItemOffer {
@@ -1036,6 +1078,10 @@ export interface RunView {
   itemOfferReason: 'floor' | 'reward' | null
   // An item floor's offer that hasn't been rerolled yet (once per floor).
   canRerollItems: boolean
+  // A New Ability / New Move floor: the four choices, until one is given to someone.
+  pickOffer: { kind: 'ability' | 'move'; options: RunPickOption[] } | null
+  // A floor's pick, or the reward for beating a boss.
+  pickReason: 'floor' | 'reward' | null
   // An item a newly given one replaced, waiting for a new holder before the run goes on.
   displacedItem: { itemName: string; spritenum: number; fromMonId: string } | null
   // The species the run started with, for the result banner.

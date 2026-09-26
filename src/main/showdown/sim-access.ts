@@ -1568,6 +1568,28 @@ export function signatureItemsFor(speciesName: string): string[] {
   return [...new Set([...megaStonesFor(speciesName), ...forThisLine])]
 }
 
+/** Every ability there is (not the made-up CAP ones), by name - for the boss editor. */
+export function listAllAbilities(): { id: string; name: string }[] {
+  return Dex.abilities
+    .all()
+    .filter((a) => a.exists && a.num > 0 && a.isNonstandard !== 'CAP')
+    .map((a) => ({ id: a.id, name: a.name }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/** An ability's name and short description, for the New Ability choices. */
+export function abilityInfo(id: string): { id: string; name: string; description: string } | null {
+  const ability = Dex.abilities.get(id)
+  if (!ability.exists) return null
+  return { id: ability.id, name: ability.name, description: ability.shortDesc || ability.desc || '' }
+}
+
+/** An item made for particular species: a Mega Stone, or one the Dex names users for. */
+export function isSignatureItem(itemId: string): boolean {
+  const item = Dex.items.get(itemId)
+  return !!item.megaStone || (item.itemUser?.length ?? 0) > 0
+}
+
 /** The species a form belongs to, as the Pokedex counts it ("Vulpix-Alola" -> "Vulpix"). */
 export function dexBaseSpecies(speciesName: string): string {
   const species = Dex.species.get(speciesName)

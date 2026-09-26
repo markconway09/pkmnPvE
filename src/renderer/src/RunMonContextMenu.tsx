@@ -11,11 +11,13 @@ interface Props {
   // What it holds - "Move item" only shows when it holds something.
   heldItem: string | null
   onMoveItem: () => void
+  onEdit: () => void
   onClose: () => void
 }
 
-// Clicking (or right-clicking) a run Pokemon: evolve it or move its held item.
-function RunMonContextMenu({ x, y, species, evolutions, onEvolve, heldItem, onMoveItem, onClose }: Props): React.JSX.Element {
+// Clicking (or right-clicking) a run Pokemon: edit its moves, evolve it, or move its
+// held item.
+function RunMonContextMenu({ x, y, species, evolutions, onEvolve, heldItem, onMoveItem, onEdit, onClose }: Props): React.JSX.Element {
   return createPortal(
     <div
       className="context-menu-overlay"
@@ -27,6 +29,9 @@ function RunMonContextMenu({ x, y, species, evolutions, onEvolve, heldItem, onMo
     >
       <ContextMenuPanel x={x} y={y}>
         <div className="context-menu-title">{species}</div>
+        <button className="context-menu-item" onClick={onEdit}>
+          Edit moves
+        </button>
         {evolutions.map((target) => (
           <button key={target} className="context-menu-item" onClick={() => onEvolve(target)}>
             Evolve into {target}

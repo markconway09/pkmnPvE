@@ -34,6 +34,20 @@ function RogueliteBossEditor({ trainer, onClose, onSaved }: Props): React.JSX.El
   // Empty until picked - a boss made before classes existed has none yet.
   const [bossClass, setBossClass] = useState<RogueliteBossClass | ''>(trainer?.rogueliteClass ?? '')
   const [generation, setGeneration] = useState<number | ''>(trainer?.rogueliteGeneration ?? '')
+  // The ability beating this boss offers (typed by name, stored by id).
+  const [rewardAbility, setRewardAbility] = useState('')
+  const [abilities, setAbilities] = useState<{ id: string; name: string }[]>([])
+
+  useEffect(() => {
+    window.api
+      .listAllAbilities()
+      .then((list) => {
+        setAbilities(list)
+        const current = list.find((a) => a.id === trainer?.rogueliteRewardAbility)
+        if (current) setRewardAbility(current.name)
+      })
+      .catch(() => {})
+  }, [trainer?.rogueliteRewardAbility])
   const [pickerOpen, setPickerOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -62,7 +76,13 @@ function RogueliteBossEditor({ trainer, onClose, onSaved }: Props): React.JSX.El
       .catch(() => {})
   }, [])
 
+  const rewardAbilityId = abilities.find((a) => a.name.toLowerCase() === rewardAbility.trim().toLowerCase())?.id ?? ''
+
   async function save(): Promise<void> {
+    if (rewardAbility.trim() && !rewardAbilityId) {
+      setError(`There's no ability called "${rewardAbility.trim()}"`)
+      return
+    }
     setSaving(true)
     setError(null)
     try {
@@ -79,6 +99,7 @@ function RogueliteBossEditor({ trainer, onClose, onSaved }: Props): React.JSX.El
         rocketEvent: false,
         rogueliteClass: bossClass || undefined,
         rogueliteGeneration: generation || undefined,
+        rogueliteRewardAbility: rewardAbilityId || undefined,
         // Run bosses don't drop anything - whatever a trainer already had is just kept.
         drops: trainer?.drops ?? []
       }
@@ -155,6 +176,22 @@ function RogueliteBossEditor({ trainer, onClose, onSaved }: Props): React.JSX.El
                 </option>
               ))}
             </select>
+          </label>
+
+          <label className="editor-field">
+            <span>Reward ability</span>
+            <input
+              type="text"
+              list="boss-reward-abilities"
+              placeholder="None (beating it gives an item pick)"
+              value={rewardAbility}
+              onChange={(e) => setRewardAbility(e.target.value)}
+            />
+            <datalist id="boss-reward-abilities">
+              {abilities.map((a) => (
+                <option key={a.id} value={a.name} />
+              ))}
+            </datalist>
           </label>
 
           <label className="editor-field">

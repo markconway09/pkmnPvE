@@ -4236,3 +4236,51 @@ button:disabled {
   font-weight: normal;
   color: #ffd76b;
 }
+
+/* Roguelite: keep-or-change moves, and the run's own moves editor. */
+.run-moves-modal {
+  width: 520px;
+}
+
+.run-moves-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 10px 0;
+}
+
+.run-moves-column h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+
+.run-moves-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.run-mon-editor {
+  width: 520px;
+}
+
+.run-editor-move {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.run-editor-move select {
+  flex: 1;
+}
+
+.run-editor-lock {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+}
+

@@ -9,7 +9,15 @@ import {
   type DragStartEvent
 } from '@dnd-kit/core'
 import { WILD_LOCATIONS } from '../../shared/battle-types'
-import type { BattleEligibility, BattleView, BoxPokemonView, BoxState, RunView, WildLocationId } from '../../shared/battle-types'
+import type {
+  BattleEligibility,
+  BattleView,
+  BoxPokemonView,
+  BoxState,
+  RunMovesPreview,
+  RunView,
+  WildLocationId
+} from '../../shared/battle-types'
 import TeamRow from './TeamRow'
 import BoxGrid from './BoxGrid'
 import PokemonEditor from './PokemonEditor'
@@ -24,6 +32,7 @@ import WildDropsModal from './WildDropsModal'
 import ShopPricesModal from './ShopPricesModal'
 import LoadoutsModal from './LoadoutsModal'
 import BossRematchModal from './BossRematchModal'
+import RunMovesChoice from './RunMovesChoice'
 import RoguelitePanel, { RUN_MON_DRAG_PREFIX, RUN_SLOT_DROP_PREFIX, RUN_STARTER_SLOT_ID } from './RoguelitePanel'
 import { loadMenuMode, saveMenuMode, type MenuMode } from './menuMode'
 import { trainerSpriteUrl } from './trainerSprite'
@@ -102,6 +111,12 @@ function MainMenu({
   const [runBusy, setRunBusy] = useState(false)
   const [runError, setRunError] = useState<string | null>(null)
   const [bestFloor, setBestFloor] = useState<number | null>(null)
+  // Keep moves or take new ones - asked when a run starts and when a run Pokemon evolves.
+  const [movesChoice, setMovesChoice] = useState<{
+    title: string
+    preview: RunMovesPreview
+    decide: (keep: boolean) => Promise<void>
+  } | null>(null)
   // A run in progress takes the whole menu: the regular team and box are hidden.
   const runInProgress = mode === 'roguelite' && run?.status === 'active'
   const [levelCap, setLevelCap] = useState<number | null>(null)
@@ -430,10 +445,18 @@ function MainMenu({
               onStart={(difficulty, generation) =>
                 void runAction(async () => {
                   if (!runPickId) return
-                  setRun(await window.api.startRun(runPickId, difficulty, generation))
-                  setRunPickId(null)
+                  const starter = runPickId
+                  setMovesChoice({
+                    title: `${monsById.get(starter)?.species ?? 'Your starter'} starts the run`,
+                    preview: await window.api.previewStarterMoves(starter),
+                    decide: async (keep) => {
+                      setRun(await window.api.startRun(starter, difficulty, generation, keep))
+                      setRunPickId(null)
+                    }
+                  })
                 })
               }
+              onRunUpdated={setRun}
               onChoose={(index) =>
                 void runAction(async () => {
                   const result = await window.api.chooseRunNode(index)
@@ -448,7 +471,12 @@ function MainMenu({
               }
               onEvolve={(runMonId, target) =>
                 void runAction(async () => {
-                  setRun(await window.api.evolveRunMon(runMonId, target))
+                  const from = run?.team.find((m) => m.id === runMonId)?.species ?? 'It'
+                  setMovesChoice({
+                    title: `${from} evolves into ${target}`,
+                    preview: await window.api.previewEvolutionMoves(runMonId, target),
+                    decide: async (keep) => setRun(await window.api.evolveRunMon(runMonId, target, !keep))
+                  })
                 })
               }
               onMoveItem={(fromMonId, toMonId) =>
@@ -464,6 +492,21 @@ function MainMenu({
               onRerollItems={() =>
                 void runAction(async () => {
                   setRun(await window.api.rerollRunItems())
+                })
+              }
+              onGiveAbility={(abilityId, runMonId) =>
+                void runAction(async () => {
+                  setRun(await window.api.giveRunAbility(abilityId, runMonId))
+                })
+              }
+              onTeachMove={(moveId, runMonId, replaceMoveId) =>
+                void runAction(async () => {
+                  setRun(await window.api.teachRunMove(moveId, runMonId, replaceMoveId))
+                })
+              }
+              onSkipPick={() =>
+                void runAction(async () => {
+                  setRun(await window.api.skipRunPick())
                 })
               }
               onSkipItem={() =>
@@ -648,6 +691,27 @@ function MainMenu({
             setRematchOpen(false)
             onBossRematch(trainerId)
           }}
+        />
+      )}
+
+      {movesChoice && (
+        <RunMovesChoice
+          title={movesChoice.title}
+          preview={movesChoice.preview}
+          busy={runBusy}
+          onCancel={() => setMovesChoice(null)}
+          onKeep={() =>
+            void runAction(async () => {
+              await movesChoice.decide(true)
+              setMovesChoice(null)
+            })
+          }
+          onNew={() =>
+            void runAction(async () => {
+              await movesChoice.decide(false)
+              setMovesChoice(null)
+            })
+          }
         />
       )}
 

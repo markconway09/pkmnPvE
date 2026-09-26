@@ -15,6 +15,7 @@ import PokemonTooltipContent from './PokemonTooltipContent'
 import Tooltip from './Tooltip'
 import ItemSprite from './ItemSprite'
 import RunMonContextMenu from './RunMonContextMenu'
+import RunMonEditor from './RunMonEditor'
 import { useTapGuard } from './useTapGuard'
 import { trainerSpriteUrl } from './trainerSprite'
 
@@ -36,6 +37,11 @@ interface Props {
   onChoose: (index: number) => void
   onGiveItem: (itemId: string, runMonId: string) => void
   onSkipItem: () => void
+  onGiveAbility: (abilityId: string, runMonId: string) => void
+  onTeachMove: (moveId: string, runMonId: string, replaceMoveId: string | null) => void
+  onSkipPick: () => void
+  // The run as it stands after an edit made here (the run's Pokemon editor).
+  onRunUpdated: (run: RunView) => void
   onRerollItems: () => void
   onEvolve: (runMonId: string, targetSpecies: string) => void
   onMoveItem: (fromMonId: string, toMonId: string) => void
@@ -52,7 +58,9 @@ const NODE_INFO: Record<RunNodeKind, { label: string; hint: string }> = {
   trainer: { label: 'Trainer', hint: 'A trainer battle, sized for this floor - win it for a held item and extra exp' },
   item: { label: 'Item', hint: 'Pick a held item for one of your Pokémon' },
   heal: { label: 'Rest', hint: 'Your whole team back to full HP, no status' },
-  boss: { label: 'Boss', hint: 'A boss battle - win it to heal up and move on' }
+  boss: { label: 'Boss', hint: 'A boss battle - win it to heal up and move on' },
+  ability: { label: 'New Ability', hint: 'Pick one of four strong abilities for one of your Pokémon' },
+  move: { label: 'New Move', hint: 'Pick one of four signature moves to teach one of your Pokémon' }
 }
 
 // Where a wild option is - its location's entry, or none for an older run's "anywhere".
@@ -69,7 +77,8 @@ function NodeIcon({ choice }: { choice: RunChoice }): React.JSX.Element {
   if (kind === 'trainer') return <img className="big-battle-icon" src={trainerSpriteUrl('youngster')} alt="" />
   // Who the boss is stays a surprise until the fight starts.
   if (kind === 'boss') return <img className="big-battle-icon run-boss-silhouette" src={trainerSpriteUrl('giovanni')} alt="" />
-  return <span className="run-node-emoji">{kind === 'heal' ? '❤️' : '🎁'}</span>
+  const emoji: Partial<Record<RunNodeKind, string>> = { heal: '❤️', item: '🎁', ability: '🧬', move: '📜' }
+  return <span className="run-node-emoji">{emoji[kind] ?? '❔'}</span>
 }
 
 // The copy a run starts with: the same Pokemon at Lv 5, holding nothing.
@@ -169,6 +178,10 @@ function RoguelitePanel({
   onChoose,
   onGiveItem,
   onSkipItem,
+  onGiveAbility,
+  onTeachMove,
+  onSkipPick,
+  onRunUpdated,
   onRerollItems,
   onEvolve,
   onMoveItem,
@@ -176,6 +189,11 @@ function RoguelitePanel({
   onForfeit
 }: Props): React.JSX.Element {
   const [confirmingForfeit, setConfirmingForfeit] = useState(false)
+  // A New Ability / New Move floor: the choice made, then (for a move) who learns it.
+  const [chosenPick, setChosenPick] = useState<string | null>(null)
+  const [learner, setLearner] = useState<RunMonView | null>(null)
+  // The run Pokemon open in the run's own moves editor.
+  const [editingMonId, setEditingMonId] = useState<string | null>(null)
   // The next run's settings, picked beside the starter slot.
   const [difficulty, setDifficulty] = useState<RunDifficulty>('normal')
   const [generation, setGeneration] = useState<number | null>(null)
@@ -279,6 +297,8 @@ function RoguelitePanel({
 
   const offer = run.itemOffer
   const displaced = run.displacedItem
+  const pick = run.pickOffer
+  const pickName = pick?.options.find((o) => o.id === chosenPick)?.name
   // What clicking a team member does right now, if anything.
   const pickTarget = (mon: RunMonView): (() => void) | null => {
     if (busy) return null
@@ -289,6 +309,17 @@ function RoguelitePanel({
       }
     }
     if (displaced && mon.id !== displaced.fromMonId) return () => onPlaceDisplacedItem(mon.id)
+    if (pick && chosenPick && !learner) {
+      if (pick.kind === 'ability') {
+        return () => {
+          onGiveAbility(chosenPick, mon.id)
+          setChosenPick(null)
+        }
+      }
+      // Can't teach a move it already knows.
+      if (mon.moveList.some((m) => m.id === chosenPick)) return null
+      return () => setLearner(mon)
+    }
     if (movingFrom && mon.id !== movingFrom.id) {
       return () => {
         onMoveItem(movingFrom.id, mon.id)
@@ -330,7 +361,101 @@ function RoguelitePanel({
         </button>
       </div>
 
-      {offer ? (
+      {pick ? (
+        <div className="run-item-offer">
+          <p className="run-reward-heading">
+            {run.pickReason === 'reward' ? 'Victory reward!' : pick.kind === 'ability' ? 'New Ability' : 'New Move'}
+          </p>
+          {learner && chosenPick ? (
+            <>
+              <p className="box-empty-hint">
+                Which of {learner.species}&apos;s moves should {pickName} replace? (It stays locked in when moves update.)
+              </p>
+              <div className="run-item-row">
+                {learner.moveList.map((move) => (
+                  <button
+                    key={move.id}
+                    className="run-item-button"
+                    disabled={busy}
+                    onClick={() => {
+                      onTeachMove(chosenPick, learner.id, move.id)
+                      setChosenPick(null)
+                      setLearner(null)
+                    }}
+                  >
+                    {move.locked && '🔒 '}
+                    {move.name}
+                  </button>
+                ))}
+                {learner.moveList.length < 4 && (
+                  <button
+                    className="run-item-button"
+                    disabled={busy}
+                    onClick={() => {
+                      onTeachMove(chosenPick, learner.id, null)
+                      setChosenPick(null)
+                      setLearner(null)
+                    }}
+                  >
+                    Add as a new move
+                  </button>
+                )}
+                <button className="run-item-button run-item-skip" onClick={() => setLearner(null)}>
+                  Back
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="box-empty-hint">
+                {chosenPick
+                  ? `Now click the Pokémon to ${pick.kind === 'ability' ? 'give' : 'teach'} ${pickName} to.`
+                  : `Pick one ${pick.kind === 'ability' ? 'ability' : 'move'}.`}
+              </p>
+              <div className="run-item-row">
+                {pick.options.map((option) => (
+                  <Tooltip
+                    key={option.id}
+                    placement="below"
+                    content={
+                      <div className="tooltip-panel">
+                        <div className="tooltip-title">{option.name}</div>
+                        {option.type && (
+                          <div className="tooltip-row">
+                            <span className={`type-badge type-${option.type.toLowerCase()}`}>{option.type}</span>
+                            <span className="tooltip-category">{option.category}</span>
+                            {!!option.basePower && <span>Power: {option.basePower}</span>}
+                          </div>
+                        )}
+                        {option.description && <div className="tooltip-desc">{option.description}</div>}
+                      </div>
+                    }
+                  >
+                    <button
+                      className={`run-item-button${chosenPick === option.id ? ' run-item-button-chosen' : ''}`}
+                      disabled={busy}
+                      onClick={() => setChosenPick(option.id)}
+                    >
+                      {option.type && <span className={`type-badge type-${option.type.toLowerCase()}`}>{option.type}</span>}
+                      <span>{option.name}</span>
+                    </button>
+                  </Tooltip>
+                ))}
+                <button
+                  className="run-item-button run-item-skip"
+                  disabled={busy}
+                  onClick={() => {
+                    setChosenPick(null)
+                    onSkipPick()
+                  }}
+                >
+                  Skip
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      ) : offer ? (
         <div className="run-item-offer">
           {run.itemOfferReason === 'reward' && <p className="run-reward-heading">Victory reward!</p>}
           <p className="box-empty-hint">
@@ -447,8 +572,12 @@ function RoguelitePanel({
         </p>
       ) : (
         <p className="box-empty-hint">
-          Drag to reorder (the first one leads). Click to evolve or move its item - moves update on their own when they evolve.
+          Drag to reorder (the first one leads). Click to edit its moves, evolve it, or move its item.
         </p>
+      )}
+
+      {editingMonId && (
+        <RunMonEditor runMonId={editingMonId} onClose={() => setEditingMonId(null)} onSaved={onRunUpdated} />
       )}
 
       {menu && (
@@ -461,6 +590,10 @@ function RoguelitePanel({
           onMoveItem={() => {
             setMenu(null)
             setMovingFrom(menu.mon)
+          }}
+          onEdit={() => {
+            setMenu(null)
+            setEditingMonId(menu.mon.id)
           }}
           onEvolve={(target) => {
             setMenu(null)

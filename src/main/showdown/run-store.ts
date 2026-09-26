@@ -4,6 +4,11 @@ import type {
   ExpGainResult,
   RunChoice,
   RunItemOffer,
+  MoveInfo,
+  RunMonEdit,
+  RunMonEditInfo,
+  RunMovesPreview,
+  RunPickOption,
   RunMonView,
   RunDifficulty,
   RunNodeKind,
@@ -31,6 +36,11 @@ import {
   getEditorOptions,
   getItemSpritenum,
   levelUpMoveset,
+  abilityInfo,
+  getDefaultShopCatalog,
+  getMoveInfo,
+  getSpeciesEditInfo,
+  isSignatureItem,
   megaStonesFor,
   signatureItemsFor,
   toID,
@@ -43,7 +53,7 @@ import { copyBoxMonSet } from './box-store'
 import { recordBestFloor } from './stats-store'
 import { addItem } from './bag-store'
 import { addMoney } from './money-store'
-import { fillMoveset, recommendedLearnableMoves } from './auto-sets'
+import { buildAutoSet, fillMoveset, listAutoSets, recommendedLearnableMoves } from './auto-sets'
 import { playerPathFor } from './save-paths'
 import { onPlayerChange } from './player-session'
 import { listTrainers } from './trainer-store'
@@ -63,6 +73,10 @@ interface RunMon {
   // 0..1 of its max HP, and its status - carried from one battle into the next.
   hp: number
   status: string | null
+  // Moves taught on New Move floors (ids): kept in their slots when its moves update.
+  lockedMoves?: string[]
+  // An ability given on a New Ability floor: kept through evolution.
+  lockedAbility?: string
 }
 
 interface StoredRun {
@@ -74,6 +88,11 @@ interface StoredRun {
   itemOffer: string[] | null
   // Why items are on offer: an item floor (worth a level too) or a trainer's reward.
   itemOfferReason?: 'floor' | 'reward'
+  // A New Ability / New Move floor's four choices (ids), until one is given out - or a
+  // beaten boss's reward ability (reason 'reward': no extra level for taking it).
+  pickOffer?: { kind: 'ability' | 'move'; options: string[]; reason?: 'floor' | 'reward' } | null
+  // The boss being fought on this floor, for its reward.
+  currentBossId?: string
   // An item floor's offer can be rerolled once - set once it has been.
   itemRerolled?: boolean
   // An item a new one pushed out, waiting for a new holder (or to be let go) before the
@@ -147,8 +166,9 @@ export function runBossTeamSize(bossesBeaten: number): number {
   return BOSS_TEAM_SIZES[Math.min(bossesBeaten, BOSS_TEAM_SIZES.length - 1)]
 }
 
-// What an item floor can offer - held items that matter in a fight.
-const HELD_ITEM_POOL = [
+// The staples an item offer favours (three times as likely as anything else): the
+// strong, always-useful held items, plus the type-boosting ones. Lum is the only berry.
+const STAPLE_ITEMS = new Set([
   'leftovers',
   'lifeorb',
   'choiceband',
@@ -160,7 +180,6 @@ const HELD_ITEM_POOL = [
   'expertbelt',
   'eviolite',
   'heavydutyboots',
-  'sitrusberry',
   'lumberry',
   'weaknesspolicy',
   'muscleband',
@@ -187,7 +206,51 @@ const HELD_ITEM_POOL = [
   'metalcoat',
   'silkscarf',
   'fairyfeather'
-]
+])
+const STAPLE_WEIGHT = 3
+// Held items that do nothing in a battle.
+const NOT_FOR_BATTLE = new Set(['rarebone', 'prettyfeather', 'bottlecap', 'goldbottlecap'])
+
+let cachedItemPool: string[] | null = null
+
+/**
+ * What an item floor can offer: every held item the shop sells as an "Item" (plus Lum
+ * Berry, the one berry), except the ones made for one species - those have a roll of
+ * their own (see rollItemOffer) - and the few with no use in a fight.
+ */
+function runItemPool(): string[] {
+  if (!cachedItemPool) {
+    const signature = new Set(
+      getDefaultShopCatalog()
+        .filter((item) => item.category === 'Items')
+        .map((item) => item.id)
+        .filter((id) => isSignatureItem(id))
+    )
+    cachedItemPool = [
+      ...new Set([
+        ...STAPLE_ITEMS,
+        ...getDefaultShopCatalog()
+          .filter((item) => item.category === 'Items' && !signature.has(item.id) && !NOT_FOR_BATTLE.has(item.id))
+          .map((item) => item.id)
+      ])
+    ]
+  }
+  return cachedItemPool
+}
+
+// Draws count different items, a staple being STAPLE_WEIGHT times as likely as any other.
+function pickItems(count: number): string[] {
+  const pool = [...runItemPool()]
+  const picked: string[] = []
+  while (picked.length < count && pool.length > 0) {
+    const weights = pool.map((id) => (STAPLE_ITEMS.has(id) ? STAPLE_WEIGHT : 1))
+    let roll = Math.random() * weights.reduce((a, b) => a + b, 0)
+    let index = 0
+    while (roll >= weights[index]) roll -= weights[index++]
+    picked.push(pool.splice(index, 1)[0])
+  }
+  return picked
+}
 const ITEM_OFFER_SIZE = 3
 // How often an offer includes a Mega Stone for a team member that can Mega Evolve with
 // one (and isn't holding it yet), and - rolled separately, just as often - one of the
@@ -212,7 +275,7 @@ const REWARD_CHANCES: SpecialItemChances = { mega: MEGA_CHANCE_REWARD, signature
 // other items made for one species (Rusted Shield, Light Ball...) - each for someone
 // on the team who isn't holding it yet, in a slot of its own.
 function rollItemOffer(current: StoredRun, chances: SpecialItemChances): string[] {
-  const offer = pickRandom(HELD_ITEM_POOL, ITEM_OFFER_SIZE)
+  const offer = pickItems(ITEM_OFFER_SIZE)
   const held = new Set(current.team.map((m) => toID(m.set.item ?? '')))
   const forTeam = (list: (species: string) => string[]): string[] =>
     [...new Set(current.team.flatMap((m) => list(m.set.species)))].filter((id) => !held.has(id))
@@ -276,7 +339,37 @@ function isBossFloor(floor: number): boolean {
 // Pokemon (the weight is shared out between the locations), then trainers, and rarely
 // an item or a rest. A rest is only rolled once someone could use it.
 const FLOOR_OPTIONS = 5
-const CHOICE_WEIGHTS: Record<'wild' | 'trainer' | 'item' | 'heal', number> = { wild: 60, trainer: 25, item: 6, heal: 9 }
+const CHOICE_WEIGHTS: Record<'wild' | 'trainer' | 'item' | 'heal' | 'ability' | 'move', number> = {
+  wild: 42,
+  trainer: 25,
+  item: 4,
+  heal: 9,
+  ability: 10,
+  move: 10
+}
+
+// What a New Ability floor can offer (four at a time)...
+const RUN_ABILITIES = [
+  'drizzle', 'drought', 'snowwarning', 'sandstream',
+  'electricsurge', 'grassysurge', 'mistysurge', 'psychicsurge',
+  'adaptability', 'sheerforce', 'magicbounce', 'magicguard', 'gorillatactics', 'icescales',
+  'furcoat', 'hugepower', 'strongjaw', 'toughclaws', 'beastboost', 'grimneigh', 'chillingneigh',
+  'intrepidsword', 'dauntlessshield', 'soulheart', 'moxie', 'prankster', 'parentalbond',
+  'protean', 'multiscale', 'shadowshield', 'contrary', 'guts', 'filter', 'regenerator',
+  'speedboost', 'waterbubble', 'technician', 'serenegrace', 'noguard', 'neutralizinggas',
+  'poisonheal', 'levitate', 'lightningrod', 'stormdrain', 'simple', 'stamina'
+]
+// ...and a New Move floor.
+const RUN_MOVES = [
+  'electroshot', 'thunder', 'hurricane', 'fireblast', 'overheat', 'leafstorm', 'hydropump',
+  'dracometeor', 'voltswitch', 'flipturn', 'uturn', 'partingshot', 'meteorbeam', 'vcreate',
+  'originpulse', 'precipiceblades', 'eruption', 'waterspout', 'stoneaxe', 'ceaselessedge',
+  'infernalparade', 'triplearrows', 'dragonascent', 'dragondance', 'extremespeed',
+  'gigatonhammer', 'bloodmoon', 'boomburst', 'psychoboost', 'flareblitz', 'volttackle',
+  'makeitrain', 'headlongrush', 'pyroball', 'wavecrash', 'steameruption', 'behemothbash',
+  'behemothblade', 'dynamaxcannon', 'clangingscales', 'aeroblast', 'diamondstorm', 'fishiousrend'
+]
+const PICK_OPTIONS = 4
 // The Professor's Lab takes the place of one wild option this often.
 const LAB_CHANCE = 0.05
 // The wild locations a floor can roll: all the regular ones, not "All" or the Lab.
@@ -315,7 +408,13 @@ function rollChoices(current: StoredRun): RunChoice[] {
 
 function toView(mon: RunMon): RunMonView {
   const { percent } = expProgressForLevel(mon.set.species, mon.set.level, mon.exp)
+  const locked = new Set(mon.lockedMoves ?? [])
   return {
+    moveList: mon.set.moves.map((move) => {
+      const id = toID(move)
+      return { id, name: getMoveInfo(id)?.name ?? move, locked: locked.has(id) }
+    }),
+    abilityLocked: !!mon.lockedAbility,
     id: mon.id,
     exp: mon.exp,
     expPercent: percent,
@@ -326,6 +425,20 @@ function toView(mon: RunMon): RunMonView {
     hpPercent: Math.round(mon.hp * 100),
     status: mon.status
   }
+}
+
+function pickOfferView(offer: { kind: 'ability' | 'move'; options: string[] }): RunView['pickOffer'] {
+  const options: RunPickOption[] = offer.options.flatMap((id) => {
+    if (offer.kind === 'ability') {
+      const info = abilityInfo(id)
+      return info ? [info] : []
+    }
+    const move = getMoveInfo(id)
+    return move
+      ? [{ id: move.id, name: move.name, description: move.description, type: move.type, category: move.category, basePower: move.basePower }]
+      : []
+  })
+  return { kind: offer.kind, options }
 }
 
 function itemOfferView(ids: string[]): RunItemOffer[] {
@@ -351,6 +464,8 @@ export function getRunView(): RunView | null {
     choices: current.status === 'active' ? current.choices : [],
     itemOffer: current.itemOffer ? itemOfferView(current.itemOffer) : null,
     itemOfferReason: current.itemOffer ? (current.itemOfferReason ?? 'floor') : null,
+    pickOffer: current.pickOffer ? pickOfferView(current.pickOffer) : null,
+    pickReason: current.pickOffer ? (current.pickOffer.reason ?? 'floor') : null,
     canRerollItems: !!current.itemOffer && (current.itemOfferReason ?? 'floor') === 'floor' && !current.itemRerolled,
     displacedItem: current.displacedItem
       ? {
@@ -381,15 +496,28 @@ export function completeRunGenerations(): number[] {
 }
 
 /** Starts a run with a Lv 5 copy of a box Pokemon - same species, moves and all, minus its held item. */
-export function startRun(boxMonId: string, difficulty: RunDifficulty = 'normal', generation: number | null = null): RunView {
+const moveInfos = (ids: string[]): MoveInfo[] => ids.flatMap((id) => getMoveInfo(toID(id)) ?? [])
+
+/** The starter's own moves next to the run moveset it could have instead. */
+export function previewStarterMoves(boxMonId: string): RunMovesPreview {
+  const set = { ...copyBoxMonSet(boxMonId), level: ROGUELITE_START_LEVEL }
+  return { current: moveInfos(set.moves), proposed: moveInfos(bestRunMoveset(set)) }
+}
+
+export function startRun(
+  boxMonId: string,
+  difficulty: RunDifficulty = 'normal',
+  generation: number | null = null,
+  keepMoves = false
+): RunView {
   if (getRun()?.status === 'active') throw new Error('A run is already in progress')
   if (generation !== null && !completeRunGenerations().includes(generation)) {
     throw new Error(`Generation ${generation} doesn't have a Gym Leader, an Elite Four member and a Champion yet`)
   }
   const source = copyBoxMonSet(boxMonId)
   const set: PokemonSet = { ...source, level: ROGUELITE_START_LEVEL, item: '' }
-  // The copy gets a run moveset straight away instead of the box Pokemon's own moves.
-  refreshMoves(set)
+  // The copy gets a run moveset straight away, unless the player keeps its own moves.
+  if (!keepMoves) refreshMoves(set)
   run = {
     status: 'active',
     floor: 1,
@@ -465,6 +593,7 @@ export function runChoiceAt(index: number): RunChoice {
   const current = activeRun()
   if (current.itemOffer) throw new Error('Pick an item first')
   if (current.displacedItem) throw new Error('Choose who gets the item that was replaced first')
+  if (current.pickOffer) throw new Error('Pick an ability or move first')
   const choice = current.choices[index]
   if (!choice) throw new Error("This floor doesn't offer that")
   return { ...choice }
@@ -612,7 +741,16 @@ function runMon(current: StoredRun, runMonId: string): RunMon {
 }
 
 /** Evolves a run Pokemon (see runEvolutionOptions for when it's allowed). */
-export function evolveRunMon(runMonId: string, targetSpecies: string): RunView {
+/** An evolving Pokemon's moves next to the ones it would get as its new species (locked ones kept). */
+export function previewEvolutionMoves(runMonId: string, targetSpecies: string): RunMovesPreview {
+  const mon = runMon(activeRun(), runMonId)
+  const evolved: RunMon = { ...mon, set: evolveSet(structuredClone(mon.set), targetSpecies) }
+  refreshMonMoves(evolved)
+  return { current: moveInfos(mon.set.moves), proposed: moveInfos(evolved.set.moves) }
+}
+
+/** Evolves a run Pokemon - keeping its moves, or taking the new species' run moveset. */
+export function evolveRunMon(runMonId: string, targetSpecies: string, newMoves = true): RunView {
   const current = activeRun()
   const mon = runMon(current, runMonId)
   if (!runEvolutionOptions(mon.set).includes(targetSpecies)) {
@@ -620,9 +758,126 @@ export function evolveRunMon(runMonId: string, targetSpecies: string): RunView {
   }
   mon.set = evolveSet(mon.set, targetSpecies)
   mon.exp = totalExpForSpeciesLevel(mon.set.species, mon.set.level)
-  refreshMoves(mon.set)
+  // An ability from a New Ability floor survives evolving; taught moves stay put.
+  if (mon.lockedAbility) mon.set.ability = mon.lockedAbility
+  if (newMoves) refreshMonMoves(mon)
   persist()
   return getRunView()!
+}
+
+// ---- The run's own moves editor: moves and locks ----
+
+// In a run a Pokemon can learn anything its species ever could.
+function runLearnable(species: string): MoveInfo[] {
+  return getSpeciesEditInfo(species, 100).moves
+}
+
+export function getRunMonEditInfo(runMonId: string): RunMonEditInfo {
+  const mon = runMon(activeRun(), runMonId)
+  return {
+    species: mon.set.species,
+    learnable: runLearnable(mon.set.species),
+    autoSets: listAutoSets(mon.set.species),
+    moves: mon.set.moves.map((m) => toID(m)),
+    lockedMoves: [...(mon.lockedMoves ?? [])]
+  }
+}
+
+/** A Smogon set's moves for this Pokemon - for the editor to fill in (nothing saved). */
+export function runSmogonSet(runMonId: string, optionId: string): string[] {
+  const mon = runMon(activeRun(), runMonId)
+  return buildAutoSet(mon.set.species, 100, optionId, true).moves
+}
+
+/** Saves the run's moves editor: up to 4 moves it can learn (or already knows), and the locks. */
+export function updateRunMon(runMonId: string, input: RunMonEdit): RunView {
+  const current = activeRun()
+  const mon = runMon(current, runMonId)
+  const allowed = new Set([...runLearnable(mon.set.species).map((m) => m.id), ...mon.set.moves.map((m) => toID(m))])
+  const moves = [...new Set(input.moves.map((m) => toID(m)).filter(Boolean))]
+  if (moves.length === 0 || moves.length > 4) throw new Error('A Pokemon needs 1 to 4 moves')
+  const unknown = moves.find((m) => !allowed.has(m))
+  if (unknown) throw new Error(`${mon.set.species} can't learn ${getMoveInfo(unknown)?.name ?? unknown}`)
+  mon.set.moves = moves
+  mon.lockedMoves = input.lockedMoves.map((m) => toID(m)).filter((m) => moves.includes(m))
+  persist()
+  return getRunView()!
+}
+
+// Like refreshMoves, but the moves taught on New Move floors keep their slots - only
+// the others are refreshed (with the best moves it doesn't already have locked in).
+function refreshMonMoves(mon: RunMon): void {
+  const locked = new Set(mon.lockedMoves ?? [])
+  if (locked.size === 0) {
+    refreshMoves(mon.set)
+    return
+  }
+  const best = bestRunMoveset(mon.set).filter((id) => !locked.has(toID(id)))
+  const slots = mon.set.moves.length > 0 ? mon.set.moves : []
+  const moves = slots.map((move) => (locked.has(toID(move)) ? move : (best.shift() ?? move)))
+  while (moves.length < 4 && best.length > 0) moves.push(best.shift()!)
+  mon.set.moves = moves
+}
+
+/** A New Ability / New Move floor: four choices from its list. */
+export function takePickNode(kind: 'ability' | 'move'): RunView {
+  const current = activeRun()
+  current.pickOffer = { kind, options: pickRandom(kind === 'ability' ? RUN_ABILITIES : RUN_MOVES, PICK_OPTIONS) }
+  persist()
+  return getRunView()!
+}
+
+function finishPick(current: StoredRun): RunView {
+  // A floor's pick is worth a level; a boss's reward ability isn't (the win already was).
+  if (current.pickOffer?.reason !== 'reward') levelUpTeam(current, LEVELS_PER_QUIET_FLOOR)
+  current.pickOffer = null
+  nextFloor(current)
+  persist()
+  return getRunView()!
+}
+
+/** Gives the chosen ability to a team member - it keeps it for the rest of the run. */
+export function giveRunAbility(abilityId: string, runMonId: string): RunView {
+  const current = activeRun()
+  if (current.pickOffer?.kind !== 'ability' || !current.pickOffer.options.includes(abilityId)) {
+    throw new Error("That ability isn't on offer")
+  }
+  const mon = runMon(current, runMonId)
+  const name = abilityInfo(abilityId)?.name ?? abilityId
+  mon.set.ability = name
+  mon.lockedAbility = name
+  return finishPick(current)
+}
+
+/**
+ * Teaches the chosen move to a team member in place of one of its moves (or as a new
+ * one, if it knows fewer than four). The new move is locked in: its moves updating
+ * later never replace it.
+ */
+export function teachRunMove(moveId: string, runMonId: string, replaceMoveId: string | null): RunView {
+  const current = activeRun()
+  if (current.pickOffer?.kind !== 'move' || !current.pickOffer.options.includes(moveId)) {
+    throw new Error("That move isn't on offer")
+  }
+  const mon = runMon(current, runMonId)
+  const moves = [...mon.set.moves]
+  if (moves.some((m) => toID(m) === moveId)) throw new Error(`${mon.set.species} already knows that move`)
+  let slot = replaceMoveId ? moves.findIndex((m) => toID(m) === replaceMoveId) : -1
+  if (slot === -1) {
+    if (moves.length >= 4) throw new Error('Choose which move to replace')
+    slot = moves.length
+  }
+  moves[slot] = moveId
+  mon.set.moves = moves
+  mon.lockedMoves = [...(mon.lockedMoves ?? []).filter((id) => id !== replaceMoveId), moveId]
+  return finishPick(current)
+}
+
+/** Passes on a New Ability / New Move floor (it still counts, and gives its level). */
+export function skipRunPick(): RunView {
+  const current = activeRun()
+  if (!current.pickOffer) throw new Error('Nothing is on offer')
+  return finishPick(current)
 }
 
 // In a run every Pokemon can learn every move it could ever learn, whatever its level:
@@ -674,6 +929,7 @@ export function runFloorInfo(): {
 export function markRunBossUsed(trainerId: string): void {
   const current = activeRun()
   if (!current.usedBossIds.includes(trainerId)) current.usedBossIds.push(trainerId)
+  current.currentBossId = trainerId
   persist()
 }
 
@@ -732,8 +988,16 @@ export function finishRunBattleWon(
     persist()
     return { expGains, fainted, itemReward: false }
   }
-  current.itemOffer = rollItemOffer(current, REWARD_CHANCES)
-  current.itemOfferReason = 'reward'
+  // A boss with a reward ability of its own offers that (one choice) instead of items.
+  const rewardAbility = wasBoss
+    ? listTrainers().find((t) => t.id === current.currentBossId)?.rogueliteRewardAbility
+    : undefined
+  if (rewardAbility && abilityInfo(rewardAbility)) {
+    current.pickOffer = { kind: 'ability', options: [rewardAbility], reason: 'reward' }
+  } else {
+    current.itemOffer = rollItemOffer(current, REWARD_CHANCES)
+    current.itemOfferReason = 'reward'
+  }
   persist()
   return { expGains, fainted, itemReward: true }
 }
