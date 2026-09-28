@@ -70,7 +70,8 @@ export function parseCondition(condition: string): { hpPercent: number; fainted:
   if (condition.includes('fnt')) return { hpPercent: 0, fainted: true, status: null }
   const [hpPart, statusPart] = condition.split(' ')
   const [current, max] = hpPart.split('/').map(Number)
-  const hpPercent = max ? Math.round((current / max) * 100) : 0
+  // Anything still standing shows at least 1%, never a misleading 0%.
+  const hpPercent = max && current > 0 ? Math.max(1, Math.round((current / max) * 100)) : 0
   return { hpPercent, fainted: false, status: statusPart ?? null }
 }
 
@@ -133,6 +134,7 @@ export function buildPokemonSummary(species: string, set: PokemonSet | null): Po
     teraType: set?.teraType || types[0] || '',
     stats,
     moveIds: set?.moves ?? [],
+    gender: set?.gender ?? '',
     shiny: !!set?.shiny
   }
 }
@@ -633,19 +635,27 @@ export function generateRandomWildMon(
   return null
 }
 
-// The Professor's Lab (a wild location once every boss is beaten) has its own table:
-// an unevolved regional starter 70% of the time, a fully evolved Pokemon that evolves
-// with an item (or a trade) 20%, and a Mythical, Ultra Beast or Paradox Pokemon the
-// last 10%, split evenly between them. Never a proper legendary.
-const LAB_STARTER_CHANCE = 0.7
-const LAB_ITEM_EVO_CHANCE = 0.2
-const LAB_RARE_TAGS = new Set(['Mythical', 'Ultra Beast', 'Paradox'])
+// The Lab (a wild location once every boss is beaten) has its own table: an unevolved
+// regional starter 55% of the time, a Paradox Pokemon 20%, an Ultra Beast 20% and a
+// Mythical the last 5%. Never a restricted legendary.
+const LAB_TABLE: { chance: number; pool: keyof LabPools | 'starters' }[] = [
+  { chance: 0.55, pool: 'starters' },
+  { chance: 0.2, pool: 'paradox' },
+  { chance: 0.2, pool: 'ultraBeasts' },
+  { chance: 0.05, pool: 'mythicals' }
+]
 // Paradox Pokemon from the DLC that this Showdown version doesn't tag as Paradox.
 const UNTAGGED_PARADOX_IDS = new Set(['gougingfire', 'ragingbolt', 'ironboulder', 'ironcrown'])
 
-let cachedLabPools: { itemEvos: string[]; rare: string[] } | null = null
+interface LabPools {
+  paradox: string[]
+  ultraBeasts: string[]
+  mythicals: string[]
+}
 
-function labPools(): { itemEvos: string[]; rare: string[] } {
+let cachedLabPools: LabPools | null = null
+
+function labPools(): LabPools {
   if (!cachedLabPools) {
     const usable = Dex.species
       .all()
@@ -655,17 +665,15 @@ function labPools(): { itemEvos: string[]; rare: string[] } {
           s.num > 0 &&
           (!s.isNonstandard || s.isNonstandard === 'Past') &&
           !isBattleOnlyForme(s) &&
-          isPlainSpecies(s)
+          isPlainSpecies(s) &&
+          !s.tags.includes('Restricted Legendary')
       )
+    const tagged = (tag: string): string[] => usable.filter((s) => s.tags.some((t) => t === tag)).map((s) => s.name)
     cachedLabPools = {
-      itemEvos: usable
-        .filter((s) => s.evos.length === 0 && !!s.prevo && !!evolutionItemsFor(s))
-        .filter((s) => !s.tags.some((tag) => LEGENDARY_TAGS.has(tag)))
-        .map((s) => s.name),
-      rare: usable
-        .filter((s) => s.tags.some((tag) => LAB_RARE_TAGS.has(tag)) || UNTAGGED_PARADOX_IDS.has(s.id))
-        .filter((s) => !s.tags.includes('Restricted Legendary') && !s.tags.includes('Sub-Legendary'))
-        .map((s) => s.name)
+      paradox: [...tagged('Paradox'), ...usable.filter((s) => UNTAGGED_PARADOX_IDS.has(s.id)).map((s) => s.name)],
+      ultraBeasts: tagged('Ultra Beast'),
+      // Arceus is tagged Mythical but is too strong for the Lab.
+      mythicals: tagged('Mythical').filter((name) => name !== 'Arceus')
     }
   }
   return cachedLabPools
@@ -675,10 +683,10 @@ export function generateLabWildMon(levelCap: number): PokemonSet {
   const min = Math.max(1, levelCap - 14)
   const max = Math.max(min, levelCap - 4)
   const level = min + Math.floor(Math.random() * (max - min + 1))
-  const { itemEvos, rare } = labPools()
-  const roll = Math.random()
-  const pool =
-    roll < LAB_STARTER_CHANCE ? REGIONAL_STARTER_SPECIES : roll < LAB_STARTER_CHANCE + LAB_ITEM_EVO_CHANCE ? itemEvos : rare
+  const pools = labPools()
+  let roll = Math.random()
+  const entry = LAB_TABLE.find((e) => (roll -= e.chance) < 0) ?? LAB_TABLE[0]
+  const pool = entry.pool === 'starters' ? REGIONAL_STARTER_SPECIES : pools[entry.pool]
   const species = pool[Math.floor(Math.random() * pool.length)]
   return { ...buildBasicSet(species, level), shiny: Math.random() < 1 / WILD_SHINY_ODDS, nature: randomNatureName() }
 }
@@ -1230,7 +1238,9 @@ function powerBasedRequiredLevel(moveId: string): number {
   return clampInt(basePower / 1.5, 1, 60)
 }
 
-export function learnableMoveIds(speciesId: string, level: number): string[] {
+// anyGeneration: every move it has ever been able to learn, not just the latest
+// generation's list (Beedrill's Fell Stinger is Gen 6-7 only).
+export function learnableMoveIds(speciesId: string, level: number, anyGeneration = false): string[] {
   const merged = new Map<string, string[]>()
   // Species dropped from the current regional dex ("isNonstandard: Past",
   // e.g. Caterpie, Pidgey, Carvanha - about a third of the whole Dex) have no
@@ -1254,7 +1264,7 @@ export function learnableMoveIds(speciesId: string, level: number): string[] {
 
   const ids: string[] = []
   for (const [moveId, sources] of merged) {
-    const genSources = sources.filter((s) => s.startsWith(genPrefix))
+    const genSources = anyGeneration ? sources : sources.filter((s) => s.startsWith(genPrefix))
     if (genSources.length === 0) continue
     const requiredLevels = genSources
       .filter((s) => s[1] === 'L')
@@ -1301,7 +1311,8 @@ export function getSpeciesEditInfo(speciesName: string, level: number): SpeciesE
       description: m.shortDesc || m.desc || '',
       target: m.target,
       contact: !!m.flags?.contact,
-      multihit: !!m.multihit
+      multihit: !!m.multihit,
+      priority: m.priority
     }))
     .sort((a, b) => (usage.get(b.id) ?? 0) - (usage.get(a.id) ?? 0) || a.name.localeCompare(b.name))
 
@@ -1433,6 +1444,29 @@ export function pickRandomUnevolvedAnySpecies(): string {
   return pickFrom(all.filter((s) => isLegendaryClass(s) === wantLegendary))
 }
 
+/**
+ * A roguelite Random Swap's Pokemon, from any stage of any line: an ordinary one, a
+ * legendary-class one (legendary, mythical, ultra beast or paradox - short of the
+ * restricted ones), or a restricted legendary (Mewtwo, Kyogre, Koraidon...).
+ */
+export function pickRandomSwapSpecies(kind: 'normal' | 'legendary' | 'restricted'): string {
+  const pool = Dex.species
+    .all()
+    .filter(
+      (s) =>
+        s.exists &&
+        s.num > 0 &&
+        (!s.isNonstandard || s.isNonstandard === 'Past') &&
+        !isBattleOnlyForme(s) &&
+        isPlainSpecies(s)
+    )
+  const restricted = (s: ReturnType<typeof Dex.species.get>): boolean => s.tags.includes('Restricted Legendary')
+  // Not Cosmog or Cosmoem - tagged restricted, but hardly a jackpot.
+  if (kind === 'restricted') return pickFrom(pool.filter((s) => restricted(s) && s.evos.length === 0))
+  if (kind === 'legendary') return pickFrom(pool.filter((s) => isLegendaryClass(s) && !restricted(s)))
+  return pickFrom(pool.filter((s) => !isLegendaryClass(s)))
+}
+
 /** An unevolved legendary, mythical, ultra beast or paradox Pokemon. */
 export function pickRandomLegendarySpecies(): string {
   return pickFrom(unevolvedSpecies().filter(isLegendaryClass))
@@ -1518,6 +1552,27 @@ export function nationalDexSpecies(): { num: number; species: string }[] {
     cachedNationalDex = [...byNum].sort((a, b) => a[0] - b[0]).map(([num, species]) => ({ num, species }))
   }
   return cachedNationalDex
+}
+
+/**
+ * What the bag's Quick sell picks an item up as: a berry, or one of the type-changing
+ * items only one Pokemon can use (a Memory for Silvally, a Plate for Arceus, a Drive for
+ * Genesect) - with that Pokemon, since those are kept while one is owned.
+ */
+export function quickSellKind(itemId: string): { kind: 'berry' } | { kind: 'forPokemon'; species: string } | null {
+  const item = Dex.items.get(itemId)
+  if (!item.exists) return null
+  if (item.isBerry) return { kind: 'berry' }
+  if (item.onMemory) return { kind: 'forPokemon', species: 'Silvally' }
+  // The type Z-Crystals carry onPlate too - only the real Plates count.
+  if (item.onPlate && !item.zMove) return { kind: 'forPokemon', species: 'Arceus' }
+  if (item.onDrive) return { kind: 'forPokemon', species: 'Genesect' }
+  return null
+}
+
+/** The species a forme belongs to ("Arceus-Fire" -> "Arceus"). */
+export function baseSpeciesOf(name: string): string {
+  return Dex.species.get(name).baseSpecies
 }
 
 /** A species' proper name ("garchomp" -> "Garchomp"), or null if there's no such Pokemon. */
@@ -1739,6 +1794,28 @@ export function getMoveCombatData(id: string): MoveCombatData | null {
         : move.status ||
           (move.volatileStatus === 'yawn' ? 'slp' : move.volatileStatus === 'confusion' ? 'confusion' : null)
   }
+}
+
+export type ScreenId = 'reflect' | 'lightscreen' | 'auroraveil'
+
+// What a setup move does for its user: the stat stages it gives itself (Swords Dance
+// +2 Attack; Shell Smash's defence drops come through as negatives), or the screen it
+// puts up over its side.
+export interface MoveSetupData {
+  boosts: Partial<Record<string, number>> | null
+  screen: ScreenId | null
+}
+
+const SCREEN_IDS = new Set<string>(['reflect', 'lightscreen', 'auroraveil'])
+
+export function getMoveSetupData(id: string): MoveSetupData | null {
+  const move = Dex.moves.get(id)
+  if (!move.exists || move.category !== 'Status') return null
+  if (SCREEN_IDS.has(move.id)) return { boosts: null, screen: move.id as ScreenId }
+  // Belly Drum maxes Attack in its own code rather than through a boosts entry.
+  if (move.id === 'bellydrum') return { boosts: { atk: 6 }, screen: null }
+  if (move.target === 'self' && move.boosts) return { boosts: { ...move.boosts }, screen: null }
+  return null
 }
 
 /** A species' Speed stat at a level, for the given IVs, EVs and nature. */
@@ -1994,6 +2071,7 @@ export function getMoveInfo(id: string): MoveInfo | null {
     description: move.shortDesc || move.desc || '',
     target: move.target,
     contact: !!move.flags?.contact,
-    multihit: !!move.multihit
+    multihit: !!move.multihit,
+    priority: move.priority
   }
 }

@@ -1,7 +1,14 @@
 import { randomUUID } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { BoxPokemonView, BoxState, EditablePokemonSet, ExpGainResult, PokedexEntry } from '../../shared/battle-types'
+import type {
+  BoxPokemonView,
+  BoxState,
+  EditablePokemonSet,
+  EvolutionItemUse,
+  ExpGainResult,
+  PokedexEntry
+} from '../../shared/battle-types'
 import {
   EXP_CANDY_EXP,
   FRIENDSHIP_PER_BATTLE,
@@ -11,6 +18,7 @@ import {
 } from '../../shared/battle-types'
 import {
   applyEditableSet,
+  baseSpeciesOf,
   buildBasicSet,
   rollGiftShiny,
   buildPokemonSummary,
@@ -29,7 +37,7 @@ import {
 } from './sim-access'
 import { expProgressForLevel, getExpInfo, levelForExp, totalExpForSpeciesLevel } from './exp'
 import { getProgression } from './progression-store'
-import { addItem, hasItem, removeItem } from './bag-store'
+import { addItem, bagItemUse, hasItem, removeItem } from './bag-store'
 import { playerDirFor, playerPathFor } from './save-paths'
 import { onPlayerChange } from './player-session'
 
@@ -122,6 +130,11 @@ export function hasRegisteredSpecies(speciesName: string): boolean {
   return box.registered!.includes(dexBaseSpecies(speciesName))
 }
 
+/** Whether any Pokemon in the box (team included) is this species, in any of its formes. */
+export function ownsSpecies(baseSpecies: string): boolean {
+  return getState().mons.some((m) => baseSpeciesOf(m.set.species) === baseSpecies)
+}
+
 /** The trainer profile's Pokedex: every species in National Dex order, marked if registered. */
 export function getPokedex(): PokedexEntry[] {
   const box = getState()
@@ -132,9 +145,15 @@ export function getPokedex(): PokedexEntry[] {
 
 function toView(mon: StoredMon): BoxPokemonView {
   const { percent } = expProgressForLevel(mon.set.species, mon.set.level, mon.exp)
-  const eligibleEvolutions = evolutionOptionsFor(mon.set)
-    .filter((o) => o.requiredItems === null || o.requiredItems.some(hasItem))
-    .map((o) => o.species)
+  const usable = evolutionOptionsFor(mon.set).filter((o) => o.requiredItems === null || o.requiredItems.some(hasItem))
+  const eligibleEvolutions = usable.map((o) => o.species)
+  // The same item evolveMon spends: the first accepted one the bag has.
+  const evolutionItems: Record<string, EvolutionItemUse> = {}
+  for (const o of usable) {
+    const owned = o.requiredItems?.find(hasItem)
+    const use = owned ? bagItemUse(owned) : null
+    if (use) evolutionItems[o.species] = use
+  }
   const canLevelUpWithCandy = mon.set.level < getProgression().levelCap && hasItem(RARE_CANDY_ITEM_ID)
   const canUseShinyPatch = !mon.set.shiny && hasItem(SHINY_PATCH_ITEM_ID)
   const itemSpritenum = mon.set.item ? getItemSpritenum(mon.set.item) : null
@@ -143,6 +162,7 @@ function toView(mon: StoredMon): BoxPokemonView {
     exp: mon.exp,
     expPercent: percent,
     eligibleEvolutions,
+    evolutionItems,
     canLevelUpWithCandy,
     canUseShinyPatch,
     itemSpritenum,

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   DndContext,
   DragOverlay,
@@ -80,6 +81,14 @@ function matchesBoxSearch(mon: BoxPokemonView, search: string): boolean {
   })
 }
 
+// Each mode's colour, for the pulse when switching to it (the toggle's own colours).
+const MODE_COLORS: Record<MenuMode, string> = { classic: '#6bb0ff', roguelite: '#b48cff' }
+
+// Players who've asked their system for less motion get the switch without the effects.
+function reducedMotion(): boolean {
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+}
+
 function MainMenu({
   onFight,
   wildLocation,
@@ -105,6 +114,25 @@ function MainMenu({
   const [boxState, setBoxState] = useState<BoxState | null>(null)
   // Classic or Roguelite menu - remembered per player. Switching never touches a run.
   const [mode, setMode] = useState<MenuMode>(() => loadMenuMode(username))
+  // Switching modes: the colour pulse spreading from the toggle (see toggleMode), and the
+  // menu content fading in behind it.
+  const [modePulse, setModePulse] = useState<{ x: number; y: number; radius: number; mode: MenuMode; seq: number } | null>(
+    null
+  )
+  const sectionRef = useRef<HTMLDivElement>(null)
+  const shownMode = useRef(mode)
+  useEffect(() => {
+    if (shownMode.current === mode) return
+    shownMode.current = mode
+    if (reducedMotion()) return
+    sectionRef.current?.animate(
+      [
+        { opacity: 0, transform: 'translateY(10px) scale(0.99)' },
+        { opacity: 1, transform: 'none' }
+      ],
+      { duration: 380, delay: 120, easing: 'ease-out', fill: 'backwards' }
+    )
+  }, [mode])
   const [run, setRun] = useState<RunView | null>(null)
   // The box Pokemon dragged onto the run's starter slot - nothing moves, it's only a pick.
   const [runPickId, setRunPickId] = useState<string | null>(null)
@@ -209,10 +237,27 @@ function MainMenu({
     })
   }
 
-  function toggleMode(): void {
+  function toggleMode(e: React.MouseEvent<HTMLButtonElement>): void {
     const next: MenuMode = mode === 'classic' ? 'roguelite' : 'classic'
     setMode(next)
     saveMenuMode(username, next)
+    if (reducedMotion()) return
+    // A ring of the new mode's colour spreads from the button over the whole window...
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = rect.left + rect.width / 2
+    const y = rect.top + rect.height / 2
+    const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y))
+    setModePulse((prev) => ({ x, y, radius, mode: next, seq: (prev?.seq ?? 0) + 1 }))
+    // ...while the button itself flares up in it.
+    const color = MODE_COLORS[next]
+    e.currentTarget.animate(
+      [
+        { boxShadow: `0 0 0 0 ${color}` },
+        { boxShadow: `0 0 22px 6px ${color}`, offset: 0.3 },
+        { boxShadow: '0 0 0 0 transparent' }
+      ],
+      { duration: 700, easing: 'ease-out' }
+    )
   }
 
   function refreshAll(): void {
@@ -391,7 +436,7 @@ function MainMenu({
   const allBossesDefeated = !!eligibility?.allBossesDefeated
   if (allBossesDefeated) bossHint = 'Every boss is beaten - pick one to fight again'
 
-  // The Professor's Lab closes again if boss progress is reset - back to All.
+  // The Lab closes again if boss progress is reset - back to All.
   const selectedLocation = WILD_LOCATIONS.find((l) => l.id === wildLocation)
   useEffect(() => {
     if (eligibility && selectedLocation?.requiresAllBosses && !eligibility.allBossesDefeated) onChangeWildLocation('all')
@@ -399,6 +444,21 @@ function MainMenu({
 
   return (
     <div className="screen">
+      {modePulse &&
+        createPortal(
+          <div
+            key={modePulse.seq}
+            className={`mode-pulse mode-pulse-${modePulse.mode}`}
+            style={{
+              left: modePulse.x - modePulse.radius,
+              top: modePulse.y - modePulse.radius,
+              width: modePulse.radius * 2,
+              height: modePulse.radius * 2
+            }}
+            onAnimationEnd={() => setModePulse((current) => (current?.seq === modePulse.seq ? null : current))}
+          />,
+          document.body
+        )}
       <div className="menu-header">
         <h1>pkmnPvE</h1>
         <div className="menu-nav">
@@ -431,6 +491,7 @@ function MainMenu({
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div
+        ref={sectionRef}
         className={`battle-section${boxExpanded && !runInProgress ? ' battle-section-collapsed' : ''}${
           runInProgress ? ' battle-section-run' : ''
         }`}
@@ -753,6 +814,7 @@ function MainMenu({
           y={contextMenu.y}
           species={contextMenu.mon.species}
           evolutions={contextMenu.mon.eligibleEvolutions ?? []}
+          evolutionItems={contextMenu.mon.evolutionItems}
           canLevelUp={contextMenu.mon.canLevelUpWithCandy ?? false}
           onChoose={(target) => void evolve(contextMenu.mon.id, target)}
           onLevelUp={() => void levelUp(contextMenu.mon.id)}

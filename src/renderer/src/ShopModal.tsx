@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ShopItemEntry } from '../../shared/battle-types'
 import ItemSprite from './ItemSprite'
+import SearchBar from './SearchBar'
 import { formatMoney } from './money'
+import { pointOf, useFloatingNotes, type NotePoint } from './FloatingNotes'
 
 interface Props {
   onClose: () => void
@@ -27,6 +29,7 @@ function ShopModal({ onClose, onMoneyChange }: Props): React.JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const notes = useFloatingNotes()
 
   useEffect(() => {
     Promise.all([window.api.listShop(), window.api.getMoney()])
@@ -37,7 +40,8 @@ function ShopModal({ onClose, onMoneyChange }: Props): React.JSX.Element {
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
   }, [])
 
-  async function buy(itemId: string): Promise<void> {
+  async function buy(item: ShopItemEntry, at: NotePoint): Promise<void> {
+    const itemId = item.id
     setBusyId(itemId)
     setError(null)
     try {
@@ -45,6 +49,7 @@ function ShopModal({ onClose, onMoneyChange }: Props): React.JSX.Element {
       setMoney(result.money)
       onMoneyChange(result.money)
       if (!result.success) setError('Not enough money for that.')
+      else notes.show(`Bought ${item.name} for ${formatMoney(item.price)}`, at)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -62,13 +67,7 @@ function ShopModal({ onClose, onMoneyChange }: Props): React.JSX.Element {
           <h2>Shop</h2>
           {money !== null && <span className="money-display">{formatMoney(money)}</span>}
         </div>
-        <input
-          type="text"
-          className="shop-search"
-          placeholder="Search items..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
+        <SearchBar value={query} onChange={setQuery} placeholder="Search the shop..." autoFocus />
         {error && <p className="editor-error">{error}</p>}
         {!catalog && !error && <p>Loading...</p>}
         {catalog && filtered.length === 0 && <p className="box-empty-hint">No items match your search.</p>}
@@ -84,7 +83,7 @@ function ShopModal({ onClose, onMoneyChange }: Props): React.JSX.Element {
                   <button
                     type="button"
                     disabled={busyId === item.id || (money !== null && money < item.price)}
-                    onClick={() => void buy(item.id)}
+                    onClick={(e) => void buy(item, pointOf(e))}
                   >
                     Buy
                   </button>
@@ -96,6 +95,7 @@ function ShopModal({ onClose, onMoneyChange }: Props): React.JSX.Element {
         <div className="editor-actions">
           <button onClick={onClose}>Close</button>
         </div>
+        {notes.layer}
       </div>
     </div>,
     document.body

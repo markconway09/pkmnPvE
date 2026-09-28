@@ -1,5 +1,7 @@
 import { createPortal } from 'react-dom'
 import ContextMenuPanel from './ContextMenuPanel'
+import ItemSprite from './ItemSprite'
+import type { EvolutionItemUse } from '../../shared/battle-types'
 
 interface Props {
   x: number
@@ -9,6 +11,8 @@ interface Props {
   // same menu serves the player's box (all of it) and a trainer roster (just
   // Admin Edit).
   evolutions?: string[]
+  // What each item evolution would use up (see BoxPokemonView.evolutionItems).
+  evolutionItems?: Record<string, EvolutionItemUse>
   canLevelUp?: boolean
   onChoose?: (targetSpecies: string) => void
   onLevelUp?: () => void
@@ -27,6 +31,7 @@ function PokemonContextMenu({
   y,
   species,
   evolutions = [],
+  evolutionItems = {},
   canLevelUp = false,
   onChoose,
   onLevelUp,
@@ -75,11 +80,20 @@ function PokemonContextMenu({
           </button>
         )}
         {onChoose &&
-          evolutions.map((target) => (
-            <button key={target} className="context-menu-item" onClick={() => onChoose(target)}>
-              Evolve into {target}
-            </button>
-          ))}
+          evolutions.map((target) => {
+            const item = evolutionItems[target]
+            return (
+              <button key={target} className="context-menu-item" onClick={() => onChoose(target)}>
+                Evolve into {target}
+                {item && (
+                  <span className="context-menu-evo-item">
+                    <ItemSprite spritenum={item.spritenum} />
+                    use {item.name} (×{item.quantity})
+                  </span>
+                )}
+              </button>
+            )
+          })}
       </ContextMenuPanel>
     </div>,
     document.body

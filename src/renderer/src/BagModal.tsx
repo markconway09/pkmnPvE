@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { FOSSIL_RESTORE_COST } from '../../shared/battle-types'
 import type { BagItemView, OpenItemResult, RestoreFossilResult } from '../../shared/battle-types'
 import ItemSprite from './ItemSprite'
+import SearchBar from './SearchBar'
 import GalarFossilPrompt from './GalarFossilPrompt'
 import ContextMenuPanel from './ContextMenuPanel'
 import CaseOpening from './CaseOpening'
 import { formatMoney } from './money'
+import { errorMessage, pointOf, useFloatingNotes, type NotePoint } from './FloatingNotes'
 
 interface Props {
   onClose: () => void
@@ -37,10 +39,18 @@ function BagModal({ onClose, onChanged }: Props): React.JSX.Element {
   const [items, setItems] = useState<BagItemView[] | null>(null)
   const [money, setMoney] = useState(0)
   const [error, setError] = useState<string | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
+  // Results float up from whatever was last clicked (an item, or a sell button).
+  const notes = useFloatingNotes()
+  const lastPoint = useRef<NotePoint>({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
+  const say = (text: string): void => notes.show(text, lastPoint.current)
   const [menu, setMenu] = useState<MenuState | null>(null)
   const [galarFossil, setGalarFossil] = useState<BagItemView | null>(null)
   const [busy, setBusy] = useState(false)
+  const [query, setQuery] = useState('')
+  // Picking items to sell together: item id -> how many (the whole stack). Null when not picking.
+  const [selection, setSelection] = useState<Map<string, number> | null>(null)
+  // The context menu's "Sell [n]" amount.
+  const [sellCount, setSellCount] = useState(1)
   // A Random Pokemon / Random Legendary being opened, shown as a spinning case.
   const [opening, setOpening] = useState<{ item: BagItemView; result: OpenItemResult; seq: number } | null>(null)
 
@@ -64,21 +74,57 @@ function BagModal({ onClose, onChanged }: Props): React.JSX.Element {
     setBusy(true)
     setError(null)
     try {
-      setMessage(await action())
+      say(await action())
       await refresh()
       onChanged()
     } catch (e) {
-      setMessage(null)
-      setError(e instanceof Error ? e.message : String(e))
+      // Shown where it was tried, in red - "Your whole team is already at the level cap"...
+      notes.show(errorMessage(e), lastPoint.current, 'bad')
     } finally {
       setBusy(false)
     }
   }
 
-  function sell(item: BagItemView): Promise<void> {
+  function sell(item: BagItemView, quantity = 1): Promise<void> {
     return act(async () => {
-      const result = await window.api.sellItem(item.id)
-      return `Sold ${item.name} for ${formatMoney(result.sold)}.`
+      const result = await window.api.sellItems([{ itemId: item.id, quantity }])
+      return `Sold ${quantity > 1 ? `${quantity}× ` : ''}${item.name} for ${formatMoney(result.sold)}.`
+    })
+  }
+
+  function toggleSelected(item: BagItemView): void {
+    if (!selection || item.sellPrice === null) return
+    const next = new Map(selection)
+    if (next.has(item.id)) next.delete(item.id)
+    else next.set(item.id, item.quantity)
+    setSelection(next)
+  }
+
+  // Quick sell: picks every berry, and the Memories/Plates/Drives no owned Pokemon can use,
+  // for a look before selling.
+  async function startQuickSell(e: React.MouseEvent): Promise<void> {
+    lastPoint.current = pointOf(e)
+    setError(null)
+    try {
+      const picks = await window.api.quickSellSelection()
+      if (picks.length === 0) {
+        notes.show('Nothing for Quick sell - no berries, or Memories, Plates or Drives nobody can use.', lastPoint.current, 'bad')
+        return
+      }
+      setSelection(new Map(picks.map((p) => [p.itemId, p.quantity])))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  function sellSelected(e: React.MouseEvent): Promise<void> {
+    lastPoint.current = pointOf(e)
+    const entries = [...(selection ?? [])].map(([itemId, quantity]) => ({ itemId, quantity }))
+    const count = entries.reduce((sum, e) => sum + e.quantity, 0)
+    return act(async () => {
+      const result = await window.api.sellItems(entries)
+      setSelection(null)
+      return `Sold ${count} item${count === 1 ? '' : 's'} for ${formatMoney(result.sold)}.`
     })
   }
 
@@ -90,12 +136,12 @@ function BagModal({ onClose, onChanged }: Props): React.JSX.Element {
     const itemName = opening.item.name
     const { result } = opening
     if (result.kind === 'item' && soldFor !== undefined) {
-      setMessage(`Opened ${itemName}: you got ${result.name} and sold it for ${formatMoney(soldFor)}.`)
+      say(`Opened ${itemName}: you got ${result.name} and sold it for ${formatMoney(soldFor)}.`)
     } else if (result.kind === 'item') {
-      setMessage(`Opened ${itemName}: you got ${result.name} - it's in your bag.`)
+      say(`Opened ${itemName}: you got ${result.name} - it's in your bag.`)
     } else {
       const got = result.shiny ? `a ✨shiny✨ ${result.name}` : result.name
-      setMessage(`Opened ${itemName}: you got ${got} (Lv ${result.level}) - it's waiting in your box.`)
+      say(`Opened ${itemName}: you got ${got} (Lv ${result.level}) - it's waiting in your box.`)
     }
   }
 
@@ -103,7 +149,6 @@ function BagModal({ onClose, onChanged }: Props): React.JSX.Element {
     setMenu(null)
     setBusy(true)
     setError(null)
-    setMessage(null)
     try {
       const result = await window.api.openBagItem(item.id)
       // A fresh case each time (seq), even when opening the same item again.
@@ -142,30 +187,63 @@ function BagModal({ onClose, onChanged }: Props): React.JSX.Element {
 
   function openMenu(e: React.MouseEvent, item: BagItemView): void {
     e.preventDefault()
+    lastPoint.current = pointOf(e)
+    if (selection) {
+      toggleSelected(item)
+      return
+    }
+    setSellCount(1)
     setMenu({ item, x: e.clientX, y: e.clientY })
   }
 
   const canAffordRestore = money >= FOSSIL_RESTORE_COST
+  const shown = items?.filter((i) => i.name.toLowerCase().includes(query.trim().toLowerCase())) ?? []
+  const priceOf = new Map(items?.map((i) => [i.id, i.sellPrice ?? 0]) ?? [])
+  const selectionTotal = [...(selection ?? [])].reduce((sum, [id, qty]) => sum + (priceOf.get(id) ?? 0) * qty, 0)
+  const selectionCount = [...(selection ?? [])].reduce((sum, [, qty]) => sum + qty, 0)
 
   return createPortal(
     <div className="modal-overlay" onMouseDown={onClose}>
       <div className="modal-panel bag-modal" onMouseDown={(e) => e.stopPropagation()}>
         <h2>Bag</h2>
-        <p className="box-empty-hint">Click an item to use, sell or open it, or restore a fossil.</p>
+        <p className="box-empty-hint">
+          {selection
+            ? 'Click items to pick the ones to sell - all of each.'
+            : 'Click an item to use, sell or open it, or restore a fossil.'}
+        </p>
         {error && <p className="editor-error">{error}</p>}
-        {message && <p className="bag-message">{message}</p>}
         {!items && !error && <p>Loading...</p>}
         {items && items.length === 0 && <p className="box-empty-hint">Your bag is empty.</p>}
         {items && items.length > 0 && (
+          <div className="bag-toolbar">
+            <SearchBar value={query} onChange={setQuery} placeholder="Search your bag..." autoFocus />
+            {!selection && (
+              <>
+                <button disabled={busy} onClick={() => setSelection(new Map())}>
+                  Select to sell
+                </button>
+                <button
+                  disabled={busy}
+                  title="Picks every berry, plus the Memories, Plates and Drives with no Silvally, Arceus or Genesect to use them"
+                  onClick={(e) => void startQuickSell(e)}
+                >
+                  Quick sell
+                </button>
+              </>
+            )}
+          </div>
+        )}
+        {items && items.length > 0 && shown.length === 0 && <p className="box-empty-hint">No items match.</p>}
+        {items && items.length > 0 && (
           <div className="bag-scroll">
-            {groupByCategory(items).map(([category, group]) => (
+            {groupByCategory(shown).map(([category, group]) => (
               <div key={category}>
                 <h3 className="shop-category-heading">{category}</h3>
                 <div className="bag-grid">
                   {group.map((item) => (
                     <div
                       key={item.id}
-                      className="bag-item"
+                      className={`bag-item${selection?.has(item.id) ? ' bag-item-selected' : ''}${selection && item.sellPrice === null ? ' bag-item-unsellable' : ''}`}
                       title={item.description}
                       onContextMenu={(e) => openMenu(e, item)}
                       onClick={(e) => openMenu(e, item)}
@@ -180,9 +258,23 @@ function BagModal({ onClose, onChanged }: Props): React.JSX.Element {
             ))}
           </div>
         )}
-        <div className="editor-actions">
-          <button onClick={onClose}>Close</button>
-        </div>
+        {selection ? (
+          <div className="editor-actions bag-sell-bar">
+            <span className="bag-sell-summary">
+              {selectionCount} item{selectionCount === 1 ? '' : 's'} selected · {formatMoney(selectionTotal)}
+            </span>
+            <button disabled={busy} onClick={() => setSelection(null)}>
+              Cancel
+            </button>
+            <button disabled={busy || selectionCount === 0} onClick={(e) => void sellSelected(e)}>
+              Sell selected
+            </button>
+          </div>
+        ) : (
+          <div className="editor-actions">
+            <button onClick={onClose}>Close</button>
+          </div>
+        )}
 
         {/* Inside the panel (not beside it) so a click on either one's
             backdrop stops here instead of also closing the bag. */}
@@ -231,9 +323,37 @@ function BagModal({ onClose, onChanged }: Props): React.JSX.Element {
                 </button>
               )}
               {menu.item.sellPrice !== null ? (
-                <button className="context-menu-item" disabled={busy} onClick={() => void sell(menu.item)}>
-                  Sell for {formatMoney(menu.item.sellPrice)}
-                </button>
+                <>
+                  <button className="context-menu-item" disabled={busy} onClick={() => void sell(menu.item)}>
+                    Sell for {formatMoney(menu.item.sellPrice)}
+                  </button>
+                  {menu.item.quantity > 1 && (
+                    <>
+                      <div className="context-menu-item bag-sell-count" onMouseDown={(e) => e.stopPropagation()}>
+                        Sell
+                        <input
+                          type="number"
+                          min={1}
+                          max={menu.item.quantity}
+                          value={sellCount}
+                          onChange={(e) =>
+                            setSellCount(Math.max(1, Math.min(menu.item.quantity, Math.floor(Number(e.target.value)) || 1)))
+                          }
+                        />
+                        <button disabled={busy} onClick={() => void sell(menu.item, sellCount)}>
+                          {formatMoney(menu.item.sellPrice * sellCount)}
+                        </button>
+                      </div>
+                      <button
+                        className="context-menu-item"
+                        disabled={busy}
+                        onClick={() => void sell(menu.item, menu.item.quantity)}
+                      >
+                        Sell all ×{menu.item.quantity} for {formatMoney(menu.item.sellPrice * menu.item.quantity)}
+                      </button>
+                    </>
+                  )}
+                </>
               ) : (
                 <button className="context-menu-item" disabled title="The shop doesn't buy this">
                   Can&apos;t be sold
@@ -268,12 +388,13 @@ function BagModal({ onClose, onChanged }: Props): React.JSX.Element {
             onRestored={(result) => {
               setGalarFossil(null)
               setError(null)
-              setMessage(describeRestore(result))
+              say(describeRestore(result))
               void refresh()
               onChanged()
             }}
           />
         )}
+        {notes.layer}
       </div>
     </div>,
     document.body

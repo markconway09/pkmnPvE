@@ -112,7 +112,10 @@ function BattleResultModal({
         )}
         {replacing && (
           <div className="run-replace">
-            <p className="box-empty-hint">Your run team is full - who should make room?</p>
+            <p className="box-empty-hint">
+              Your run team is full - who should make room? The new Pokémon takes over its held item, and any ability
+              or moves it got from New Ability and New Move floors.
+            </p>
             <div className="run-replace-grid">
               {replacing.map((mon) => (
                 <button key={mon.id} disabled={busy} onClick={() => void catchPokemon(mon.id)}>

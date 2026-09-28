@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type {
   BattleView,
+  AbilityEvent,
   FeedbackEvent,
   FieldEffectView,
   ActivePokemonView,
@@ -35,7 +36,7 @@ import {
 import { loadLegacyTrainerSprite } from './trainerSprite'
 import Login from './Login'
 
-type Screen = 'menu' | 'battle' | 'options' | 'trainers' | 'rogueliteBosses' | 'premadeTeams' | 'progression'
+type Screen = 'menu' | 'battle' | 'trainers' | 'rogueliteBosses' | 'premadeTeams' | 'progression'
 
 const REVEAL_DELAY_MS = 350
 const EMPTY_FIELD: FieldSnapshot = { p1: [], p2: [], effects: [] }
@@ -193,6 +194,8 @@ interface GameProps {
 
 function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onLogout }: GameProps): React.JSX.Element {
   const [screen, setScreen] = useState<Screen>('menu')
+  // Options opens as a pop-up over the main menu.
+  const [optionsOpen, setOptionsOpen] = useState(false)
   // Which trainer list the premade teams screen was opened from, to go back to.
   const [premadeTeamsBack, setPremadeTeamsBack] = useState<Screen>('trainers')
   const [view, setView] = useState<BattleView | null>(null)
@@ -361,6 +364,9 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
     currentGimmick?.slot === slot ? currentGimmick : null
   const feedbackFor = (slot: FeedbackEvent['slot']): FeedbackEvent | null =>
     currentFeedback?.slot === slot ? currentFeedback : null
+  const currentAbility = visibleLogCount > 0 ? (view?.abilityEvents?.[visibleLogCount - 1] ?? null) : null
+  const abilityFor = (slot: AbilityEvent['slot']): AbilityEvent | null =>
+    currentAbility?.slot === slot ? currentAbility : null
 
   // When the line just revealed is a move being used, play its animation -
   // the real attacker/target slots come straight from the sim (see
@@ -649,20 +655,6 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
     setTargeting(null)
   }
 
-  if (screen === 'options') {
-    return (
-      <Options
-        username={username}
-        onLogout={onLogout}
-        spriteStyle={spriteStyle}
-        onChangeSpriteStyle={changeSpriteStyle}
-        background={background}
-        onChangeBackground={setBackground}
-        onBack={() => setScreen('menu')}
-      />
-    )
-  }
-
   if (screen === 'trainers') {
     return (
       <TrainerList
@@ -698,28 +690,41 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
 
   if (screen === 'menu') {
     return (
-      <MainMenu
-        onFight={() => void startBattle(wildLocation, wildLevelCap)}
-        wildLocation={wildLocation}
-        onChangeWildLocation={setWildLocation}
-        wildLevelCap={wildLevelCap}
-        onChangeWildLevelCap={setWildLevelCap}
-        onTrainerFight={() => void startTrainerBattle(false)}
-        onBossFight={() => void startTrainerBattle(true)}
-        onBossRematch={(trainerId) => void startTrainerBattle(true, trainerId)}
-        onOptions={() => setScreen('options')}
-        onTrainers={() => setScreen('trainers')}
-        onRogueliteBosses={() => setScreen('rogueliteBosses')}
-        onProgression={() => setScreen('progression')}
-        fightBusy={busy}
-        fightError={error}
-        trainerSprite={trainerSprite}
-        onChangeTrainerSprite={changeTrainerSprite}
-        username={username}
-        isAdmin={isAdmin}
-        onChallengePlayer={startPlayerBattle}
-        onRunBattle={startRunBattle}
-      />
+      <>
+        {optionsOpen && (
+          <Options
+            username={username}
+            onLogout={onLogout}
+            spriteStyle={spriteStyle}
+            onChangeSpriteStyle={changeSpriteStyle}
+            background={background}
+            onChangeBackground={setBackground}
+            onClose={() => setOptionsOpen(false)}
+          />
+        )}
+        <MainMenu
+          onFight={() => void startBattle(wildLocation, wildLevelCap)}
+          wildLocation={wildLocation}
+          onChangeWildLocation={setWildLocation}
+          wildLevelCap={wildLevelCap}
+          onChangeWildLevelCap={setWildLevelCap}
+          onTrainerFight={() => void startTrainerBattle(false)}
+          onBossFight={() => void startTrainerBattle(true)}
+          onBossRematch={(trainerId) => void startTrainerBattle(true, trainerId)}
+          onOptions={() => setOptionsOpen(true)}
+          onTrainers={() => setScreen('trainers')}
+          onRogueliteBosses={() => setScreen('rogueliteBosses')}
+          onProgression={() => setScreen('progression')}
+          fightBusy={busy}
+          fightError={error}
+          trainerSprite={trainerSprite}
+          onChangeTrainerSprite={changeTrainerSprite}
+          username={username}
+          isAdmin={isAdmin}
+          onChallengePlayer={startPlayerBattle}
+          onRunBattle={startRunBattle}
+        />
+      </>
     )
   }
 
@@ -788,6 +793,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
             screens={screensFor('p2')}
             feedback={feedbackFor('p2a')}
             gimmick={gimmickFor('p2a')}
+            ability={abilityFor('p2a')}
             slot="p2a"
           />
           <BattleSprite
@@ -798,6 +804,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
             spriteStyle={spriteStyle}
             feedback={feedbackFor('p2b')}
             gimmick={gimmickFor('p2b')}
+            ability={abilityFor('p2b')}
             slot="p2b"
           />
           <BattleSprite
@@ -810,6 +817,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
             screens={screensFor('p1')}
             feedback={feedbackFor('p1a')}
             gimmick={gimmickFor('p1a')}
+            ability={abilityFor('p1a')}
             slot="p1a"
           />
           <BattleSprite
@@ -820,6 +828,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
             spriteStyle={spriteStyle}
             feedback={feedbackFor('p1b')}
             gimmick={gimmickFor('p1b')}
+            ability={abilityFor('p1b')}
             slot="p1b"
           />
           <AnimationLayer fieldRef={battleFieldRef} trigger={animTrigger} onDone={() => setAnimTrigger(null)} />
@@ -861,7 +870,9 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
               // Its STAB types: once Terastallized, its original types still count and the
               // Tera type joins them (Stellar boosts differently, so it's left out); toggling
               // Tera on for this turn shows what that would do.
-              const teraNow = slotMon?.terastallized ?? (gimmickOn && gimmick?.suffix === 'terastallize' ? (gimmick.typeForBadge ?? null) : null)
+              const teraNow =
+                slotMon?.terastallized ??
+                (gimmickOn && gimmick?.suffix === 'terastallize' ? (gimmick.typeForBadge ?? null) : null)
               const stabTypes = slotMon
                 ? {
                     own: slotMon.terastallized ? slotMon.baseTypes : slotMon.types,
@@ -1015,7 +1026,8 @@ function App(): React.JSX.Element {
 
   // The very first player takes over the sprite chosen before there were players;
   // anyone who joins later starts with the default.
-  const initialTrainerSprite = session.trainerSprite ?? (session.players.length <= 1 ? loadLegacyTrainerSprite() : 'red')
+  const initialTrainerSprite =
+    session.trainerSprite ?? (session.players.length <= 1 ? loadLegacyTrainerSprite() : 'red')
   return (
     <Game
       key={session.username}

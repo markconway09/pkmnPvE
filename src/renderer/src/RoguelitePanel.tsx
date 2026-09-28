@@ -4,10 +4,13 @@ import type { BoxPokemonView, RunChoice, RunDifficulty, RunMonView, RunNodeKind,
 import {
   POKEMON_GENERATIONS,
   ROGUELITE_BOSS_COUNT,
+  ROGUELITE_BOSS_EVERY,
   ROGUELITE_FINAL_FLOOR,
   ROGUELITE_START_LEVEL,
   RUN_DIFFICULTIES,
   WILD_LOCATIONS,
+  rogueliteBossClassAt,
+  rogueliteBossLabelAt,
   runDifficultyInfo
 } from '../../shared/battle-types'
 import PokemonIconVisual from './PokemonIconVisual'
@@ -18,6 +21,31 @@ import RunMonContextMenu from './RunMonContextMenu'
 import RunMonEditor from './RunMonEditor'
 import { useTapGuard } from './useTapGuard'
 import { trainerSpriteUrl } from './trainerSprite'
+
+// The whole run as a bar: a notch per floor, a bigger one for each boss (coloured by
+// Gym Leader / Elite Four / Champion), filled up to the floor the run is on.
+function RunProgressBar({ floor }: { floor: number }): React.JSX.Element {
+  const done = Math.min(1, (floor - 1) / (ROGUELITE_FINAL_FLOOR - 1))
+  return (
+    <div className="run-progress" title={`Floor ${floor} of ${ROGUELITE_FINAL_FLOOR}`}>
+      <div className="run-progress-fill" style={{ width: `${done * 100}%` }} />
+      {Array.from({ length: ROGUELITE_FINAL_FLOOR }, (_, i) => {
+        const n = i + 1
+        const boss = n % ROGUELITE_BOSS_EVERY === 0
+        const bossIndex = n / ROGUELITE_BOSS_EVERY - 1
+        const state = n < floor ? 'done' : n === floor ? 'current' : 'ahead'
+        return (
+          <span
+            key={n}
+            className={`run-notch run-notch-${state}${boss ? ` run-notch-boss run-notch-${rogueliteBossClassAt(bossIndex)}` : ''}`}
+            style={{ left: `${(i / (ROGUELITE_FINAL_FLOOR - 1)) * 100}%` }}
+            title={boss ? `Floor ${n}: ${rogueliteBossLabelAt(bossIndex)}` : `Floor ${n}`}
+          />
+        )
+      })}
+    </div>
+  )
+}
 
 // The droppable id MainMenu's drag handler looks for.
 export const RUN_STARTER_SLOT_ID = 'run-starter-slot'
@@ -57,15 +85,19 @@ const NODE_INFO: Record<RunNodeKind, { label: string; hint: string }> = {
   wild: { label: 'Wild Pokémon', hint: 'Beat it and you can catch it for your run' },
   trainer: { label: 'Trainer', hint: 'A trainer battle, sized for this floor - win it for a held item and extra exp' },
   item: { label: 'Item', hint: 'Pick a held item for one of your Pokémon' },
-  heal: { label: 'Rest', hint: 'Your whole team back to full HP, no status' },
+  heal: { label: 'Pokémon Center', hint: 'Your whole team back to full HP, no status' },
   boss: { label: 'Boss', hint: 'A boss battle - win it to heal up and move on' },
   ability: { label: 'New Ability', hint: 'Pick one of four strong abilities for one of your Pokémon' },
-  move: { label: 'New Move', hint: 'Pick one of four signature moves to teach one of your Pokémon' }
+  move: { label: 'New Move', hint: 'Pick one of four signature moves to teach one of your Pokémon' },
+  swap: { label: 'Random Swap', hint: 'Swap one Pokémon - or your whole team - for completely random ones at the next boss’s level' }
 }
 
 // Where a wild option is - its location's entry, or none for an older run's "anywhere".
 const locationOf = (choice: RunChoice): (typeof WILD_LOCATIONS)[number] | undefined =>
   WILD_LOCATIONS.find((l) => l.id === choice.location)
+
+// A TR's icon on Showdown's item sheet (every TR shares it).
+const TR_SPRITENUM = 721
 
 function NodeIcon({ choice }: { choice: RunChoice }): React.JSX.Element {
   const { kind } = choice
@@ -77,7 +109,18 @@ function NodeIcon({ choice }: { choice: RunChoice }): React.JSX.Element {
   if (kind === 'trainer') return <img className="big-battle-icon" src={trainerSpriteUrl('youngster')} alt="" />
   // Who the boss is stays a surprise until the fight starts.
   if (kind === 'boss') return <img className="big-battle-icon run-boss-silhouette" src={trainerSpriteUrl('giovanni')} alt="" />
-  const emoji: Partial<Record<RunNodeKind, string>> = { heal: '❤️', item: '🎁', ability: '🧬', move: '📜' }
+  // The Ability Patch (the Shiny Patch shares its picture) and a TR from the item sheet.
+  if (kind === 'ability') return <img className="big-battle-icon run-node-item-icon" src="./sprites/misc/shinypatch.png" alt="" />
+  if (kind === 'move') {
+    return (
+      <span className="run-node-tr">
+        <ItemSprite spritenum={TR_SPRITENUM} />
+      </span>
+    )
+  }
+  if (kind === 'swap') return <img className="big-battle-icon" src={trainerSpriteUrl('burglar')} alt="" />
+  if (kind === 'heal') return <img className="big-battle-icon" src={trainerSpriteUrl('nurse')} alt="" />
+  const emoji: Partial<Record<RunNodeKind, string>> = { item: '🎁' }
   return <span className="run-node-emoji">{emoji[kind] ?? '❔'}</span>
 }
 
@@ -215,6 +258,26 @@ function RoguelitePanel({
   const [menu, setMenu] = useState<{ mon: RunMonView; x: number; y: number } | null>(null)
   // "Move item" from the context menu: whose item is being moved, until a new holder is clicked.
   const [movingFrom, setMovingFrom] = useState<RunMonView | null>(null)
+  // A Random Swap floor: 'one' once "Swap one Pokémon" is picked (then a team member is
+  // clicked); the whole-team swap asks for a second click first.
+  const [swapMode, setSwapMode] = useState<'one' | null>(null)
+  const [confirmingTeamSwap, setConfirmingTeamSwap] = useState(false)
+  const [swapBusy, setSwapBusy] = useState(false)
+  const [swapError, setSwapError] = useState<string | null>(null)
+
+  async function doSwap(action: () => Promise<RunView>): Promise<void> {
+    setSwapBusy(true)
+    setSwapError(null)
+    try {
+      onRunUpdated(await action())
+      setSwapMode(null)
+      setConfirmingTeamSwap(false)
+    } catch (e) {
+      setSwapError(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']*': (?:Error: )?/, '') : String(e))
+    } finally {
+      setSwapBusy(false)
+    }
+  }
 
   if (!run || run.status !== 'active') {
     return (
@@ -232,8 +295,8 @@ function RoguelitePanel({
                 {run.rewards.map((line) => (
                   <span key={line.label} className="run-reward-line">
                     {line.spritenum !== null && <ItemSprite spritenum={line.spritenum} />}
-                    {line.label}
-                    {line.quantity > 1 ? ` ×${line.quantity}` : ''}
+                    {/* One string, so the count can't drift next to the following reward's icon. */}
+                    {line.itemId ? `${line.quantity}× ${line.label}` : line.label}
                   </span>
                 ))}
               </div>
@@ -301,7 +364,8 @@ function RoguelitePanel({
   const pickName = pick?.options.find((o) => o.id === chosenPick)?.name
   // What clicking a team member does right now, if anything.
   const pickTarget = (mon: RunMonView): (() => void) | null => {
-    if (busy) return null
+    if (busy || swapBusy) return null
+    if (run.swapOffer && swapMode === 'one') return () => void doSwap(() => window.api.swapRunMon(mon.id))
     if (offer && chosenItem) {
       return () => {
         onGiveItem(chosenItem, mon.id)
@@ -360,8 +424,50 @@ function RoguelitePanel({
           {confirmingForfeit ? 'Give up the run? Click again' : 'Forfeit'}
         </button>
       </div>
+      <RunProgressBar floor={run.floor} />
 
-      {pick ? (
+      {run.swapOffer ? (
+        <div className="run-item-offer">
+          <p className="run-reward-heading">Random Swap</p>
+          <p className="box-empty-hint">
+            {swapMode === 'one'
+              ? 'Now click the Pokémon to swap away - its replacement takes over its held item and its New Ability / New Move picks.'
+              : `Swapped-in Pokémon are completely random, at Lv ${run.swapLevel}, and take over the held items and New Ability / New Move picks of the ones they replace. Each has a 10% chance to be a legendary - and swapping the whole team has a 5% chance to be all restricted legendaries.`}
+          </p>
+          <div className="run-item-row">
+            <button
+              className={`run-item-button${swapMode === 'one' ? ' run-item-button-chosen' : ''}`}
+              disabled={busy || swapBusy}
+              onClick={() => {
+                setConfirmingTeamSwap(false)
+                setSwapMode(swapMode === 'one' ? null : 'one')
+              }}
+            >
+              Swap one Pokémon
+            </button>
+            <button
+              className={`run-item-button${confirmingTeamSwap ? ' confirm-button' : ''}`}
+              disabled={busy || swapBusy}
+              onClick={() => {
+                setSwapMode(null)
+                if (!confirmingTeamSwap) setConfirmingTeamSwap(true)
+                else void doSwap(() => window.api.swapRunTeam())
+              }}
+              onBlur={() => setConfirmingTeamSwap(false)}
+            >
+              {confirmingTeamSwap ? 'Swap all of them? Click again' : 'Swap the whole team'}
+            </button>
+            <button
+              className="run-item-button run-item-skip"
+              disabled={busy || swapBusy}
+              onClick={() => void doSwap(() => window.api.skipRunSwap())}
+            >
+              Skip
+            </button>
+          </div>
+          {swapError && <p className="editor-error">{swapError}</p>}
+        </div>
+      ) : pick ? (
         <div className="run-item-offer">
           <p className="run-reward-heading">
             {run.pickReason === 'reward' ? 'Victory reward!' : pick.kind === 'ability' ? 'New Ability' : 'New Move'}
@@ -577,7 +683,12 @@ function RoguelitePanel({
       )}
 
       {editingMonId && (
-        <RunMonEditor runMonId={editingMonId} onClose={() => setEditingMonId(null)} onSaved={onRunUpdated} />
+        <RunMonEditor
+          runMonId={editingMonId}
+          mon={run.team.find((m) => m.id === editingMonId)}
+          onClose={() => setEditingMonId(null)}
+          onSaved={onRunUpdated}
+        />
       )}
 
       {menu && (

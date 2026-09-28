@@ -104,6 +104,27 @@ export async function checkForUpdate(): Promise<UpdateCheckResult> {
 }
 
 /**
+ * An empty folder to download and unpack into. The last update's leftovers are cleared
+ * with asar support switched off (process.noAsar): otherwise Electron's fs treats the
+ * unpacked resources\app.asar as a folder, so deleting through it fails with "directory
+ * not empty" on every update after the first. If something still holds a file there,
+ * a fresh folder is used instead.
+ */
+function cleanWorkDir(): string {
+  const temp = app.getPath('temp')
+  const work = join(temp, 'pkmnPvE-update')
+  process.noAsar = true
+  try {
+    rmSync(work, { recursive: true, force: true, maxRetries: 3 })
+    return work
+  } catch {
+    return join(temp, `pkmnPvE-update-${Date.now()}`)
+  } finally {
+    process.noAsar = false
+  }
+}
+
+/**
  * Downloads and unpacks the release found by checkForUpdate, reporting progress to
  * the window, then hands over to the swap script and quits the game.
  */
@@ -113,8 +134,7 @@ export async function installUpdate(sender: WebContents): Promise<void> {
   if (!asset) throw new Error('Check for updates first')
 
   const appDir = dirname(app.getPath('exe'))
-  const work = join(app.getPath('temp'), 'pkmnPvE-update')
-  rmSync(work, { recursive: true, force: true })
+  const work = cleanWorkDir()
   mkdirSync(join(work, 'new'), { recursive: true })
 
   // Download, reporting how far along it is. Each chunk is copied before it's

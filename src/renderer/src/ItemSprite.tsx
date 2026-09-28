@@ -5,6 +5,10 @@ interface Props {
   className?: string
 }
 
+// Images drawn edge to edge get this much padding so they match the sheet icons,
+// which sit inside a margin of their 24px cell.
+const SYNTHETIC_PADDING: Record<number, number> = { '-10': 3 }
+
 // Negative spritenums are sentinels for items with no real Showdown sprite
 // (synthetic items this project made up) - shown from a standalone vendored
 // image instead of a slice of the sheet.
@@ -24,7 +28,14 @@ const SYNTHETIC_SPRITES: Record<number, string> = {
 function ItemSprite({ spritenum, className }: Props): React.JSX.Element {
   const src = SYNTHETIC_SPRITES[spritenum]
   if (src) {
-    return <img className={className} src={src} alt="" style={{ width: 24, height: 24, objectFit: 'contain', flexShrink: 0 }} />
+    return <img className={className} src={src} alt="" style={{
+          width: 24,
+          height: 24,
+          padding: SYNTHETIC_PADDING[spritenum] ?? 0,
+          boxSizing: 'border-box',
+          objectFit: 'contain',
+          flexShrink: 0
+        }} />
   }
   // A made-up item that hasn't been given an image yet.
   if (spritenum < 0) {

@@ -31,6 +31,7 @@ import type {
   UpdateProgress,
   SessionInfo,
   RestoreFossilResult,
+  ItemQuantity,
   SellResult,
   ShopItemEntry,
   ShopPriceEntry,
@@ -74,6 +75,9 @@ const api = {
   teachRunMove: (moveId: string, runMonId: string, replaceMoveId: string | null): Promise<RunView> =>
     ipcRenderer.invoke('run:teachMove', moveId, runMonId, replaceMoveId),
   skipRunPick: (): Promise<RunView> => ipcRenderer.invoke('run:skipPick'),
+  swapRunMon: (runMonId: string): Promise<RunView> => ipcRenderer.invoke('run:swapMon', runMonId),
+  swapRunTeam: (): Promise<RunView> => ipcRenderer.invoke('run:swapTeam'),
+  skipRunSwap: (): Promise<RunView> => ipcRenderer.invoke('run:skipSwap'),
   listAllAbilities: (): Promise<{ id: string; name: string }[]> => ipcRenderer.invoke('dex:abilities'),
   rerollRunItems: (): Promise<RunView> => ipcRenderer.invoke('run:rerollItems'),
   evolveRunMon: (runMonId: string, targetSpecies: string, newMoves: boolean): Promise<RunView> =>
@@ -132,6 +136,8 @@ const api = {
   setShopPrice: (itemId: string, price: number | null): Promise<ShopPriceEntry[]> =>
     ipcRenderer.invoke('shop:setPrice', itemId, price),
   sellItem: (itemId: string): Promise<SellResult> => ipcRenderer.invoke('bag:sell', itemId),
+  sellItems: (entries: ItemQuantity[]): Promise<SellResult> => ipcRenderer.invoke('bag:sellMany', entries),
+  quickSellSelection: (): Promise<ItemQuantity[]> => ipcRenderer.invoke('bag:quickSellSelection'),
   openBagItem: (itemId: string): Promise<OpenItemResult> => ipcRenderer.invoke('bag:open', itemId),
   getGalarFossilPartners: (itemId: string): Promise<GalarFossilPartner[]> =>
     ipcRenderer.invoke('fossil:galarPartners', itemId),

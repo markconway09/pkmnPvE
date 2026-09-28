@@ -8,6 +8,15 @@ body {
   background: #10141a;
   color: #e6e6e6;
   overflow: hidden;
+  /* A game, not a page: no highlighting text by dragging or double-clicking. */
+  user-select: none;
+}
+
+/* Text boxes still select normally, so typing and editing work as usual. */
+input,
+textarea,
+[contenteditable='true'] {
+  user-select: text;
 }
 
 .screen {
@@ -2306,8 +2315,9 @@ button:disabled {
   flex-shrink: 0;
 }
 
+/* As wide as the shop, six items to a row. */
 .bag-modal {
-  width: 480px;
+  width: 710px;
 }
 
 /* Holds every category, so the whole bag scrolls as one list. */
@@ -2318,8 +2328,8 @@ button:disabled {
 }
 
 .bag-grid {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
   margin: 6px 0 12px;
 }
@@ -2329,7 +2339,7 @@ button:disabled {
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  width: 76px;
+  min-width: 0;
   padding: 8px 4px;
   background: #1a2230;
   border: 1px solid #3a4150;
@@ -2348,12 +2358,6 @@ button:disabled {
 .bag-item-qty {
   font-size: 11px;
   color: #6bb0ff;
-}
-
-.bag-message {
-  margin: 8px 0 0;
-  font-size: 12px;
-  color: #7be08a;
 }
 
 .galar-prompt {
@@ -3976,6 +3980,9 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
   color: #e6e6e6;
 }
 
@@ -3989,18 +3996,10 @@ button:disabled {
 }
 
 /* Options: the whole screen scrolls (it outgrew the window). */
-.options-screen {
-  overflow-y: auto;
-}
-
 /* Every text on a screen gets a shadow, so it stays readable over a custom background
    picture (Options → Background). Pop-ups sit outside the screens and keep plain text. */
 .screen {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 2px rgba(0, 0, 0, 0.8);
-}
-
-.options-screen > * {
-  flex-shrink: 0;
 }
 
 /* The dim hint lines are too dark to read over a background picture, even shadowed -
@@ -4284,3 +4283,829 @@ button:disabled {
   cursor: pointer;
 }
 
+
+/* Crits, flinches and confusion - bigger labels and an effect on the sprite itself. */
+.feedback-label.feedback-emphasis {
+  font-size: 19px;
+  letter-spacing: 0.5px;
+  animation-duration: 1300ms;
+}
+
+.feedback-crit {
+  color: #ffd23f;
+  font-size: 22px;
+  text-shadow:
+    0 0 4px #b33000,
+    0 0 8px #ff5a1f,
+    0 1px 2px #000;
+}
+
+.feedback-flinch {
+  color: #ff8a4c;
+}
+
+.feedback-confusion {
+  color: #d59cff;
+}
+
+.sprite.sprite-emphasis-crit {
+  animation: sprite-crit 520ms ease-out;
+}
+
+@keyframes sprite-crit {
+  0% {
+    filter: brightness(3.5) saturate(0);
+    transform: translateX(0);
+  }
+  15% {
+    transform: translateX(-9px) rotate(-4deg);
+  }
+  30% {
+    filter: brightness(2.2) saturate(0.4);
+    transform: translateX(9px) rotate(4deg);
+  }
+  45% {
+    transform: translateX(-6px);
+  }
+  60% {
+    transform: translateX(5px);
+  }
+  100% {
+    filter: none;
+    transform: translateX(0);
+  }
+}
+
+.sprite.sprite-emphasis-flinch {
+  animation: sprite-flinch 600ms ease-out;
+}
+
+@keyframes sprite-flinch {
+  0% {
+    transform: translateY(0) scaleY(1);
+  }
+  20% {
+    transform: translateY(6px) scaleY(0.88);
+    filter: brightness(0.6);
+  }
+  40% {
+    transform: translateY(-3px) scaleY(1.04);
+  }
+  60% {
+    transform: translateY(3px) scaleY(0.96);
+    filter: brightness(0.8);
+  }
+  100% {
+    transform: translateY(0) scaleY(1);
+    filter: none;
+  }
+}
+
+.sprite.sprite-emphasis-confusion {
+  animation: sprite-confusion 900ms ease-in-out;
+}
+
+@keyframes sprite-confusion {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  20% {
+    transform: rotate(-8deg);
+  }
+  45% {
+    transform: rotate(8deg);
+    filter: hue-rotate(40deg);
+  }
+  70% {
+    transform: rotate(-5deg);
+  }
+}
+
+.confusion-stars {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 70px;
+  height: 22px;
+  margin-left: -35px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.confusion-star {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  color: #ffe45c;
+  font-size: 15px;
+  text-shadow: 0 0 3px #000;
+  animation: confusion-orbit 800ms linear infinite;
+}
+
+@keyframes confusion-orbit {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg) translateX(30px) rotate(0deg) scaleY(1);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg) translateX(30px) rotate(-360deg) scaleY(1);
+  }
+}
+
+/* An ability doing something - a banner by the Pokemon, like Showdown's. */
+.ability-popup {
+  position: absolute;
+  top: 38%;
+  display: flex;
+  flex-direction: column;
+  padding: 4px 12px;
+  background: rgba(20, 24, 34, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 4px;
+  color: #fff;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 4;
+  text-shadow: 0 1px 2px #000;
+  animation: ability-popup-in 1600ms ease-out forwards;
+}
+
+.ability-popup-left {
+  left: -40px;
+  --ability-from: -24px;
+}
+
+.ability-popup-right {
+  right: -40px;
+  --ability-from: 24px;
+}
+
+.ability-popup-mon {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.ability-popup-name {
+  font-size: 15px;
+  font-weight: bold;
+}
+
+@keyframes ability-popup-in {
+  0% {
+    opacity: 0;
+    transform: translateX(var(--ability-from));
+  }
+  12%,
+  85% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(0);
+  }
+}
+
+/* The item an evolution uses up, under "Evolve into ..." in the box menu. */
+.context-menu-evo-item {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 1px;
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+/* A case opening's win the player didn't have before. */
+.case-new-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #e8b923;
+  color: #1b1b1b;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  text-shadow: none;
+  vertical-align: middle;
+  animation: case-new-pop 500ms ease-out;
+}
+
+@keyframes case-new-pop {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Bag: search with the multi-sell buttons beside it, picked items, the sell bar. */
+.bag-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bag-toolbar .shop-search {
+  flex: 1;
+}
+
+.bag-item.bag-item-selected {
+  outline: 2px solid #e8b923;
+  background: rgba(232, 185, 35, 0.18);
+}
+
+.bag-item.bag-item-unsellable {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.bag-sell-bar {
+  align-items: center;
+}
+
+.bag-sell-summary {
+  margin-right: auto;
+  font-size: 13px;
+}
+
+.bag-sell-count {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: default;
+}
+
+.bag-sell-count input {
+  width: 56px;
+}
+
+/* A confirmation rising from where it happened (see FloatingNotes). */
+.floating-note {
+  position: fixed;
+  z-index: 10000;
+  max-width: 300px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: rgba(16, 36, 22, 0.94);
+  border: 1px solid #3b8a4a;
+  color: #9af0a8;
+  font-size: 13px;
+  font-weight: bold;
+  text-align: center;
+  pointer-events: none;
+  text-shadow: 0 1px 2px #000;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  animation-name: floating-note-rise;
+  animation-timing-function: ease-out;
+  animation-fill-mode: forwards;
+}
+
+@keyframes floating-note-rise {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -60%) scale(0.9);
+  }
+  8% {
+    opacity: 1;
+    transform: translate(-50%, -100%) scale(1);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -100%) translateY(-36px);
+  }
+}
+
+.floating-note.floating-note-bad {
+  background: rgba(44, 14, 14, 0.94);
+  border-color: #a8413a;
+  color: #ff9a8f;
+}
+
+/* Roguelite: the run's progress - a notch per floor, bigger ones for the bosses. */
+.run-progress {
+  position: relative;
+  width: min(760px, calc(100% - 32px));
+  height: 8px;
+  margin: 8px 0 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.run-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #3f8f5a, #6fd08a);
+  transition: width 0.4s ease;
+}
+
+.run-notch {
+  position: absolute;
+  top: 50%;
+  width: 3px;
+  height: 12px;
+  border-radius: 2px;
+  transform: translate(-50%, -50%);
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.run-notch-done {
+  background: #d8f5df;
+}
+
+.run-notch-current {
+  height: 16px;
+  width: 4px;
+  background: #ffffff;
+  box-shadow: 0 0 6px #ffffff;
+}
+
+.run-notch-boss {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 0, 0, 0.55);
+  background: #8a93a3;
+}
+
+.run-notch-boss.run-notch-gymLeader {
+  background: #c9a13b;
+}
+
+.run-notch-boss.run-notch-eliteFour {
+  background: #9b59d0;
+}
+
+.run-notch-boss.run-notch-champion {
+  width: 18px;
+  height: 18px;
+  background: #e8453c;
+}
+
+.run-notch-boss.run-notch-done {
+  filter: saturate(0.4) brightness(1.2);
+}
+
+.run-notch-boss.run-notch-current {
+  box-shadow: 0 0 8px #ffffff;
+  border-color: #ffffff;
+}
+
+/* Roguelite floor options: the New Ability patch and the New Move TR. */
+.run-node-item-icon {
+  object-fit: contain;
+  padding: 6px;
+  box-sizing: border-box;
+}
+
+.run-node-tr {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 76px;
+  height: 76px;
+}
+
+.run-node-tr > span {
+  transform: scale(3);
+  image-rendering: pixelated;
+}
+
+/* The classic Pokemon editor: wider, three fields to a row, and the Pokemon itself in
+   the top-right corner. */
+.pokemon-editor.pokemon-editor-main {
+  width: 660px;
+}
+
+.pokemon-editor-main .editor-moves-grid {
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.pokemon-editor-portrait {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.pokemon-editor-portrait img {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.pokemon-editor-portrait-name {
+  font-size: 11px;
+  color: #b7c0cf;
+  white-space: nowrap;
+}
+
+/* The current choice, shown greyed out while its picker is open. */
+.pokemon-editor-main .editor-field input::placeholder,
+.pokemon-editor-main .editor-moves-grid input::placeholder {
+  color: #7d8799;
+}
+
+.pokemon-editor-main .editor-moves-grid input {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* A move slot: its box, bigger, with the move's type, category, power, accuracy and PP. */
+.editor-move-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  background: #1d232d;
+  border: 1px solid #3a4150;
+  border-left: 4px solid #3a4150;
+  border-radius: 4px;
+}
+
+.pokemon-editor-main .editor-move-slot input {
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: bold;
+  padding: 7px 9px;
+  background: #232a36;
+  color: #e6e6e6;
+  border: 2px solid #3a4150;
+}
+
+.pokemon-editor-main .editor-move-slot input:focus {
+  outline: none;
+  border-color: #6bb0ff;
+}
+
+.editor-move-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 18px;
+  font-size: 12px;
+  color: #b7c0cf;
+}
+
+.editor-move-category {
+  width: 28px;
+  height: 14px;
+  image-rendering: pixelated;
+}
+
+/* The classic editor's layout: the Pokemon on the left with its ability and item under
+   it, its details beside it, then moves, then stats (nature, IVs and EVs together). */
+.pokemon-editor-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pokemon-editor-top {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.pokemon-editor-side {
+  width: 190px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pokemon-editor-side .pokemon-editor-portrait {
+  padding: 6px 0;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid #2c3340;
+  border-radius: 6px;
+}
+
+.pokemon-editor-side .pokemon-editor-portrait img {
+  width: 120px;
+  height: 120px;
+}
+
+.pokemon-editor-details {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pokemon-editor-inline {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.pokemon-editor-inline:has(> :nth-child(4)) {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.pokemon-editor-inline input,
+.pokemon-editor-inline select,
+.pokemon-editor-side input {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.pokemon-editor-details .editor-section {
+  margin-top: 0;
+}
+
+.editor-nature-field {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.editor-nature-field select {
+  flex: 1;
+}
+
+/* A stat's IV, beside its base stat. */
+.editor-ev-iv {
+  width: 44px;
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 11px;
+  color: #8a93a3;
+}
+
+input.editor-ev-iv {
+  box-sizing: border-box;
+  padding: 2px 4px;
+  font-family: inherit;
+  font-size: 12px;
+  color: #e6e6e6;
+  background: #232a36;
+  border: 1px solid #3a4150;
+}
+
+input.editor-ev-iv:focus {
+  outline: none;
+  border-color: #6bb0ff;
+}
+
+/* The Tera Type picker takes its type's colour (set inline). */
+.editor-field select.editor-tera-select {
+  font-weight: bold;
+  border-color: rgba(0, 0, 0, 0.45);
+}
+
+/* A stat's EVs, typed (the slider beside it moves with it). */
+input.editor-ev-input {
+  width: 48px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  padding: 2px 4px;
+  text-align: center;
+  font-family: inherit;
+  font-size: 12px;
+  color: #e6e6e6;
+  background: #232a36;
+  border: 1px solid #3a4150;
+}
+
+input.editor-ev-input:focus {
+  outline: none;
+  border-color: #6bb0ff;
+}
+
+.editor-ev-input-head {
+  width: 48px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+/* The run's moves editor, laid out like the classic one (see .pokemon-editor-layout). */
+.pokemon-editor.pokemon-editor-main.run-mon-editor {
+  width: 660px;
+}
+
+.run-mon-editor .run-editor-move {
+  margin-bottom: 0;
+}
+
+.run-mon-editor .run-editor-move input[type='text'] {
+  min-width: 0;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: bold;
+  padding: 6px 8px;
+  background: #232a36;
+  color: #e6e6e6;
+  border: 2px solid #3a4150;
+}
+
+.run-mon-editor .auto-set-row select {
+  min-width: 0;
+}
+
+.run-editor-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.run-editor-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.run-mon-editor .editor-moves-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.run-mon-editor .run-editor-move input[type='text'] {
+  width: 100%;
+  flex: 1;
+}
+
+.gender-male {
+  color: #6bb0ff;
+}
+
+.gender-female {
+  color: #ff7fae;
+}
+
+/* The bag's and shop's search box (see SearchBar). */
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  margin-top: 10px;
+  padding: 0 10px;
+  height: 38px;
+  box-sizing: border-box;
+  background: #11161e;
+  border: 1px solid #3a4150;
+  border-radius: 19px;
+  cursor: text;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.search-bar:focus-within {
+  border-color: #6bb0ff;
+  box-shadow: 0 0 0 3px rgba(107, 176, 255, 0.18);
+}
+
+.search-bar-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: #7d8799;
+}
+
+.search-bar:focus-within .search-bar-icon {
+  color: #6bb0ff;
+}
+
+.search-bar input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  font-family: inherit;
+  font-size: 14px;
+  color: #e6e6e6;
+  background: transparent;
+  border: none;
+  outline: none;
+}
+
+.search-bar input::placeholder {
+  color: #6b7486;
+}
+
+.search-bar-clear {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  font-size: 15px;
+  line-height: 22px;
+  color: #c7cedb;
+  background: #2c3340;
+  cursor: pointer;
+}
+
+.search-bar-clear:hover {
+  background: #3a4150;
+  color: #ffffff;
+}
+
+.bag-toolbar .search-bar {
+  margin-top: 0;
+}
+
+.bag-toolbar {
+  margin-top: 10px;
+}
+
+/* Options, as a pop-up over the main menu. */
+.options-modal {
+  width: 640px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.options-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.options-modal-header h2 {
+  margin: 0;
+}
+
+.options-modal-close {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.options-modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.options-modal-body > .options-heading:first-child {
+  margin-top: 8px;
+}
+
+/* Switching Classic / Roguelite: a ring of the new mode's colour spreading from the
+   toggle across the window, with a soft wash of that colour inside it. */
+.mode-pulse {
+  position: fixed;
+  z-index: 5000;
+  border-radius: 50%;
+  pointer-events: none;
+  box-sizing: border-box;
+  animation: mode-pulse-spread 650ms cubic-bezier(0.22, 0.8, 0.3, 1) forwards;
+}
+
+.mode-pulse-classic {
+  --mode-color: 107, 176, 255;
+}
+
+.mode-pulse-roguelite {
+  --mode-color: 180, 140, 255;
+}
+
+.mode-pulse {
+  border: 6px solid rgba(var(--mode-color), 0.9);
+  background: radial-gradient(circle, rgba(var(--mode-color), 0) 55%, rgba(var(--mode-color), 0.22) 100%);
+  box-shadow:
+    0 0 30px 8px rgba(var(--mode-color), 0.55),
+    inset 0 0 30px 8px rgba(var(--mode-color), 0.4);
+}
+
+@keyframes mode-pulse-spread {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  60% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}

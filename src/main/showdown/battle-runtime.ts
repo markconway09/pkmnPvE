@@ -60,6 +60,7 @@ import type {
   BattleRewardsView,
   CatchResult,
   ExpGainResult,
+  AbilityEvent,
   FeedbackEvent,
   FieldEffectView,
   FieldSnapshot,
@@ -141,7 +142,12 @@ function computeFeedbackEvent(line: string): FeedbackEvent | null {
   }
   if (cmd === '-crit') {
     const slot = slotKeyFromIdent(parts[1])
-    return slot && { slot, label: 'Critical hit', tone: 'bad' }
+    return slot && { slot, label: 'Critical hit!', tone: 'bad', emphasis: 'crit' }
+  }
+  // "It hurt itself in its confusion!"
+  if (cmd === '-damage' && parts.includes('[from] confusion')) {
+    const slot = slotKeyFromIdent(parts[1])
+    return slot && { slot, label: 'Hurt itself!', tone: 'bad', emphasis: 'confusion' }
   }
   if (cmd === '-supereffective') {
     const slot = slotKeyFromIdent(parts[1])
@@ -161,12 +167,13 @@ function computeFeedbackEvent(line: string): FeedbackEvent | null {
   }
   if (cmd === 'cant') {
     const slot = slotKeyFromIdent(parts[1])
-    if (slot && parts[2] === 'flinch') return { slot, label: 'Flinched', tone: 'bad' }
+    if (slot && parts[2] === 'flinch') return { slot, label: 'Flinched!', tone: 'bad', emphasis: 'flinch' }
   }
   if (cmd === '-activate') {
     const slot = slotKeyFromIdent(parts[1])
     if (!slot) return null
     const effect = parts[2] ?? ''
+    if (effect === 'confusion') return { slot, label: 'Confused', tone: 'neutral', emphasis: 'confusion' }
     if (effect === 'item: Sturdy') return { slot, label: 'Endured', tone: 'good' }
     if (effect.startsWith('move: ')) {
       const moveId = toID(effect.slice('move: '.length))
@@ -175,6 +182,33 @@ function computeFeedbackEvent(line: string): FeedbackEvent | null {
     }
   }
   return null
+}
+
+// Which Pokemon's ability this line shows working, like Showdown's ability pop-up: a
+// -ability line, an -activate/-block/-immune naming "ability: X", or anything
+// "[from] ability: X". The one with the ability is the [of] Pokemon when there is one
+// (Rough Skin, Static and Drizzle name the Pokemon they hit or come from) - except a
+// heal, where [of] is who it absorbed the move from (Volt Absorb, Water Absorb).
+function computeAbilityEvent(line: string): AbilityEvent | null {
+  if (!line.startsWith('|')) return null
+  const parts = line.slice(1).split('|')
+  const cmd = parts[0]
+  if (parts.includes('[silent]')) return null
+  const withAbility = (ident: string | undefined, ability: string): AbilityEvent | null => {
+    const slot = slotKeyFromIdent(ident)
+    const pokemon = ident?.split(': ')[1]
+    return slot && pokemon && ability ? { slot, pokemon, ability } : null
+  }
+  if (cmd === '-ability') return withAbility(parts[1], parts[2])
+  const named = parts.slice(2).find((p) => p.startsWith('ability: '))
+  if (named && (cmd === '-activate' || cmd === '-block' || cmd === '-immune')) {
+    return withAbility(parts[1], named.slice('ability: '.length))
+  }
+  const from = parts.find((p) => p.startsWith('[from] ability: '))
+  if (!from) return null
+  const of = parts.find((p) => p.startsWith('[of] '))?.slice('[of] '.length)
+  const holder = cmd === '-heal' || !of ? parts[1] : of
+  return withAbility(holder, from.slice('[from] ability: '.length))
 }
 
 // A Pokemon Terastallizing or Mega Evolving on this line (Primal Reversion and Ultra
@@ -265,6 +299,7 @@ export class WildBattle {
   // Parallel to displayLog/logStates - see computeMoveEvent.
   private readonly moveEvents: (MoveEvent | null)[] = []
   private readonly gimmickEvents: (GimmickEvent | null)[] = []
+  private readonly abilityEvents: (AbilityEvent | null)[] = []
   private readonly textParser = new BattleTextParser('p1')
   private readonly p1team: PokemonSet[]
   private readonly p2team: PokemonSet[]
@@ -405,6 +440,7 @@ export class WildBattle {
         const event = computeFeedbackEvent(line)
         const moveEvent = this.computeMoveEvent(line, lines.slice(index + 1))
         const gimmickEvent = computeGimmickEvent(line)
+        const abilityEvent = computeAbilityEvent(line)
         let eventUsed = false
         for (const textLine of rendered.split('\n')) {
           if (!textLine.trim()) continue
@@ -416,6 +452,7 @@ export class WildBattle {
           this.feedback.push(eventUsed ? null : event)
           this.moveEvents.push(eventUsed ? null : moveEvent)
           this.gimmickEvents.push(eventUsed ? null : gimmickEvent)
+          this.abilityEvents.push(eventUsed ? null : abilityEvent)
           eventUsed = true
         }
 
@@ -617,6 +654,7 @@ export class WildBattle {
     this.feedback.push(null)
     this.moveEvents.push(null)
     this.gimmickEvents.push(null)
+    this.abilityEvents.push(null)
   }
 
   private snapshotField(): FieldSnapshot {
@@ -1142,6 +1180,7 @@ export class WildBattle {
       feedback: [...this.feedback],
       moveEvents: [...this.moveEvents],
       gimmickEvents: [...this.gimmickEvents],
+      abilityEvents: [...this.abilityEvents],
       request: this.ended ? null : this.human.latestRequest,
       ended: this.ended,
       winner: this.winner,

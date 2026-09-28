@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ActivePokemonView, BoostStat, FeedbackEvent, FieldEffectView, GimmickEvent } from '../../shared/battle-types'
+import type {
+  AbilityEvent,
+  ActivePokemonView,
+  BoostStat,
+  FeedbackEvent,
+  FieldEffectView,
+  GimmickEvent
+} from '../../shared/battle-types'
 import { toSpriteId } from '../../shared/battle-types'
 import SideHazards from './SideHazards'
 import PokemonTooltipContent from './PokemonTooltipContent'
@@ -34,6 +41,9 @@ interface Props {
   // Set for the one tick this Pokemon Terastallizes or Mega Evolves - the sprite
   // plays its own short animation for GIMMICK_MS after, like feedback above.
   gimmick?: GimmickEvent | null
+  // Set for the one tick this Pokemon's ability does something - it shows a banner
+  // naming it for ABILITY_MS after, like Showdown's ability pop-up.
+  ability?: AbilityEvent | null
 }
 
 type Phase = 'idle' | 'recalling' | 'sending-out'
@@ -42,6 +52,9 @@ const RECALL_MS = 350
 const SEND_OUT_MS = 350
 const FEEDBACK_MS = 900
 const GIMMICK_MS = 1100
+const ABILITY_MS = 1600
+// Crits, flinches and confusion stay up a bit longer than the other labels.
+const EMPHASIS_FEEDBACK_MS = 1300
 
 const STATUS_LABELS: Record<string, string> = {
   par: 'PAR',
@@ -72,19 +85,48 @@ function typesChanged(pokemon: ActivePokemonView): boolean {
 // The Poke Ball item icon, shown by a wild Pokemon's name when that species has been caught before.
 const POKE_BALL_SPRITENUM = 345
 
-function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, hazards, screens, feedback, slot, gimmick }: Props): React.JSX.Element {
+function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, hazards, screens, feedback, slot, gimmick, ability }: Props): React.JSX.Element {
   const slotClass = `sprite-slot ${align}${slotIndex === 1 ? ' sprite-slot-second' : ''}`
   const [displayed, setDisplayed] = useState<ActivePokemonView | null>(pokemon)
   const [phase, setPhase] = useState<Phase>('idle')
   const [shake, setShake] = useState(false)
   const [shownFeedback, setShownFeedback] = useState<FeedbackEvent | null>(null)
 
+  // Its own timer, not the effect's cleanup: the next log line sets feedback back to
+  // null, which mustn't cancel the hide (a crit's sprite effect would stick around).
+  const shownFeedbackRef = useRef<FeedbackEvent | null>(null)
+  const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
     if (!feedback) return
+    // A crit, flinch or confusion isn't cut short by a plainer label right behind it
+    // (a crit's "Super-effective" comes on the very next line).
+    if (shownFeedbackRef.current?.emphasis && !feedback.emphasis) return
+    shownFeedbackRef.current = feedback
     setShownFeedback(feedback)
-    const timer = setTimeout(() => setShownFeedback(null), FEEDBACK_MS)
-    return () => clearTimeout(timer)
+    if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current)
+    feedbackTimerRef.current = setTimeout(
+      () => {
+        shownFeedbackRef.current = null
+        setShownFeedback(null)
+      },
+      feedback.emphasis ? EMPHASIS_FEEDBACK_MS : FEEDBACK_MS
+    )
   }, [feedback])
+  const [shownAbility, setShownAbility] = useState<AbilityEvent | null>(null)
+  const abilityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (!ability) return
+    setShownAbility(ability)
+    if (abilityTimerRef.current) clearTimeout(abilityTimerRef.current)
+    abilityTimerRef.current = setTimeout(() => setShownAbility(null), ABILITY_MS)
+  }, [ability])
+  useEffect(
+    () => () => {
+      if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current)
+      if (abilityTimerRef.current) clearTimeout(abilityTimerRef.current)
+    },
+    []
+  )
   const [shownGimmick, setShownGimmick] = useState<GimmickEvent | null>(null)
   useEffect(() => {
     if (!gimmick) return
@@ -157,7 +199,8 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
     displayed.fainted && 'sprite-fainted',
     phase === 'recalling' && 'sprite-recalling',
     phase === 'sending-out' && 'sprite-sending-out',
-    displayed.substituted && 'sprite-substituted'
+    displayed.substituted && 'sprite-substituted',
+    shownFeedback?.emphasis && `sprite-emphasis-${shownFeedback.emphasis}`
   ]
     .filter(Boolean)
     .join(' ')
@@ -195,9 +238,27 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
             <span className="gimmick-flash" />
           </div>
         )}
+        {shownFeedback?.emphasis === 'confusion' && (
+          <div key={'stars' + shownFeedback.label} className="confusion-stars">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <span key={i} className="confusion-star" style={{ animationDelay: `${i * -200}ms` }}>
+                ★
+              </span>
+            ))}
+          </div>
+        )}
         {shownFeedback && (
-          <div key={shownFeedback.label + shownFeedback.slot} className={`feedback-label feedback-${shownFeedback.tone}`}>
+          <div
+            key={shownFeedback.label + shownFeedback.slot}
+            className={`feedback-label feedback-${shownFeedback.tone}${shownFeedback.emphasis ? ` feedback-emphasis feedback-${shownFeedback.emphasis}` : ''}`}
+          >
             {shownFeedback.label}
+          </div>
+        )}
+        {shownAbility && (
+          <div key={shownAbility.ability + shownAbility.slot} className={`ability-popup ability-popup-${align}`}>
+            <span className="ability-popup-mon">{shownAbility.pokemon}&apos;s</span>
+            <span className="ability-popup-name">{shownAbility.ability}</span>
           </div>
         )}
         {phase === 'sending-out' && displayed.shiny && (

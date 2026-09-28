@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from 'node:fs'
-import type { BagItemView } from '../../shared/battle-types'
+import type { BagItemView, EvolutionItemUse } from '../../shared/battle-types'
 import { EXP_CANDY_EXP, OPENABLE_ITEM_IDS } from '../../shared/battle-types'
 import { BAG_CATEGORY_ORDER, RETIRED_ITEMS, bagCategoryFor, getEditorOptions, sellPriceFor } from './sim-access'
 import { addMoney } from './money-store'
@@ -90,6 +90,12 @@ export function getBagState(): BagItemView[] {
   return views.sort(
     (a, b) => BAG_CATEGORY_ORDER.indexOf(a.category) - BAG_CATEGORY_ORDER.indexOf(b.category) || a.name.localeCompare(b.name)
   )
+}
+
+/** An item's name and icon with how many the bag has - for showing what an action would use up. */
+export function bagItemUse(itemId: string): EvolutionItemUse | null {
+  const item = getEditorOptions().items.find((i) => i.id === itemId)
+  return item ? { name: item.name, spritenum: item.spritenum, quantity: getItemQuantity(itemId) } : null
 }
 
 export function hasItem(itemId: string): boolean {

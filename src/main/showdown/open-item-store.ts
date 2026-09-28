@@ -10,7 +10,7 @@ import {
   speciesRarityTier
 } from './sim-access'
 import { addItem, getItemQuantity, removeItem } from './bag-store'
-import { addCaughtMon } from './box-store'
+import { addCaughtMon, hasRegisteredSpecies } from './box-store'
 import { restoredLevel } from './fossil-store'
 import { listShop } from './shop-store'
 
@@ -46,6 +46,8 @@ export function openBagItem(itemId: string): OpenItemResult {
   const species = pickSpecies()
   const level = restoredLevel()
   const shiny = rollGiftShiny()
+  // Checked before it's added, which registers it.
+  const isNew = !hasRegisteredSpecies(species)
   removeItem(itemId, 1)
   addCaughtMon({ ...buildBasicSet(species, level), nature: randomNatureName(), shiny })
   const asEntry = (name: string): ReelEntry => ({ name, species: name, tier: speciesRarityTier(name) })
@@ -58,7 +60,8 @@ export function openBagItem(itemId: string): OpenItemResult {
     tier: winner.tier,
     reel: buildReel(winner, () => asEntry(pickSpecies())),
     winnerIndex: REEL_WINNER_INDEX,
-    remaining: getItemQuantity(itemId)
+    remaining: getItemQuantity(itemId),
+    isNew
   }
 }
 
@@ -105,6 +108,7 @@ function openLockCapsule(): OpenItemResult {
   const pool = listShop().filter((item) => item.id !== LOCK_CAPSULE_ITEM_ID && item.price > 0)
   if (pool.length === 0) throw new Error('The shop has nothing to give')
   const item = pickCapsuleItem(pool)
+  const isNew = getItemQuantity(item.id) === 0
   removeItem(LOCK_CAPSULE_ITEM_ID, 1)
   addItem(item.id, 1)
   const asEntry = (entry: ShopItemEntry): ReelEntry => ({
@@ -118,6 +122,8 @@ function openLockCapsule(): OpenItemResult {
     name: item.name,
     itemId: item.id,
     sellPrice: sellPriceFor(item.id),
+    price: item.price,
+    isNew,
     level: 0,
     shiny: false,
     tier: winner.tier,

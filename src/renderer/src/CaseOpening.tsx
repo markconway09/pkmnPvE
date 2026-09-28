@@ -181,8 +181,9 @@ function CaseOpening({ itemName, result, onClose, onOpenAnother }: Props): React
               {result.shiny && '✨ '}
               {result.shiny ? `Shiny ${result.name}` : result.name}
               {result.shiny && ' ✨'}
-              {result.kind === 'item' && !!result.sellPrice && (
-                <span className="case-result-price">{formatMoney(result.sellPrice)}</span>
+              {result.isNew && <span className="case-new-badge">New</span>}
+              {result.kind === 'item' && !!result.price && (
+                <span className="case-result-price">{formatMoney(result.price)}</span>
               )}
             </p>
             <p className="box-empty-hint">

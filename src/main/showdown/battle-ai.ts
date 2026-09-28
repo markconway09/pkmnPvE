@@ -3,9 +3,12 @@ import type { ChoiceRequest, PokemonMoveRequestData, PokemonSwitchRequestData } 
 import {
   ABILITY_FLAG_IMMUNITIES,
   ABILITY_TYPE_IMMUNITIES,
+  computeStats,
   BattlePlayer,
   getMoveCombatData,
   getMoveInfo,
+  getMoveSetupData,
+  type ScreenId,
   moveDoesNothing,
   type MoveCombatData,
   type MoveParty,
@@ -62,6 +65,37 @@ function nextSpeBoost(current: number, parts: string[]): number {
   if (cmd === '-invertboost') return -current
   return current
 }
+
+// A stat stage change from one battle log line, for any stat (see nextSpeBoost).
+function nextBoosts(current: Record<string, number>, parts: string[]): Record<string, number> {
+  const [cmd, , stat, amount] = parts
+  const n = Number(amount) || 0
+  const now = current[stat] ?? 0
+  if (cmd === '-boost') return { ...current, [stat]: Math.min(6, now + n) }
+  if (cmd === '-unboost') return { ...current, [stat]: Math.max(-6, now - n) }
+  if (cmd === '-setboost') return { ...current, [stat]: n }
+  if (cmd === '-clearboost') return {}
+  if (cmd === '-clearnegativeboost') {
+    return Object.fromEntries(Object.entries(current).map(([s, v]) => [s, Math.max(0, v)]))
+  }
+  if (cmd === '-invertboost') return Object.fromEntries(Object.entries(current).map(([s, v]) => [s, -v]))
+  return current
+}
+
+// Setup moves (Swords Dance, Calm Mind, Reflect...) - see setupScore.
+// Speed and the defences don't add damage themselves, so their boosts count for this
+// share of what an Attack boost would.
+const SETUP_STAT_WEIGHT: Record<string, number> = { spe: 0.5, def: 0.35, spd: 0.35, evasion: 0.25 }
+// The most turns of payoff a setup move is credited with.
+const SETUP_MAX_PAYOFF = 1.5
+// A screen is worth this share of its best hit (before the payoff and bonuses)...
+const SCREEN_WORTH = 0.8
+// ...and at least this much of a score, for a Pokemon with no real attack.
+const SCREEN_FLOOR = 60
+// Light Clay makes a screen last 8 turns instead of 5.
+const LIGHT_CLAY_BONUS = 1.6
+// Aurora Veil is both screens in one.
+const AURORA_VEIL_BONUS = 1.4
 
 // A stat stage as a multiplier: +1 is x1.5, -1 is x2/3, and so on.
 function boostMultiplier(stage: number): number {
@@ -155,6 +189,9 @@ function pickRandom<T>(items: T[]): T {
 // (self, spread moves, side-wide effects, ...) auto-resolves without one.
 const CHOOSABLE_TARGETS = new Set(['normal', 'any', 'adjacentAlly', 'adjacentAllyOrSelf', 'adjacentFoe'])
 
+// A move that hits more than one Pokemon does 75% to each (doubles).
+const SPREAD_DAMAGE = 0.75
+
 function averageExposure(attackerTypes: string[], defenderTypes: string[], immuneTypes: string[] = []): number {
   if (attackerTypes.length === 0) return 1
   return (
@@ -208,6 +245,10 @@ export class AIPlayer extends BattlePlayer {
   // The AI's own active Pokemon's Speed stages, by slot - the request only
   // carries its raw stats, so these are followed from the battle log.
   private ownSpeBoost: number[] = [0, 0]
+  // All of its active Pokemon's stat stages, by slot - so setup stops once it's set up.
+  private ownBoosts: Record<string, number>[] = [{}, {}]
+  // The screens up on the AI's own side.
+  private ownScreens = new Set<ScreenId>()
 
   constructor(
     stream: Streams.ObjectReadWriteStream<string>,
@@ -266,14 +307,29 @@ export class AIPlayer extends BattlePlayer {
     }
     if (cmd === '-clearallboost') {
       this.ownSpeBoost = [0, 0]
+      this.ownBoosts = [{}, {}]
       for (const o of this.opponents) if (o) o.speBoost = 0
+      return
+    }
+    // "-sidestart|p2: Blue|Reflect" / "move: Light Screen" - screens on the AI's side.
+    if ((cmd === '-sidestart' || cmd === '-sideend') && parts[1]?.startsWith(`${this.mySide}:`)) {
+      const screen = toID((parts[2] ?? '').replace(/^move: /, ''))
+      if (screen === 'reflect' || screen === 'lightscreen' || screen === 'auroraveil') {
+        if (cmd === '-sidestart') this.ownScreens.add(screen)
+        else this.ownScreens.delete(screen)
+      }
       return
     }
 
     const ownSlot = this.ownSlotIndex(parts[1])
     if (ownSlot !== null) {
-      if (cmd === 'switch' || cmd === 'drag') this.ownSpeBoost[ownSlot] = 0
-      else this.ownSpeBoost[ownSlot] = nextSpeBoost(this.ownSpeBoost[ownSlot], parts)
+      if (cmd === 'switch' || cmd === 'drag') {
+        this.ownSpeBoost[ownSlot] = 0
+        this.ownBoosts[ownSlot] = {}
+      } else {
+        this.ownSpeBoost[ownSlot] = nextSpeBoost(this.ownSpeBoost[ownSlot], parts)
+        this.ownBoosts[ownSlot] = nextBoosts(this.ownBoosts[ownSlot], parts)
+      }
       return
     }
 
@@ -543,7 +599,13 @@ export class AIPlayer extends BattlePlayer {
       ? alive.filter((i) => !moveDoesNothing(moveId, own, this.foeParty(this.opponents[i]!, this.moldBreaker)))
       : alive
     const aliveIndices = workable.length > 0 ? workable : alive
-    const best = aliveIndices.reduce((a, b) => (this.opponents[a]!.hpPercent <= this.opponents[b]!.hpPercent ? a : b))
+    // A tie (both untouched, most often) goes either way, not always to the left one.
+    const best = aliveIndices.reduce((a, b) => {
+      const hpA = this.opponents[a]!.hpPercent
+      const hpB = this.opponents[b]!.hpPercent
+      if (hpA === hpB) return Math.random() < 0.5 ? a : b
+      return hpA < hpB ? a : b
+    })
     return best + 1
   }
 
@@ -553,10 +615,13 @@ export class AIPlayer extends BattlePlayer {
     ownTypes: string[],
     numActive: number,
     mySlotIndex: number,
-    own?: MoveParty
+    own?: MoveParty,
+    // The foe already picked for it (see scoreAgainstFoes), if any.
+    chosenTargetLoc?: number
   ): string {
     const moveReq = active.moves[slot - 1]
-    const targetLoc = this.pickTargetLoc(moveReq?.target ?? 'normal', numActive, mySlotIndex, moveReq?.id ?? '', own)
+    const targetLoc =
+      chosenTargetLoc ?? this.pickTargetLoc(moveReq?.target ?? 'normal', numActive, mySlotIndex, moveReq?.id ?? '', own)
     const targetSuffix = targetLoc !== 0 ? ` ${targetLoc}` : ''
     return `move ${slot}${targetSuffix}${this.gimmickSuffix(active, slot, moveReq?.id ?? '', ownTypes)}`
   }
@@ -611,9 +676,160 @@ export class AIPlayer extends BattlePlayer {
       if (switchSlot !== null) return `switch ${switchSlot + 1}`
     }
 
-    const scored = legalMoves.map((m) => ({ slot: m.slot, id: m.id, score: this.scoreMove(m.id, ownTypes, own, mySlotIndex, ownActive) }))
+    const scored = legalMoves.map((m) => ({
+      slot: m.slot,
+      id: m.id,
+      ...this.scoreAgainstFoes(m.id, m.target, ownTypes, own, mySlotIndex, ownActive, numActive)
+    }))
+    // Setup moves are weighed against how much its attacks would do right now.
+    const bestOf = (category: string): number =>
+      Math.max(0, ...scored.filter((s) => getMoveInfo(s.id)?.category === category).map((s) => s.score))
+    const best = { physical: bestOf('Physical'), special: bestOf('Special') }
+    for (const s of scored) {
+      const setup = this.setupScore(s.id, best, ownActive, own, mySlotIndex, numActive)
+      if (setup !== null) s.score = setup
+    }
     scored.sort((a, b) => b.score - a.score)
-    return this.formatMoveChoice(scored[0].slot, active, ownTypes, numActive, mySlotIndex, own)
+    return this.formatMoveChoice(scored[0].slot, active, ownTypes, numActive, mySlotIndex, own, scored[0].targetLoc)
+  }
+
+  /**
+   * What a setup move is worth right now, or null for any other move. Boosting moves
+   * (Swords Dance, Calm Mind, Dragon Dance...) count the stages they'd add that it can
+   * use - Attack only with physical attacks, Special Attack only with special ones - and
+   * less once it's already boosted. Screens count when they're not up yet, more against
+   * foes that hit on the side they guard, and more again with Light Clay. Both are worth
+   * the most when its best attack only scratches the foe, and little when it would
+   * already hit hard (or knock it out); and little at low HP, where there's no time to
+   * cash in.
+   */
+  private setupScore(
+    moveId: string,
+    best: { physical: number; special: number },
+    ownActive: PokemonSwitchRequestData,
+    own: MoveParty,
+    mySlotIndex: number,
+    numActive: number
+  ): number | null {
+    const setup = getMoveSetupData(moveId)
+    if (!setup) return null
+    const foe = this.primaryOpponent()
+    const current = this.ownBoosts[mySlotIndex] ?? {}
+    const bestAttack = Math.max(best.physical, best.special)
+    // How many of its best hits (with the boosts it already has) the foe takes to go
+    // down - setting up only pays when that's more than a couple.
+    const share = foe
+      ? Math.max(
+          this.hitShare(best.physical, 'atk', current.atk ?? 0, ownActive, foe),
+          this.hitShare(best.special, 'spa', current.spa ?? 0, ownActive, foe)
+        )
+      : 0
+    const hitsToKO = share > 0 ? Math.ceil(1 / share) : 6
+    // Two hits or fewer: just attack. Each hit beyond that is a turn a boost pays off in.
+    const payoff = Math.min(SETUP_MAX_PAYOFF, Math.max(0, (hitsToKO - 2) / 2))
+    const hpFactor = own.hpPercent >= 70 ? 1 : own.hpPercent >= 45 ? 0.5 : 0.15
+
+    if (setup.screen) {
+      if (this.ownScreens.has(setup.screen)) return 0
+      const weather = this.activeWeather(ownActive)
+      if (setup.screen === 'auroraveil' && !(weather && SNOW.has(weather))) return 0
+      // Reflect guards against physical attackers, Light Screen special ones.
+      const foes = this.aliveOpponents()
+      const lean =
+        setup.screen === 'auroraveil' || foes.length === 0
+          ? 1
+          : foes.reduce((sum, f) => {
+              const { atk, spa } = speciesStatsAndTypes(f.species, null).stats
+              return sum + Math.min(1.3, ((setup.screen === 'reflect' ? atk : spa) / Math.max(1, atk + spa)) * 2)
+            }, 0) / foes.length
+      // Halving what it takes buys about the same as a turn of its own damage, more
+      // the longer the fight will go.
+      let worth = Math.max(bestAttack, SCREEN_FLOOR) * SCREEN_WORTH * lean * (0.4 + payoff) * hpFactor
+      if (setup.screen === 'auroraveil') worth *= AURORA_VEIL_BONUS
+      if (toID(ownActive.item ?? '') === 'lightclay') worth *= LIGHT_CLAY_BONUS
+      // A screen covers both Pokemon in doubles.
+      if (numActive >= 2) worth *= 1.2
+      return worth
+    }
+
+    // Belly Drum costs half its HP - it fails at half or less.
+    if (moveId === 'bellydrum' && own.hpPercent <= 50) return 0
+    let worth = 0
+    for (const [stat, amount] of Object.entries(setup.boosts ?? {})) {
+      if (!amount) continue
+      const now = current[stat] ?? 0
+      // What the boost adds to its hits: +2 Attack from nothing doubles a physical hit.
+      const gain = boostMultiplier(Math.max(-6, Math.min(6, now + amount))) / boostMultiplier(now) - 1
+      if (stat === 'atk') worth += best.physical * gain
+      else if (stat === 'spa') worth += best.special * gain
+      // Speed and the defences don't hit harder, so they count for a share.
+      else worth += bestAttack * gain * (SETUP_STAT_WEIGHT[stat] ?? 0)
+    }
+    if (worth <= 0) return 0
+    // Two foes get to hit it while it sets up in doubles.
+    const doublesFactor = numActive >= 2 ? 0.75 : 1
+    return worth * payoff * hpFactor * doublesFactor
+  }
+
+  /**
+   * About what share of the foe's HP a hit of this score takes, with a real damage
+   * formula: its own attacking stat (and stage) against the foe's defence and HP, as a
+   * typically trained Pokemon of its species and level would have them.
+   */
+  private hitShare(score: number, stat: 'atk' | 'spa', stage: number, ownActive: PokemonSwitchRequestData, foe: OpponentInfo): number {
+    if (score <= 0) return 0
+    const level = Number(/, L(\d+)/.exec(ownActive.details)?.[1] ?? 100)
+    const attack = ownActive.stats[stat] * boostMultiplier(stage)
+    const foeStats = computeStats(
+      speciesStatsAndTypes(foe.species, null).stats,
+      foe.level,
+      { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+      { hp: 84, atk: 84, def: 84, spa: 84, spd: 84, spe: 84 },
+      'Hardy'
+    )
+    const defence = stat === 'atk' ? foeStats.def : foeStats.spd
+    // Score already folds in power, typing, STAB, accuracy and the field.
+    const damage = (((2 * level) / 5 + 2) * score * (attack / Math.max(1, defence))) / 50 + 2
+    const hpLeft = foeStats.hp * (foe.hpPercent / 100)
+    return damage / Math.max(1, hpLeft)
+  }
+
+  /**
+   * A move's score and who it should go at. In doubles a single-target attack is
+   * scored against each foe on its own - typing, immunities and "does this knock it
+   * out" differ between them - and aimed at the best one; a spread move is worth what
+   * it does to them all. (Scoring against just the first foe, then aiming at whoever
+   * was lowest - the left one on a tie - kept almost every attack on the left Pokemon.)
+   */
+  private scoreAgainstFoes(
+    moveId: string,
+    targetType: string | undefined,
+    ownTypes: string[],
+    own: MoveParty,
+    mySlotIndex: number,
+    ownActive: PokemonSwitchRequestData,
+    numActive: number
+  ): { score: number; targetLoc?: number } {
+    const foes = [0, 1].filter((i) => this.opponents[i] && !this.opponents[i]!.fainted)
+    const type = targetType ?? 'normal'
+    const allyAimed = type === 'adjacentAlly' || type === 'adjacentAllyOrSelf' || ALLY_AIMED_MOVES.has(moveId)
+    const aimable = CHOOSABLE_TARGETS.has(type) || type === 'allAdjacentFoes' || type === 'allAdjacent'
+    if (numActive < 2 || foes.length < 2 || allyAimed || !aimable) {
+      return { score: this.scoreMove(moveId, ownTypes, own, mySlotIndex, ownActive) }
+    }
+    const against = (i: number): number => this.scoreMove(moveId, ownTypes, own, mySlotIndex, ownActive, this.opponents[i])
+    // A spread move lands on both foes, for three quarters each.
+    if (type === 'allAdjacentFoes' || type === 'allAdjacent') {
+      return { score: foes.reduce((sum, i) => sum + against(i), 0) * SPREAD_DAMAGE }
+    }
+    let best = { score: -Infinity, targetLoc: foes[0] + 1 }
+    for (const i of foes) {
+      // A hurt foe is a little more worth hitting (closer to going down); a dead
+      // heat goes either way rather than always left.
+      const score = against(i) * (1 + (100 - this.opponents[i]!.hpPercent) / 1000)
+      if (score > best.score || (score === best.score && Math.random() < 0.5)) best = { score, targetLoc: i + 1 }
+    }
+    return best
   }
 
   // Mega Evolution/Ultra Burst/Z-Move are one-time, item-gated resources -
@@ -667,7 +883,9 @@ export class AIPlayer extends BattlePlayer {
     ownTypes: string[],
     own: MoveParty,
     mySlotIndex: number,
-    ownActive: PokemonSwitchRequestData
+    ownActive: PokemonSwitchRequestData,
+    // The foe it's scored against - in doubles each move is scored against each foe.
+    target: OpponentInfo | null = this.primaryOpponent()
   ): number {
     const info = getMoveInfo(moveId)
     const combat = getMoveCombatData(moveId)
@@ -711,7 +929,7 @@ export class AIPlayer extends BattlePlayer {
       return 35
     }
 
-    const opponent = this.primaryOpponent()
+    const opponent = target
     if (info.category === 'Status') {
       // Worth less if the terrain might keep the status off (a foe that may or may not be grounded).
       const maybeBlocked =

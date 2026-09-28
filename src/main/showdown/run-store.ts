@@ -40,12 +40,16 @@ import {
   getDefaultShopCatalog,
   getMoveInfo,
   getSpeciesEditInfo,
+  learnableMoveIds,
   isSignatureItem,
   megaStonesFor,
   signatureItemsFor,
   toID,
   runEvolutionOptions,
   speciesRarityTier,
+  buildBasicSet,
+  pickRandomSwapSpecies,
+  randomNatureName,
   type PokemonSet
 } from './sim-access'
 import { totalExpForSpeciesLevel, expProgressForLevel } from './exp'
@@ -91,6 +95,8 @@ interface StoredRun {
   // A New Ability / New Move floor's four choices (ids), until one is given out - or a
   // beaten boss's reward ability (reason 'reward': no extra level for taking it).
   pickOffer?: { kind: 'ability' | 'move'; options: string[]; reason?: 'floor' | 'reward' } | null
+  // A Random Swap floor waiting on its choice.
+  swapOffer?: boolean
   // The boss being fought on this floor, for its reward.
   currentBossId?: string
   // An item floor's offer can be rerolled once - set once it has been.
@@ -111,18 +117,18 @@ interface StoredRun {
 // The run's level cap only goes up by beating a boss - a ceiling, not something to
 // chase. It starts at FIRST_LEVEL_CAP and climbs evenly with each boss, to 100 for
 // the Champion - about the level of each boss when you reach it.
-const FIRST_LEVEL_CAP = 20
+const FIRST_LEVEL_CAP = 15
 
 export function runLevelCap(bossesBeaten: number): number {
   const steps = ROGUELITE_BOSS_COUNT - 1
   return Math.round(FIRST_LEVEL_CAP + ((100 - FIRST_LEVEL_CAP) * Math.min(bossesBeaten, steps)) / steps)
 }
 
-// How strong this floor's opponents are (Lv 8 on the first floor). Each stretch between bosses is a climb of its
+// How strong this floor's opponents are (Lv 4 on the first floor, just under the Lv 5 starter). Each stretch between bosses is a climb of its
 // own: the floor after a boss starts at that boss's level, and the next ones rise
 // quickly (front-loaded) to a level under the next boss. A boss fights at the level
 // cap its stretch had (the Champion at 100) - as strong as your team can be.
-const FIRST_OPPONENT_LEVEL = 8
+const FIRST_OPPONENT_LEVEL = 4
 // Under 1 makes the first floors of a stretch climb faster than the last.
 const STRETCH_CURVE = 0.8
 
@@ -143,12 +149,12 @@ export function runOpponentLevel(floor: number): number {
   return Math.round(start + (end - start) * Math.pow(t, STRETCH_CURVE))
 }
 
-// Levels every team member gains on each floor, up to the cap: a won battle (a boss
+// Levels every team member gains on each floor, up to the cap: a won battle (a trainer
 // is worth more), and a little for an item or rest floor too. Anyone below the
-// team's strongest gains double, so a fresh catch catches up.
+// team's strongest gains double, so a fresh catch catches up. Beating a boss instead
+// brings the whole team up to that boss's level (see levelTeamTo).
 const LEVELS_PER_WILD_WIN = 2
 const LEVELS_PER_TRAINER_WIN = 4
-const LEVELS_PER_BOSS_WIN = 4
 const LEVELS_PER_QUIET_FLOOR = 1
 
 // How many Pokemon a regular trainer sends out: 1 for the first 9 floors, one more
@@ -339,14 +345,22 @@ function isBossFloor(floor: number): boolean {
 // Pokemon (the weight is shared out between the locations), then trainers, and rarely
 // an item or a rest. A rest is only rolled once someone could use it.
 const FLOOR_OPTIONS = 5
-const CHOICE_WEIGHTS: Record<'wild' | 'trainer' | 'item' | 'heal' | 'ability' | 'move', number> = {
-  wild: 42,
+// Random Swap is as rare as an item floor - its share came out of Wild's, so nothing
+// else got rarer.
+const CHOICE_WEIGHTS: Record<'wild' | 'trainer' | 'item' | 'heal' | 'ability' | 'move' | 'swap', number> = {
+  wild: 38,
   trainer: 25,
   item: 4,
   heal: 9,
   ability: 10,
-  move: 10
+  move: 10,
+  swap: 4
 }
+
+// Random Swap: a swapped-in Pokemon is a legendary this often (each one, for a whole
+// team) - and a whole-team swap is all restricted legendaries this often.
+const SWAP_LEGENDARY_CHANCE = 0.1
+const SWAP_ALL_RESTRICTED_CHANCE = 0.05
 
 // What a New Ability floor can offer (four at a time)...
 const RUN_ABILITIES = [
@@ -370,7 +384,7 @@ const RUN_MOVES = [
   'behemothblade', 'dynamaxcannon', 'clangingscales', 'aeroblast', 'diamondstorm', 'fishiousrend'
 ]
 const PICK_OPTIONS = 4
-// The Professor's Lab takes the place of one wild option this often.
+// The Lab takes the place of one wild option this often.
 const LAB_CHANCE = 0.05
 // The wild locations a floor can roll: all the regular ones, not "All" or the Lab.
 const RUN_WILD_LOCATIONS = WILD_LOCATIONS.filter((l) => l.id !== 'all' && !l.requiresAllBosses).map((l) => l.id)
@@ -392,7 +406,7 @@ const choiceKey = (c: RunChoice): string => `${c.kind}:${c.location ?? ''}`
 // so there's at most one trainer, item and rest. A boss floor offers only the boss.
 function rollChoices(current: StoredRun): RunChoice[] {
   if (isBossFloor(current.floor)) return [{ kind: 'boss' }]
-  // No Rest floors at all on a no-healing difficulty.
+  // No Pokémon Center floors at all on a no-healing difficulty.
   const hurt = !runDifficultyInfo(current.difficulty).noHealing && current.team.some((m) => m.hp < 1 || m.status)
   const choices: RunChoice[] = []
   for (let tries = 0; choices.length < FLOOR_OPTIONS && tries < 200; tries++) {
@@ -422,7 +436,7 @@ function toView(mon: RunMon): RunMonView {
     eligibleEvolutions: runEvolutionOptions(mon.set),
     rarityTier: speciesRarityTier(mon.set.species),
     ...buildPokemonSummary(mon.set.species, mon.set),
-    hpPercent: Math.round(mon.hp * 100),
+    hpPercent: mon.hp > 0 ? Math.max(1, Math.round(mon.hp * 100)) : 0,
     status: mon.status
   }
 }
@@ -466,6 +480,8 @@ export function getRunView(): RunView | null {
     itemOfferReason: current.itemOffer ? (current.itemOfferReason ?? 'floor') : null,
     pickOffer: current.pickOffer ? pickOfferView(current.pickOffer) : null,
     pickReason: current.pickOffer ? (current.pickOffer.reason ?? 'floor') : null,
+    swapOffer: !!current.swapOffer,
+    swapLevel: runBossLevel(current.bossesBeaten),
     canRerollItems: !!current.itemOffer && (current.itemOfferReason ?? 'floor') === 'floor' && !current.itemRerolled,
     displacedItem: current.displacedItem
       ? {
@@ -594,9 +610,23 @@ export function runChoiceAt(index: number): RunChoice {
   if (current.itemOffer) throw new Error('Pick an item first')
   if (current.displacedItem) throw new Error('Choose who gets the item that was replaced first')
   if (current.pickOffer) throw new Error('Pick an ability or move first')
+  if (current.swapOffer) throw new Error('Choose what to swap first')
   const choice = current.choices[index]
   if (!choice) throw new Error("This floor doesn't offer that")
   return { ...choice }
+}
+
+/** Everyone on the team up to this level (nobody goes down). */
+function levelTeamTo(current: StoredRun, level: number): ExpGainResult[] {
+  return current.team.map((mon) => {
+    const levelBefore = mon.set.level
+    const expBefore = mon.exp
+    if (level > levelBefore) {
+      mon.set.level = level
+      mon.exp = totalExpForSpeciesLevel(mon.set.species, level)
+    }
+    return { species: mon.set.species, gained: mon.exp - expBefore, levelBefore, levelAfter: mon.set.level, cappedOut: level <= levelBefore }
+  })
 }
 
 function levelUpTeam(current: StoredRun, levels: number): ExpGainResult[] {
@@ -768,8 +798,23 @@ export function evolveRunMon(runMonId: string, targetSpecies: string, newMoves =
 // ---- The run's own moves editor: moves and locks ----
 
 // In a run a Pokemon can learn anything its species ever could.
+// The run editor offers anything the species could ever learn, in any generation, plus
+// every move its Smogon sets use - so applying a set never leaves a slot blank. The
+// classic editor's list (most-used first) leads, the rest follow by name.
+const runLearnableCache = new Map<string, MoveInfo[]>()
 function runLearnable(species: string): MoveInfo[] {
-  return getSpeciesEditInfo(species, 100).moves
+  const cached = runLearnableCache.get(species)
+  if (cached) return cached
+  const base = getSpeciesEditInfo(species, 100).moves
+  const known = new Set(base.map((m) => m.id))
+  const smogonMoves = listAutoSets(species).flatMap((o) => buildAutoSet(species, 100, o.id, true).moves)
+  const extra = [...new Set([...learnableMoveIds(toID(species), 100, true), ...smogonMoves.map((m) => toID(m))])]
+    .filter((id) => !known.has(id))
+    .flatMap((id) => getMoveInfo(id) ?? [])
+    .sort((a, b) => a.name.localeCompare(b.name))
+  const all = [...base, ...extra]
+  runLearnableCache.set(species, all)
+  return all
 }
 
 export function getRunMonEditInfo(runMonId: string): RunMonEditInfo {
@@ -817,6 +862,80 @@ function refreshMonMoves(mon: RunMon): void {
   const moves = slots.map((move) => (locked.has(toID(move)) ? move : (best.shift() ?? move)))
   while (moves.length < 4 && best.length > 0) moves.push(best.shift()!)
   mon.set.moves = moves
+}
+
+/** A Random Swap floor: waits for one Pokemon to be swapped, the whole team, or neither. */
+export function takeSwapNode(): RunView {
+  const current = activeRun()
+  current.swapOffer = true
+  persist()
+  return getRunView()!
+}
+
+/**
+ * Whoever takes a team member's place (a Random Swap, or a catch replacing it) inherits
+ * what the run gave that member: its held item, an ability from a New Ability floor, and
+ * the moves from New Move floors - all still locked in, the moves in its first slots.
+ */
+function inheritFromReplaced(newcomer: RunMon, replaced: RunMon): RunMon {
+  newcomer.set.item = replaced.set.item
+  if (replaced.lockedAbility) {
+    newcomer.set.ability = replaced.lockedAbility
+    newcomer.lockedAbility = replaced.lockedAbility
+  }
+  const lockedMoves = replaced.lockedMoves ?? []
+  if (lockedMoves.length > 0) {
+    newcomer.lockedMoves = [...lockedMoves]
+    const rest = newcomer.set.moves.filter((m) => !lockedMoves.includes(toID(m)))
+    newcomer.set.moves = [...lockedMoves, ...rest].slice(0, 4)
+  }
+  return newcomer
+}
+
+// A brand new Pokemon for a Random Swap, at the next boss's level, with a run moveset,
+// full HP and no status - and whatever the one it replaces had from the run.
+function swappedInMon(current: StoredRun, kind: 'normal' | 'legendary' | 'restricted', replaced: RunMon): RunMon {
+  const level = runBossLevel(current.bossesBeaten)
+  const set: PokemonSet = { ...buildBasicSet(pickRandomSwapSpecies(kind), level), nature: randomNatureName() }
+  refreshMoves(set)
+  const newcomer = { id: randomUUID(), set, exp: totalExpForSpeciesLevel(set.species, level), hp: 1, status: null }
+  return inheritFromReplaced(newcomer, replaced)
+}
+
+const swapKind = (): 'normal' | 'legendary' => (Math.random() < SWAP_LEGENDARY_CHANCE ? 'legendary' : 'normal')
+
+function finishSwap(current: StoredRun): RunView {
+  current.swapOffer = false
+  levelUpTeam(current, LEVELS_PER_QUIET_FLOOR)
+  nextFloor(current)
+  persist()
+  return getRunView()!
+}
+
+/** Random Swap: this team member is replaced by a completely random Pokemon. */
+export function swapRunMon(runMonId: string): RunView {
+  const current = activeRun()
+  if (!current.swapOffer) throw new Error("There's no swap on offer")
+  const index = current.team.findIndex((m) => m.id === runMonId)
+  if (index === -1) throw new Error("That Pokemon isn't on your run team")
+  current.team[index] = swappedInMon(current, swapKind(), current.team[index])
+  return finishSwap(current)
+}
+
+/** Random Swap: the whole team is replaced, one for one - now and then all restricted legendaries. */
+export function swapRunTeam(): RunView {
+  const current = activeRun()
+  if (!current.swapOffer) throw new Error("There's no swap on offer")
+  const allRestricted = Math.random() < SWAP_ALL_RESTRICTED_CHANCE
+  current.team = current.team.map((mon) => swappedInMon(current, allRestricted ? 'restricted' : swapKind(), mon))
+  return finishSwap(current)
+}
+
+/** Turns the swap down and moves on. */
+export function skipRunSwap(): RunView {
+  const current = activeRun()
+  if (!current.swapOffer) throw new Error("There's no swap on offer")
+  return finishSwap(current)
 }
 
 /** A New Ability / New Move floor: four choices from its list. */
@@ -968,10 +1087,12 @@ export function finishRunBattleWon(
   const wasBoss = kind === 'boss'
   const current = activeRun()
   const fainted = applyOutcome(current, outcome)
-  // A beaten boss raises the cap first, so its levels count against the new one.
+  // A beaten boss brings everyone up to its own level (the cap it was fought at) -
+  // nobody is left behind for the next stretch - then raises the cap.
+  const expGains = wasBoss
+    ? levelTeamTo(current, runBossLevel(current.bossesBeaten))
+    : levelUpTeam(current, kind === 'trainer' ? LEVELS_PER_TRAINER_WIN : LEVELS_PER_WILD_WIN)
   if (wasBoss) current.bossesBeaten += 1
-  const levels = wasBoss ? LEVELS_PER_BOSS_WIN : kind === 'trainer' ? LEVELS_PER_TRAINER_WIN : LEVELS_PER_WILD_WIN
-  const expGains = levelUpTeam(current, levels)
   if (wasBoss && !runDifficultyInfo(current.difficulty).noHealing) {
     // A beaten boss patches the team up for the next stretch.
     for (const mon of current.team) {
@@ -1037,7 +1158,8 @@ export function addRunCatch(set: PokemonSet, replaceRunMonId?: string): void {
     hp: 1,
     status: null
   }
-  if (replaceAt >= 0) current.team[replaceAt] = newcomer
+  // Taking a team member's place, it inherits that member's item and run-given ability and moves.
+  if (replaceAt >= 0) current.team[replaceAt] = inheritFromReplaced(newcomer, current.team[replaceAt])
   else current.team.push(newcomer)
   persist()
 }

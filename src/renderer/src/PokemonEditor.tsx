@@ -5,6 +5,7 @@ import { NON_HELD_ITEM_IDS, toSpriteId } from '../../shared/battle-types'
 import type { NatureOptionEntry } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
 import { itemIconStyle } from './itemIcon'
+import { TYPE_COLORS } from './moveAnimations'
 
 export type PokemonEditorSource = { kind: 'box'; monId: string } | { kind: 'premadeTeam'; teamId: string; monId: string }
 
@@ -74,6 +75,19 @@ function finalStat(
   if (nature?.plus === stat && nature.minus !== stat) value = Math.floor(value * 1.1)
   if (nature?.minus === stat && nature.plus !== stat) value = Math.floor(value * 0.9)
   return value
+}
+
+// The Tera Type picker in its type's colour (Stellar, which has no type colour, in a
+// rainbow), with white text shadowed so it reads on the light colours too.
+const STELLAR_BACKGROUND = 'linear-gradient(90deg, #e8453c, #f0a030, #f8d030, #58c060, #4890f0, #9b59d0)'
+
+function teraTypeStyle(type: string): React.CSSProperties {
+  const color = TYPE_COLORS[type.toLowerCase()]
+  return {
+    background: color ?? (type === 'Stellar' ? STELLAR_BACKGROUND : undefined),
+    color: '#ffffff',
+    textShadow: '0 1px 2px #000'
+  }
 }
 
 type ActiveSelector = 'species' | 'ability' | 'item' | 0 | 1 | 2 | 3 | null
@@ -204,6 +218,45 @@ function PokemonEditor({ source, admin, onClose, onSaved }: Props): React.JSX.El
     })
   }
 
+  // Typed EVs: any number up to what's left of the 510 (the slider snaps to 4s, typing
+  // doesn't). Like Showdown, a + or - after it ("252+", "0-") also picks the nature that
+  // raises or lowers that stat, keeping the other half of the current nature.
+  function handleEvInput(stat: keyof StatBlock, text: string): void {
+    const digits = text.replace(/[^0-9]/g, '')
+    const value = digits === '' ? 0 : Number(digits)
+    setSet((prev) => {
+      if (!prev) return prev
+      const clamped = Math.max(0, Math.min(evMax(prev.evs, stat), value))
+      return { ...prev, evs: { ...prev.evs, [stat]: clamped } }
+    })
+    const sign = text.trim().endsWith('+') ? '+' : text.trim().endsWith('-') ? '-' : null
+    if (sign && stat !== 'hp') applyNatureSign(stat, sign)
+  }
+
+  function applyNatureSign(stat: keyof StatBlock, sign: '+' | '-'): void {
+    if (!options || !set) return
+    const current = options.natures.find((n) => n.name === set.nature)
+    const neutral = !current || !current.plus || current.plus === current.minus
+    let plus = neutral ? null : current!.plus
+    let minus = neutral ? null : current!.minus
+    if (sign === '+') {
+      plus = stat
+      if (minus === stat) minus = null
+    } else {
+      minus = stat
+      if (plus === stat) plus = null
+    }
+    // Only one half given (from a neutral nature): the usual trade is to lower the
+    // attacking stat this Pokemon uses less, and raise the one it uses more.
+    const [weaker, stronger] = (['atk', 'spa'] as const)
+      .slice()
+      .sort((a, b) => (baseStats?.[a] ?? 0) - (baseStats?.[b] ?? 0))
+    if (!minus) minus = plus === weaker ? stronger : weaker
+    if (!plus) plus = minus === stronger ? weaker : stronger
+    const nature = options.natures.find((n) => n.plus === plus && n.minus === minus)
+    if (nature) update('nature', nature.name)
+  }
+
   function updateIv(stat: keyof StatBlock, rawValue: number): void {
     setSet((prev) => {
       if (!prev) return prev
@@ -298,15 +351,17 @@ function PokemonEditor({ source, admin, onClose, onSaved }: Props): React.JSX.El
 
   function handleFormFocus(e: React.FocusEvent<HTMLDivElement>): void {
     const field = (e.target as HTMLElement).dataset.selectorField
+    // Each picker opens with an empty search - the whole list at once - and the current
+    // choice showing as the placeholder, instead of having to clear it out first.
     if (field === 'species') {
       setActiveSelector('species')
-      setSpeciesQuery(set?.species ?? '')
+      setSpeciesQuery('')
     } else if (field === 'ability') {
       setActiveSelector('ability')
-      setAbilityQuery(set?.ability ?? '')
+      setAbilityQuery('')
     } else if (field === 'item') {
       setActiveSelector('item')
-      setItemQuery(set?.item ?? '')
+      setItemQuery('')
     } else if (field?.startsWith('move-')) {
       setActiveSelector(Number(field.slice(5)) as 0 | 1 | 2 | 3)
       setMoveQuery('')
@@ -358,187 +413,192 @@ function PokemonEditor({ source, admin, onClose, onSaved }: Props): React.JSX.El
   return createPortal(
     <div className="modal-overlay" onMouseDown={onClose}>
       <div className="modal-row" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="modal-panel pokemon-editor">
+        <div className="modal-panel pokemon-editor pokemon-editor-main">
           <h2>Edit Pokemon</h2>
           {!(options && set && speciesInfo) && !error && <p>Loading...</p>}
           {options && set && speciesInfo && (
-            <div className="editor-form" onFocus={handleFormFocus}>
-              <label className="editor-field">
-                <span>Nickname</span>
-                <input
-                  type="text"
-                  value={nicknameValue}
-                  placeholder={set.species}
-                  onChange={(e) => updateNickname(e.target.value)}
-                />
-              </label>
-
-              {isAdmin && (
-                <label className="editor-field">
-                  <span>Species</span>
-                  <input
-                    type="text"
-                    data-selector-field="species"
-                    value={activeSelector === 'species' ? speciesQuery : set.species}
-                    placeholder="Species"
-                    onChange={(e) => setSpeciesQuery(e.target.value)}
-                    onKeyDown={handleSelectorKeyDown}
-                  />
-                </label>
-              )}
-
-              {isAdmin && (
-                <label className="editor-field">
-                  <span>Level</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={set.level}
-                    disabled={typeof set.capOffset === 'number'}
-                    title={typeof set.capOffset === 'number' ? 'Set by the level cap - untick "Level follows the cap" to fix it' : undefined}
-                    onChange={(e) => void updateLevel(Number(e.target.value))}
-                  />
-                </label>
-              )}
-
-              {isTeamMon && (
-                <div className="editor-field editor-cap-offset">
-                  <label className="editor-field-checkbox">
+            <div className="pokemon-editor-layout" onFocus={handleFormFocus}>
+              <div className="pokemon-editor-top">
+                {/* The Pokemon itself, with what it holds and its ability right under it. */}
+                <div className="pokemon-editor-side">
+                  <div className="pokemon-editor-portrait" title={set.shiny ? `Shiny ${set.species}` : set.species}>
+                    <SpriteImage style="2d-animated" spriteId={toSpriteId(set.species)} shiny={set.shiny} alt={set.species} />
+                    <span className="pokemon-editor-portrait-name">
+                      {set.shiny && '★ '}
+                      {set.species} · Lv {set.level}
+                    </span>
+                  </div>
+                  <label className="editor-field">
+                    <span>Ability</span>
                     <input
-                      type="checkbox"
-                      checked={typeof set.capOffset === 'number'}
-                      onChange={(e) => updateCapOffset(e.target.checked ? Math.max(0, (levelCap ?? set.level) - set.level) : null)}
+                      type="text"
+                      data-selector-field="ability"
+                      value={activeSelector === 'ability' ? abilityQuery : set.ability}
+                      placeholder={set.ability || 'Ability'}
+                      onChange={(e) => setAbilityQuery(e.target.value)}
+                      onKeyDown={handleSelectorKeyDown}
                     />
-                    <span>Level follows the cap</span>
                   </label>
-                  {typeof set.capOffset === 'number' && (
-                    <span className="editor-cap-offset-detail">
+                  <label className="editor-field">
+                    <span>Item</span>
+                    <div className="editor-field-with-icon">
+                      {set.item && currentItemSpritenum !== undefined && (
+                        <span style={itemIconStyle(currentItemSpritenum)} />
+                      )}
                       <input
-                        type="number"
-                        min={0}
-                        max={99}
-                        value={set.capOffset}
-                        onChange={(e) => updateCapOffset(Number(e.target.value))}
-                      />{' '}
-                      below the cap
-                      {levelCap !== null && (
-                        <span className="editor-hint">
-                          {' '}
-                          (Lv {set.level} at the current cap of {levelCap})
+                        type="text"
+                        data-selector-field="item"
+                        value={activeSelector === 'item' ? itemQuery : set.item}
+                        placeholder={set.item || '(None)'}
+                        onChange={(e) => setItemQuery(e.target.value)}
+                        onKeyDown={handleSelectorKeyDown}
+                      />
+                    </div>
+                  </label>
+                </div>
+
+                <div className="pokemon-editor-details">
+                  <div className="pokemon-editor-inline">
+                    <label className="editor-field">
+                      <span>Nickname</span>
+                      <input
+                        type="text"
+                        value={nicknameValue}
+                        placeholder={set.species}
+                        onChange={(e) => updateNickname(e.target.value)}
+                      />
+                    </label>
+                    <label className="editor-field">
+                      <span>Gender</span>
+                      <select value={set.gender} onChange={(e) => update('gender', e.target.value)}>
+                        {speciesInfo.genders.map((g) => (
+                          <option key={g} value={g}>
+                            {GENDER_LABELS[g] ?? g}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="editor-field">
+                      <span>Tera Type</span>
+                      <select
+                        className="editor-tera-select"
+                        style={teraTypeStyle(set.teraType)}
+                        value={set.teraType}
+                        onChange={(e) => update('teraType', e.target.value)}
+                      >
+                        {options.types.map((t) => (
+                          <option key={t} value={t} style={teraTypeStyle(t)}>
+                            {t}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  {isAdmin && (
+                    <div className="pokemon-editor-inline">
+                      {isAdmin && (
+                        <label className="editor-field">
+                          <span>Species</span>
+                          <input
+                            type="text"
+                            data-selector-field="species"
+                            value={activeSelector === 'species' ? speciesQuery : set.species}
+                            placeholder={set.species || 'Species'}
+                            onChange={(e) => setSpeciesQuery(e.target.value)}
+                            onKeyDown={handleSelectorKeyDown}
+                          />
+                        </label>
+                      )}
+                      {isAdmin && (
+                        <label className="editor-field">
+                          <span>Level</span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={100}
+                            value={set.level}
+                            disabled={typeof set.capOffset === 'number'}
+                            title={typeof set.capOffset === 'number' ? 'Set by the level cap - untick "Level follows the cap" to fix it' : undefined}
+                            onChange={(e) => void updateLevel(Number(e.target.value))}
+                          />
+                        </label>
+                      )}
+                      {isAdmin && (
+                        <label className="editor-field editor-field-checkbox">
+                          <span>Shiny</span>
+                          <input type="checkbox" checked={set.shiny} onChange={(e) => update('shiny', e.target.checked)} />
+                        </label>
+                      )}
+                      {isAdmin && (
+                        <label className="editor-field">
+                          <span>Happiness</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={255}
+                            value={set.happiness}
+                            onChange={(e) => update('happiness', Number(e.target.value))}
+                          />
+                        </label>
+                      )}
+                    </div>
+                  )}
+                  {isTeamMon && (
+                    <div className="editor-field editor-cap-offset">
+                      <label className="editor-field-checkbox">
+                        <input
+                          type="checkbox"
+                          checked={typeof set.capOffset === 'number'}
+                          onChange={(e) => updateCapOffset(e.target.checked ? Math.max(0, (levelCap ?? set.level) - set.level) : null)}
+                        />
+                        <span>Level follows the cap</span>
+                      </label>
+                      {typeof set.capOffset === 'number' && (
+                        <span className="editor-cap-offset-detail">
+                          <input
+                            type="number"
+                            min={0}
+                            max={99}
+                            value={set.capOffset}
+                            onChange={(e) => updateCapOffset(Number(e.target.value))}
+                          />{' '}
+                          below the cap
+                          {levelCap !== null && (
+                            <span className="editor-hint">
+                              {' '}
+                              (Lv {set.level} at the current cap of {levelCap})
+                            </span>
+                          )}
                         </span>
                       )}
-                    </span>
+                    </div>
                   )}
+                  <div className="editor-section">
+                    <h3>Auto-fill</h3>
+                    <div className="auto-set-row">
+                      <select value={autoSetId} onChange={(e) => setAutoSetId(e.target.value)}>
+                        {autoSets.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                      <button disabled={autoBusy || !autoSetId} onClick={() => void applyAutoSet()}>
+                        Apply
+                      </button>
+                    </div>
+                    <p className="editor-hint">
+                      Fills in moves, ability, item, nature, EVs, IVs and Tera type - check them over before saving.
+                    </p>
+                    {autoNotes && autoNotes.length > 0 && (
+                      <ul className="auto-set-notes">
+                        {autoNotes.map((note, i) => (
+                          <li key={i}>{note}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </div>
-              )}
-
-              <label className="editor-field">
-                <span>Gender</span>
-                <select value={set.gender} onChange={(e) => update('gender', e.target.value)}>
-                  {speciesInfo.genders.map((g) => (
-                    <option key={g} value={g}>
-                      {GENDER_LABELS[g] ?? g}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              {isAdmin && (
-                <label className="editor-field editor-field-checkbox">
-                  <span>Shiny</span>
-                  <input type="checkbox" checked={set.shiny} onChange={(e) => update('shiny', e.target.checked)} />
-                </label>
-              )}
-
-              {isAdmin && (
-                <label className="editor-field">
-                  <span>Happiness</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={255}
-                    value={set.happiness}
-                    onChange={(e) => update('happiness', Number(e.target.value))}
-                  />
-                </label>
-              )}
-
-              <label className="editor-field">
-                <span>Ability</span>
-                <input
-                  type="text"
-                  data-selector-field="ability"
-                  value={activeSelector === 'ability' ? abilityQuery : set.ability}
-                  placeholder="Ability"
-                  onChange={(e) => setAbilityQuery(e.target.value)}
-                  onKeyDown={handleSelectorKeyDown}
-                />
-              </label>
-
-              <label className="editor-field">
-                <span>Item</span>
-                <div className="editor-field-with-icon">
-                  {set.item && currentItemSpritenum !== undefined && (
-                    <span style={itemIconStyle(currentItemSpritenum)} />
-                  )}
-                  <input
-                    type="text"
-                    data-selector-field="item"
-                    value={activeSelector === 'item' ? itemQuery : set.item}
-                    placeholder="(None)"
-                    onChange={(e) => setItemQuery(e.target.value)}
-                    onKeyDown={handleSelectorKeyDown}
-                  />
-                </div>
-              </label>
-
-              <label className="editor-field">
-                <span>Nature</span>
-                <select value={set.nature} onChange={(e) => update('nature', e.target.value)}>
-                  {options.natures.map((n) => (
-                    <option key={n.name} value={n.name}>
-                      {natureLabel(n)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="editor-field">
-                <span>Tera Type</span>
-                <select value={set.teraType} onChange={(e) => update('teraType', e.target.value)}>
-                  {options.types.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <div className="editor-section">
-                <h3>Auto-fill</h3>
-                <div className="auto-set-row">
-                  <select value={autoSetId} onChange={(e) => setAutoSetId(e.target.value)}>
-                    {autoSets.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                  <button disabled={autoBusy || !autoSetId} onClick={() => void applyAutoSet()}>
-                    Apply
-                  </button>
-                </div>
-                <p className="editor-hint">
-                  Fills in moves, ability, item, nature, EVs, IVs and Tera type - check them over before saving.
-                </p>
-                {autoNotes && autoNotes.length > 0 && (
-                  <ul className="auto-set-notes">
-                    {autoNotes.map((note, i) => (
-                      <li key={i}>{note}</li>
-                    ))}
-                  </ul>
-                )}
               </div>
 
               <div className="editor-section">
@@ -546,32 +606,70 @@ function PokemonEditor({ source, admin, onClose, onSaved }: Props): React.JSX.El
                   Moves <span className="editor-hint">(up to 4, {speciesInfo.moves.length} available)</span>
                 </h3>
                 <div className="editor-moves-grid">
-                  {[0, 1, 2, 3].map((i) => (
-                    <input
-                      key={i}
-                      type="text"
-                      data-selector-field={`move-${i}`}
-                      value={activeSelector === i ? moveQuery : moveDisplayName(set.moves[i] ?? '')}
-                      placeholder={`Move ${i + 1}`}
-                      onChange={(e) => setMoveQuery(e.target.value)}
-                      onKeyDown={handleSelectorKeyDown}
-                    />
-                  ))}
+                  {[0, 1, 2, 3].map((i) => {
+                    // The chosen move's type, category, power, accuracy and PP under its box.
+                    const move = speciesInfo.moves.find((m) => m.id === set.moves[i])
+                    return (
+                      <div
+                        key={i}
+                        className="editor-move-slot"
+                        style={move ? { borderLeftColor: TYPE_COLORS[move.type.toLowerCase()] } : undefined}
+                      >
+                        <input
+                          type="text"
+                          data-selector-field={`move-${i}`}
+                          value={activeSelector === i ? moveQuery : moveDisplayName(set.moves[i] ?? '')}
+                          placeholder={moveDisplayName(set.moves[i] ?? '') || `Move ${i + 1}`}
+                          onChange={(e) => setMoveQuery(e.target.value)}
+                          onKeyDown={handleSelectorKeyDown}
+                        />
+                        <div className="editor-move-info">
+                          {move ? (
+                            <>
+                              <span className={`type-badge type-${move.type.toLowerCase()}`}>{move.type}</span>
+                              <img
+                                className="editor-move-category"
+                                src={`./sprites/misc/category-${move.category.toLowerCase()}.png`}
+                                alt={move.category}
+                                title={move.category}
+                              />
+                              <span>Pow {move.basePower || '—'}</span>
+                              <span>Acc {move.accuracy === true ? '—' : move.accuracy}</span>
+                              <span>PP {move.pp}</span>
+                            </>
+                          ) : (
+                            <span className="editor-hint">No move</span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
 
               <div className="editor-section">
                 <h3>
-                  EVs{' '}
+                  Stats{' '}
                   <span className="editor-hint">
-                    ({evTotal}/{EV_TOTAL_CAP})
+                    (EVs {evTotal}/{EV_TOTAL_CAP})
                   </span>
                 </h3>
+                <label className="editor-field editor-nature-field">
+                  <span>Nature</span>
+                  <select value={set.nature} onChange={(e) => update('nature', e.target.value)}>
+                    {options.natures.map((n) => (
+                      <option key={n.name} value={n.name}>
+                        {natureLabel(n)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <div className="editor-ev-row editor-ev-header">
                   <span className="editor-ev-label" />
                   <span className="editor-ev-base">Base</span>
+                  <span className="editor-ev-iv">IVs</span>
                   <span className="editor-ev-spacer" />
-                  <span className="editor-ev-value">EVs</span>
+                  <span className="editor-ev-input-head">EVs</span>
                   <span className="editor-ev-stat">Stat</span>
                 </div>
                 {STAT_LABELS.map(({ key, label }) => {
@@ -588,6 +686,15 @@ function PokemonEditor({ source, admin, onClose, onSaved }: Props): React.JSX.El
                       <span className="editor-ev-label">{label}</span>
                       <span className="editor-ev-base">{baseStats?.[key] ?? '—'}</span>
                       <input
+                        className="editor-ev-iv"
+                        type="number"
+                        min={0}
+                        max={31}
+                        value={set.ivs[key]}
+                        title={`${label} IV (0-31)`}
+                        onChange={(e) => updateIv(key, Number(e.target.value))}
+                      />
+                      <input
                         type="range"
                         min={0}
                         max={252}
@@ -595,7 +702,18 @@ function PokemonEditor({ source, admin, onClose, onSaved }: Props): React.JSX.El
                         value={set.evs[key]}
                         onChange={(e) => updateEv(key, Number(e.target.value))}
                       />
-                      <span className="editor-ev-value">{set.evs[key]}</span>
+                      <input
+                        className="editor-ev-input"
+                        type="text"
+                        inputMode="numeric"
+                        value={set.evs[key]}
+                        title={
+                          key === 'hp'
+                            ? 'HP EVs (0-252)'
+                            : `${label} EVs (0-252) - type + or - after the number to raise or lower ${label} with the nature`
+                        }
+                        onChange={(e) => handleEvInput(key, e.target.value)}
+                      />
                       <span className={`editor-ev-stat${natureMark}`}>
                         {baseStats
                           ? finalStat(key, baseStats[key], set.level, set.ivs[key], set.evs[key], nature)
@@ -604,24 +722,6 @@ function PokemonEditor({ source, admin, onClose, onSaved }: Props): React.JSX.El
                     </div>
                   )
                 })}
-              </div>
-
-              <div className="editor-section">
-                <h3>IVs</h3>
-                <div className="editor-stats-grid">
-                  {STAT_LABELS.map(({ key, label }) => (
-                    <label key={key} className="editor-stat-field">
-                      <span>{label}</span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={31}
-                        value={set.ivs[key]}
-                        onChange={(e) => updateIv(key, Number(e.target.value))}
-                      />
-                    </label>
-                  ))}
-                </div>
               </div>
             </div>
           )}

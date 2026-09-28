@@ -13,7 +13,7 @@ import type {
   NextBossInfo,
   Trainer
 } from '../shared/battle-types'
-import type { WildLocationId } from '../shared/battle-types'
+import type { ItemQuantity, WildLocationId } from '../shared/battle-types'
 import { WILD_LOCATIONS, WILD_RANDOM_DROP_CHANCE, normalizeUsername, usernameProblem } from '../shared/battle-types'
 import { WildBattle, getMoveInfo } from './showdown/battle-runtime'
 import {
@@ -85,6 +85,10 @@ import {
   takeHealNode,
   takeItemNode,
   takePickNode,
+  takeSwapNode,
+  swapRunMon,
+  swapRunTeam,
+  skipRunSwap,
   previewStarterMoves,
   previewEvolutionMoves,
   getRunMonEditInfo,
@@ -96,7 +100,15 @@ import {
 } from './showdown/run-store'
 import { createRunBattle } from './showdown/run-battles'
 import { getWildDropFor, listWildDrops, setWildDrop } from './showdown/wild-drops-store'
-import { buyItem, listShop, listShopPrices, sellItem, setShopPrice } from './showdown/shop-store'
+import {
+  buyItem,
+  listShop,
+  listShopPrices,
+  quickSellSelection,
+  sellItem,
+  sellItems,
+  setShopPrice
+} from './showdown/shop-store'
 import { getGalarFossilPartners, restoreFossil } from './showdown/fossil-store'
 import { openBagItem } from './showdown/open-item-store'
 import { eligibleRandomTrainers, isRocketEventActive } from './showdown/trainer-selection'
@@ -127,12 +139,18 @@ function createWindow(): void {
     // this the battle screen's 3-column layout starts running out of room.
     minWidth: 1280,
     minHeight: 960,
+    // No File/Edit/View menu bar - it's Electron's default, not the game's. A dev
+    // copy still shows it on Alt, for reload and the DevTools.
+    autoHideMenuBar: true,
     show: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
       sandbox: false
     }
   })
+
+  // The packaged game has no menu at all (so Alt doesn't bring one up mid-battle).
+  if (app.isPackaged) mainWindow.removeMenu()
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
@@ -314,7 +332,7 @@ ipcMain.handle('battle:eligibility', (): BattleEligibility => {
 })
 
 // Every boss in the order is beaten: Boss Battle becomes the rematch menu and the
-// Professor's Lab opens up as a wild location.
+// The Lab opens up as a wild location.
 function allBossesDefeated(): boolean {
   return getProgression().bossOrder.length > 0 && !getNextBoss()
 }
@@ -350,11 +368,16 @@ ipcMain.handle('run:moveItem', (_event, fromMonId: string, toMonId: string) => m
 ipcMain.handle('run:reorder', (_event, runMonIds: string[]) => reorderRunTeam(runMonIds))
 // A floor's choice: a heal or an item floor answers with the run as it now stands, a
 // fight starts the battle.
+ipcMain.handle('run:swapMon', (_event, runMonId: string) => swapRunMon(runMonId))
+ipcMain.handle('run:swapTeam', () => swapRunTeam())
+ipcMain.handle('run:skipSwap', () => skipRunSwap())
+
 ipcMain.handle('run:choose', async (_event, index: number): Promise<RunChoiceResult> => {
   const choice = runChoiceAt(index)
   if (choice.kind === 'heal') return { run: takeHealNode() }
   if (choice.kind === 'item') return { run: takeItemNode() }
   if (choice.kind === 'ability' || choice.kind === 'move') return { run: takePickNode(choice.kind) }
+  if (choice.kind === 'swap') return { run: takeSwapNode() }
   activeBattle = createRunBattle(choice)
   return { battle: await activeBattle.getInitialView(), location: choice.location }
 })
@@ -420,6 +443,8 @@ ipcMain.handle('shop:setPrice', (_event, itemId: string, price: number | null) =
   return setShopPrice(itemId, price)
 })
 ipcMain.handle('bag:sell', (_event, itemId: string) => sellItem(itemId))
+ipcMain.handle('bag:sellMany', (_event, entries: ItemQuantity[]) => sellItems(entries))
+ipcMain.handle('bag:quickSellSelection', () => quickSellSelection())
 ipcMain.handle('bag:open', (_event, itemId: string) => openBagItem(itemId))
 ipcMain.handle('fossil:galarPartners', (_event, itemId: string) => getGalarFossilPartners(itemId))
 ipcMain.handle('fossil:restore', (_event, itemId: string, secondItemId?: string) =>

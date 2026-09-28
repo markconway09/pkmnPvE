@@ -97,7 +97,7 @@ export interface WildLocationConfig {
   eggGroups?: string[]
   exceptionBaseSpecies: string[]
   // Only there once every boss is beaten, with an encounter table of its own
-  // (the Professor's Lab - see generateLabWildMon) instead of the type filters.
+  // (the Lab - see generateLabWildMon) instead of the type filters.
   requiresAllBosses?: boolean
 }
 
@@ -169,7 +169,7 @@ export const WILD_LOCATIONS: WildLocationConfig[] = [
   },
   {
     id: 'lab',
-    label: "Professor's Lab",
+    label: 'Lab',
     icon: '🧪',
     types: null,
     exceptionBaseSpecies: [],
@@ -208,6 +208,8 @@ export interface MoveInfo {
   // extra reps for a move that hits multiple times.
   contact: boolean
   multihit: boolean
+  // Above 0 for a priority move (Quick Attack, Extreme Speed...) - it animates faster.
+  priority: number
 }
 
 export interface PokemonSummary {
@@ -220,6 +222,8 @@ export interface PokemonSummary {
   teraType: string
   stats: StatBlock
   moveIds: string[]
+  // 'M', 'F' or 'N' (genderless) - '' when it isn't set.
+  gender: string
   shiny: boolean
 }
 
@@ -277,6 +281,12 @@ export interface ActivePokemonView extends PokemonSummary {
   switchSeq: number
 }
 
+export interface EvolutionItemUse {
+  name: string
+  spritenum: number
+  quantity: number
+}
+
 export interface BoxPokemonView extends PokemonSummary {
   id: string
   // Only present for the player's own persisted box/team Pokemon - premade
@@ -285,6 +295,9 @@ export interface BoxPokemonView extends PokemonSummary {
   exp?: number
   expPercent?: number
   eligibleEvolutions?: string[]
+  // The bag item each item evolution above would use up (by target species), and how
+  // many of it the bag has - a level/friendship evolution has no entry.
+  evolutionItems?: Record<string, EvolutionItemUse>
   canLevelUpWithCandy?: boolean
   // Not shiny yet, and there's a Shiny Patch in the bag to make it so.
   canUseShinyPatch?: boolean
@@ -662,6 +675,19 @@ export interface FeedbackEvent {
   slot: BattleSlotKey
   label: string
   tone: 'good' | 'bad' | 'neutral'
+  // The results worth seeing at a glance get a bigger label and their own effect on
+  // the sprite: a crit's white flash and hard shake, a flinch's stagger, confusion's
+  // spinning stars.
+  emphasis?: 'crit' | 'flinch' | 'confusion'
+}
+
+// An ability doing something (Intimidate, Drizzle, Rough Skin, Volt Absorb...) - the
+// battle screen pops up a "Gyarados's Intimidate" banner by the Pokemon that has it,
+// like Showdown does.
+export interface AbilityEvent {
+  slot: BattleSlotKey
+  pokemon: string
+  ability: string
 }
 
 // A move being used, for the animation layer - which slot used it, which
@@ -798,11 +824,21 @@ export interface OpenItemResult {
   // can't be sold) - so it can be sold straight from the result.
   itemId?: string
   sellPrice?: number | null
+  // An item won: its full shop price, shown by its name.
+  price?: number
+  // A Pokemon not in the Pokedex yet, or an item the bag didn't have - marked "New".
+  isNew: boolean
 }
 
 export interface SellResult {
   sold: number
   money: number
+}
+
+// Some number of one bag item, for selling several at once.
+export interface ItemQuantity {
+  itemId: string
+  quantity: number
 }
 
 // One of the fossils a Galar fossil can be combined with, and what the pair
@@ -855,6 +891,7 @@ export interface BattleView {
   moveEvents: (MoveEvent | null)[]
   // Parallel to log - set on the line where a Pokemon Terastallizes or Mega Evolves.
   gimmickEvents: (GimmickEvent | null)[]
+  abilityEvents: (AbilityEvent | null)[]
   request: ChoiceRequest | null
   ended: boolean
   winner: string | null
@@ -898,10 +935,10 @@ export const ROGUELITE_GYM_LEADERS = 8
 export const ROGUELITE_ELITE_FOUR = 4
 export const ROGUELITE_BOSS_COUNT = ROGUELITE_GYM_LEADERS + ROGUELITE_ELITE_FOUR + 1
 export const ROGUELITE_FINAL_FLOOR = ROGUELITE_BOSS_EVERY * ROGUELITE_BOSS_COUNT
-export const ROGUELITE_START_LEVEL = 10
+export const ROGUELITE_START_LEVEL = 5
 export const ROGUELITE_MAX_TEAM = 6
 
-export type RunNodeKind = 'wild' | 'trainer' | 'item' | 'heal' | 'boss' | 'ability' | 'move'
+export type RunNodeKind = 'wild' | 'trainer' | 'item' | 'heal' | 'boss' | 'ability' | 'move' | 'swap'
 
 // Keep or change moves: a starter's own moves against a run moveset, or an evolving
 // Pokemon's moves against what it would get as its new species (locked moves kept).
@@ -964,7 +1001,7 @@ export interface RunDifficultyInfo {
   extraOpponentMons: number
   // Every boss brings a full team of 6.
   fullBossTeams: boolean
-  // No Rest floors and no heal after beating a boss.
+  // No Pokémon Center floors and no heal after beating a boss.
   noHealing: boolean
 }
 
@@ -1030,7 +1067,7 @@ export interface RunRewardLine {
   quantity: number
 }
 
-// One of a floor's options. A wild one says where (Cave, Ocean... or the Professor's
+// One of a floor's options. A wild one says where (Cave, Ocean... or the
 // Lab); an older run's wild option may not, and draws from everywhere.
 export interface RunChoice {
   kind: RunNodeKind
@@ -1082,6 +1119,10 @@ export interface RunView {
   pickOffer: { kind: 'ability' | 'move'; options: RunPickOption[] } | null
   // A floor's pick, or the reward for beating a boss.
   pickReason: 'floor' | 'reward' | null
+  // A Random Swap floor waiting on its choice: one Pokemon, the whole team, or neither.
+  swapOffer: boolean
+  // The level a swapped-in Pokemon arrives at (the next boss's).
+  swapLevel: number
   // An item a newly given one replaced, waiting for a new holder before the run goes on.
   displacedItem: { itemName: string; spritenum: number; fromMonId: string } | null
   // The species the run started with, for the result banner.

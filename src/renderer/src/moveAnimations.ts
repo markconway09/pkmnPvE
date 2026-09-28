@@ -52,7 +52,15 @@ function scaledDuration(basePower: number, base: number): number {
 /** Field/team effects and moves with no real attack of their own - nothing worth animating. */
 const NO_TARGET_TYPES = new Set(['foeSide', 'allySide', 'allyTeam'])
 
+// A priority move (Quick Attack, Extreme Speed, Sucker Punch...) plays this much faster.
+const PRIORITY_SPEED = 0.5
+
 export function animationFor(info: MoveInfo): MoveAnimRecipe {
+  const recipe = baseAnimationFor(info)
+  return info.priority > 0 ? { ...recipe, durationMs: Math.round(recipe.durationMs * PRIORITY_SPEED) } : recipe
+}
+
+function baseAnimationFor(info: MoveInfo): MoveAnimRecipe {
   const reps = info.multihit ? 2 : 1
   const type = info.type.toLowerCase()
   const bigHit = info.basePower >= BIG_HIT_POWER
