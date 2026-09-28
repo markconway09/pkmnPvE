@@ -304,6 +304,11 @@ export function isNotFullyEvolved(speciesName: string): boolean {
   return !!Dex.species.get(speciesName).nfe
 }
 
+/** A species' National Dex number (0 if there's no such species). */
+export function speciesDexNum(speciesName: string): number {
+  return Dex.species.get(speciesName).num || 0
+}
+
 export function bstOf(speciesName: string): number {
   const cached = bstCache.get(speciesName)
   if (cached !== undefined) return cached

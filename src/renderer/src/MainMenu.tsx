@@ -38,6 +38,8 @@ import RoguelitePanel, { RUN_MON_DRAG_PREFIX, RUN_SLOT_DROP_PREFIX, RUN_STARTER_
 import { loadMenuMode, saveMenuMode, type MenuMode } from './menuMode'
 import { trainerSpriteUrl } from './trainerSprite'
 import SlotMachine from './SlotMachine'
+import BlackjackTable from './BlackjackTable'
+import type { GameCornerGame } from './GameCornerTabs'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
 import CoinShopModal from './CoinShopModal'
 import { LOCATION_BUTTON_BACKDROP, backdropUrl, locationIconUrl } from './battleScenery'
@@ -71,6 +73,23 @@ const EMPTY_TEAM: (string | null)[] = [null, null, null, null, null, null]
 // Below this a wild encounter's level range gets thin enough to barely mean
 // anything - the slider simply doesn't go lower.
 const WILD_LEVEL_CAP_MIN = 15
+
+// The orders the expanded box can be sorted in.
+type BoxSortKey = 'arrival' | 'name' | 'bst' | 'dex'
+const BOX_SORTS: { key: BoxSortKey; label: string }[] = [
+  { key: 'arrival', label: 'Catch date' },
+  { key: 'name', label: 'Name' },
+  { key: 'bst', label: 'Base stat total' },
+  { key: 'dex', label: 'Pokédex number' }
+]
+
+// Ascending order for a sort key (the caller flips it for descending).
+function compareBoxMons(a: BoxPokemonView, b: BoxPokemonView, key: BoxSortKey): number {
+  if (key === 'name') return a.species.localeCompare(b.species)
+  if (key === 'bst') return (a.bst ?? 0) - (b.bst ?? 0)
+  if (key === 'dex') return (a.dexNum ?? 0) - (b.dexNum ?? 0)
+  return (a.arrival ?? 0) - (b.arrival ?? 0)
+}
 
 // The box search: every word typed has to match something about the Pokemon - its
 // species, a type, its ability, item or nature, or one of its moves ("fire", "u-turn").
@@ -166,13 +185,28 @@ function MainMenu({
   const [rematchOpen, setRematchOpen] = useState(false)
   // Only there while the box is expanded - collapsing it clears the search.
   const [boxSearch, setBoxSearch] = useState('')
+  // How the box is ordered (set from the expanded box): by arrival (catch order), name,
+  // base stat total or Pokedex number, either way round.
+  const [boxSort, setBoxSort] = useState<BoxSortKey>('arrival')
+  const [boxSortDescending, setBoxSortDescending] = useState(false)
   const [playerTrainerOpen, setPlayerTrainerOpen] = useState(false)
   const [starterOpen, setStarterOpen] = useState(false)
   const [bagOpen, setBagOpen] = useState(false)
   const [shopOpen, setShopOpen] = useState(false)
   // The Game Corner: the slot machine, and the Coin Shop its coins come from.
-  const [slotsOpen, setSlotsOpen] = useState(false)
+  // The Game Corner game open (null: none), and the last one played - the button and the
+  // Coin Shop both go back to it.
+  const [gameCorner, setGameCorner] = useState<GameCornerGame | null>(null)
+  const [lastGame, setLastGame] = useState<GameCornerGame>('slots')
   const [coinShopOpen, setCoinShopOpen] = useState(false)
+  const openGame = (game: GameCornerGame): void => {
+    setLastGame(game)
+    setGameCorner(game)
+  }
+  const toCoinShop = (): void => {
+    setGameCorner(null)
+    setCoinShopOpen(true)
+  }
   const [money, setMoney] = useState<number | null>(null)
   // Notes that float up from the box (a Pokemon sold, or why it couldn't be).
   const notes = useFloatingNotes()
@@ -434,11 +468,17 @@ function MainMenu({
 
   const team = boxState?.team ?? EMPTY_TEAM
   const monsById = new Map((boxState?.mons ?? []).map((m) => [m.id, m]))
-  // Favorites first; otherwise the box keeps its usual (arrival) order.
+  // Favorites first, then the chosen order (arrival order by default).
+  const sortDirection = boxSortDescending ? -1 : 1
   const boxMons = (boxState?.mons ?? [])
     .filter((m) => !team.includes(m.id))
     .filter((m) => matchesBoxSearch(m, boxSearch))
-    .sort((a, b) => Number(!!b.favorite) - Number(!!a.favorite))
+    .sort(
+      (a, b) =>
+        Number(!!b.favorite) - Number(!!a.favorite) ||
+        sortDirection * compareBoxMons(a, b, boxSort) ||
+        (a.arrival ?? 0) - (b.arrival ?? 0)
+    )
   const teamCount = team.filter(Boolean).length
   const teamEmpty = teamCount === 0
   const boxEmpty = (boxState?.mons.length ?? 0) === 0
@@ -503,9 +543,9 @@ function MainMenu({
           >
             {mode === 'classic' ? '⚔ Classic' : '🎲 Roguelite'}
           </button>
-          {/* The Coin Shop opens from inside the slot machine. */}
-          <button disabled={mode === 'roguelite'} title="Game Corner slot machine" onClick={() => setSlotsOpen(true)}>
-            🎰 Slots
+          {/* The Coin Shop opens from inside the Game Corner's games. */}
+          <button disabled={mode === 'roguelite'} title="Game Corner: slots and blackjack" onClick={() => openGame(lastGame)}>
+            🎰 Game Corner
           </button>
           <button onClick={() => setPlayerTrainerOpen(true)}>{username}</button>
           {/* A run has no bag or shop of its own - these are the classic game's. */}
@@ -728,6 +768,24 @@ function MainMenu({
               }}
             />
           )}
+          {boxExpanded && (
+            <span className="box-sort">
+              <select value={boxSort} onChange={(e) => setBoxSort(e.target.value as BoxSortKey)} title="Order the box">
+                {BOX_SORTS.map((sort) => (
+                  <option key={sort.key} value={sort.key}>
+                    {sort.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="box-sort-direction"
+                title={boxSortDescending ? 'Descending - click for ascending' : 'Ascending - click for descending'}
+                onClick={() => setBoxSortDescending((d) => !d)}
+              >
+                {boxSortDescending ? '↓' : '↑'}
+              </button>
+            </span>
+          )}
         </div>
         <BoxGrid
           mons={boxMons}
@@ -882,21 +940,18 @@ function MainMenu({
       )}
 
       {notes.layer}
-      {slotsOpen && (
-        <SlotMachine
-          onClose={() => setSlotsOpen(false)}
-          onOpenCoinShop={() => {
-            setSlotsOpen(false)
-            setCoinShopOpen(true)
-          }}
-        />
+      {gameCorner === 'slots' && (
+        <SlotMachine onClose={() => setGameCorner(null)} onOpenCoinShop={toCoinShop} onSwitchGame={() => openGame('blackjack')} />
+      )}
+      {gameCorner === 'blackjack' && (
+        <BlackjackTable onClose={() => setGameCorner(null)} onOpenCoinShop={toCoinShop} onSwitchGame={() => openGame('slots')} />
       )}
       {coinShopOpen && (
         <CoinShopModal
           onClose={() => {
             setCoinShopOpen(false)
-            // The Coin Shop is only reached from the slot machine - closing it goes back there.
-            setSlotsOpen(true)
+            // The Coin Shop is only reached from a Game Corner game - closing it goes back there.
+            setGameCorner(lastGame)
             refreshBox()
           }}
           onMoneyChange={setMoney}

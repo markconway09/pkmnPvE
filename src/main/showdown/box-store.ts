@@ -27,6 +27,8 @@ import {
   dexFormOf,
   unretiredHeldItem,
   speciesRarityTier,
+  speciesDexNum,
+  bstOf,
   nationalDexSpecies,
   nationalDexForms,
   evolutionOptionsFor,
@@ -165,7 +167,7 @@ export function getPokedex(): PokedexEntry[] {
   ])
 }
 
-function toView(mon: StoredMon): BoxPokemonView {
+function toView(mon: StoredMon, arrival: number): BoxPokemonView {
   const { percent } = expProgressForLevel(mon.set.species, mon.set.level, mon.exp)
   const usable = evolutionOptionsFor(mon.set).filter((o) => o.requiredItems === null || o.requiredItems.some(hasItem))
   const eligibleEvolutions = usable.map((o) => o.species)
@@ -191,12 +193,15 @@ function toView(mon: StoredMon): BoxPokemonView {
     itemSpritenum,
     favorite: !!mon.favorite,
     rarityTier: speciesRarityTier(mon.set.species),
+    dexNum: speciesDexNum(mon.set.species),
+    bst: bstOf(mon.set.species),
+    arrival,
     ...buildPokemonSummary(mon.set.species, mon.set)
   }
 }
 
 export function getBoxState(): BoxState {
-  return { mons: getState().mons.map(toView), team: [...getState().team] }
+  return { mons: getState().mons.map((mon, i) => toView(mon, i)), team: [...getState().team] }
 }
 
 export function addRandomMon(): BoxState {

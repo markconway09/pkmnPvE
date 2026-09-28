@@ -44,6 +44,14 @@ export function getCoins(): number {
   return getState().coins
 }
 
+/** Takes (negative) or pays (positive) coins for another Game Corner game - never below zero. */
+export function changeCoins(delta: number): number {
+  if (getCoins() + delta < 0) throw new Error('Not enough coins - buy some at the Coin Shop')
+  getState().coins += delta
+  persist()
+  return getCoins()
+}
+
 /** Buys one of the coin packs with Poke Dollars. */
 export function buyCoins(amount: number): CoinBalance {
   if (!COIN_PACKS.includes(amount)) throw new Error("That coin pack isn't sold")

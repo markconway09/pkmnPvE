@@ -5512,3 +5512,217 @@ img.wild-location-icon {
   font-weight: bold;
   line-height: 1;
 }
+
+/* ---- Game Corner: switching games, and the blackjack table ---- */
+.game-corner-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.game-corner-tab {
+  flex: 1;
+  padding: 6px 10px;
+}
+
+.game-corner-tab-active {
+  border-color: #ffd76b;
+  color: #ffd76b;
+  background: rgba(255, 215, 107, 0.08);
+}
+
+.blackjack-modal {
+  width: 560px;
+}
+
+.blackjack-felt {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 14px 16px;
+  min-height: 330px;
+  box-sizing: border-box;
+  background: radial-gradient(ellipse at center, #1f7a45 0%, #135a31 70%, #0d4323 100%);
+  border: 6px solid #6b3f1d;
+  border-radius: 18px;
+  box-shadow:
+    inset 0 0 30px rgba(0, 0, 0, 0.5),
+    0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+.blackjack-hand {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.blackjack-hand-label {
+  font-size: 13px;
+  font-weight: bold;
+  color: #e9f5ec;
+  text-shadow: 0 1px 2px #000;
+}
+
+.blackjack-hand-label span {
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #ffd76b;
+}
+
+.blackjack-cards {
+  display: flex;
+  gap: 8px;
+  min-height: 104px;
+}
+
+.blackjack-result {
+  text-align: center;
+  font-size: 15px;
+  font-weight: bold;
+  color: #e9f5ec;
+  text-shadow: 0 1px 3px #000;
+}
+
+.blackjack-result-good {
+  color: #ffd76b;
+}
+
+.blackjack-result-bad {
+  color: #ffb3a8;
+}
+
+.blackjack-result-even {
+  color: #cfe3ff;
+}
+
+.blackjack-action {
+  min-width: 110px;
+  font-weight: bold;
+}
+
+/* A playing card: rank and suit in two corners, and its pip or Pokemon in the middle. */
+.playing-card {
+  position: relative;
+  width: 72px;
+  height: 104px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  background: #fbfaf4;
+  border: 1px solid #b9b4a4;
+  border-radius: 7px;
+  color: #1b1b1b;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.45);
+  animation: playing-card-deal 0.35s ease-out backwards;
+}
+
+.playing-card-red {
+  color: #c8231b;
+}
+
+@keyframes playing-card-deal {
+  from {
+    opacity: 0;
+    transform: translate(40px, -30px) rotate(12deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.playing-card-corner {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 13px;
+  font-weight: bold;
+  line-height: 1;
+  text-align: center;
+}
+
+.playing-card-corner-bottom {
+  top: auto;
+  left: auto;
+  bottom: 4px;
+  right: 6px;
+  transform: rotate(180deg);
+}
+
+.playing-card-pip {
+  font-size: 34px;
+  line-height: 1;
+}
+
+.playing-card-pip.playing-card-ace {
+  font-size: 52px;
+}
+
+.playing-card-face {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+/* Face down: a Poke Ball on a red back. */
+.playing-card-back {
+  background: repeating-linear-gradient(45deg, #b3261e 0 6px, #9a1f18 6px 12px);
+  border: 3px solid #fbfaf4;
+}
+
+.playing-card-ball {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid #1b1b1b;
+  background: linear-gradient(180deg, #e33a2f 0 46%, #1b1b1b 46% 54%, #fbfaf4 54% 100%);
+  box-sizing: border-box;
+  position: relative;
+}
+
+.playing-card-ball::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: #fbfaf4;
+  border: 2px solid #1b1b1b;
+  box-sizing: border-box;
+}
+
+/* Ordering the expanded box: what by, and which way round. */
+.box-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  animation: box-search-in 0.25s ease;
+}
+
+.box-sort select {
+  padding: 3px 6px;
+  font: inherit;
+  font-size: 12px;
+  color: #e6e6e6;
+  background: #10141a;
+  border: 1px solid #3a4150;
+  border-radius: 3px;
+}
+
+.box-sort-direction {
+  width: 26px;
+  height: 24px;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+}

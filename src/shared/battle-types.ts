@@ -308,6 +308,11 @@ export interface BoxPokemonView extends PokemonSummary {
   // Its colour on the Random Pokemon roulette (see speciesRarityTier) - the box and
   // team squares are bordered with it.
   rarityTier?: RarityTier
+  // For sorting the box: its National Dex number, base stat total, and when it arrived
+  // (its place in the box's arrival order - 0 the first ever).
+  dexNum?: number
+  bst?: number
+  arrival?: number
 }
 
 export interface BoxState {

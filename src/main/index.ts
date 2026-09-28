@@ -66,6 +66,13 @@ import {
 import { getNextBoss, getProgression, resetProgression, setBossOrder, setLevelCap } from './showdown/progression-store'
 import { addMoney, getMoney, resetMoney } from './showdown/money-store'
 import { buyCoinPrize, buyCoins, getCoins, getSlotRules, spinSlots } from './showdown/game-corner-store'
+import {
+  dealBlackjack,
+  doubleBlackjack,
+  getBlackjackView,
+  hitBlackjack,
+  standBlackjack
+} from './showdown/blackjack-store'
 import { resetStatsCounters } from './showdown/stats-store'
 import { getTrainerProfile } from './showdown/trainer-profile'
 import { buildAutoSet, listAutoSets } from './showdown/auto-sets'
@@ -437,6 +444,11 @@ ipcMain.handle('coins:buy', (_event, amount: number) => buyCoins(amount))
 ipcMain.handle('coins:prize', (_event, itemId: string) => buyCoinPrize(itemId))
 ipcMain.handle('slots:spin', (_event, bet: number) => spinSlots(bet))
 ipcMain.handle('slots:rules', () => getSlotRules())
+ipcMain.handle('blackjack:view', () => getBlackjackView())
+ipcMain.handle('blackjack:deal', (_event, bet: number) => dealBlackjack(bet))
+ipcMain.handle('blackjack:hit', () => hitBlackjack())
+ipcMain.handle('blackjack:stand', () => standBlackjack())
+ipcMain.handle('blackjack:double', () => doubleBlackjack())
 ipcMain.handle('money:debugAdd', (_event, amount: number) => {
   requireAdmin()
   return addMoney(amount)

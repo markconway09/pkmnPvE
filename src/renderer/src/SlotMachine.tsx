@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { SlotLineWin, SlotSpinResult, SlotSymbol } from '../../shared/slots'
 import type { SlotRules } from '../../shared/slots'
-import { SLOT_RULES, SLOT_ROWS } from '../../shared/slots'
+import { SLOT_LINES, SLOT_RULES } from '../../shared/slots'
 import ItemSprite from './ItemSprite'
+import BetSlider, { placedBet } from './BetSlider'
+import GameCornerTabs from './GameCornerTabs'
 import SpriteImage from './SpriteImage'
 import { toSpriteId } from '../../shared/battle-types'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
@@ -12,6 +14,8 @@ interface Props {
   onClose: () => void
   // "Coin Shop" from inside the machine, for when the coins run out.
   onOpenCoinShop: () => void
+  // The Game Corner's other game.
+  onSwitchGame: () => void
 }
 
 // One symbol's cell on a reel.
@@ -44,13 +48,13 @@ function SymbolIcon({ symbol, pokemon }: { symbol: SlotSymbol; pokemon: SlotPoke
 
 /**
  * The Game Corner slot machine: three reels that stop on their own, left to right, on
- * where the main process already stopped them (see spinSlots). Every spin plays all three
- * rows; the bet (a slider, up to every coin held) multiplies whatever they win, and the
- * winning rows light up once the last reel has stopped.
+ * where the main process already stopped them (see spinSlots). Every spin plays five
+ * lines (the rows and both diagonals); the bet (a slider, up to every coin held)
+ * multiplies whatever they win, and the winning lines light up once the last reel stops.
  */
-function SlotMachine({ onClose, onOpenCoinShop }: Props): React.JSX.Element {
+function SlotMachine({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JSX.Element {
   const [coins, setCoins] = useState<number | null>(null)
-  const [bet, setBet] = useState(10)
+  const [betWanted, setBet] = useState(10)
   const [spinning, setSpinning] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Each reel's middle symbol right now, and how it's drawn: the strip's offset and
@@ -86,25 +90,15 @@ function SlotMachine({ onClose, onOpenCoinShop }: Props): React.JSX.Element {
     return () => timers.current.forEach(clearTimeout)
   }, [])
 
-  // The bet as it can actually be placed: at least 1, at most every coin held.
-  const maxBet = Math.max(1, coins ?? 1)
-  const placedBet = Math.min(Math.max(1, bet), maxBet)
-  // The slider's stops: 1, then every 10 up to what's held (Max bets the exact total).
-  const betSteps = [1, ...Array.from({ length: Math.floor(maxBet / 10) }, (_, i) => (i + 1) * 10)]
-  const stepIndex = betSteps.reduce((best, step, i) => (step <= placedBet ? i : best), 0)
-  // − and + move one stop down or up (from a Max bet between stops, down to the stop below;
-  // + past the last stop, up to everything held).
-  const lowerBet = betSteps[placedBet === betSteps[stepIndex] ? Math.max(0, stepIndex - 1) : stepIndex]
-  const higherBet = stepIndex < betSteps.length - 1 ? betSteps[stepIndex + 1] : maxBet
-  const betLocked = spinning || coins === null || coins < 1
+  const bet = placedBet(betWanted, coins)
 
   async function spin(): Promise<void> {
-    if (spinning || coins === null || coins < placedBet) return
+    if (spinning || coins === null || coins < bet) return
     setError(null)
     setWins([])
     let result: SlotSpinResult
     try {
-      result = await window.api.spinSlots(placedBet)
+      result = await window.api.spinSlots(bet)
     } catch (e) {
       setError(errorMessage(e))
       return
@@ -148,6 +142,7 @@ function SlotMachine({ onClose, onOpenCoinShop }: Props): React.JSX.Element {
   return createPortal(
     <div className="modal-overlay" onMouseDown={() => !spinning && onClose()}>
       <div className="modal-panel slots-modal" onMouseDown={(e) => e.stopPropagation()}>
+        <GameCornerTabs current="slots" disabled={spinning} onSwitch={onSwitchGame} />
         <div className="slots-header">
           <h2>Slot Machine</h2>
           <span className="slots-coins">🪙 {coins === null ? '…' : coins.toLocaleString('en-US')} coins</span>
@@ -174,16 +169,13 @@ function SlotMachine({ onClose, onOpenCoinShop }: Props): React.JSX.Element {
                 </div>
               </div>
             ))}
-            {/* The three rows every spin plays, faint - and the winners lit once the reels stop. */}
+            {/* The five lines every spin plays, faint - and the winners lit once the reels stop. */}
             <svg className="slots-lines" viewBox={`0 0 300 ${CELL * 3}`} preserveAspectRatio="none">
-              {SLOT_ROWS.map((row) => (
-                <line
-                  key={row}
-                  x1={4}
-                  x2={296}
-                  y1={CELL / 2 + row * CELL}
-                  y2={CELL / 2 + row * CELL}
-                  className={`slots-line${winningLines.has(row) ? ' slots-line-win' : ''}`}
+              {SLOT_LINES.map(({ rows }, line) => (
+                <polyline
+                  key={line}
+                  points={rows.map((row, reel) => `${50 + reel * 100},${CELL / 2 + row * CELL}`).join(' ')}
+                  className={`slots-line${winningLines.has(line) ? ' slots-line-win' : ''}`}
                 />
               ))}
             </svg>
@@ -191,39 +183,18 @@ function SlotMachine({ onClose, onOpenCoinShop }: Props): React.JSX.Element {
         </div>
 
         <div className="slots-controls">
-          <span className="slots-bet-label">Bet</span>
-          <button className="slots-bet-step" title="Bet less" disabled={betLocked || placedBet <= 1} onClick={() => setBet(lowerBet)}>
-            −
-          </button>
-          <input
-            type="range"
-            className="slots-bet-slider"
-            min={0}
-            max={betSteps.length - 1}
-            value={stepIndex}
-            disabled={spinning || coins === null || coins < 1}
-            onChange={(e) => setBet(betSteps[Number(e.target.value)])}
-          />
-          <button className="slots-bet-step" title="Bet more" disabled={betLocked || placedBet >= maxBet} onClick={() => setBet(higherBet)}>
-            +
-          </button>
-          <span className="slots-bet-value">
-            🪙 {placedBet.toLocaleString('en-US')}
-          </span>
-          <button className="slots-bet-max" disabled={spinning || !coins} onClick={() => setBet(maxBet)}>
-            Max
-          </button>
+          <BetSlider bet={bet} max={Math.max(1, coins ?? 1)} disabled={spinning || !coins} onChange={setBet} />
           <button
             ref={spinButtonRef}
             className="slots-spin"
-            disabled={spinning || coins === null || coins < placedBet}
+            disabled={spinning || coins === null || coins < bet}
             onClick={() => void spin()}
           >
             {spinning ? 'Spinning…' : 'Spin'}
           </button>
         </div>
         <p className="editor-hint slots-hint">
-          Every spin plays all three rows. Each winning row pays the amount below times your bet.
+          Every spin plays five lines - the three rows and both diagonals. Each winning line pays the amount below times your bet (single and double cherries count on the rows only).
         </p>
         {error && <p className="editor-error">{error}</p>}
         {coins !== null && coins < 1 && !spinning && (

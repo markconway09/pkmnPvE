@@ -9,9 +9,9 @@ export type SlotSymbol = 'gholdengo' | 'ball' | 'high' | 'mid' | 'low' | 'cherry
 // Pokemon stands for each is picked at random whenever the machine opens (see
 // SlotRules.pokemon), the stronger (by base stat total) the better it pays. Tuned (with the payouts below)
 // so that, over time, the machine pays back
-// about 120% of what's bet - in the player's favour on purpose, so coins grow the more
+// about 130% of what's bet - in the player's favour on purpose, so coins grow the more
 // they spin; the same at any bet, since wins scale with it - something
-// wins on about half of all spins, and three Gholdengo land about once in 1,160 spins.
+// wins on just over half of all spins, and three Gholdengo land about once in 700 spins.
 export const SLOT_REELS: SlotSymbol[][] = [
   [
     'mid', 'low', 'cherry', 'low', 'low', 'high', 'mid', 'gholdengo', 'ball',
@@ -34,25 +34,33 @@ export const SLOT_REELS: SlotSymbol[][] = [
 ]
 
 // Every spin plays all three rows, whatever the bet.
-export const SLOT_ROWS = [0, 1, 2]
+// Every spin plays five lines, whatever the bet: the three rows, then both diagonals.
+// Each line lists the row (0 top, 1 middle, 2 bottom) it crosses on each reel.
+export const SLOT_LINES: { rows: [number, number, number]; diagonal: boolean }[] = [
+  { rows: [0, 0, 0], diagonal: false },
+  { rows: [1, 1, 1], diagonal: false },
+  { rows: [2, 2, 2], diagonal: false },
+  { rows: [0, 1, 2], diagonal: true },
+  { rows: [2, 1, 0], diagonal: true }
+]
 
-// What a row pays for each coin bet, for three of a symbol. A cherry on the first reel
-// pays on its own, more with two in a row. Each payout follows how rare its result is:
+// What a line pays for each coin bet, for three of a symbol. A cherry on the first reel
+// pays on its own, more with two in a row - on the rows only; a diagonal needs all three. Each payout follows how rare its result is:
 // apart from the single cherry (x1, the smallest whole win), every result gives back
 // about the same share of the total - so the rarer it is, the more it pays.
 export const SLOT_PAYOUTS: Record<SlotSymbol, number> = {
-  gholdengo: 150,
-  ball: 45,
-  high: 9,
-  mid: 3,
+  gholdengo: 86,
+  ball: 26,
+  high: 6,
+  mid: 2,
   low: 1,
-  cherry: 32
+  cherry: 20
 }
 export const CHERRY_ONE = 1
 export const CHERRY_TWO = 4
 
 export interface SlotLineWin {
-  // The row that won (0 top, 1 middle, 2 bottom).
+  // The line that won (its index in SLOT_LINES).
   line: number
   symbol: SlotSymbol
   count: number
@@ -69,16 +77,16 @@ export function slotSymbolAt(reel: number, stop: number, row: number): SlotSymbo
 /** What each row pays with the reels stopped here (stops = each reel's middle symbol) for this bet. */
 export function slotWins(stops: number[], bet: number): SlotLineWin[] {
   const wins: SlotLineWin[] = []
-  for (const row of SLOT_ROWS) {
-    const symbols = [0, 1, 2].map((reel) => slotSymbolAt(reel, stops[reel], row))
+  SLOT_LINES.forEach(({ rows, diagonal }, line) => {
+    const symbols = rows.map((row, reel) => slotSymbolAt(reel, stops[reel], row))
     const [first] = symbols
     if (symbols[1] === first && symbols[2] === first) {
-      wins.push({ line: row, symbol: first, count: 3, payout: SLOT_PAYOUTS[first] * bet })
-    } else if (first === 'cherry') {
+      wins.push({ line, symbol: first, count: 3, payout: SLOT_PAYOUTS[first] * bet })
+    } else if (first === 'cherry' && !diagonal) {
       const two = symbols[1] === 'cherry'
-      wins.push({ line: row, symbol: 'cherry', count: two ? 2 : 1, payout: (two ? CHERRY_TWO : CHERRY_ONE) * bet })
+      wins.push({ line, symbol: 'cherry', count: two ? 2 : 1, payout: (two ? CHERRY_TWO : CHERRY_ONE) * bet })
     }
-  }
+  })
   return wins
 }
 
