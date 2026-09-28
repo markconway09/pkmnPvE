@@ -51,7 +51,7 @@ import {
   finishRunBattleWon,
   type RunBattleOutcome
 } from './run-store'
-import { DEFAULT_POKEBALL_ID, prizeMoneyFor } from '../../shared/battle-types'
+import { DEFAULT_POKEBALL_ID, TRAINER_RUN_COST, prizeMoneyFor } from '../../shared/battle-types'
 import type {
   ActivePokemonView,
   AiDifficulty,
@@ -246,6 +246,8 @@ export interface OpponentConfig {
   // The drop set on the premade team the trainer chose - rolled with `drops`, kept
   // apart only so the rewards tooltip can say where it comes from.
   teamDrop?: ItemDropConfig
+  // A boss rematch (the menu once every boss is beaten): exp and drops, but no prize money.
+  noPrizeMoney?: boolean
   // Percent chance of one extra drop picked at random from the whole item pool.
   randomDropChance?: number
   // A friendly match (another player's saved team): winning gives no exp, money,
@@ -472,8 +474,10 @@ export class WildBattle {
               if (!this.opponent.isBoss) countStat('trainersDefeated')
               // Per Pokemon on the team they actually sent out, or a flat sum for a
               // boss - either way plus the level cap as a percentage on top.
-              this.moneyGained = prizeMoneyFor(!!this.opponent.isBoss, this.p2team.length, levelCap)
-              addMoney(this.moneyGained)
+              this.moneyGained = this.opponent.noPrizeMoney
+                ? 0
+                : prizeMoneyFor(!!this.opponent.isBoss, this.p2team.length, levelCap)
+              if (this.moneyGained > 0) addMoney(this.moneyGained)
             } else {
               countStat('wildDefeated')
             }
@@ -780,15 +784,29 @@ export class WildBattle {
     return { money: getMoney(), pokeballs: getItemQuantity(DEFAULT_POKEBALL_ID) }
   }
 
-  // Only a wild encounter can be fled - there's no reward, exp or catch for a
-  // battle you walked away from, and the battle is simply abandoned.
-  assertCanRun(): void {
-    if (this.opponent?.trainerId) throw new Error("You can't run from a trainer battle")
+  // What running costs here, or null if it isn't allowed: a wild encounter is free, an
+  // ordinary trainer battle costs TRAINER_RUN_COST, and there's no running from a boss
+  // or from a Roguelite run's trainers. There's no reward, exp or catch for a battle
+  // you walked away from - it's simply abandoned.
+  private runCost(): number | null {
+    if (!this.opponent?.trainerId) return 0
+    if (this.opponent.isBoss || this.opponent.run) return null
+    // A friendly match (another player's team) has nothing riding on it.
+    if (this.opponent.noRewards) return 0
+    return TRAINER_RUN_COST
   }
 
-  /** Runs away. In a run, the floor still counts as cleared, and the team keeps the damage it took. */
+  assertCanRun(): void {
+    if (this.runCost() === null) throw new Error("You can't run from this battle")
+  }
+
+  /** Runs away (paying for it, from a trainer). In a run, the floor still counts as cleared, and the team keeps the damage it took. */
   runAway(): void {
-    this.assertCanRun()
+    const cost = this.runCost()
+    if (cost === null) throw new Error("You can't run from this battle")
+    if (cost > 0 && !this.ended && !spendMoney(cost)) {
+      throw new Error(`Running from a trainer costs ₽${cost.toLocaleString('en-US')} - you don't have enough`)
+    }
     if (this.opponent?.run && !this.ended) finishRunBattleFled(this.p1Outcome())
   }
 
@@ -1195,6 +1213,7 @@ export class WildBattle {
       movePowers: this.liveMovePowers(),
       moveEffectiveness: this.moveEffectivenessView(),
       opponentTrainer,
+      runCost: this.runCost(),
       opponentRoster: this.opponentRoster(),
       rewards: this.rewardsView(),
       runBattle: !!this.opponent?.run,
@@ -1218,7 +1237,7 @@ export class WildBattle {
     for (const drop of opponent?.drops ?? []) add(drop, opponent?.trainerId ? 'trainer' : 'wild')
     add(opponent?.teamDrop, 'team')
     return {
-      money: opponent?.trainerId
+      money: opponent?.trainerId && !opponent.noPrizeMoney
         ? prizeMoneyFor(!!opponent.isBoss, this.p2team.length, getProgression().levelCap)
         : null,
       items,

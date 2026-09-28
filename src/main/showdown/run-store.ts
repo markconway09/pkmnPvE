@@ -53,7 +53,7 @@ import {
   type PokemonSet
 } from './sim-access'
 import { totalExpForSpeciesLevel, expProgressForLevel } from './exp'
-import { copyBoxMonSet } from './box-store'
+import { copyBoxMonSet, hasRegisteredSpecies } from './box-store'
 import { recordBestFloor } from './stats-store'
 import { addItem } from './bag-store'
 import { addMoney } from './money-store'
@@ -434,6 +434,7 @@ function toView(mon: RunMon): RunMonView {
     expPercent: percent,
     itemSpritenum: mon.set.item ? getItemSpritenum(mon.set.item) : null,
     eligibleEvolutions: runEvolutionOptions(mon.set),
+    registeredEvolutions: runEvolutionOptions(mon.set).filter(hasRegisteredSpecies),
     rarityTier: speciesRarityTier(mon.set.species),
     ...buildPokemonSummary(mon.set.species, mon.set),
     hpPercent: mon.hp > 0 ? Math.max(1, Math.round(mon.hp * 100)) : 0,

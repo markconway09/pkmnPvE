@@ -880,7 +880,11 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
                   }
                 : undefined
               const canGoBack = prevActiveSlot(slotIndex) !== null
-              const canRun = !canGoBack && !!view && !view.opponentTrainer
+              // Free from a wild Pokemon, paid from an ordinary trainer, never from a boss.
+              const runCost = view?.runCost ?? null
+              const canRun = !canGoBack && !!view && runCost !== null
+              // A paid run, or walking away from a shiny, asks for a second click.
+              const runNeedsConfirm = (runCost ?? 0) > 0 || !!view?.p2[0]?.shiny
               return (
                 <div key={slotIndex} className="battle-action-slot">
                   {activeRequest.length > 1 && slotMon && (
@@ -912,12 +916,19 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
                               goBackActiveSlot()
                               return
                             }
-                            // A shiny is worth a second thought before walking away from it.
-                            if (view!.p2[0]?.shiny && !confirmingRun) setConfirmingRun(true)
+                            if (runNeedsConfirm && !confirmingRun) setConfirmingRun(true)
                             else void runFromBattle()
                           }}
                         >
-                          {canGoBack ? 'Cancel' : confirmingRun ? 'Run from the shiny? Click again' : 'Run'}
+                          {canGoBack
+                            ? 'Cancel'
+                            : confirmingRun
+                              ? (runCost ?? 0) > 0
+                                ? `Pay ₽${(runCost ?? 0).toLocaleString('en-US')} to run? Click again`
+                                : 'Run from the shiny? Click again'
+                              : (runCost ?? 0) > 0
+                                ? `Run (₽${(runCost ?? 0).toLocaleString('en-US')})`
+                                : 'Run'}
                         </button>
                       )}
                     </div>

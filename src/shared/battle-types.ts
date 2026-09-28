@@ -298,6 +298,8 @@ export interface BoxPokemonView extends PokemonSummary {
   // The bag item each item evolution above would use up (by target species), and how
   // many of it the bag has - a level/friendship evolution has no entry.
   evolutionItems?: Record<string, EvolutionItemUse>
+  // The evolutions above already in the Pokedex - marked with a Poke Ball in the menu.
+  registeredEvolutions?: string[]
   canLevelUpWithCandy?: boolean
   // Not shiny yet, and there's a Shiny Patch in the bag to make it so.
   canUseShinyPatch?: boolean
@@ -784,8 +786,10 @@ export interface LeagueMilestone {
 export interface PokedexEntry {
   num: number
   species: string
-  // Had in the box at some point (see box-store's registered species).
+  // Had in the box at some point, in this exact form (see box-store's registered forms).
   registered: boolean
+  // An alternate form (Alolan, Hisuian, Rotom-Wash...) listed after its species.
+  form: boolean
 }
 
 export interface TrainerProfile {
@@ -829,6 +833,9 @@ export interface OpenItemResult {
   // A Pokemon not in the Pokedex yet, or an item the bag didn't have - marked "New".
   isNew: boolean
 }
+
+// Running from an ordinary trainer battle (never a boss) costs this much.
+export const TRAINER_RUN_COST = 200
 
 export interface SellResult {
   sold: number
@@ -914,6 +921,9 @@ export interface BattleView {
   // worst of them) - the defensive side of the same matchup.
   teamDefense: (number | null)[][]
   opponentTrainer: TrainerBattleInfo | null
+  // What running away costs: 0 from a wild Pokemon, TRAINER_RUN_COST from an ordinary
+  // trainer, null when it isn't allowed at all (a boss, a Roguelite trainer or boss).
+  runCost: number | null
   opponentRoster: RosterSlotView[]
   // A Roguelite run's battle: catching is free and fills the run's team, and there's
   // no money or items. Set with the Pokemon that fainted - they leave the run's team.

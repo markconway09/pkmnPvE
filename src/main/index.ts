@@ -64,6 +64,7 @@ import {
 } from './showdown/premade-teams-store'
 import { getNextBoss, getProgression, resetProgression, setBossOrder, setLevelCap } from './showdown/progression-store'
 import { addMoney, getMoney, resetMoney } from './showdown/money-store'
+import { buyCoinPrize, buyCoins, getCoins, spinSlots } from './showdown/game-corner-store'
 import { resetStatsCounters } from './showdown/stats-store'
 import { getTrainerProfile } from './showdown/trainer-profile'
 import { buildAutoSet, listAutoSets } from './showdown/auto-sets'
@@ -206,8 +207,8 @@ ipcMain.handle('battle:startTrainer', async (_event, boss: boolean, rematchTrain
   let trainer: Trainer | null = null
   if (boss && rematchTrainerId) {
     // A rematch from the boss menu: any boss in the order the player has already beaten.
-    // It pays out like any boss fight, but can't move progression along (recordTrainerWin
-    // only counts the next unbeaten boss).
+    // It gives exp and drops like any boss fight, but no prize money, and can't move
+    // progression along (recordTrainerWin only counts the next unbeaten boss).
     const inOrder = progression.bossOrder.some((step) => step.trainerId === rematchTrainerId)
     if (!inOrder || !progression.bossesDefeated.includes(rematchTrainerId)) {
       throw new Error('Only a boss you have already beaten can be rematched')
@@ -255,7 +256,8 @@ ipcMain.handle('battle:startTrainer', async (_event, boss: boolean, rematchTrain
     spriteId: trainer.spriteId,
     drops: trainer.drops,
     teamDrop,
-    isBoss: trainer.isBoss
+    isBoss: trainer.isBoss,
+    noPrizeMoney: !!(boss && rematchTrainerId)
   })
   return activeBattle.getInitialView()
 })
@@ -428,6 +430,10 @@ ipcMain.handle('bag:list', () => getBagState())
 ipcMain.handle('bag:useExpCandy', (_event, itemId: string) => useExpCandy(itemId))
 
 ipcMain.handle('money:get', () => getMoney())
+ipcMain.handle('coins:get', () => getCoins())
+ipcMain.handle('coins:buy', (_event, amount: number) => buyCoins(amount))
+ipcMain.handle('coins:prize', (_event, itemId: string) => buyCoinPrize(itemId))
+ipcMain.handle('slots:spin', (_event, bet: number) => spinSlots(bet))
 ipcMain.handle('money:debugAdd', (_event, amount: number) => {
   requireAdmin()
   return addMoney(amount)

@@ -21,6 +21,7 @@ import RunMonContextMenu from './RunMonContextMenu'
 import RunMonEditor from './RunMonEditor'
 import { useTapGuard } from './useTapGuard'
 import { trainerSpriteUrl } from './trainerSprite'
+import { LOCATION_BUTTON_BACKDROP, backdropUrl, locationIconUrl } from './battleScenery'
 
 // The whole run as a bar: a notch per floor, a bigger one for each boss (coloured by
 // Gym Leader / Elite Four / Champion), filled up to the floor the run is on.
@@ -102,9 +103,8 @@ const TR_SPRITENUM = 721
 function NodeIcon({ choice }: { choice: RunChoice }): React.JSX.Element {
   const { kind } = choice
   if (kind === 'wild') {
-    const location = locationOf(choice)
-    if (location) return <span className="run-node-emoji">{location.icon}</span>
-    return <img className="big-battle-icon" src="./icons/tall-grass.png" alt="" />
+    // The location's own icon over its backdrop (wild grass for an older run's "anywhere").
+    return <img className="big-battle-icon run-node-location-icon" src={locationIconUrl(locationOf(choice)?.id)} alt="" />
   }
   if (kind === 'trainer') return <img className="big-battle-icon" src={trainerSpriteUrl('youngster')} alt="" />
   // Who the boss is stays a surprise until the fight starts.
@@ -119,7 +119,7 @@ function NodeIcon({ choice }: { choice: RunChoice }): React.JSX.Element {
     )
   }
   if (kind === 'swap') return <img className="big-battle-icon" src={trainerSpriteUrl('burglar')} alt="" />
-  if (kind === 'heal') return <img className="big-battle-icon" src={trainerSpriteUrl('nurse')} alt="" />
+  if (kind === 'heal') return <img className="big-battle-icon" src={trainerSpriteUrl('pokemoncenterlady')} alt="" />
   const emoji: Partial<Record<RunNodeKind, string>> = { item: '🎁' }
   return <span className="run-node-emoji">{emoji[kind] ?? '❔'}</span>
 }
@@ -636,7 +636,10 @@ function RoguelitePanel({
             return (
               <button
                 key={index}
-                className={`big-battle-button run-node-button run-node-${choice.kind}${location?.id === 'lab' ? ' run-node-lab' : ''}`}
+                className={`big-battle-button run-node-button run-node-${choice.kind}${location?.id === 'lab' ? ' run-node-lab' : ''}${location ? ' run-node-located' : ''}`}
+                style={
+                  location ? { backgroundImage: `url(${backdropUrl(LOCATION_BUTTON_BACKDROP[location.id])})` } : undefined
+                }
                 disabled={busy}
                 title={NODE_INFO[choice.kind].hint}
                 onClick={() => onChoose(index)}
@@ -697,6 +700,7 @@ function RoguelitePanel({
           y={menu.y}
           species={menu.mon.species}
           evolutions={menu.mon.eligibleEvolutions ?? []}
+          registeredEvolutions={menu.mon.registeredEvolutions}
           heldItem={menu.mon.item || null}
           onMoveItem={() => {
             setMenu(null)

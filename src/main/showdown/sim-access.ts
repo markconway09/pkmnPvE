@@ -1542,6 +1542,50 @@ function evolutionItemsFor(evoSpecies: ReturnType<typeof Dex.species.get>): stri
 
 let cachedNationalDex: { num: number; species: string }[] | null = null
 
+// A form with a Pokedex entry of its own: regional forms (Alolan Ninetales), Rotom's
+// appliances, Therian formes, gendered forms (Meowstic-F)... - but not a battle-only
+// forme (a Mega counts as its base), a cosmetic one, or one set by a held item (Arceus's
+// types, Silvally's, Genesect's drives).
+function isDexForm(s: ReturnType<typeof Dex.species.get>): boolean {
+  return (
+    s.exists &&
+    s.num > 0 &&
+    !!s.forme &&
+    !s.battleOnly &&
+    !s.requiredItem &&
+    !(s.requiredItems && s.requiredItems.length > 0) &&
+    !s.isCosmeticForme &&
+    s.forme !== 'Gmax' &&
+    !s.forme.includes('Totem') &&
+    (!s.isNonstandard || s.isNonstandard === 'Past')
+  )
+}
+
+/** The Pokedex entry a Pokemon counts as: its own form if that has an entry, otherwise its species. */
+export function dexFormOf(speciesName: string): string {
+  const s = Dex.species.get(speciesName)
+  if (!s.exists) return speciesName
+  if (isDexForm(s)) return s.name
+  // A battle-only forme of a form (Galarian Zen Darmanitan) counts as that form.
+  const from = typeof s.battleOnly === 'string' ? Dex.species.get(s.battleOnly) : null
+  if (from && isDexForm(from)) return from.name
+  return s.baseSpecies
+}
+
+let cachedDexForms: Map<number, string[]> | null = null
+
+/** Each Dex number's forms with entries of their own (see isDexForm), in the Dex's order. */
+export function nationalDexForms(): Map<number, string[]> {
+  if (!cachedDexForms) {
+    cachedDexForms = new Map()
+    for (const s of Dex.species.all()) {
+      if (!isDexForm(s)) continue
+      cachedDexForms.set(s.num, [...(cachedDexForms.get(s.num) ?? []), s.name])
+    }
+  }
+  return cachedDexForms
+}
+
 /** Every species in National Dex order, one per number (base forms only). */
 export function nationalDexSpecies(): { num: number; species: string }[] {
   if (!cachedNationalDex) {

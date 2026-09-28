@@ -43,6 +43,25 @@ const LOCATION_BACKDROP_IDS: Record<WildLocationId, string[]> = {
   lab: ['library']
 }
 
+// The one backdrop each location's button in the main menu shows behind its name.
+export const LOCATION_BUTTON_BACKDROP: Record<WildLocationId, string> = {
+  cave: 'earthycave',
+  mountain: 'skypillar',
+  forest: 'forest',
+  city: 'city',
+  industry: 'darkcity',
+  cemetery: 'elite4drake',
+  ocean: 'beach',
+  all: 'meadow',
+  lab: 'library'
+}
+
+// Each wild location's icon (overworld sprites from Bulbapedia's archives, in
+// public/icons/locations) - "All" and anything without one of its own get wild grass.
+export function locationIconUrl(location: WildLocationId | undefined): string {
+  return location && location !== 'all' ? `./icons/locations/${location}.png` : './icons/tall-grass.png'
+}
+
 // `location` is only known for a wild battle - everything else (trainer,
 // boss, player challenge) still picks from every backdrop, same as before.
 export function randomBackdropId(location?: WildLocationId): string {

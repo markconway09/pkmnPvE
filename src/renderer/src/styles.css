@@ -5109,3 +5109,368 @@ input.editor-ev-input:focus {
     opacity: 0;
   }
 }
+
+/* The player's own trainer sprite, small, beside their money in the menu bar. */
+.nav-trainer-sprite {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  cursor: pointer;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+}
+
+.nav-trainer-sprite:hover {
+  transform: scale(1.1);
+}
+
+/* "Evolve into X" with a Poke Ball when X is already in the Pokedex. */
+.context-menu-evo-target {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.context-menu-caught {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+}
+
+.context-menu-caught > span {
+  transform: scale(0.75);
+}
+
+/* An alternate form's Pokedex cell, after its species. */
+.pokedex-cell.pokedex-cell-form {
+  border-style: dashed;
+}
+
+.pokedex-cell-form .pokedex-name {
+  font-size: 9px;
+}
+
+.pokedex-count-forms {
+  font-size: 11px;
+  color: #a3adbd;
+}
+
+/* Each wild location's button shows a backdrop of that place (see
+   LOCATION_BUTTON_BACKDROP), darkened so the label reads over it. */
+.wild-location-button {
+  position: relative;
+  justify-content: flex-end;
+  min-width: 84px;
+  height: 64px;
+  overflow: hidden;
+  background-size: cover;
+  background-position: center;
+  color: #ffffff;
+  text-shadow:
+    0 1px 3px #000,
+    0 0 2px #000;
+}
+
+.wild-location-button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.65) 100%);
+  transition: background 0.15s ease;
+}
+
+.wild-location-button > * {
+  position: relative;
+}
+
+.wild-location-button:hover:not(:disabled)::before {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.5) 100%);
+}
+
+.wild-location-button.wild-location-button-active {
+  border-color: #ffd76b;
+  color: #ffd76b;
+  box-shadow: 0 0 0 1px #ffd76b, 0 0 10px rgba(255, 215, 107, 0.45);
+}
+
+/* A Roguelite wild floor: the location's backdrop behind the grass (same pictures as
+   the main menu's location buttons), darkened toward the bottom for the label. */
+.run-node-button.run-node-located {
+  position: relative;
+  overflow: hidden;
+  background-size: cover;
+  background-position: center;
+  color: #ffffff;
+  text-shadow:
+    0 1px 3px #000,
+    0 0 2px #000;
+}
+
+.run-node-button.run-node-located::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0.7) 100%);
+  transition: background 0.15s ease;
+}
+
+.run-node-button.run-node-located:hover:not(:disabled)::before {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.5) 100%);
+}
+
+.run-node-button.run-node-located > * {
+  position: relative;
+}
+
+.run-node-button.run-node-located .run-node-sub {
+  color: #d5dbe6;
+}
+
+/* The wild grass on each location button (the background shows which place it is). */
+img.wild-location-icon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+}
+
+/* Roguelite wild floors: the location's small pixel icon, scaled up crisply. */
+.run-node-location-icon {
+  object-fit: contain;
+  image-rendering: pixelated;
+  padding: 10px;
+  box-sizing: border-box;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.8));
+}
+
+/* ---- Game Corner: the slot machine and the Coin Shop ---- */
+.slots-modal {
+  width: 460px;
+}
+
+.slots-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.slots-header h2 {
+  margin: 0;
+}
+
+.slots-coins {
+  font-weight: bold;
+  color: #ffd76b;
+}
+
+.slots-machine {
+  margin: 14px auto 10px;
+  padding: 12px;
+  width: fit-content;
+  background: linear-gradient(180deg, #b3261e, #7a1611);
+  border: 3px solid #e8b923;
+  border-radius: 12px;
+  box-shadow:
+    inset 0 2px 6px rgba(255, 255, 255, 0.25),
+    0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+.slots-window {
+  position: relative;
+  display: flex;
+  gap: 6px;
+}
+
+.slots-reel {
+  position: relative;
+  width: 96px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #cfd4dc 0%, #ffffff 30%, #ffffff 70%, #cfd4dc 100%);
+  border: 2px solid #3a2a10;
+  border-radius: 6px;
+}
+
+.slots-strip {
+  will-change: transform;
+}
+
+.slots-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.slot-seven {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 44px;
+  font-weight: bold;
+  color: #d8231a;
+  text-shadow:
+    1px 1px 0 #7a1611,
+    0 0 4px rgba(255, 215, 107, 0.8);
+}
+
+.slot-item > span {
+  transform: scale(2);
+  image-rendering: pixelated;
+}
+
+.slot-mon {
+  width: 88px;
+  height: 88px;
+  margin: -12px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+/* The lines the bet plays (faint) and the ones that won (lit), over the reels. */
+.slots-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.slots-line {
+  fill: none;
+  stroke: rgba(232, 185, 35, 0.35);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.slots-line-win {
+  stroke: #ffd76b;
+  stroke-width: 4;
+  filter: drop-shadow(0 0 4px #ffd76b);
+  animation: slots-line-flash 0.5s ease-in-out 4 alternate;
+}
+
+@keyframes slots-line-flash {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.35;
+  }
+}
+
+.slots-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.slots-bet-label {
+  font-size: 13px;
+  color: #b7c0cf;
+}
+
+.slots-bet {
+  width: 38px;
+}
+
+.slots-bet-active {
+  border-color: #ffd76b;
+  color: #ffd76b;
+}
+
+.slots-spin {
+  min-width: 110px;
+  margin-left: 10px;
+  font-weight: bold;
+  border-color: #d8231a;
+}
+
+.slots-hint {
+  text-align: center;
+}
+
+.slots-paytable {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 16px;
+  margin: 10px 0 4px;
+  padding: 8px 10px;
+  background: #1a2230;
+  border: 1px solid #3a4150;
+  font-size: 12px;
+}
+
+.slots-pay {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.slots-pay-icons {
+  display: flex;
+  align-items: center;
+  height: 26px;
+}
+
+.slots-pay-icons .slot-seven {
+  font-size: 20px;
+  width: 22px;
+  text-align: center;
+}
+
+.slots-pay-icons .slot-item {
+  width: 24px;
+}
+
+.slots-pay-icons .slot-item > span {
+  transform: none;
+}
+
+.slots-pay-icons .slot-mon {
+  width: 30px;
+  height: 30px;
+  margin: -2px;
+}
+
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: #6bb0ff;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.coin-shop-modal {
+  width: 710px;
+}
+
+.coin-shop-balance {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.coin-pack-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.coin-pack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 4px;
+  background: #1a2230;
+  border: 1px solid #3a4150;
+}
+
+.coin-pack-amount {
+  font-size: 15px;
+  font-weight: bold;
+  color: #ffd76b;
+}

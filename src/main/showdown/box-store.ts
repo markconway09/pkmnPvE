@@ -23,9 +23,11 @@ import {
   rollGiftShiny,
   buildPokemonSummary,
   dexBaseSpecies,
+  dexFormOf,
   unretiredHeldItem,
   speciesRarityTier,
   nationalDexSpecies,
+  nationalDexForms,
   evolutionOptionsFor,
   evolveSet,
   generateRandomSingle,
@@ -55,6 +57,9 @@ interface StoredBox {
   // ever had in their box, kept even after that Pokemon evolves or is released.
   // A wild one of these gets a Poke Ball by its name in battle.
   registered?: string[]
+  // The same, form by form (see dexFormOf): Alolan Ninetales apart from Ninetales. A
+  // save from before forms were tracked starts with its species as their base forms.
+  registeredForms?: string[]
 }
 
 function emptyBox(): StoredBox {
@@ -119,15 +124,23 @@ function persist(): void {
 function registerOwnedSpecies(): void {
   const box = getState()
   const registered = new Set(box.registered ?? [])
-  for (const mon of box.mons) registered.add(dexBaseSpecies(mon.set.species))
+  const forms = new Set(box.registeredForms ?? box.registered ?? [])
+  for (const mon of box.mons) {
+    registered.add(dexBaseSpecies(mon.set.species))
+    forms.add(dexFormOf(mon.set.species))
+  }
   box.registered = [...registered].sort()
+  box.registeredForms = [...forms].sort()
 }
 
-/** Whether the player has ever had this species (any form of it) in their box. */
+/**
+ * Whether the player has ever had this Pokemon in their box - in this form: an Alolan
+ * Ninetales isn't registered by having had a Kantonian one, or the other way round.
+ */
 export function hasRegisteredSpecies(speciesName: string): boolean {
   const box = getState()
-  if (!box.registered) registerOwnedSpecies()
-  return box.registered!.includes(dexBaseSpecies(speciesName))
+  if (!box.registeredForms) registerOwnedSpecies()
+  return box.registeredForms!.includes(dexFormOf(speciesName))
 }
 
 /** Whether any Pokemon in the box (team included) is this species, in any of its formes. */
@@ -135,12 +148,19 @@ export function ownsSpecies(baseSpecies: string): boolean {
   return getState().mons.some((m) => baseSpeciesOf(m.set.species) === baseSpecies)
 }
 
-/** The trainer profile's Pokedex: every species in National Dex order, marked if registered. */
+/**
+ * The trainer profile's Pokedex: every species in National Dex order, each followed by
+ * its alternate forms, marked if that exact form has been registered.
+ */
 export function getPokedex(): PokedexEntry[] {
   const box = getState()
-  if (!box.registered) registerOwnedSpecies()
-  const registered = new Set(box.registered)
-  return nationalDexSpecies().map(({ num, species }) => ({ num, species, registered: registered.has(species) }))
+  if (!box.registeredForms) registerOwnedSpecies()
+  const registered = new Set(box.registeredForms)
+  const forms = nationalDexForms()
+  return nationalDexSpecies().flatMap(({ num, species }) => [
+    { num, species, registered: registered.has(species), form: false },
+    ...(forms.get(num) ?? []).map((form) => ({ num, species: form, registered: registered.has(form), form: true }))
+  ])
 }
 
 function toView(mon: StoredMon): BoxPokemonView {
@@ -163,6 +183,7 @@ function toView(mon: StoredMon): BoxPokemonView {
     expPercent: percent,
     eligibleEvolutions,
     evolutionItems,
+    registeredEvolutions: eligibleEvolutions.filter(hasRegisteredSpecies),
     canLevelUpWithCandy,
     canUseShinyPatch,
     itemSpritenum,

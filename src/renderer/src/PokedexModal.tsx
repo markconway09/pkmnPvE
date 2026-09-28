@@ -8,8 +8,9 @@ interface Props {
   onClose: () => void
 }
 
-// The trainer profile's Pokedex: every species in National Dex order - the ones the
-// player has registered (had in their box) with their sprite, the rest as a "?".
+// The trainer profile's Pokedex: every species in National Dex order, each followed by
+// its alternate forms (Alolan, Hisuian, Rotom-Wash...) - the ones the player has
+// registered (had in their box, in that form) with their sprite, the rest as a "?".
 function PokedexModal({ onClose }: Props): React.JSX.Element {
   const [entries, setEntries] = useState<PokedexEntry[] | null>(null)
   const [search, setSearch] = useState('')
@@ -21,7 +22,10 @@ function PokedexModal({ onClose }: Props): React.JSX.Element {
       .catch(() => setEntries([]))
   }, [])
 
-  const registeredCount = entries?.filter((e) => e.registered).length ?? 0
+  const species = entries?.filter((e) => !e.form) ?? []
+  const forms = entries?.filter((e) => e.form) ?? []
+  const registeredCount = species.filter((e) => e.registered).length
+  const registeredForms = forms.filter((e) => e.registered).length
   // Matches a name ("char") or a Dex number ("6", "#006").
   const query = search.trim().toLowerCase().replace(/^#/, '')
   const shown = (entries ?? []).filter(
@@ -34,8 +38,12 @@ function PokedexModal({ onClose }: Props): React.JSX.Element {
         <div className="pokedex-header">
           <h2>Pokédex</h2>
           {entries && (
-            <span className="pokedex-count">
-              {registeredCount}/{entries.length}
+            <span className="pokedex-count" title="Species in their usual form · alternate forms">
+              {registeredCount}/{species.length}
+              <span className="pokedex-count-forms">
+                {' '}
+                · Forms {registeredForms}/{forms.length}
+              </span>
             </span>
           )}
           <input
@@ -49,7 +57,11 @@ function PokedexModal({ onClose }: Props): React.JSX.Element {
         </div>
         <div className="pokedex-grid">
           {shown.map((e) => (
-            <div key={e.num} className={`pokedex-cell${e.registered ? '' : ' pokedex-cell-unknown'}`}>
+            <div
+              key={e.species}
+              className={`pokedex-cell${e.registered ? '' : ' pokedex-cell-unknown'}${e.form ? ' pokedex-cell-form' : ''}`}
+              title={e.form ? `#${e.num} ${e.species}` : undefined}
+            >
               {e.registered ? (
                 <SpriteImage style="2d-static" className="pokedex-sprite" spriteId={toSpriteId(e.species)} alt={e.species} />
               ) : (

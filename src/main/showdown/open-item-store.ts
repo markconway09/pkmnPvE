@@ -76,14 +76,14 @@ function priceTier(price: number): RarityTier {
 
 // The capsule's jackpots have fixed odds of their own, whatever their shop price.
 const CAPSULE_JACKPOTS: [itemId: string, chance: number][] = [
-  [RANDOM_LEGENDARY_ITEM_ID, 1 / 1000],
-  [RANDOM_POKEMON_ITEM_ID, 1 / 100]
+  [RANDOM_LEGENDARY_ITEM_ID, 1 / 100],
+  [RANDOM_POKEMON_ITEM_ID, 1 / 10]
 ]
 
 /**
  * A random item from the shop as it is for this player right now (so nothing still
- * locked away), except Lock Capsules themselves: a Random Legendary 1 time in 1000, a
- * Random Pokemon 1 in 100, and otherwise any other item, each weighted by 1 / its price,
+ * locked away), except Lock Capsules themselves: a Random Legendary 1 time in 100, a
+ * Random Pokemon 1 in 10, and otherwise any other item, each weighted by 1 / its price,
  * so an item twice as expensive comes up half as often.
  */
 function pickCapsuleItem(pool: ShopItemEntry[]): ShopItemEntry {

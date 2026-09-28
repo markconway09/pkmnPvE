@@ -37,6 +37,9 @@ import RunMovesChoice from './RunMovesChoice'
 import RoguelitePanel, { RUN_MON_DRAG_PREFIX, RUN_SLOT_DROP_PREFIX, RUN_STARTER_SLOT_ID } from './RoguelitePanel'
 import { loadMenuMode, saveMenuMode, type MenuMode } from './menuMode'
 import { trainerSpriteUrl } from './trainerSprite'
+import SlotMachine from './SlotMachine'
+import CoinShopModal from './CoinShopModal'
+import { LOCATION_BUTTON_BACKDROP, backdropUrl, locationIconUrl } from './battleScenery'
 import { formatMoney } from './money'
 
 interface Props {
@@ -166,6 +169,9 @@ function MainMenu({
   const [starterOpen, setStarterOpen] = useState(false)
   const [bagOpen, setBagOpen] = useState(false)
   const [shopOpen, setShopOpen] = useState(false)
+  // The Game Corner: the slot machine, and the Coin Shop its coins come from.
+  const [slotsOpen, setSlotsOpen] = useState(false)
+  const [coinShopOpen, setCoinShopOpen] = useState(false)
   const [money, setMoney] = useState<number | null>(null)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<{ mon: BoxPokemonView; x: number; y: number } | null>(null)
@@ -462,6 +468,14 @@ function MainMenu({
       <div className="menu-header">
         <h1>pkmnPvE</h1>
         <div className="menu-nav">
+          {/* The player's trainer, small, beside their money - opens their profile too. */}
+          <img
+            className="nav-trainer-sprite"
+            src={trainerSpriteUrl(trainerSprite)}
+            alt=""
+            title={`${username}'s trainer profile`}
+            onClick={() => setPlayerTrainerOpen(true)}
+          />
           {money !== null && <span className="money-display">{formatMoney(money)}</span>}
           <button
             className={`mode-toggle mode-toggle-${mode}`}
@@ -469,6 +483,10 @@ function MainMenu({
             onClick={toggleMode}
           >
             {mode === 'classic' ? '⚔ Classic' : '🎲 Roguelite'}
+          </button>
+          {/* The Coin Shop opens from inside the slot machine. */}
+          <button disabled={mode === 'roguelite'} title="Game Corner slot machine" onClick={() => setSlotsOpen(true)}>
+            🎰 Slots
           </button>
           <button onClick={() => setPlayerTrainerOpen(true)}>{username}</button>
           {/* A run has no bag or shop of its own - these are the classic game's. */}
@@ -626,9 +644,10 @@ function MainMenu({
                 key={loc.id}
                 className={`wild-location-button${wildLocation === loc.id ? ' wild-location-button-active' : ''}`}
                 title={loc.label}
+                style={{ backgroundImage: `url(${backdropUrl(LOCATION_BUTTON_BACKDROP[loc.id])})` }}
                 onClick={() => onChangeWildLocation(loc.id)}
               >
-                <span className="wild-location-icon">{loc.icon}</span>
+                <img className="wild-location-icon" src={locationIconUrl(loc.id)} alt="" />
                 <span>{loc.label}</span>
               </button>
             ))}
@@ -815,6 +834,7 @@ function MainMenu({
           species={contextMenu.mon.species}
           evolutions={contextMenu.mon.eligibleEvolutions ?? []}
           evolutionItems={contextMenu.mon.evolutionItems}
+          registeredEvolutions={contextMenu.mon.registeredEvolutions}
           canLevelUp={contextMenu.mon.canLevelUpWithCandy ?? false}
           onChoose={(target) => void evolve(contextMenu.mon.id, target)}
           onLevelUp={() => void levelUp(contextMenu.mon.id)}
@@ -835,6 +855,27 @@ function MainMenu({
             refreshMoney()
             refreshBox()
           }}
+        />
+      )}
+
+      {slotsOpen && (
+        <SlotMachine
+          onClose={() => setSlotsOpen(false)}
+          onOpenCoinShop={() => {
+            setSlotsOpen(false)
+            setCoinShopOpen(true)
+          }}
+        />
+      )}
+      {coinShopOpen && (
+        <CoinShopModal
+          onClose={() => {
+            setCoinShopOpen(false)
+            // The Coin Shop is only reached from the slot machine - closing it goes back there.
+            setSlotsOpen(true)
+            refreshBox()
+          }}
+          onMoneyChange={setMoney}
         />
       )}
 

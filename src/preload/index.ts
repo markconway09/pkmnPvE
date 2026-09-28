@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { CoinBalance, SlotSpinResult } from '../shared/slots'
 import type {
   AutoSetOption,
   AutoSetResult,
@@ -111,6 +112,10 @@ const api = {
   listBag: (): Promise<BagItemView[]> => ipcRenderer.invoke('bag:list'),
   useExpCandy: (itemId: string): Promise<ExpGainResult[]> => ipcRenderer.invoke('bag:useExpCandy', itemId),
   getMoney: (): Promise<number> => ipcRenderer.invoke('money:get'),
+  getCoins: (): Promise<number> => ipcRenderer.invoke('coins:get'),
+  buyCoins: (amount: number): Promise<CoinBalance> => ipcRenderer.invoke('coins:buy', amount),
+  buyCoinPrize: (itemId: string): Promise<CoinBalance & { itemName: string }> => ipcRenderer.invoke('coins:prize', itemId),
+  spinSlots: (bet: number): Promise<SlotSpinResult> => ipcRenderer.invoke('slots:spin', bet),
   getTrainerProfile: (): Promise<TrainerProfile> => ipcRenderer.invoke('profile:get'),
   getPokedex: (): Promise<PokedexEntry[]> => ipcRenderer.invoke('profile:pokedex'),
   checkForUpdate: (): Promise<UpdateCheckResult> => ipcRenderer.invoke('update:check'),
