@@ -13,6 +13,7 @@ import {
   EXP_CANDY_EXP,
   FRIENDSHIP_PER_BATTLE,
   MAX_HAPPINESS,
+  POKEMON_SELL_PRICES,
   RARE_CANDY_ITEM_ID,
   SHINY_PATCH_ITEM_ID
 } from '../../shared/battle-types'
@@ -42,6 +43,7 @@ import { getProgression } from './progression-store'
 import { addItem, bagItemUse, hasItem, removeItem } from './bag-store'
 import { playerDirFor, playerPathFor } from './save-paths'
 import { onPlayerChange } from './player-session'
+import { addMoney } from './money-store'
 
 interface StoredMon {
   id: string
@@ -221,6 +223,29 @@ export function addCaughtMon(set: PokemonSet): BoxState {
   getState().mons.push({ id: randomUUID(), set: caught, exp })
   persist()
   return getBoxState()
+}
+
+/** The id of the Pokemon most recently added to the box. */
+export function lastAddedMonId(): string | null {
+  const mons = getState().mons
+  return mons.length > 0 ? mons[mons.length - 1].id : null
+}
+
+/**
+ * Sells a Pokemon from the box (off the team too) for its rarity's price (see
+ * POKEMON_SELL_PRICES). The last Pokemon can't be sold - there'd be nobody left to battle.
+ */
+export function sellMon(id: string): { sold: number; species: string; money: number; box: BoxState } {
+  const box = getState()
+  const index = box.mons.findIndex((m) => m.id === id)
+  if (index === -1) throw new Error(`Unknown Pokemon id: ${id}`)
+  if (box.mons.length <= 1) throw new Error("That's your last Pokemon - it can't be sold")
+  const [mon] = box.mons.splice(index, 1)
+  box.team = box.team.map((slot) => (slot === id ? null : slot))
+  const sold = POKEMON_SELL_PRICES[speciesRarityTier(mon.set.species)]
+  const money = addMoney(sold)
+  persist()
+  return { sold, species: mon.set.species, money, box: getBoxState() }
 }
 
 export function setTeam(team: (string | null)[]): BoxState {

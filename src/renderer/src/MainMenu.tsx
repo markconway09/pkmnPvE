@@ -9,7 +9,7 @@ import {
   type DragEndEvent,
   type DragStartEvent
 } from '@dnd-kit/core'
-import { WILD_LOCATIONS } from '../../shared/battle-types'
+import { CONFIRM_SELL_TIERS, POKEMON_SELL_PRICES, WILD_LOCATIONS } from '../../shared/battle-types'
 import type {
   BattleEligibility,
   BattleView,
@@ -38,6 +38,7 @@ import RoguelitePanel, { RUN_MON_DRAG_PREFIX, RUN_SLOT_DROP_PREFIX, RUN_STARTER_
 import { loadMenuMode, saveMenuMode, type MenuMode } from './menuMode'
 import { trainerSpriteUrl } from './trainerSprite'
 import SlotMachine from './SlotMachine'
+import { errorMessage, useFloatingNotes } from './FloatingNotes'
 import CoinShopModal from './CoinShopModal'
 import { LOCATION_BUTTON_BACKDROP, backdropUrl, locationIconUrl } from './battleScenery'
 import { formatMoney } from './money'
@@ -173,6 +174,8 @@ function MainMenu({
   const [slotsOpen, setSlotsOpen] = useState(false)
   const [coinShopOpen, setCoinShopOpen] = useState(false)
   const [money, setMoney] = useState<number | null>(null)
+  // Notes that float up from the box (a Pokemon sold, or why it couldn't be).
+  const notes = useFloatingNotes()
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<{ mon: BoxPokemonView; x: number; y: number } | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
@@ -324,6 +327,22 @@ function MainMenu({
     setBusy(true)
     try {
       setBoxState(await window.api.evolveMon(monId, targetSpecies))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function sellMon(monId: string): Promise<void> {
+    const at = contextMenu ? { x: contextMenu.x, y: contextMenu.y } : { x: window.innerWidth / 2, y: window.innerHeight / 2 }
+    setContextMenu(null)
+    setBusy(true)
+    try {
+      const result = await window.api.sellMon(monId)
+      setBoxState(result.box)
+      setMoney(result.money)
+      notes.show(`Sold ${result.species} for ${formatMoney(result.sold)}`, at)
+    } catch (e) {
+      notes.show(errorMessage(e), at, 'bad')
     } finally {
       setBusy(false)
     }
@@ -844,6 +863,10 @@ function MainMenu({
           onToggleFavorite={() => void toggleFavorite(contextMenu.mon.id)}
           onEdit={() => openEditor(contextMenu.mon.id, false)}
           onAdminEdit={isAdmin ? () => openEditor(contextMenu.mon.id, true) : undefined}
+          onSell={() => void sellMon(contextMenu.mon.id)}
+          sellPrice={POKEMON_SELL_PRICES[contextMenu.mon.rarityTier ?? 'common']}
+          sellNeedsConfirm={!!contextMenu.mon.shiny || CONFIRM_SELL_TIERS.has(contextMenu.mon.rarityTier ?? 'common')}
+          shiny={!!contextMenu.mon.shiny}
           onClose={() => setContextMenu(null)}
         />
       )}
@@ -858,6 +881,7 @@ function MainMenu({
         />
       )}
 
+      {notes.layer}
       {slotsOpen && (
         <SlotMachine
           onClose={() => setSlotsOpen(false)}

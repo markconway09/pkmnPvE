@@ -1467,6 +1467,29 @@ export function pickRandomSwapSpecies(kind: 'normal' | 'legendary' | 'restricted
   return pickFrom(pool.filter((s) => !isLegendaryClass(s)))
 }
 
+/**
+ * Three different Pokemon for the slot machine's reels, strongest first by base stat
+ * total: ordinary species in their usual form (no legendaries, nothing unreleased), and
+ * never Gholdengo, which is the machine's jackpot.
+ */
+export function randomSlotPokemon(): [string, string, string] {
+  const pool = Dex.species
+    .all()
+    .filter(
+      (s) =>
+        s.exists &&
+        s.num > 0 &&
+        s.name === s.baseSpecies &&
+        !s.isNonstandard &&
+        s.tags.length === 0 &&
+        s.id !== 'gholdengo'
+    )
+  const picked = new Set<string>()
+  while (picked.size < 3) picked.add(pickFrom(pool))
+  const [a, b, c] = [...picked].sort((x, y) => bstOf(y) - bstOf(x))
+  return [a, b, c]
+}
+
 /** An unevolved legendary, mythical, ultra beast or paradox Pokemon. */
 export function pickRandomLegendarySpecies(): string {
   return pickFrom(unevolvedSpecies().filter(isLegendaryClass))

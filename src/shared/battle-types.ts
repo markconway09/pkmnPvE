@@ -801,6 +801,18 @@ export interface TrainerProfile {
 // purple, pink, gold.
 export type RarityTier = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary'
 
+// What the shop pays for a Pokemon, by its rarity colour: grey, blue, purple, red, gold.
+export const POKEMON_SELL_PRICES: Record<RarityTier, number> = {
+  common: 150,
+  uncommon: 300,
+  rare: 500,
+  epic: 10000,
+  legendary: 50000
+}
+
+// Selling one of these asks for a second click first (as does selling a shiny).
+export const CONFIRM_SELL_TIERS = new Set<RarityTier>(['epic', 'legendary'])
+
 // One card on the case-opening strip: a Pokemon (species) or an item (spritenum).
 export interface ReelEntry {
   name: string
@@ -828,6 +840,8 @@ export interface OpenItemResult {
   // can't be sold) - so it can be sold straight from the result.
   itemId?: string
   sellPrice?: number | null
+  // A Pokemon won: its id in the box, so it can be sold from the result (at sellPrice).
+  monId?: string
   // An item won: its full shop price, shown by its name.
   price?: number
   // A Pokemon not in the Pokedex yet, or an item the bag didn't have - marked "New".

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { OpenItemResult, RarityTier } from '../../shared/battle-types'
-import { toSpriteId } from '../../shared/battle-types'
+import { CONFIRM_SELL_TIERS, toSpriteId } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
 import ItemSprite from './ItemSprite'
 import { formatMoney } from './money'
@@ -61,13 +61,26 @@ function CaseOpening({ itemName, result, onClose, onOpenAnother }: Props): React
   const [soldFor, setSoldFor] = useState<number | null>(null)
   const [selling, setSelling] = useState(false)
   const [sellError, setSellError] = useState<string | null>(null)
+  // Selling a shiny, or a red or gold Pokemon, takes a second click.
+  const [confirmingSell, setConfirmingSell] = useState(false)
+  const canSell = !!result.sellPrice && (result.kind === 'item' ? !!result.itemId : !!result.monId)
+  const sellNeedsConfirm =
+    result.kind === 'pokemon' && (result.shiny || CONFIRM_SELL_TIERS.has(result.tier))
 
   async function sell(): Promise<void> {
-    if (!result.itemId) return
+    if (!canSell) return
+    if (sellNeedsConfirm && !confirmingSell) {
+      setConfirmingSell(true)
+      return
+    }
     setSelling(true)
     setSellError(null)
     try {
-      setSoldFor((await window.api.sellItem(result.itemId)).sold)
+      const sold =
+        result.kind === 'item'
+          ? (await window.api.sellItem(result.itemId!)).sold
+          : (await window.api.sellMon(result.monId!)).sold
+      setSoldFor(sold)
     } catch (e) {
       setSellError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -191,19 +204,25 @@ function CaseOpening({ itemName, result, onClose, onOpenAnother }: Props): React
                 ? soldFor !== null
                   ? `${TIER_LABELS[winner.tier]} · sold for ${formatMoney(soldFor)}`
                   : `${TIER_LABELS[winner.tier]} · it's in your bag`
-                : `${TIER_LABELS[winner.tier]} · Lv ${result.level} · it's waiting in your box`}
+                : soldFor !== null
+                  ? `${TIER_LABELS[winner.tier]} · Lv ${result.level} · sold for ${formatMoney(soldFor)}`
+                  : `${TIER_LABELS[winner.tier]} · Lv ${result.level} · it's waiting in your box`}
             </p>
             {sellError && <p className="editor-error">{sellError}</p>}
             <div className="case-result-actions">
-              {result.kind === 'item' && !!result.sellPrice && soldFor === null && (
+              {canSell && soldFor === null && (
                 <button
+                  className={confirmingSell ? 'confirm-button' : undefined}
                   disabled={selling}
                   onClick={(e) => {
                     e.stopPropagation()
                     void sell()
                   }}
+                  onBlur={() => setConfirmingSell(false)}
                 >
-                  Sell ({formatMoney(result.sellPrice)})
+                  {confirmingSell
+                    ? `Sell ${result.shiny ? 'this shiny' : TIER_LABELS[winner.tier]} ${result.name} for ${formatMoney(result.sellPrice!)}? Click again`
+                    : `Sell (${formatMoney(result.sellPrice!)})`}
                 </button>
               )}
               {result.remaining > 0 && (

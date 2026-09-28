@@ -141,7 +141,11 @@ function BagModal({ onClose, onChanged }: Props): React.JSX.Element {
       say(`Opened ${itemName}: you got ${result.name} - it's in your bag.`)
     } else {
       const got = result.shiny ? `a ✨shiny✨ ${result.name}` : result.name
-      say(`Opened ${itemName}: you got ${got} (Lv ${result.level}) - it's waiting in your box.`)
+      say(
+        soldFor !== undefined
+          ? `Opened ${itemName}: you got ${got} (Lv ${result.level}) and sold it for ${formatMoney(soldFor)}.`
+          : `Opened ${itemName}: you got ${got} (Lv ${result.level}) - it's waiting in your box.`
+      )
     }
   }
 

@@ -1,80 +1,84 @@
 // The Game Corner slot machine's rules, shared by the main process (which decides every
 // spin) and the renderer (which draws the reels): its symbols, the three reel strips,
-// the lines each bet plays, and what a line pays.
+// the rows every spin plays, and what a row pays.
 
-export type SlotSymbol = 'seven' | 'ball' | 'pikachu' | 'marill' | 'psyduck' | 'cherry'
+export type SlotSymbol = 'gholdengo' | 'ball' | 'high' | 'mid' | 'low' | 'cherry'
 
-export const SLOT_SYMBOLS: SlotSymbol[] = ['seven', 'ball', 'pikachu', 'marill', 'psyduck', 'cherry']
-
-// Each reel, top to bottom, wrapping round - one seven on each. Tuned (with the payouts
-// below) so that, over time, a bet of 3 pays back about 95% of what goes in, a bet of 2
-// about 86% and a bet of 1 about 57%: more lines for the coin, as in the Gen 3 slots.
+// Each reel, top to bottom, wrapping round: about thirty symbols (no blanks), two of
+// them Gholdengo - the jackpot. The other three Pokemon are tiers, not species: which
+// Pokemon stands for each is picked at random whenever the machine opens (see
+// SlotRules.pokemon), the stronger (by base stat total) the better it pays. Tuned (with the payouts below)
+// so that, over time, the machine pays back
+// about 120% of what's bet - in the player's favour on purpose, so coins grow the more
+// they spin; the same at any bet, since wins scale with it - something
+// wins on about half of all spins, and three Gholdengo land about once in 1,160 spins.
 export const SLOT_REELS: SlotSymbol[][] = [
-  ['seven', 'cherry', 'psyduck', 'marill', 'psyduck', 'pikachu', 'psyduck', 'ball', 'marill', 'cherry', 'psyduck',
-    'pikachu', 'marill', 'psyduck', 'psyduck', 'ball', 'marill', 'pikachu', 'psyduck', 'cherry', 'marill'],
-  ['seven', 'psyduck', 'marill', 'pikachu', 'psyduck', 'cherry', 'marill', 'ball', 'psyduck', 'pikachu', 'marill',
-    'psyduck', 'cherry', 'marill', 'pikachu', 'psyduck', 'ball', 'marill', 'psyduck', 'pikachu', 'marill'],
-  ['seven', 'marill', 'psyduck', 'pikachu', 'marill', 'psyduck', 'ball', 'cherry', 'marill', 'psyduck', 'pikachu',
-    'marill', 'psyduck', 'ball', 'cherry', 'pikachu', 'marill', 'psyduck', 'pikachu', 'marill', 'psyduck']
+  [
+    'mid', 'low', 'cherry', 'low', 'low', 'high', 'mid', 'gholdengo', 'ball',
+    'cherry', 'mid', 'low', 'high', 'low', 'mid', 'low', 'low', 'cherry',
+    'ball', 'high', 'mid', 'low', 'low', 'gholdengo', 'high', 'cherry', 'mid',
+    'mid', 'ball', 'low', 'high'
+  ],
+  [
+    'mid', 'high', 'low', 'low', 'mid', 'ball', 'low', 'high', 'cherry',
+    'mid', 'low', 'low', 'mid', 'high', 'gholdengo', 'ball', 'mid', 'low',
+    'cherry', 'high', 'low', 'mid', 'low', 'low', 'low', 'ball', 'high',
+    'mid', 'cherry', 'gholdengo'
+  ],
+  [
+    'low', 'low', 'ball', 'high', 'mid', 'cherry', 'gholdengo', 'mid', 'high',
+    'low', 'low', 'mid', 'ball', 'low', 'high', 'cherry', 'mid', 'low',
+    'low', 'mid', 'high', 'gholdengo', 'ball', 'mid', 'low', 'cherry', 'high',
+    'low', 'mid', 'low'
+  ]
 ]
 
-export const SLOT_BETS = [1, 2, 3] as const
-export type SlotBet = (typeof SLOT_BETS)[number]
+// Every spin plays all three rows, whatever the bet.
+export const SLOT_ROWS = [0, 1, 2]
 
-// A line: which of the three visible rows (0 top, 1 middle, 2 bottom) it crosses on
-// each reel. Bet 1 plays the middle row, 2 all three rows, 3 the rows and both
-// diagonals - as in the Gen 3 Game Corner.
-export const SLOT_LINES: { rows: [number, number, number]; name: string }[] = [
-  { rows: [1, 1, 1], name: 'middle' },
-  { rows: [0, 0, 0], name: 'top' },
-  { rows: [2, 2, 2], name: 'bottom' },
-  { rows: [0, 1, 2], name: 'diagonal-down' },
-  { rows: [2, 1, 0], name: 'diagonal-up' }
-]
-const LINES_FOR_BET: Record<SlotBet, number> = { 1: 1, 2: 3, 3: 5 }
-
-export function linesForBet(bet: SlotBet): typeof SLOT_LINES {
-  return SLOT_LINES.slice(0, LINES_FOR_BET[bet])
-}
-
-// Coins a line pays for three of a symbol. A cherry on the first reel pays on its own,
-// more with two in a row.
+// What a row pays for each coin bet, for three of a symbol. A cherry on the first reel
+// pays on its own, more with two in a row. Each payout follows how rare its result is:
+// apart from the single cherry (x1, the smallest whole win), every result gives back
+// about the same share of the total - so the rarer it is, the more it pays.
 export const SLOT_PAYOUTS: Record<SlotSymbol, number> = {
-  seven: 300,
-  ball: 40,
-  pikachu: 12,
-  marill: 4,
-  psyduck: 2,
-  cherry: 12
+  gholdengo: 150,
+  ball: 45,
+  high: 9,
+  mid: 3,
+  low: 1,
+  cherry: 32
 }
-export const CHERRY_ONE = 2
-export const CHERRY_TWO = 3
+export const CHERRY_ONE = 1
+export const CHERRY_TWO = 4
 
 export interface SlotLineWin {
+  // The row that won (0 top, 1 middle, 2 bottom).
   line: number
   symbol: SlotSymbol
   count: number
+  // Coins it pays: its payout for each coin, times the bet.
   payout: number
 }
 
-/** The symbol showing in a row (0-2) of a reel stopped with `stop` in the middle row. */
+/** The symbol showing in a row (0-2) of a reel stopped with its stop symbol in the middle row. */
 export function slotSymbolAt(reel: number, stop: number, row: number): SlotSymbol {
   const strip = SLOT_REELS[reel]
   return strip[(stop + row - 1 + strip.length) % strip.length]
 }
 
-/** What each played line pays with the reels stopped here (`stops` = each reel's middle symbol). */
-export function slotWins(stops: number[], bet: SlotBet): SlotLineWin[] {
+/** What each row pays with the reels stopped here (stops = each reel's middle symbol) for this bet. */
+export function slotWins(stops: number[], bet: number): SlotLineWin[] {
   const wins: SlotLineWin[] = []
-  linesForBet(bet).forEach((line, index) => {
-    const symbols = line.rows.map((row, reel) => slotSymbolAt(reel, stops[reel], row))
-    if (symbols[0] === symbols[1] && symbols[1] === symbols[2]) {
-      wins.push({ line: index, symbol: symbols[0], count: 3, payout: SLOT_PAYOUTS[symbols[0]] })
-    } else if (symbols[0] === 'cherry') {
+  for (const row of SLOT_ROWS) {
+    const symbols = [0, 1, 2].map((reel) => slotSymbolAt(reel, stops[reel], row))
+    const [first] = symbols
+    if (symbols[1] === first && symbols[2] === first) {
+      wins.push({ line: row, symbol: first, count: 3, payout: SLOT_PAYOUTS[first] * bet })
+    } else if (first === 'cherry') {
       const two = symbols[1] === 'cherry'
-      wins.push({ line: index, symbol: 'cherry', count: two ? 2 : 1, payout: two ? CHERRY_TWO : CHERRY_ONE })
+      wins.push({ line: row, symbol: 'cherry', count: two ? 2 : 1, payout: (two ? CHERRY_TWO : CHERRY_ONE) * bet })
     }
-  })
+  }
   return wins
 }
 
@@ -88,15 +92,13 @@ export interface CoinPrize {
   coins: number
 }
 
-// Prizes cost a bit more in coins than their shop price would buy at COIN_PRICE - the
-// slots are how coins are meant to grow.
 export const COIN_PRIZES: CoinPrize[] = [
-  { itemId: 'lockcapsule', coins: 60 },
-  { itemId: 'rarecandy', coins: 30 },
-  { itemId: 'randompokemon', coins: 300 },
-  { itemId: 'shinypatch', coins: 600 },
-  { itemId: 'expcandyl', coins: 600 },
-  { itemId: 'randomlegendary', coins: 6000 }
+  { itemId: 'lockcapsule', coins: 50 },
+  { itemId: 'rarecandy', coins: 25 },
+  { itemId: 'randompokemon', coins: 250 },
+  { itemId: 'shinypatch', coins: 500 },
+  { itemId: 'expcandyl', coins: 500 },
+  { itemId: 'randomlegendary', coins: 5000 }
 ]
 
 // Coins and Poke Dollars after a Game Corner purchase.
@@ -112,4 +114,28 @@ export interface SlotSpinResult {
   payout: number
   // The balance after the bet and the payout.
   coins: number
+}
+
+// The machine as the main process has it - the renderer draws from this copy rather
+// than its own, so what's on screen is always what gets scored (a renderer that has
+// reloaded with newer rules than a still-running main process would otherwise show
+// reels that don't match the result).
+// The three Pokemon tiers on the reels (see SlotRules.pokemon for who they are).
+export type SlotPokemonTier = 'high' | 'mid' | 'low'
+
+export interface SlotRules {
+  reels: SlotSymbol[][]
+  // The Pokemon each tier shows this time the machine is open - strongest on 'high'.
+  pokemon: Record<SlotPokemonTier, string>
+  payouts: Record<SlotSymbol, number>
+  cherryOne: number
+  cherryTwo: number
+}
+
+export const SLOT_RULES: SlotRules = {
+  reels: SLOT_REELS,
+  pokemon: { high: 'Magby', mid: 'Luvdisc', low: 'Stunky' },
+  payouts: SLOT_PAYOUTS,
+  cherryOne: CHERRY_ONE,
+  cherryTwo: CHERRY_TWO
 }

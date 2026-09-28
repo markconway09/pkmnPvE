@@ -1,10 +1,10 @@
 import { randomInt } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
-import type { CoinBalance, SlotBet, SlotSpinResult } from '../../shared/slots'
-import { COIN_PACKS, COIN_PRICE, COIN_PRIZES, SLOT_BETS, SLOT_REELS, slotWins } from '../../shared/slots'
+import type { CoinBalance, SlotRules, SlotSpinResult } from '../../shared/slots'
+import { COIN_PACKS, COIN_PRICE, COIN_PRIZES, SLOT_REELS, SLOT_RULES, slotWins } from '../../shared/slots'
 import { getMoney, spendMoney } from './money-store'
 import { addItem } from './bag-store'
-import { getEditorOptions } from './sim-access'
+import { getEditorOptions, randomSlotPokemon } from './sim-access'
 import { playerPathFor } from './save-paths'
 import { onPlayerChange } from './player-session'
 
@@ -65,14 +65,20 @@ export function buyCoinPrize(itemId: string): CoinBalance & { itemName: string }
   return { coins: getCoins(), money: getMoney(), itemName }
 }
 
-/** One pull of the slot machine: takes the bet, stops each reel at random, pays the lines. */
+/** One pull of the slot machine: takes the bet (any whole number of coins it has), stops each reel at random, pays the rows. */
 export function spinSlots(bet: number): SlotSpinResult {
-  if (!SLOT_BETS.includes(bet as SlotBet)) throw new Error('Bet 1, 2 or 3 coins')
+  if (!Number.isInteger(bet) || bet < 1) throw new Error('Bet at least 1 coin')
   if (getCoins() < bet) throw new Error('Not enough coins - buy some at the Coin Shop')
   const stops = SLOT_REELS.map((strip) => randomInt(strip.length))
-  const wins = slotWins(stops, bet as SlotBet)
+  const wins = slotWins(stops, bet)
   const payout = wins.reduce((sum, w) => sum + w.payout, 0)
   getState().coins += payout - bet
   persist()
   return { stops, wins, payout, coins: getCoins() }
+}
+
+/** The machine's rules for this time it's opened - with three freshly picked Pokemon. */
+export function getSlotRules(): SlotRules {
+  const [high, mid, low] = randomSlotPokemon()
+  return { ...SLOT_RULES, pokemon: { high, mid, low } }
 }

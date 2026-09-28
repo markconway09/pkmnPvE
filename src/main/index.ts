@@ -21,6 +21,7 @@ import {
   addStarter,
   evolveMon,
   getBoxState,
+  sellMon,
   getPokedex,
   getMonSet,
   getTeamPokemonSets,
@@ -64,7 +65,7 @@ import {
 } from './showdown/premade-teams-store'
 import { getNextBoss, getProgression, resetProgression, setBossOrder, setLevelCap } from './showdown/progression-store'
 import { addMoney, getMoney, resetMoney } from './showdown/money-store'
-import { buyCoinPrize, buyCoins, getCoins, spinSlots } from './showdown/game-corner-store'
+import { buyCoinPrize, buyCoins, getCoins, getSlotRules, spinSlots } from './showdown/game-corner-store'
 import { resetStatsCounters } from './showdown/stats-store'
 import { getTrainerProfile } from './showdown/trainer-profile'
 import { buildAutoSet, listAutoSets } from './showdown/auto-sets'
@@ -402,6 +403,7 @@ ipcMain.handle('battle:bossRematchList', (): BossRematchInfo[] => {
 ipcMain.handle('dex:move', (_event, id: string) => getMoveInfo(id))
 
 ipcMain.handle('box:list', () => getBoxState())
+ipcMain.handle('box:sell', (_event, id: string) => sellMon(id))
 ipcMain.handle('box:addRandom', () => {
   requireAdmin()
   return addRandomMon()
@@ -434,6 +436,7 @@ ipcMain.handle('coins:get', () => getCoins())
 ipcMain.handle('coins:buy', (_event, amount: number) => buyCoins(amount))
 ipcMain.handle('coins:prize', (_event, itemId: string) => buyCoinPrize(itemId))
 ipcMain.handle('slots:spin', (_event, bet: number) => spinSlots(bet))
+ipcMain.handle('slots:rules', () => getSlotRules())
 ipcMain.handle('money:debugAdd', (_event, amount: number) => {
   requireAdmin()
   return addMoney(amount)

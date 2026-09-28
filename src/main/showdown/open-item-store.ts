@@ -1,5 +1,10 @@
 import type { OpenItemResult, RarityTier, ReelEntry, ShopItemEntry } from '../../shared/battle-types'
-import { LOCK_CAPSULE_ITEM_ID, RANDOM_LEGENDARY_ITEM_ID, RANDOM_POKEMON_ITEM_ID } from '../../shared/battle-types'
+import {
+  LOCK_CAPSULE_ITEM_ID,
+  POKEMON_SELL_PRICES,
+  RANDOM_LEGENDARY_ITEM_ID,
+  RANDOM_POKEMON_ITEM_ID
+} from '../../shared/battle-types'
 import {
   buildBasicSet,
   pickRandomLegendarySpecies,
@@ -10,7 +15,7 @@ import {
   speciesRarityTier
 } from './sim-access'
 import { addItem, getItemQuantity, removeItem } from './bag-store'
-import { addCaughtMon, hasRegisteredSpecies } from './box-store'
+import { addCaughtMon, hasRegisteredSpecies, lastAddedMonId } from './box-store'
 import { restoredLevel } from './fossil-store'
 import { listShop } from './shop-store'
 
@@ -50,6 +55,7 @@ export function openBagItem(itemId: string): OpenItemResult {
   const isNew = !hasRegisteredSpecies(species)
   removeItem(itemId, 1)
   addCaughtMon({ ...buildBasicSet(species, level), nature: randomNatureName(), shiny })
+  const monId = lastAddedMonId() ?? undefined
   const asEntry = (name: string): ReelEntry => ({ name, species: name, tier: speciesRarityTier(name) })
   const winner = asEntry(species)
   return {
@@ -61,7 +67,10 @@ export function openBagItem(itemId: string): OpenItemResult {
     reel: buildReel(winner, () => asEntry(pickSpecies())),
     winnerIndex: REEL_WINNER_INDEX,
     remaining: getItemQuantity(itemId),
-    isNew
+    isNew,
+    // It can be sold straight from the result, for its rarity's price.
+    monId,
+    sellPrice: POKEMON_SELL_PRICES[winner.tier]
   }
 }
 

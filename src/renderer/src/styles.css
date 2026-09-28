@@ -5474,3 +5474,41 @@ img.wild-location-icon {
   font-weight: bold;
   color: #ffd76b;
 }
+
+/* The slot machine's bet: a slider up to every coin held. */
+.slots-bet-slider {
+  flex: 1;
+  min-width: 0;
+  accent-color: #ffd76b;
+}
+
+.slots-bet-value {
+  min-width: 64px;
+  font-weight: bold;
+  color: #ffd76b;
+  text-align: right;
+}
+
+.slots-bet-max {
+  padding: 4px 8px;
+}
+
+/* Selling a Pokemon from its menu - red while it asks to be sure. */
+.context-menu-sell {
+  color: #ffb3a8;
+}
+
+.context-menu-item.context-menu-confirm {
+  color: #ffffff;
+  background: #8a2a22;
+}
+
+/* The − / + either side of the slot machine's bet slider. */
+.slots-bet-step {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: 18px;
+  font-weight: bold;
+  line-height: 1;
+}

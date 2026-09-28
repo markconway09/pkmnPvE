@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import ContextMenuPanel from './ContextMenuPanel'
 import ItemSprite from './ItemSprite'
@@ -28,6 +29,11 @@ interface Props {
   onEdit?: () => void
   // Only given to admins.
   onAdminEdit?: () => void
+  // Sells it for sellPrice; a shiny or a red/gold Pokemon (sellNeedsConfirm) asks twice.
+  onSell?: () => void
+  sellPrice?: number
+  sellNeedsConfirm?: boolean
+  shiny?: boolean
   onClose: () => void
 }
 
@@ -47,8 +53,13 @@ function PokemonContextMenu({
   onToggleFavorite,
   onEdit,
   onAdminEdit,
+  onSell,
+  sellPrice,
+  sellNeedsConfirm = false,
+  shiny = false,
   onClose
 }: Props): React.JSX.Element {
+  const [confirmingSell, setConfirmingSell] = useState(false)
   return createPortal(
     <div
       className="context-menu-overlay"
@@ -107,6 +118,19 @@ function PokemonContextMenu({
               </button>
             )
           })}
+        {onSell && sellPrice !== undefined && (
+          <button
+            className={`context-menu-item context-menu-sell${confirmingSell ? ' context-menu-confirm' : ''}`}
+            onClick={() => {
+              if (sellNeedsConfirm && !confirmingSell) setConfirmingSell(true)
+              else onSell()
+            }}
+          >
+            {confirmingSell
+              ? `Sell ${shiny ? 'this shiny ' : ''}${species}? Click again`
+              : `Sell for ₽${sellPrice.toLocaleString('en-US')}`}
+          </button>
+        )}
       </ContextMenuPanel>
     </div>,
     document.body
