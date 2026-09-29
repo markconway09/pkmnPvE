@@ -15,9 +15,27 @@ import {
   RANDOM_POKEMON_ITEM_ID,
   LOCK_CAPSULE_ITEM_ID,
   RARE_CANDY_ITEM_ID,
-  SHINY_PATCH_ITEM_ID
+  SHINY_PATCH_ITEM_ID,
+  KEY_ITEM_IDS,
+  ROTOM_CATALOG_ITEM_ID,
+  EXP_CHARM_ITEM_ID,
+  SHINY_CHARM_ITEM_ID,
+  SHINY_CHARM_MULTIPLIER,
+  N_SOLARIZER_ITEM_ID,
+  N_LUNARIZER_ITEM_ID,
+  DNA_SPLICERS_ITEM_ID,
+  REINS_OF_UNITY_ITEM_ID,
+  FRIENDSHIP_CHARM_ITEM_ID,
+  CATCHING_CHARM_ITEM_ID,
+  ITEM_CHARM_ITEM_ID,
+  FORM_CHANGES,
+  PRISON_BOTTLE_ITEM_ID,
+  REVEAL_GLASS_ITEM_ID,
+  GRACIDEA_ITEM_ID,
+  METEORITE_ITEM_ID
 } from '../../shared/battle-types'
 import type {
+  AutoSetResult,
   RarityTier,
   EditablePokemonSet,
   EditorOptions,
@@ -34,6 +52,8 @@ import type {
 import { getShopPriceOverrides } from './shop-price-store'
 import { FOSSIL_SPECIES } from './fossils'
 import { REGIONAL_STARTER_SPECIES } from '../../shared/starters'
+// Only called inside functions (never while modules load), so the import cycle with bag-store is harmless.
+import { hasItem } from './bag-store'
 
 // pokemon-showdown is CommonJS; Node's static named-export detection misses
 // some of these under ESM, so the package is loaded via require() instead.
@@ -375,6 +395,12 @@ export function generateRandomTrainerTeam(
 
 const WILD_SHINY_ODDS = 512
 
+/** A wild Pokemon's shiny roll: 1 in WILD_SHINY_ODDS, three times likelier with the Shiny Charm. */
+function rollWildShiny(): boolean {
+  const boost = hasItem(SHINY_CHARM_ITEM_ID) ? SHINY_CHARM_MULTIPLIER : 1
+  return Math.random() < boost / WILD_SHINY_ODDS
+}
+
 // Pokemon handed to the player outright - a starter, a restored fossil, one
 // opened from a Random Pokemon / Random Legendary - get better odds than the wild.
 const GIFT_SHINY_ODDS = 128
@@ -634,7 +660,7 @@ export function generateRandomWildMon(
       // exactly WILD_SHINY_ODDS regardless of format. The generator leaves the
       // nature blank (and a de-evolved set is Hardy) - a wild Pokemon gets a
       // real random one instead, which a caught copy then keeps.
-      return { ...wild, shiny: Math.random() < 1 / WILD_SHINY_ODDS, nature: randomNatureName() }
+      return { ...wild, shiny: rollWildShiny(), nature: randomNatureName() }
     }
   }
   return null
@@ -693,7 +719,7 @@ export function generateLabWildMon(levelCap: number): PokemonSet {
   const entry = LAB_TABLE.find((e) => (roll -= e.chance) < 0) ?? LAB_TABLE[0]
   const pool = entry.pool === 'starters' ? REGIONAL_STARTER_SPECIES : pools[entry.pool]
   const species = pool[Math.floor(Math.random() * pool.length)]
-  return { ...buildBasicSet(species, level), shiny: Math.random() < 1 / WILD_SHINY_ODDS, nature: randomNatureName() }
+  return { ...buildBasicSet(species, level), shiny: rollWildShiny(), nature: randomNatureName() }
 }
 
 const TERA_TYPES = [
@@ -792,6 +818,107 @@ const SHINY_PATCH_ITEM: ItemOptionEntry = {
 }
 const SHINY_PATCH_PRICE = 10000
 
+// A key item (see KEY_ITEM_IDS) - never sold. -11 maps to its own image (see ItemSprite).
+// More key items. -12 and -13 map to their own images (see ItemSprite).
+const EXP_CHARM_ITEM: ItemOptionEntry = {
+  id: EXP_CHARM_ITEM_ID,
+  name: 'Exp. Charm',
+  description: 'Your team gains 1.5× exp from every battle won.',
+  spritenum: -12
+}
+
+const SHINY_CHARM_ITEM: ItemOptionEntry = {
+  id: SHINY_CHARM_ITEM_ID,
+  name: 'Shiny Charm',
+  description: 'Wild Pokemon are three times as likely to be shiny.',
+  spritenum: -13
+}
+
+// Three more charms - -18 to -20 are Serebii's Oval, Catching and Mark Charm icons (see ItemSprite).
+const MORE_CHARMS: ItemOptionEntry[] = [
+  {
+    id: FRIENDSHIP_CHARM_ITEM_ID,
+    name: 'Friendship Charm',
+    description: 'Your team grows twice as close to you with every battle won.',
+    spritenum: -18
+  },
+  {
+    id: CATCHING_CHARM_ITEM_ID,
+    name: 'Catching Charm',
+    description: 'Half of all catches are free - no Poke Ball used and nothing paid.',
+    spritenum: -19
+  },
+  {
+    id: ITEM_CHARM_ITEM_ID,
+    name: 'Item Charm',
+    description: 'Wild Pokemon are 1.5× as likely to drop items.',
+    spritenum: -20
+  }
+]
+
+// The form-change key items (see FORM_CHANGES). -21 to -24 are Serebii's icons (see ItemSprite).
+const FORM_CHANGE_ITEMS: ItemOptionEntry[] = [
+  {
+    id: PRISON_BOTTLE_ITEM_ID,
+    name: 'Prison Bottle',
+    description: 'Right-click a Hoopa to change it between its Confined and Unbound forms.',
+    spritenum: -21
+  },
+  {
+    id: REVEAL_GLASS_ITEM_ID,
+    name: 'Reveal Glass',
+    description: 'Right-click Tornadus, Thundurus, Landorus or Enamorus to change it between its Incarnate and Therian Formes.',
+    spritenum: -22
+  },
+  {
+    id: GRACIDEA_ITEM_ID,
+    name: 'Gracidea',
+    description: 'Right-click a Shaymin to change it between its Land and Sky Formes.',
+    spritenum: -23
+  },
+  {
+    id: METEORITE_ITEM_ID,
+    name: 'Meteorite',
+    description: 'Right-click a Deoxys to change it between its Normal, Attack, Defense and Speed Formes.',
+    spritenum: -24
+  }
+]
+
+// The fusion key items (see FUSIONS). -14 to -17 map to Serebii's icons (see ItemSprite).
+const FUSION_ITEMS: ItemOptionEntry[] = [
+  {
+    id: N_SOLARIZER_ITEM_ID,
+    name: 'N-Solarizer',
+    description: 'Right-click a Necrozma to fuse it with a Solgaleo from your box - or to unfuse them.',
+    spritenum: -14
+  },
+  {
+    id: N_LUNARIZER_ITEM_ID,
+    name: 'N-Lunarizer',
+    description: 'Right-click a Necrozma to fuse it with a Lunala from your box - or to unfuse them.',
+    spritenum: -15
+  },
+  {
+    id: DNA_SPLICERS_ITEM_ID,
+    name: 'DNA Splicers',
+    description: 'Right-click a Kyurem to fuse it with a Zekrom or Reshiram from your box - or to unfuse them.',
+    spritenum: -16
+  },
+  {
+    id: REINS_OF_UNITY_ITEM_ID,
+    name: 'Reins of Unity',
+    description: 'Right-click a Calyrex to fuse it with a Glastrier or Spectrier from your box - or to unfuse them.',
+    spritenum: -17
+  }
+]
+
+const ROTOM_CATALOG_ITEM: ItemOptionEntry = {
+  id: ROTOM_CATALOG_ITEM_ID,
+  name: 'Rotom Catalog',
+  description: 'Right-click a Rotom to change its form - it takes a Smogon set for the new one.',
+  spritenum: -11
+}
+
 const EXP_CANDY_PRICE: Record<string, number> = {
   expcandys: 1000,
   expcandym: 5000,
@@ -852,6 +979,12 @@ export function getEditorOptions(): EditorOptions {
       RANDOM_LEGENDARY_ITEM,
       LOCK_CAPSULE_ITEM,
       SHINY_PATCH_ITEM,
+      ROTOM_CATALOG_ITEM,
+      EXP_CHARM_ITEM,
+      SHINY_CHARM_ITEM,
+      ...MORE_CHARMS,
+      ...FORM_CHANGE_ITEMS,
+      ...FUSION_ITEMS,
       ...EXP_CANDY_ITEMS
     ])
     .sort(byName)
@@ -884,6 +1017,11 @@ export function getItemSpritenum(itemName: string): number | null {
     itemSpritenumByName = new Map(getEditorOptions().items.map((i) => [i.name, i.spritenum]))
   }
   return itemSpritenumByName.get(itemName) ?? null
+}
+
+/** An item's icon by its id (0, the blank icon, for an unknown one). */
+export function getItemSpritenumById(itemId: string): number {
+  return getEditorOptions().items.find((i) => i.id === itemId)?.spritenum ?? 0
 }
 
 const RARE_CANDY_PRICE = 800
@@ -932,6 +1070,7 @@ function isUneatableByHolder(dexItem: ReturnType<typeof Dex.items.get>): boolean
 // always leads.
 const SHOP_CATEGORY_ORDER = [
   'Recommended',
+  'Key Items',
   'Items',
   'Evolution Items',
   'Berries',
@@ -964,6 +1103,7 @@ let cachedShopCategoryById: Map<string, string> | null = null
 /** Which bag group an item belongs to: its shop category, or one of the two extra groups. */
 export function bagCategoryFor(itemId: string): string {
   if (!cachedShopCategoryById) cachedShopCategoryById = new Map(getShopCatalog().map((i) => [i.id, i.category]))
+  if (KEY_ITEM_IDS.has(itemId)) return 'Key Items'
   const shopCategory = cachedShopCategoryById.get(itemId)
   if (shopCategory) return shopCategory
   if (getEvolutionOnlyItemIds().has(itemId)) return 'Evolution Items'
@@ -1083,6 +1223,8 @@ export function getDefaultShopCatalog(): ShopItemEntry[] {
   const evolutionOnlyIds = getEvolutionOnlyItemIds()
   cachedBaseShopCatalog = getEditorOptions()
     .items.filter((item) => {
+      // Key items are never sold, nor bought back (see shop-store's listShop).
+      if (KEY_ITEM_IDS.has(item.id)) return false
       if (
         item.id === RARE_CANDY_ITEM_ID ||
         item.id === SHINY_PATCH_ITEM_ID ||
@@ -1237,15 +1379,21 @@ export function moveUsageFor(speciesName: string): Map<string, number> {
 // like Hyper Beam just because it's technically TM-taught. 60 rather than
 // the level cap itself, since by then a Pokemon has room to actually use
 // whatever a TM hands it for a while before the game's over.
+// From this level a Pokemon can learn every move its species has ever learned - even
+// one it only learns by level-up later (Pidgeot's Hurricane at 62, Nidorino's Earth Power
+// at 71).
+const ALL_MOVES_LEVEL = 60
+
 function powerBasedRequiredLevel(moveId: string): number {
   const basePower = Dex.moves.get(moveId).basePower || 0
   if (basePower <= 0) return 1
-  return clampInt(basePower / 1.5, 1, 60)
+  return clampInt(basePower / 1.5, 1, ALL_MOVES_LEVEL)
 }
 
-// anyGeneration: every move it has ever been able to learn, not just the latest
-// generation's list (Beedrill's Fell Stinger is Gen 6-7 only).
-export function learnableMoveIds(speciesId: string, level: number, anyGeneration = false): string[] {
+// Every move it has ever been able to learn, in any generation - Emolga's Knock Off and
+// Beedrill's Fell Stinger are Gen 5-7 / 6-7 only (from Gen 8 they're gone), yet Smogon's
+// sets use them. anyGeneration false narrows it to the latest generation's list alone.
+export function learnableMoveIds(speciesId: string, level: number, anyGeneration = true): string[] {
   const merged = new Map<string, string[]>()
   // Species dropped from the current regional dex ("isNonstandard: Past",
   // e.g. Caterpie, Pidgey, Carvanha - about a third of the whole Dex) have no
@@ -1271,11 +1419,10 @@ export function learnableMoveIds(speciesId: string, level: number, anyGeneration
   for (const [moveId, sources] of merged) {
     const genSources = anyGeneration ? sources : sources.filter((s) => s.startsWith(genPrefix))
     if (genSources.length === 0) continue
-    const requiredLevels = genSources
-      .filter((s) => s[1] === 'L')
-      .map((s) => parseInt(s.slice(2), 10))
-      .filter(Number.isFinite)
-    const requiredLevel = requiredLevels.length > 0 ? Math.min(...requiredLevels) : powerBasedRequiredLevel(moveId)
+    // The earliest it can come: a level-up source at its level, any other source (TM,
+    // tutor, egg...) at its power-based level - and from ALL_MOVES_LEVEL on, everything.
+    const levels = genSources.map((s) => (s[1] === 'L' ? parseInt(s.slice(2), 10) : powerBasedRequiredLevel(moveId)))
+    const requiredLevel = Math.min(ALL_MOVES_LEVEL, ...levels.filter(Number.isFinite))
     if (level >= requiredLevel) ids.push(moveId)
   }
   return ids
@@ -1405,6 +1552,8 @@ export function buildBasicSet(speciesName: string, level: number): PokemonSet {
 const REGIONAL_FORMES = ['Alola', 'Galar', 'Hisui', 'Paldea']
 
 function isPlainSpecies(species: ReturnType<typeof Dex.species.get>): boolean {
+  // Not a Totem (Alolan Totem Raticate): a boss-only size, and there's no sprite for it.
+  if (species.forme.includes('Totem')) return false
   return !species.forme || REGIONAL_FORMES.some((region) => species.forme.startsWith(region))
 }
 
@@ -1473,26 +1622,29 @@ export function pickRandomSwapSpecies(kind: 'normal' | 'legendary' | 'restricted
 }
 
 /**
- * Three different Pokemon for the slot machine's reels, strongest first by base stat
- * total: ordinary species in their usual form (no legendaries, nothing unreleased), and
- * never Gholdengo, which is the machine's jackpot.
+ * The slot machine's three Pokemon, each picked on its own: a final-stage evolution of a
+ * three-stage line for the big prize, a second stage for the medium one, and a first
+ * stage (one that evolves) for the small one - say Skeledirge, Raichu and Hoppip. Only
+ * ordinary species in current games.
  */
 export function randomSlotPokemon(): [string, string, string] {
-  const pool = Dex.species
-    .all()
-    .filter(
-      (s) =>
-        s.exists &&
-        s.num > 0 &&
-        s.name === s.baseSpecies &&
-        !s.isNonstandard &&
-        s.tags.length === 0 &&
-        s.id !== 'gholdengo'
-    )
-  const picked = new Set<string>()
-  while (picked.size < 3) picked.add(pickFrom(pool))
-  const [a, b, c] = [...picked].sort((x, y) => bstOf(y) - bstOf(x))
-  return [a, b, c]
+  const usable = (s: ReturnType<typeof Dex.species.get>): boolean =>
+    s.exists && s.num > 0 && !s.isNonstandard && s.tags.length === 0 && isPlainSpecies(s) && !isBattleOnlyForme(s)
+  const stage = (s: ReturnType<typeof Dex.species.get>): number => {
+    let depth = 1
+    let prevo = s.prevo
+    while (prevo) {
+      depth++
+      prevo = Dex.species.get(prevo).prevo
+    }
+    return depth
+  }
+  const species = Dex.species.all().filter(usable)
+  const first = species.filter((s) => stage(s) === 1 && s.evos.length > 0)
+  // Never Gholdengo as the second stage: it's already the machine's jackpot symbol.
+  const second = species.filter((s) => stage(s) === 2 && s.id !== 'gholdengo')
+  const third = species.filter((s) => stage(s) === 3)
+  return [pickFrom(third), pickFrom(second), pickFrom(first)]
 }
 
 /** An unevolved legendary, mythical, ultra beast or paradox Pokemon. */
@@ -1671,9 +1823,9 @@ export function megaStonesFor(speciesName: string): string[] {
  * the Dex names it (or another form of it) as the user of - Rusted Sword/Shield, Light
  * Ball, Thick Club, Leek, Soul Dew, the Adamant/Lustrous/Griseous orbs, Red/Blue Orb,
  * Ogerpon's masks, Genesect's drives, Silvally's memories, species Z-Crystals...
- * An Origin Forme's item (Adamant Crystal, Lustrous Globe, Griseous Core) is only for
- * that Origin Forme, and it's all the Origin Forme gets - the plain Dialga, Palkia and
- * Giratina have their orbs instead, which do the same thing.
+ * Dialga, Palkia and Giratina get both of their items - the orb, and the one that turns
+ * them into their Origin Forme (Adamant Crystal, Lustrous Globe, Griseous Core; see
+ * heldItemForme) - though a run only offers one of each pair (see ALTERNATIVE_ITEMS).
  */
 export function signatureItemsFor(speciesName: string): string[] {
   const self = Dex.species.get(speciesName)
@@ -1686,9 +1838,7 @@ export function signatureItemsFor(speciesName: string): string[] {
         item.isNonstandard !== 'CAP' &&
         !!item.itemUser?.some((user) => {
           const userSpecies = Dex.species.get(user)
-          if (userSpecies.name === self.name) return true
-          // An Origin Forme only takes its own item; the plain forme never takes that one.
-          return self.forme !== 'Origin' && userSpecies.forme !== 'Origin' && userSpecies.baseSpecies === base
+          return userSpecies.name === self.name || userSpecies.baseSpecies === base
         })
     )
     .map((item) => item.id)
@@ -1767,6 +1917,59 @@ export function runEvolutionOptions(set: PokemonSet): string[] {
         (!evo.gender || !set.gender || evo.gender === set.gender)
     )
     .map((evo) => evo.name)
+}
+
+/**
+ * The other forms a Pokemon can change into with a form-change key item (see FORM_CHANGES)
+ * and that item - null if it has none.
+ */
+export function formChangeFor(speciesName: string): { forms: string[]; itemId: string } | null {
+  const name = Dex.species.get(speciesName).name
+  const group = FORM_CHANGES.find((g) => g.forms.includes(name))
+  return group ? { forms: group.forms.filter((form) => form !== name), itemId: group.itemId } : null
+}
+
+/**
+ * A Pokemon in the form its held item gives it: Arceus holding a Flame Plate is
+ * Arceus-Fire, Giratina with the Griseous Core its Origin Forme, Ogerpon in a mask... and
+ * back to the plain form when it no longer holds one. The battle engine doesn't do this
+ * itself - an Arceus sent in as "Arceus" with a plate would stay Normal-type.
+ */
+export function heldItemForme<T extends PokemonSet>(set: T): T {
+  const species = Dex.species.get(set.species)
+  if (!species.exists) return set
+  const base = Dex.species.get(species.baseSpecies)
+  const itemFormes = [base.name, ...(base.otherFormes ?? [])]
+    .map((name) => Dex.species.get(name))
+    .filter((f) => f.exists && !f.battleOnly && (f.requiredItem || (f.requiredItems?.length ?? 0) > 0))
+  if (itemFormes.length === 0) return set
+  const item = toID(set.item ?? '')
+  const matched = item
+    ? itemFormes.find((f) => [f.requiredItem, ...(f.requiredItems ?? [])].some((r) => r && toID(r) === item))
+    : undefined
+  let target = species.name
+  if (matched) target = matched.name
+  else if (itemFormes.some((f) => f.name === species.name)) target = base.name
+  if (target === species.name) return set
+  const wasDefaultName = !set.name || set.name === set.species
+  return { ...set, species: target, name: wasDefaultName ? target : set.name }
+}
+
+/** A Pokemon changed into another form, taking a whole set (moves, ability, nature, EVs...) for it. */
+export function formChangedSet(set: PokemonSet, form: string, auto: AutoSetResult): PokemonSet {
+  const species = Dex.species.get(form)
+  const wasDefaultName = set.name === set.species || set.species.startsWith(`${set.name}-`)
+  return {
+    ...set,
+    species: species.name,
+    name: wasDefaultName ? species.name : set.name,
+    moves: auto.moves,
+    ability: auto.ability ?? species.abilities[0],
+    nature: auto.nature,
+    evs: auto.evs,
+    ivs: auto.ivs,
+    teraType: auto.teraType ?? set.teraType
+  }
 }
 
 export function evolveSet(set: PokemonSet, targetSpecies: string): PokemonSet {

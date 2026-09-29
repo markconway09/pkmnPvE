@@ -7,6 +7,7 @@ import SearchBar from './SearchBar'
 import GalarFossilPrompt from './GalarFossilPrompt'
 import ContextMenuPanel from './ContextMenuPanel'
 import CaseOpening from './CaseOpening'
+import BagShopTabs from './BagShopTabs'
 import { formatMoney } from './money'
 import { errorMessage, pointOf, useFloatingNotes, type NotePoint } from './FloatingNotes'
 
@@ -15,6 +16,8 @@ interface Props {
   // Selling or restoring changes the wallet and (for a restore) the box, both
   // of which the main menu is showing behind this.
   onChanged: () => void
+  // Switches over to the Shop (the tab at the top).
+  onOpenShop: () => void
 }
 
 interface MenuState {
@@ -35,7 +38,7 @@ function groupByCategory(items: BagItemView[]): [string, BagItemView[]][] {
   return groups
 }
 
-function BagModal({ onClose, onChanged }: Props): React.JSX.Element {
+function BagModal({ onClose, onChanged, onOpenShop }: Props): React.JSX.Element {
   const [items, setItems] = useState<BagItemView[] | null>(null)
   const [money, setMoney] = useState(0)
   const [error, setError] = useState<string | null>(null)
@@ -209,12 +212,7 @@ function BagModal({ onClose, onChanged }: Props): React.JSX.Element {
   return createPortal(
     <div className="modal-overlay" onMouseDown={onClose}>
       <div className="modal-panel bag-modal" onMouseDown={(e) => e.stopPropagation()}>
-        <h2>Bag</h2>
-        <p className="box-empty-hint">
-          {selection
-            ? 'Click items to pick the ones to sell - all of each.'
-            : 'Click an item to use, sell or open it, or restore a fossil.'}
-        </p>
+        <BagShopTabs current="bag" onSwitch={onOpenShop} />
         {error && <p className="editor-error">{error}</p>}
         {!items && !error && <p>Loading...</p>}
         {items && items.length === 0 && <p className="box-empty-hint">Your bag is empty.</p>}

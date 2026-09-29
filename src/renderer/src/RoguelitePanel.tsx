@@ -99,6 +99,8 @@ const locationOf = (choice: RunChoice): (typeof WILD_LOCATIONS)[number] | undefi
 
 // A TR's icon on Showdown's item sheet (every TR shares it).
 const TR_SPRITENUM = 721
+// The Choice Band on the same sheet, for item floors.
+const CHOICE_BAND_SPRITENUM = 68
 
 function NodeIcon({ choice }: { choice: RunChoice }): React.JSX.Element {
   const { kind } = choice
@@ -120,8 +122,15 @@ function NodeIcon({ choice }: { choice: RunChoice }): React.JSX.Element {
   }
   if (kind === 'swap') return <img className="big-battle-icon" src={trainerSpriteUrl('burglar')} alt="" />
   if (kind === 'heal') return <img className="big-battle-icon" src={trainerSpriteUrl('pokemoncenterlady')} alt="" />
-  const emoji: Partial<Record<RunNodeKind, string>> = { item: '🎁' }
-  return <span className="run-node-emoji">{emoji[kind] ?? '❔'}</span>
+  // An item floor shows a Choice Band, scaled up like the TR.
+  if (kind === 'item') {
+    return (
+      <span className="run-node-tr">
+        <ItemSprite spritenum={CHOICE_BAND_SPRITENUM} />
+      </span>
+    )
+  }
+  return <span className="run-node-emoji">❔</span>
 }
 
 // The copy a run starts with: the same Pokemon at Lv 5, holding nothing.

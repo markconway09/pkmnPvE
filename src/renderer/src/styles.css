@@ -38,15 +38,221 @@ textarea,
   margin: 0;
 }
 
+/* The logo and the mode switch on the left; the actions and the player card on the right. */
+.menu-header-left {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
 .menu-nav {
   display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* Classic | Roguelite, the lit half is the mode you're in. */
+.mode-switch {
+  display: flex;
+  border: 2px solid #3a4150;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.mode-switch-option {
+  padding: 7px 12px;
+  border: none;
+  border-radius: 0;
+  background: #171b22;
+  color: #7d8799;
+  font-size: 13px;
+}
+
+.mode-switch-option:hover:not(.mode-switch-active) {
+  color: #e6e6e6;
+  background: #1e242e;
+}
+
+.mode-switch-classic.mode-switch-active {
+  background: #1d3350;
+  color: #b9dcff;
+  cursor: default;
+}
+
+.mode-switch-roguelite.mode-switch-active {
+  background: #33254f;
+  color: #d9c7ff;
+  cursor: default;
+}
+
+.nav-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* The pixel-art icons on the Bag, Shop and Game Corner buttons. */
+.nav-icon {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  vertical-align: middle;
+}
+
+/* Icons on the Classic | Roguelite switch and in the player card's menu. */
+.mode-switch-option {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mode-switch-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  margin: -4px 0;
+}
+
+.mode-switch-option:not(.mode-switch-active) .mode-switch-icon {
+  filter: grayscale(0.7);
+  opacity: 0.7;
+}
+
+.nav-menu-item {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
-.menu-nav-cog {
-  font-size: 16px;
+.nav-menu-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  text-align: center;
+  line-height: 24px;
+}
+
+/* A drawn (not pixel-art) icon: scaled smoothly. */
+.nav-icon.nav-icon-smooth,
+.bag-shop-tab-icon.nav-icon-smooth {
+  image-rendering: auto;
+}
+
+/* The shop's key items: never sold - owned, or locked behind an achievement. */
+.shop-key-item-status {
+  font-size: 11px;
+  color: #8a94a6;
+  text-align: center;
+}
+
+/* The shop's items, laid out like the bag's: click one for the buy menu. */
+.shop-buyable {
+  cursor: pointer;
+}
+
+.shop-buyable:hover {
+  border-color: #6b7688;
+}
+
+.shop-unaffordable .shop-item-price {
+  color: #a8413a;
+}
+
+.shop-key-item-owned {
+  border-color: #3b8a4a;
+}
+
+.shop-key-item-owned .shop-key-item-status {
+  color: #7fd08c;
+}
+
+.shop-key-item:not(.shop-key-item-owned) .shop-item-icon {
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+
+.achievement-reward-key {
+  color: #9fd3ff;
+}
+
+.nav-icon-button:disabled .nav-icon {
+  filter: grayscale(1);
+}
+
+/* A Game Corner coin in a line of text. */
+.coin-icon {
+  width: 1.15em;
+  height: 1.15em;
+  object-fit: contain;
+  image-rendering: pixelated;
+  vertical-align: -0.2em;
+}
+
+.coin-shop-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nav-icon-button {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border-radius: 8px;
+  font-size: 19px;
   line-height: 1;
-  padding: 10px 12px;
+}
+
+/* The player card: trainer, name and title, money - a menu opens below it. */
+.nav-player-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 10px 2px 4px;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.nav-player-card-open {
+  border-color: #6b7688;
+}
+
+.nav-player-card .nav-trainer-sprite {
+  width: 38px;
+  height: 38px;
+}
+
+.nav-player-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.nav-player-name {
+  font-weight: bold;
+}
+
+.nav-player-title {
+  color: #ffd76b;
+  font-size: 11px;
+}
+
+.nav-player-money {
+  margin-left: 6px;
+  font-weight: bold;
+  color: #ffd76b;
+}
+
+.nav-player-caret {
+  color: #7d8799;
+  font-size: 11px;
+}
+
+.nav-player-menu {
+  min-width: 190px;
 }
 
 .big-battle-row {
@@ -434,7 +640,7 @@ textarea,
   pointer-events: none;
 }
 
-/* Favorite ⭐ / shiny ✨ markers, tucked in the top-left corner (the held item sits bottom-right). */
+/* Favorite ❤️ / shiny ✨ markers, tucked in the top-left corner (the held item sits bottom-right). */
 .box-icon-badges {
   position: absolute;
   top: 3px;
@@ -3483,22 +3689,11 @@ button:disabled {
 }
 
 /* The box search - shown next to the Box heading only while the box is expanded. */
-.box-search {
-  width: 280px;
-  max-width: 50vw;
-  padding: 4px 8px;
-  font: inherit;
-  font-size: 12px;
-  color: #e6e6e6;
-  background: #10141a;
-  border: 1px solid #3a4150;
-  border-radius: 3px;
+/* The expanded box's search: the same pill as the bag's and shop's. */
+.search-bar.box-search {
+  flex: 0 1 460px;
+  margin-top: 0;
   animation: box-search-in 0.25s ease;
-}
-
-.box-search:focus {
-  outline: none;
-  border-color: #6bb0ff;
 }
 
 @keyframes box-search-in {
@@ -3653,10 +3848,6 @@ button:disabled {
 }
 
 /* ---- Roguelite mode ---- */
-.mode-toggle-roguelite {
-  border-color: #b48cff;
-  color: #d9c7ff;
-}
 
 .run-panel {
   display: flex;
@@ -5525,6 +5716,21 @@ img.wild-location-icon {
   padding: 6px 10px;
 }
 
+/* The Bag | Shop tabs: an icon beside each name. */
+.bag-shop-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.bag-shop-tab-icon {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
 .game-corner-tab-active {
   border-color: #ffd76b;
   color: #ffd76b;
@@ -5702,27 +5908,270 @@ img.wild-location-icon {
 }
 
 /* Ordering the expanded box: what by, and which way round. */
+/* The box's order, sized to match the search beside it. */
 .box-sort {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   animation: box-search-in 0.25s ease;
 }
 
 .box-sort select {
-  padding: 3px 6px;
+  height: 38px;
+  padding: 0 14px;
   font: inherit;
-  font-size: 12px;
+  font-size: 14px;
   color: #e6e6e6;
+  background: #11161e;
+  border: 1px solid #3a4150;
+  border-radius: 19px;
+  cursor: pointer;
+}
+
+.box-sort select:focus {
+  outline: none;
+  border-color: #6bb0ff;
+}
+
+.box-sort-direction {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 17px;
+  line-height: 1;
+}
+
+/* The Game Corner's bet, typed. */
+.slots-bet-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.slots-bet-input {
+  width: 64px;
+  padding: 3px 6px;
+  box-sizing: border-box;
+  font: inherit;
+  font-weight: bold;
+  color: #ffd76b;
+  text-align: right;
   background: #10141a;
   border: 1px solid #3a4150;
   border-radius: 3px;
 }
 
-.box-sort-direction {
-  width: 26px;
-  height: 24px;
-  padding: 0;
-  font-size: 14px;
-  line-height: 1;
+.slots-bet-input:focus {
+  outline: none;
+  border-color: #ffd76b;
+}
+
+/* Achievements: the nav button's count of rewards waiting to be claimed, the list, and
+   the pop-up when one unlocks. */
+.nav-achievements-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  background: #d64545;
+  color: #fff;
+  font-size: 10px;
+  font-weight: bold;
+  line-height: 16px;
+  text-align: center;
+}
+
+
+.achievements-modal {
+  width: 760px;
+}
+
+.achievements-count {
+  margin-left: auto;
+  color: #ffd76b;
+  font-weight: bold;
+}
+
+.achievements-title-pick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #b7c0cf;
+}
+
+.achievement-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.achievement {
+  display: grid;
+  grid-template-columns: 32px 1fr auto 96px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: #1c212b;
+  border: 1px solid #2c3340;
+  border-radius: 6px;
+  opacity: 0.7;
+}
+
+.achievement-unlocked {
+  opacity: 1;
+  border-color: #a8872e;
+  background: #262216;
+}
+
+.achievement-claimed {
+  border-color: #2c3340;
+  background: #1c212b;
+}
+
+.achievement-icon {
+  font-size: 22px;
+  text-align: center;
+}
+
+.achievement:not(.achievement-unlocked) .achievement-icon {
+  filter: grayscale(1);
+}
+
+.achievement-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.achievement-name {
+  font-weight: bold;
+}
+
+.achievement-desc {
+  font-size: 12px;
+  color: #b7c0cf;
+}
+
+.achievement-progress {
+  position: relative;
+  height: 14px;
+  margin-top: 3px;
+  background: #11151b;
+  border: 1px solid #3a4150;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.achievement-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: #3b6fb0;
+}
+
+.achievement-progress span {
+  position: relative;
+  display: block;
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+}
+
+.achievement-reward {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  max-width: 240px;
+}
+
+.achievement-reward-chip {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  background: #11151b;
+  border: 1px solid #3a4150;
+  border-radius: 10px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.achievement-reward-title {
+  color: #ffd76b;
+}
+
+.achievement-action {
+  text-align: right;
+}
+
+.achievement-done {
+  font-size: 12px;
+  color: #7fd08c;
+}
+
+.achievement-toasts {
+  position: fixed;
+  /* Below the menu bar, so it doesn't cover the buttons. */
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10001;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.achievement-toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 260px;
+  padding: 10px 16px;
+  background: rgba(38, 34, 22, 0.96);
+  border: 2px solid #d4a833;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+  animation-name: achievement-toast;
+  animation-fill-mode: forwards;
+}
+
+.achievement-toast-icon {
+  font-size: 26px;
+}
+
+.achievement-toast-label {
+  font-size: 11px;
+  color: #d4a833;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.achievement-toast-name {
+  font-weight: bold;
+  color: #fff;
+}
+
+@keyframes achievement-toast {
+  0% {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  6% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }

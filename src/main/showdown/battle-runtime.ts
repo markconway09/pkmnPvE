@@ -17,6 +17,7 @@ import {
   liveMovePower,
   moveTypeEffectiveness,
   packTeam,
+  heldItemForme,
   parseCondition,
   pokeballPrice,
   speciesStatsAndTypes,
@@ -51,7 +52,13 @@ import {
   finishRunBattleWon,
   type RunBattleOutcome
 } from './run-store'
-import { DEFAULT_POKEBALL_ID, TRAINER_RUN_COST, prizeMoneyFor } from '../../shared/battle-types'
+import {
+  CATCHING_CHARM_FREE_CHANCE,
+  CATCHING_CHARM_ITEM_ID,
+  ITEM_CHARM_DROP_MULTIPLIER,
+  ITEM_CHARM_ITEM_ID
+} from '../../shared/battle-types'
+import { DEFAULT_POKEBALL_ID, EXP_CHARM_ITEM_ID, EXP_CHARM_MULTIPLIER, TRAINER_RUN_COST, prizeMoneyFor } from '../../shared/battle-types'
 import type {
   ActivePokemonView,
   AiDifficulty,
@@ -345,8 +352,9 @@ export class WildBattle {
     this.ai = new AIPlayer(this.streams.p2, 'p2', opponent?.difficulty ?? 'easy', (slot, moveId) =>
       this.aiMovePower(slot, moveId)
     )
-    this.p1team = p1team
-    this.p2team = opponent?.team ?? [generateRandomSingle(generationFormat)]
+    // Each in the form its held item gives it (a plated Arceus, an Origin Forme Giratina...).
+    this.p1team = p1team.map(heldItemForme)
+    this.p2team = (opponent?.team ?? [generateRandomSingle(generationFormat)]).map(heldItemForme)
 
     void this.human.start()
     void this.ai.start()
@@ -481,7 +489,9 @@ export class WildBattle {
             } else {
               countStat('wildDefeated')
             }
-            const totalExp = this.p2team.reduce((sum, mon) => sum + expYieldFor(mon.species, mon.level), 0)
+            const baseExp = this.p2team.reduce((sum, mon) => sum + expYieldFor(mon.species, mon.level), 0)
+            // The Exp. Charm: 1.5x exp.
+            const totalExp = hasItem(EXP_CHARM_ITEM_ID) ? Math.floor(baseExp * EXP_CHARM_MULTIPLIER) : baseExp
             this.expGains = awardExpToTeam(totalExp)
             awardFriendshipToTeam()
             this.itemDrops = this.rollItemDrops()
@@ -739,16 +749,18 @@ export class WildBattle {
     const catalog = new Map(getEditorOptions().items.map((i) => [i.id, i]))
     const results: ItemDropResult[] = []
     const teamDrop = this.opponent?.teamDrop
+    // The Item Charm: a wild Pokemon's drops are 1.5x as likely.
+    const dropBoost = !this.opponent?.trainerId && hasItem(ITEM_CHARM_ITEM_ID) ? ITEM_CHARM_DROP_MULTIPLIER : 1
     for (const drop of [...(this.opponent?.drops ?? []), ...(teamDrop ? [teamDrop] : [])]) {
       if (!drop.itemId || drop.chance <= 0) continue
-      if (Math.random() * 100 >= drop.chance) continue
+      if (Math.random() * 100 >= drop.chance * dropBoost) continue
       const item = catalog.get(drop.itemId)
       if (!item) continue
       addItem(item.id, 1)
       results.push({ itemId: item.id, itemName: item.name, spritenum: item.spritenum })
     }
     const randomChance = this.opponent?.randomDropChance ?? 0
-    if (randomChance > 0 && Math.random() * 100 < randomChance) {
+    if (randomChance > 0 && Math.random() * 100 < randomChance * dropBoost) {
       const pool = getWildDropPool()
       const item = pool[Math.floor(Math.random() * pool.length)]
       addItem(item.id, 1)
@@ -772,7 +784,11 @@ export class WildBattle {
       this.caught = true
       return { money: getMoney(), pokeballs: getItemQuantity(DEFAULT_POKEBALL_ID) }
     }
-    if (hasItem(DEFAULT_POKEBALL_ID)) {
+    // The Catching Charm: half the time, no Poke Ball and nothing paid.
+    const free = hasItem(CATCHING_CHARM_ITEM_ID) && Math.random() < CATCHING_CHARM_FREE_CHANCE
+    if (free) {
+      // Nothing spent.
+    } else if (hasItem(DEFAULT_POKEBALL_ID)) {
       removeItem(DEFAULT_POKEBALL_ID, 1)
     } else {
       const price = pokeballPrice()
@@ -781,7 +797,7 @@ export class WildBattle {
     addCaughtMon(this.p2team[0])
     this.caught = true
     countStat('wildCaught')
-    return { money: getMoney(), pokeballs: getItemQuantity(DEFAULT_POKEBALL_ID) }
+    return { money: getMoney(), pokeballs: getItemQuantity(DEFAULT_POKEBALL_ID), free }
   }
 
   // What running costs here, or null if it isn't allowed: a wild encounter is free, an

@@ -5,6 +5,7 @@ import { CONFIRM_SELL_TIERS, toSpriteId } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
 import ItemSprite from './ItemSprite'
 import { formatMoney } from './money'
+import { playTick } from './ticks'
 
 interface Props {
   // What the Random Pokemon / Random Legendary was, and what it gave.
@@ -30,19 +31,6 @@ const TIER_LABELS: Record<RarityTier, string> = {
   rare: 'Rare',
   epic: 'Mythical',
   legendary: 'Legendary'
-}
-
-// A short click for each card that passes the marker, made on the spot - no sound file needed.
-function playTick(audio: AudioContext): void {
-  const osc = audio.createOscillator()
-  const gain = audio.createGain()
-  osc.type = 'square'
-  osc.frequency.value = 1400
-  gain.gain.setValueAtTime(0.04, audio.currentTime)
-  gain.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + 0.04)
-  osc.connect(gain).connect(audio.destination)
-  osc.start()
-  osc.stop(audio.currentTime + 0.05)
 }
 
 /**

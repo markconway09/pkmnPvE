@@ -1,10 +1,13 @@
 import type { ItemQuantity, SellResult, ShopItemEntry, ShopPriceEntry } from '../../shared/battle-types'
-import { addItem, getBagState, getItemQuantity, removeItem } from './bag-store'
+import { KEY_ITEM_IDS } from '../../shared/battle-types'
+import { ACHIEVEMENTS } from '../../shared/achievements'
+import { addItem, getBagState, getItemQuantity, hasItem, removeItem } from './bag-store'
 import { ownsSpecies } from './box-store'
 import { addMoney, getMoney, spendMoney } from './money-store'
 import { setShopPriceOverride } from './shop-price-store'
 import {
   getDefaultShopCatalog,
+  getEditorOptions,
   getShopCatalog,
   isLateGameItem,
   quickSellKind,
@@ -20,8 +23,26 @@ function buyableCatalog(): ShopItemEntry[] {
   return getShopCatalog().filter((i) => !isLateGameItem(i.id))
 }
 
+/**
+ * The shop's shelves: what can be bought, with the key items shown after the Recommended
+ * ones - never for sale, just whether the player has each and the achievement that
+ * unlocks it.
+ */
 export function listShop(): ShopItemEntry[] {
-  return buyableCatalog()
+  const catalog = buyableCatalog()
+  const keyItems: ShopItemEntry[] = getEditorOptions()
+    .items.filter((item) => KEY_ITEM_IDS.has(item.id))
+    .map((item) => ({
+      ...item,
+      price: 0,
+      category: 'Key Items',
+      keyItem: {
+        owned: hasItem(item.id),
+        unlockedBy: ACHIEVEMENTS.find((a) => a.reward.keyItems?.includes(item.id))?.name ?? 'an achievement'
+      }
+    }))
+  const afterRecommended = catalog.filter((i) => i.category === 'Recommended').length
+  return [...catalog.slice(0, afterRecommended), ...keyItems, ...catalog.slice(afterRecommended)]
 }
 
 /** The whole shop with each item's default price beside its current one, for the admin price editor. */

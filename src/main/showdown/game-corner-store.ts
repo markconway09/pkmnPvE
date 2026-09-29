@@ -1,12 +1,13 @@
 import { randomInt } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
 import type { CoinBalance, SlotRules, SlotSpinResult } from '../../shared/slots'
-import { COIN_PACKS, COIN_PRICE, COIN_PRIZES, SLOT_REELS, SLOT_RULES, slotWins } from '../../shared/slots'
+import { COIN_PACKS, COIN_PRICE, COIN_PRIZES, MAX_BET, SLOT_REELS, SLOT_RULES, slotWins } from '../../shared/slots'
 import { getMoney, spendMoney } from './money-store'
 import { addItem } from './bag-store'
 import { getEditorOptions, randomSlotPokemon } from './sim-access'
 import { playerPathFor } from './save-paths'
 import { onPlayerChange } from './player-session'
+import { countAchievement } from './achievement-progress'
 
 /**
  * The Game Corner: the player's coins (bought with Poke Dollars, never sold back), the
@@ -76,12 +77,16 @@ export function buyCoinPrize(itemId: string): CoinBalance & { itemName: string }
 /** One pull of the slot machine: takes the bet (any whole number of coins it has), stops each reel at random, pays the rows. */
 export function spinSlots(bet: number): SlotSpinResult {
   if (!Number.isInteger(bet) || bet < 1) throw new Error('Bet at least 1 coin')
+  if (bet > MAX_BET) throw new Error(`Bet at most ${MAX_BET} coins`)
   if (getCoins() < bet) throw new Error('Not enough coins - buy some at the Coin Shop')
   const stops = SLOT_REELS.map((strip) => randomInt(strip.length))
   const wins = slotWins(stops, bet)
   const payout = wins.reduce((sum, w) => sum + w.payout, 0)
   getState().coins += payout - bet
   persist()
+  countAchievement('slotSpins')
+  countAchievement('slotCoinsWon', payout)
+  if (wins.some((w) => w.symbol === 'gholdengo')) countAchievement('jackpots')
   return { stops, wins, payout, coins: getCoins() }
 }
 

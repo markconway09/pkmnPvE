@@ -22,7 +22,21 @@ const SYNTHETIC_SPRITES: Record<number, string> = {
   '-7': './sprites/misc/expcandyl.png', // Exp. Candy L
   '-8': './sprites/misc/shinypatch.png', // Shiny Patch (Serebii's Ability Patch icon)
   '-9': './sprites/misc/lockcapsule.png', // Lock Capsule (Serebii)
-  '-10': './sprites/misc/gsball.png' // Random Pokemon (Serebii's GS Ball)
+  '-10': './sprites/misc/gsball.png', // Random Pokemon (Serebii's GS Ball)
+  '-11': './sprites/misc/rotomcatalog.png', // Rotom Catalog (Serebii)
+  '-12': './sprites/misc/expcharm.png', // Exp. Charm (Serebii)
+  '-13': './sprites/misc/shinycharm.png', // Shiny Charm (Serebii)
+  '-14': './sprites/misc/nsolarizer.png', // N-Solarizer (Serebii)
+  '-15': './sprites/misc/nlunarizer.png', // N-Lunarizer (Serebii)
+  '-16': './sprites/misc/dnasplicers.png', // DNA Splicers (Serebii)
+  '-17': './sprites/misc/reinsofunity.png', // Reins of Unity (Serebii)
+  '-18': './sprites/misc/friendshipcharm.png', // Friendship Charm (Serebii's Oval Charm)
+  '-19': './sprites/misc/catchingcharm.png', // Catching Charm (Serebii)
+  '-20': './sprites/misc/itemcharm.png', // Item Charm (Serebii's Mark Charm)
+  '-21': './sprites/misc/prisonbottle.png', // Prison Bottle (Serebii)
+  '-22': './sprites/misc/revealglass.png', // Reveal Glass (Serebii)
+  '-23': './sprites/misc/gracidea.png', // Gracidea (Serebii)
+  '-24': './sprites/misc/meteorite.png' // Meteorite (Serebii)
 }
 
 function ItemSprite({ spritenum, className }: Props): React.JSX.Element {

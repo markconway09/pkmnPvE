@@ -4,11 +4,13 @@ import type { SlotLineWin, SlotSpinResult, SlotSymbol } from '../../shared/slots
 import type { SlotRules } from '../../shared/slots'
 import { SLOT_LINES, SLOT_RULES } from '../../shared/slots'
 import ItemSprite from './ItemSprite'
-import BetSlider, { placedBet } from './BetSlider'
+import BetSlider, { maxBet, placedBet, useSavedBet } from './BetSlider'
 import GameCornerTabs from './GameCornerTabs'
 import SpriteImage from './SpriteImage'
 import { toSpriteId } from '../../shared/battle-types'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
+import { playClunk, playTick } from './ticks'
+import CoinIcon from './CoinIcon'
 
 interface Props {
   onClose: () => void
@@ -49,12 +51,12 @@ function SymbolIcon({ symbol, pokemon }: { symbol: SlotSymbol; pokemon: SlotPoke
 /**
  * The Game Corner slot machine: three reels that stop on their own, left to right, on
  * where the main process already stopped them (see spinSlots). Every spin plays five
- * lines (the rows and both diagonals); the bet (a slider, up to every coin held)
+ * lines (the rows and both diagonals); the bet (a slider, up to every coin held or MAX_BET)
  * multiplies whatever they win, and the winning lines light up once the last reel stops.
  */
 function SlotMachine({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JSX.Element {
   const [coins, setCoins] = useState<number | null>(null)
-  const [betWanted, setBet] = useState(10)
+  const [betWanted, setBet] = useSavedBet('slots')
   const [spinning, setSpinning] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Each reel's middle symbol right now, and how it's drawn: the strip's offset and
@@ -69,6 +71,7 @@ function SlotMachine({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JS
   const [wins, setWins] = useState<SlotLineWin[]>([])
   const spinButtonRef = useRef<HTMLButtonElement>(null)
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
+  const stripRefs = useRef<(HTMLDivElement | null)[]>([])
   const notes = useFloatingNotes()
   // The reels and payouts as the main process has them (see SLOT_RULES) - this copy is
   // only until they arrive.
@@ -122,6 +125,48 @@ function SlotMachine({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JS
     )
   }
 
+  // The sound of a spin: a click each time a new symbol reaches the middle row of any
+  // reel (following the strips as they really move, so it slows down with them), and a
+  // clunk as each reel lands.
+  useEffect(() => {
+    if (!spinning || !animating) return
+    let audio: AudioContext | null = null
+    try {
+      audio = new AudioContext()
+    } catch {
+      return
+    }
+    const sound = audio
+    const lastCell: (number | null)[] = rules.reels.map(() => null)
+    let lastTickAt = 0
+    let raf = 0
+    const follow = (): void => {
+      stripRefs.current.forEach((strip, r) => {
+        if (!strip) return
+        const y = new DOMMatrixReadOnly(getComputedStyle(strip).transform).m42
+        const cell = Math.round(-y / CELL)
+        if (lastCell[r] !== null && cell !== lastCell[r]) {
+          // Three reels at full speed would be a buzz - at most one click every 30ms.
+          const now = performance.now()
+          if (now - lastTickAt > 30) {
+            lastTickAt = now
+            playTick(sound, 1300 + r * 150, 0.03)
+          }
+        }
+        lastCell[r] = cell
+      })
+      raf = requestAnimationFrame(follow)
+    }
+    raf = requestAnimationFrame(follow)
+    const landings = REEL_SPIN_MS.map((ms) => setTimeout(() => playClunk(sound), ms))
+    return () => {
+      cancelAnimationFrame(raf)
+      landings.forEach(clearTimeout)
+      // Let the last clunk ring out before closing the sound.
+      setTimeout(() => void sound.close(), 300)
+    }
+  }, [spinning, animating, rules])
+
   // The last reel has stopped: pay out, light the winning rows.
   function settle(result: SlotSpinResult): void {
     setSpinning(false)
@@ -145,7 +190,8 @@ function SlotMachine({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JS
         <GameCornerTabs current="slots" disabled={spinning} onSwitch={onSwitchGame} />
         <div className="slots-header">
           <h2>Slot Machine</h2>
-          <span className="slots-coins">🪙 {coins === null ? '…' : coins.toLocaleString('en-US')} coins</span>
+          <span className="slots-coins">
+            <CoinIcon /> {coins === null ? '…' : coins.toLocaleString('en-US')} coins</span>
         </div>
 
         <div className="slots-machine">
@@ -153,6 +199,9 @@ function SlotMachine({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JS
             {rules.reels.map((strip, r) => (
               <div key={r} className="slots-reel" style={{ height: CELL * 3 }}>
                 <div
+                  ref={(el) => {
+                    stripRefs.current[r] = el
+                  }}
                   className="slots-strip"
                   style={{
                     transform: `translateY(${offsets[r]}px)`,
@@ -183,7 +232,7 @@ function SlotMachine({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JS
         </div>
 
         <div className="slots-controls">
-          <BetSlider bet={bet} max={Math.max(1, coins ?? 1)} disabled={spinning || !coins} onChange={setBet} />
+          <BetSlider bet={bet} max={maxBet(coins)} disabled={spinning || !coins} onChange={setBet} />
           <button
             ref={spinButtonRef}
             className="slots-spin"
@@ -228,8 +277,8 @@ function SlotMachine({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JS
         </div>
 
         <div className="editor-actions">
-          <button onClick={onOpenCoinShop} disabled={spinning}>
-            Coin Shop
+          <button className="coin-shop-button" onClick={onOpenCoinShop} disabled={spinning}>
+            <CoinIcon /> Coin Shop
           </button>
           <button onClick={onClose} disabled={spinning}>
             Close

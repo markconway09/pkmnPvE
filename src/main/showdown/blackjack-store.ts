@@ -2,7 +2,9 @@ import { randomInt } from 'node:crypto'
 import type { BlackjackOutcome, BlackjackView, Card } from '../../shared/blackjack'
 import { CARD_RANKS, CARD_SUITS, RESHUFFLE_BELOW, SHOE_DECKS, handValue, isBlackjack } from '../../shared/blackjack'
 import { changeCoins, getCoins } from './game-corner-store'
+import { MAX_BET } from '../../shared/slots'
 import { onPlayerChange } from './player-session'
+import { countAchievement } from './achievement-progress'
 
 /**
  * Game Corner blackjack, dealt and settled here (the renderer only shows the table - see
@@ -109,6 +111,8 @@ function finish(current: Round, outcome: BlackjackOutcome): void {
   current.done = true
   current.outcome = outcome
   current.returned = returned
+  if (outcome === 'win' || outcome === 'blackjack') countAchievement('blackjackWins')
+  if (outcome === 'blackjack') countAchievement('naturalBlackjacks')
 }
 
 function activeRound(): Round {
@@ -124,6 +128,7 @@ export function getBlackjackView(): BlackjackView {
 export function dealBlackjack(bet: number): BlackjackView {
   if (round && !round.done) throw new Error('Finish this hand first')
   if (!Number.isInteger(bet) || bet < 1) throw new Error('Bet at least 1 coin')
+  if (bet > MAX_BET) throw new Error(`Bet at most ${MAX_BET} coins`)
   changeCoins(-bet)
   if (shoe.length < RESHUFFLE_BELOW) shoe = freshShoe()
   const current: Round = { bet, player: [], dealer: [], doubled: false, done: false, outcome: null, returned: 0 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import AchievementToasts from './AchievementToasts'
 import type {
   BattleView,
   AbilityEvent,
@@ -1040,14 +1041,17 @@ function App(): React.JSX.Element {
   const initialTrainerSprite =
     session.trainerSprite ?? (session.players.length <= 1 ? loadLegacyTrainerSprite() : 'red')
   return (
-    <Game
-      key={session.username}
-      username={session.username}
-      isAdmin={session.isAdmin}
-      initialTrainerSprite={initialTrainerSprite}
-      savedTrainerSprite={session.trainerSprite !== null}
-      onLogout={logout}
-    />
+    <>
+      <Game
+        key={session.username}
+        username={session.username}
+        isAdmin={session.isAdmin}
+        initialTrainerSprite={initialTrainerSprite}
+        savedTrainerSprite={session.trainerSprite !== null}
+        onLogout={logout}
+      />
+      <AchievementToasts />
+    </>
   )
 }
 

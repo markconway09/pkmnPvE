@@ -41,6 +41,8 @@ function BattleResultModal({
   const [money, setMoney] = useState<number | null>(null)
   const [pokeballPrice, setPokeballPrice] = useState(POKEBALL_PRICE)
   const [caught, setCaught] = useState(false)
+  // The Catching Charm made the catch free.
+  const [freeCatch, setFreeCatch] = useState(false)
   // A run whose team is full picks who the catch replaces - the team, while choosing.
   const [replacing, setReplacing] = useState<RunMonView[] | null>(null)
   const [busy, setBusy] = useState(false)
@@ -73,6 +75,7 @@ function BattleResultModal({
       setPokeballs(result.pokeballs)
       setMoney(result.money)
       setCaught(true)
+      setFreeCatch(!!result.free)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -84,7 +87,9 @@ function BattleResultModal({
   const canAfford = (money ?? 0) >= pokeballPrice
   const catchDisabled = runBattle ? busy || caught : busy || caught || pokeballs === null || (!hasPokeballs && !canAfford)
   const catchLabel = caught
-    ? 'Caught!'
+    ? freeCatch
+      ? 'Caught! (free - Catching Charm)'
+      : 'Caught!'
     : runBattle
       ? 'Catch it for your run'
       : hasPokeballs

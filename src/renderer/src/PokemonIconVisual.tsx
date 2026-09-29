@@ -25,7 +25,7 @@ function PokemonIconVisual({ mon }: Props): React.JSX.Element {
       )}
       {(mon.favorite || mon.shiny) && (
         <span className="box-icon-badges">
-          {mon.favorite && <span title="Favorite">⭐</span>}
+          {mon.favorite && <span title="Favorite">❤️</span>}
           {mon.shiny && <span title="Shiny">✨</span>}
         </span>
       )}

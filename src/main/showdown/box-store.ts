@@ -14,7 +14,11 @@ import {
   FRIENDSHIP_PER_BATTLE,
   MAX_HAPPINESS,
   POKEMON_SELL_PRICES,
+  FRIENDSHIP_CHARM_ITEM_ID,
+  FRIENDSHIP_CHARM_MULTIPLIER,
+  FUSIONS,
   RARE_CANDY_ITEM_ID,
+  ROTOM_CATALOG_ITEM_ID,
   SHINY_PATCH_ITEM_ID
 } from '../../shared/battle-types'
 import {
@@ -33,7 +37,12 @@ import {
   nationalDexForms,
   evolutionOptionsFor,
   evolveSet,
+  formChangedSet,
+  formChangeFor,
+  getItemSpritenumById,
+  heldItemForme,
   generateRandomSingle,
+  getEditorOptions,
   getItemSpritenum,
   pickRandomUnevolvedSpecies,
   toEditableSet,
@@ -46,12 +55,16 @@ import { addItem, bagItemUse, hasItem, removeItem } from './bag-store'
 import { playerDirFor, playerPathFor } from './save-paths'
 import { onPlayerChange } from './player-session'
 import { addMoney } from './money-store'
+import { countAchievement } from './achievement-progress'
+import { buildAutoSet, listAutoSets } from './auto-sets'
 
 interface StoredMon {
   id: string
   set: PokemonSet
   exp: number
   favorite?: boolean
+  // A fused Necrozma, Kyurem or Calyrex: the partner inside it, handed back on unfusing.
+  fusedWith?: StoredMon
 }
 
 interface StoredBox {
@@ -82,6 +95,8 @@ function load(): StoredBox {
     for (const mon of parsed.mons) {
       // A held item taken out of the game becomes its modern twin (or goes).
       if (mon.set.item) mon.set.item = unretiredHeldItem(mon.set.item)
+      // In the form its held item gives it (see heldItemForme).
+      mon.set = heldItemForme(mon.set)
       if (typeof mon.exp !== 'number') mon.exp = totalExpForSpeciesLevel(mon.set.species, mon.set.level)
       // Exp once kept piling up past the level cap (the level stopped, the exp
       // didn't). Anything beyond the Pokemon's current level is trimmed back to
@@ -180,6 +195,12 @@ function toView(mon: StoredMon, arrival: number): BoxPokemonView {
   }
   const canLevelUpWithCandy = mon.set.level < getProgression().levelCap && hasItem(RARE_CANDY_ITEM_ID)
   const canUseShinyPatch = !mon.set.shiny && hasItem(SHINY_PATCH_ITEM_ID)
+  const formChange = formChangeFor(mon.set.species)
+  const formChanges =
+    formChange && hasItem(formChange.itemId)
+      ? { forms: formChange.forms, itemName: itemName(formChange.itemId), spritenum: getItemSpritenumById(formChange.itemId) }
+      : undefined
+  const fusion = fusionOptionsFor(mon)
   const itemSpritenum = mon.set.item ? getItemSpritenum(mon.set.item) : null
   return {
     id: mon.id,
@@ -190,6 +211,9 @@ function toView(mon: StoredMon, arrival: number): BoxPokemonView {
     registeredEvolutions: eligibleEvolutions.filter(hasRegisteredSpecies),
     canLevelUpWithCandy,
     canUseShinyPatch,
+    formChanges,
+    fusions: fusion.fusions,
+    unfuse: fusion.unfuse,
     itemSpritenum,
     favorite: !!mon.favorite,
     rarityTier: speciesRarityTier(mon.set.species),
@@ -197,6 +221,47 @@ function toView(mon: StoredMon, arrival: number): BoxPokemonView {
     bst: bstOf(mon.set.species),
     arrival,
     ...buildPokemonSummary(mon.set.species, mon.set)
+  }
+}
+
+// The Reveal Glass's four: any one of them unlocks it.
+const FORCES_OF_NATURE = new Set(['Tornadus', 'Thundurus', 'Landorus', 'Enamorus'])
+
+/** What the box holds, for achievements: its shiny and legendary Pokemon, and the Pokedex. */
+export function boxAchievementStats(): {
+  rotom: number
+  necrozma: number
+  kyurem: number
+  calyrex: number
+  hoopa: number
+  forces: number
+  shaymin: number
+  deoxys: number
+  shiny: number
+  legendaryClass: number
+  restricted: number
+  dexSpecies: number
+  dexForms: number
+} {
+  const box = getState()
+  if (!box.registeredForms || !box.registered) registerOwnedSpecies()
+  const tiers = box.mons.map((m) => speciesRarityTier(m.set.species))
+  const species = box.registered!.length
+  return {
+    rotom: box.mons.filter((m) => baseSpeciesOf(m.set.species) === 'Rotom').length,
+    necrozma: box.mons.filter((m) => baseSpeciesOf(m.set.species) === 'Necrozma').length,
+    kyurem: box.mons.filter((m) => baseSpeciesOf(m.set.species) === 'Kyurem').length,
+    calyrex: box.mons.filter((m) => baseSpeciesOf(m.set.species) === 'Calyrex').length,
+    hoopa: box.mons.filter((m) => baseSpeciesOf(m.set.species) === 'Hoopa').length,
+    forces: box.mons.filter((m) => FORCES_OF_NATURE.has(baseSpeciesOf(m.set.species))).length,
+    shaymin: box.mons.filter((m) => baseSpeciesOf(m.set.species) === 'Shaymin').length,
+    deoxys: box.mons.filter((m) => baseSpeciesOf(m.set.species) === 'Deoxys').length,
+    shiny: box.mons.filter((m) => m.set.shiny).length,
+    legendaryClass: tiers.filter((t) => t === 'epic' || t === 'legendary').length,
+    restricted: tiers.filter((t) => t === 'legendary').length,
+    dexSpecies: species,
+    // Every registered form past each species' own entry.
+    dexForms: Math.max(0, box.registeredForms!.length - species)
   }
 }
 
@@ -245,11 +310,14 @@ export function sellMon(id: string): { sold: number; species: string; money: num
   const index = box.mons.findIndex((m) => m.id === id)
   if (index === -1) throw new Error(`Unknown Pokemon id: ${id}`)
   if (box.mons.length <= 1) throw new Error("That's your last Pokemon - it can't be sold")
+  if (box.mons[index].fusedWith) throw new Error('Unfuse it first - its partner would be sold with it')
   const [mon] = box.mons.splice(index, 1)
   box.team = box.team.map((slot) => (slot === id ? null : slot))
   const sold = POKEMON_SELL_PRICES[speciesRarityTier(mon.set.species)]
   const money = addMoney(sold)
   persist()
+  countAchievement('pokemonSold')
+  if (mon.set.shiny) countAchievement('shinySold')
   return { sold, species: mon.set.species, money, box: getBoxState() }
 }
 
@@ -299,7 +367,8 @@ export function updateMon(id: string, input: EditablePokemonSet, admin = false):
     }
     if (previousItem) addItem(toID(previousItem), 1)
   }
-  mon.set = applyEditableSet(mon.set, input)
+  // In the form its (possibly new) held item gives it - see heldItemForme.
+  mon.set = heldItemForme(applyEditableSet(mon.set, input))
   // Exp progress only depends on species/level, and only a manual change to
   // one of those is an absolute override (reset to exactly the start of
   // whatever level/species was set, same as a freshly caught Pokemon) -
@@ -426,7 +495,9 @@ export function useExpCandy(itemId: string): ExpGainResult[] {
 // closer to its trainer after a battle won, whether or not it had exp to
 // gain. Capped at MAX_HAPPINESS. Deliberately not part of ExpGainResult: it's
 // never shown on the battle result screen.
-export function awardFriendshipToTeam(amount = FRIENDSHIP_PER_BATTLE): void {
+export function awardFriendshipToTeam(baseAmount = FRIENDSHIP_PER_BATTLE): void {
+  // The Friendship Charm: twice as much.
+  const amount = hasItem(FRIENDSHIP_CHARM_ITEM_ID) ? baseAmount * FRIENDSHIP_CHARM_MULTIPLIER : baseAmount
   const byId = new Map(getState().mons.map((m) => [m.id, m]))
   for (const id of getState().team) {
     const mon = id ? byId.get(id) : undefined
@@ -453,6 +524,7 @@ export function evolveMon(id: string, targetSpecies: string): BoxState {
   }
   mon.set = evolveSet(mon.set, targetSpecies)
   persist()
+  countAchievement('evolutions')
   return getBoxState()
 }
 
@@ -467,6 +539,100 @@ export function levelUpMon(id: string): BoxState {
   if (!removeItem(RARE_CANDY_ITEM_ID, 1)) throw new Error(`You don't have a Rare Candy`)
   mon.set.level += 1
   mon.exp = totalExpForSpeciesLevel(mon.set.species, mon.set.level)
+  persist()
+  return getBoxState()
+}
+
+/**
+ * The Rotom Catalog: changes a Rotom into another of its forms (the catalog isn't used
+ * up), with the new form's best Smogon set - moves, ability, nature, EVs and IVs - fitted
+ * to its level. Its held item stays.
+ */
+function itemName(itemId: string): string {
+  return getEditorOptions().items.find((i) => i.id === itemId)?.name ?? itemId
+}
+
+// The fusion menu entries for a Pokemon: the partners in the box a plain Necrozma, Kyurem
+// or Calyrex can fuse with (fusion item in the bag), or who a fused one would hand back.
+function fusionOptionsFor(mon: StoredMon): Pick<BoxPokemonView, 'fusions' | 'unfuse'> {
+  if (mon.fusedWith) {
+    const rule = FUSIONS.find((f) => f.result === mon.set.species)
+    if (!rule || !hasItem(rule.itemId)) return {}
+    return { unfuse: { partnerSpecies: mon.fusedWith.set.species, itemName: itemName(rule.itemId) } }
+  }
+  const rules = FUSIONS.filter((f) => f.base === mon.set.species && hasItem(f.itemId))
+  if (rules.length === 0) return {}
+  const fusions = rules.flatMap((rule) =>
+    getState()
+      .mons.filter((m) => m.id !== mon.id && !m.fusedWith && baseSpeciesOf(m.set.species) === rule.partner)
+      .map((m) => ({
+        partnerId: m.id,
+        partnerSpecies: m.set.species,
+        partnerLevel: m.set.level,
+        result: rule.result,
+        itemName: itemName(rule.itemId)
+      }))
+  )
+  return fusions.length > 0 ? { fusions } : {}
+}
+
+// A Pokemon taking a new form, with the new form's best Smogon set fitted to its level.
+function withSmogonSet(set: PokemonSet, form: string): PokemonSet {
+  const [best] = listAutoSets(form)
+  return formChangedSet(set, form, buildAutoSet(form, set.level, best.id, false))
+}
+
+/**
+ * Fuses a plain Necrozma, Kyurem or Calyrex with a partner from the box (with the right
+ * fusion item - never used up): the partner leaves the box (and team) and waits inside
+ * until unfused, and the fused Pokemon takes a Smogon set for its new form.
+ */
+export function fuseMon(id: string, partnerId: string): BoxState {
+  const box = getState()
+  const mon = box.mons.find((m) => m.id === id)
+  const partner = box.mons.find((m) => m.id === partnerId)
+  if (!mon || !partner || mon === partner) throw new Error('Unknown Pokemon')
+  if (mon.fusedWith || partner.fusedWith) throw new Error('One of those is already fused')
+  const rule = FUSIONS.find((f) => f.base === mon.set.species && f.partner === baseSpeciesOf(partner.set.species))
+  if (!rule) throw new Error(`${mon.set.species} can't fuse with ${partner.set.species}`)
+  if (!hasItem(rule.itemId)) throw new Error(`You don't have the ${itemName(rule.itemId)}`)
+  box.mons = box.mons.filter((m) => m !== partner)
+  box.team = box.team.map((slot) => (slot === partner.id ? null : slot))
+  mon.fusedWith = partner
+  mon.set = withSmogonSet(mon.set, rule.result)
+  persist()
+  return getBoxState()
+}
+
+/** Splits a fused Pokemon back up: it returns to its plain form (with a set for it), and its partner rejoins the box. */
+export function unfuseMon(id: string): BoxState {
+  const box = getState()
+  const mon = box.mons.find((m) => m.id === id)
+  if (!mon?.fusedWith) throw new Error("That Pokemon isn't fused")
+  const rule = FUSIONS.find((f) => f.result === mon.set.species)
+  if (!rule) throw new Error(`${mon.set.species} can't be unfused`)
+  if (!hasItem(rule.itemId)) throw new Error(`You don't have the ${itemName(rule.itemId)}`)
+  const partner = mon.fusedWith
+  delete mon.fusedWith
+  mon.set = withSmogonSet(mon.set, rule.base)
+  box.mons.push(partner)
+  persist()
+  return getBoxState()
+}
+
+/**
+ * A form-change key item (the Rotom Catalog, Prison Bottle, Reveal Glass, Gracidea or
+ * Meteorite - never used up): changes a Pokemon into another of its forms, with the new
+ * form's best Smogon set - moves, ability, nature, EVs and IVs - fitted to its level. Its
+ * held item stays.
+ */
+export function changeForm(id: string, form: string): BoxState {
+  const mon = getState().mons.find((m) => m.id === id)
+  if (!mon) throw new Error(`Unknown Pokemon id: ${id}`)
+  const change = formChangeFor(mon.set.species)
+  if (!change || !change.forms.includes(form)) throw new Error(`${mon.set.species} can't change into ${form}`)
+  if (!hasItem(change.itemId)) throw new Error(`You don't have the ${itemName(change.itemId)}`)
+  mon.set = withSmogonSet(mon.set, form)
   persist()
   return getBoxState()
 }

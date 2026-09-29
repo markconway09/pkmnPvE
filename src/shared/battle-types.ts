@@ -37,6 +37,84 @@ export const EXP_CANDY_EXP: Record<string, number> = {
 // see getEditorOptions() in sim-access.ts.
 export const SHINY_PATCH_ITEM_ID = 'shinypatch'
 
+// Key items: never bought or sold - each is unlocked by an achievement and kept for good.
+// The Rotom Catalog changes a Rotom's form from its right-click menu; the Exp. Charm gives
+// 1.5x exp from battles; the Shiny Charm triples the odds of a shiny wild one.
+export const ROTOM_CATALOG_ITEM_ID = 'rotomcatalog'
+export const EXP_CHARM_ITEM_ID = 'expcharm'
+export const SHINY_CHARM_ITEM_ID = 'shinycharm'
+export const EXP_CHARM_MULTIPLIER = 1.5
+export const SHINY_CHARM_MULTIPLIER = 3
+// The Friendship Charm doubles the friendship from each battle won; the Catching Charm
+// makes half of all catches free (no Poke Ball used, nothing paid); the Item Charm makes
+// a wild Pokemon's item drops 1.5x as likely.
+export const FRIENDSHIP_CHARM_ITEM_ID = 'friendshipcharm'
+export const CATCHING_CHARM_ITEM_ID = 'catchingcharm'
+export const ITEM_CHARM_ITEM_ID = 'itemcharm'
+export const FRIENDSHIP_CHARM_MULTIPLIER = 2
+export const CATCHING_CHARM_FREE_CHANCE = 0.5
+export const ITEM_CHARM_DROP_MULTIPLIER = 1.5
+// The fusion items: each fuses a legendary with its partner (who waits inside until
+// they're unfused) - see FUSIONS.
+export const N_SOLARIZER_ITEM_ID = 'nsolarizer'
+export const N_LUNARIZER_ITEM_ID = 'nlunarizer'
+export const DNA_SPLICERS_ITEM_ID = 'dnasplicers'
+export const REINS_OF_UNITY_ITEM_ID = 'reinsofunity'
+// The form-change items (see FORM_CHANGES).
+export const PRISON_BOTTLE_ITEM_ID = 'prisonbottle'
+export const REVEAL_GLASS_ITEM_ID = 'revealglass'
+export const GRACIDEA_ITEM_ID = 'gracidea'
+export const METEORITE_ITEM_ID = 'meteorite'
+export const KEY_ITEM_IDS = new Set([
+  ROTOM_CATALOG_ITEM_ID,
+  EXP_CHARM_ITEM_ID,
+  SHINY_CHARM_ITEM_ID,
+  FRIENDSHIP_CHARM_ITEM_ID,
+  CATCHING_CHARM_ITEM_ID,
+  ITEM_CHARM_ITEM_ID,
+  N_SOLARIZER_ITEM_ID,
+  N_LUNARIZER_ITEM_ID,
+  DNA_SPLICERS_ITEM_ID,
+  REINS_OF_UNITY_ITEM_ID,
+  PRISON_BOTTLE_ITEM_ID,
+  REVEAL_GLASS_ITEM_ID,
+  GRACIDEA_ITEM_ID,
+  METEORITE_ITEM_ID
+])
+
+// The form-change key items: with one in the bag, a Pokemon in its group can be changed
+// into any other form in that group from its right-click menu.
+export const FORM_CHANGES: { itemId: string; forms: string[] }[] = [
+  {
+    itemId: ROTOM_CATALOG_ITEM_ID,
+    forms: ['Rotom', 'Rotom-Heat', 'Rotom-Wash', 'Rotom-Frost', 'Rotom-Fan', 'Rotom-Mow']
+  },
+  { itemId: PRISON_BOTTLE_ITEM_ID, forms: ['Hoopa', 'Hoopa-Unbound'] },
+  { itemId: REVEAL_GLASS_ITEM_ID, forms: ['Tornadus', 'Tornadus-Therian'] },
+  { itemId: REVEAL_GLASS_ITEM_ID, forms: ['Thundurus', 'Thundurus-Therian'] },
+  { itemId: REVEAL_GLASS_ITEM_ID, forms: ['Landorus', 'Landorus-Therian'] },
+  { itemId: REVEAL_GLASS_ITEM_ID, forms: ['Enamorus', 'Enamorus-Therian'] },
+  { itemId: GRACIDEA_ITEM_ID, forms: ['Shaymin', 'Shaymin-Sky'] },
+  { itemId: METEORITE_ITEM_ID, forms: ['Deoxys', 'Deoxys-Attack', 'Deoxys-Defense', 'Deoxys-Speed'] }
+]
+
+export interface FusionRule {
+  // The Pokemon fused (in its plain form), the partner taken in, and what they become.
+  base: string
+  partner: string
+  result: string
+  itemId: string
+}
+
+export const FUSIONS: FusionRule[] = [
+  { base: 'Necrozma', partner: 'Solgaleo', result: 'Necrozma-Dusk-Mane', itemId: N_SOLARIZER_ITEM_ID },
+  { base: 'Necrozma', partner: 'Lunala', result: 'Necrozma-Dawn-Wings', itemId: N_LUNARIZER_ITEM_ID },
+  { base: 'Kyurem', partner: 'Zekrom', result: 'Kyurem-Black', itemId: DNA_SPLICERS_ITEM_ID },
+  { base: 'Kyurem', partner: 'Reshiram', result: 'Kyurem-White', itemId: DNA_SPLICERS_ITEM_ID },
+  { base: 'Calyrex', partner: 'Glastrier', result: 'Calyrex-Ice', itemId: REINS_OF_UNITY_ITEM_ID },
+  { base: 'Calyrex', partner: 'Spectrier', result: 'Calyrex-Shadow', itemId: REINS_OF_UNITY_ITEM_ID }
+]
+
 // Bag-only items: they exist to be spent, not held in battle, so the held-item
 // picker leaves them out.
 export const NON_HELD_ITEM_IDS = new Set([
@@ -45,6 +123,7 @@ export const NON_HELD_ITEM_IDS = new Set([
   BLACK_AUGURITE_ITEM_ID,
   PEAT_BLOCK_ITEM_ID,
   SHINY_PATCH_ITEM_ID,
+  ...KEY_ITEM_IDS,
   ...OPENABLE_ITEM_IDS,
   ...Object.keys(EXP_CANDY_EXP)
 ])
@@ -52,7 +131,7 @@ export const NON_HELD_ITEM_IDS = new Set([
 // Friendship runs 0-255. Pokemon join the box at 0, gain FRIENDSHIP_PER_BATTLE
 // after each battle won, and every friendship-style evolution needs it maxed.
 export const MAX_HAPPINESS = 255
-export const FRIENDSHIP_PER_BATTLE = 50
+export const FRIENDSHIP_PER_BATTLE = 10
 
 // The only ball this game tracks - shared between the shop (sim-access.ts)
 // and catching a defeated wild Pokemon (battle-runtime.ts), so both always
@@ -303,6 +382,14 @@ export interface BoxPokemonView extends PokemonSummary {
   canLevelUpWithCandy?: boolean
   // Not shiny yet, and there's a Shiny Patch in the bag to make it so.
   canUseShinyPatch?: boolean
+  // A Pokemon with a form-change item for it in the bag (the Rotom Catalog, Prison Bottle,
+  // Reveal Glass...): the forms it can change into, and the item.
+  formChanges?: { forms: string[]; itemName: string; spritenum: number }
+  // A plain Necrozma, Kyurem or Calyrex with its fusion item: each partner in the box it
+  // can fuse with, and what they'd become.
+  fusions?: { partnerId: string; partnerSpecies: string; partnerLevel: number; result: string; itemName: string }[]
+  // A fused one, with its fusion item: who unfusing hands back.
+  unfuse?: { partnerSpecies: string; itemName: string }
   itemSpritenum?: number | null
   favorite?: boolean
   // Its colour on the Random Pokemon roulette (see speciesRarityTier) - the box and
@@ -629,6 +716,9 @@ export interface ItemOptionEntry extends DescribedOptionEntry {
 export interface ShopItemEntry extends ItemOptionEntry {
   price: number
   category: string
+  // A key item: shown in the shop but never sold there - whether the player has it, and
+  // the achievement that unlocks it.
+  keyItem?: { owned: boolean; unlockedBy: string }
 }
 
 /** A shop item as the admin price editor sees it: its current price and the default. */
@@ -887,6 +977,8 @@ export interface RestoreFossilResult {
 export interface CatchResult {
   money: number
   pokeballs: number
+  // The Catching Charm made it free.
+  free?: boolean
 }
 
 /**

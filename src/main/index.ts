@@ -29,6 +29,9 @@ import {
   levelUpMon,
   toggleFavorite,
   useShinyPatch,
+  changeForm,
+  fuseMon,
+  unfuseMon,
   readSavedTeamOf,
   scaleTeamToLevel,
   resetBox,
@@ -74,6 +77,7 @@ import {
   standBlackjack
 } from './showdown/blackjack-store'
 import { resetStatsCounters } from './showdown/stats-store'
+import { checkAchievements, claimAchievement, getAchievements, setAchievementTitle } from './showdown/achievement-store'
 import { getTrainerProfile } from './showdown/trainer-profile'
 import { buildAutoSet, listAutoSets } from './showdown/auto-sets'
 import { checkForUpdate, installUpdate } from './updater'
@@ -133,6 +137,31 @@ import {
 } from './showdown/player-session'
 
 let activeBattle: WildBattle | null = null
+
+// Achievements are checked shortly after the renderer's calls - anything that changes a
+// tally (a battle, a catch, a spin...) comes through one - batched, so a burst of calls
+// (a battle's turns) costs one check, and off the reply's path.
+let achievementCheck: NodeJS.Timeout | null = null
+function scheduleAchievementCheck(): void {
+  if (achievementCheck) return
+  achievementCheck = setTimeout(() => {
+    achievementCheck = null
+    try {
+      checkAchievements()
+    } catch {
+      // Nobody logged in (yet) - nothing to check.
+    }
+  }, 400)
+}
+const handleIpc = ipcMain.handle.bind(ipcMain)
+ipcMain.handle = (channel, listener) =>
+  handleIpc(channel, async (event, ...args) => {
+    try {
+      return await listener(event, ...args)
+    } finally {
+      scheduleAchievementCheck()
+    }
+  })
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -427,6 +456,9 @@ ipcMain.handle('box:evolve', (_event, id: string, targetSpecies: string) => evol
 ipcMain.handle('box:levelUp', (_event, id: string) => levelUpMon(id))
 ipcMain.handle('box:toggleFavorite', (_event, id: string) => toggleFavorite(id))
 ipcMain.handle('box:useShinyPatch', (_event, id: string) => useShinyPatch(id))
+ipcMain.handle('box:changeForm', (_event, id: string, form: string) => changeForm(id, form))
+ipcMain.handle('box:fuse', (_event, id: string, partnerId: string) => fuseMon(id, partnerId))
+ipcMain.handle('box:unfuse', (_event, id: string) => unfuseMon(id))
 
 ipcMain.handle('loadouts:list', () => listLoadouts())
 ipcMain.handle('loadouts:save', (_event, name: string) => saveLoadout(name))
@@ -440,6 +472,9 @@ ipcMain.handle('bag:useExpCandy', (_event, itemId: string) => useExpCandy(itemId
 
 ipcMain.handle('money:get', () => getMoney())
 ipcMain.handle('coins:get', () => getCoins())
+ipcMain.handle('achievements:get', () => getAchievements())
+ipcMain.handle('achievements:claim', (_event, id: string) => claimAchievement(id))
+ipcMain.handle('achievements:setTitle', (_event, title: string | null) => setAchievementTitle(title))
 ipcMain.handle('coins:buy', (_event, amount: number) => buyCoins(amount))
 ipcMain.handle('coins:prize', (_event, itemId: string) => buyCoinPrize(itemId))
 ipcMain.handle('slots:spin', (_event, bet: number) => spinSlots(bet))

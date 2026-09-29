@@ -42,6 +42,10 @@ import BlackjackTable from './BlackjackTable'
 import type { GameCornerGame } from './GameCornerTabs'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
 import CoinShopModal from './CoinShopModal'
+import ItemSprite from './ItemSprite'
+import SearchBar from './SearchBar'
+import AchievementsModal from './AchievementsModal'
+import type { AchievementsState } from '../../shared/achievements'
 import { LOCATION_BUTTON_BACKDROP, backdropUrl, locationIconUrl } from './battleScenery'
 import { formatMoney } from './money'
 
@@ -73,6 +77,8 @@ const EMPTY_TEAM: (string | null)[] = [null, null, null, null, null, null]
 // Below this a wild encounter's level range gets thin enough to barely mean
 // anything - the slider simply doesn't go lower.
 const WILD_LEVEL_CAP_MIN = 15
+// The Poke Ball on the Showdown item sheet - the Classic mode's icon.
+const POKE_BALL_SPRITENUM = 345
 
 // The orders the expanded box can be sorted in.
 type BoxSortKey = 'arrival' | 'name' | 'bst' | 'dex'
@@ -208,8 +214,13 @@ function MainMenu({
     setCoinShopOpen(true)
   }
   const [money, setMoney] = useState<number | null>(null)
+  const [achievements, setAchievements] = useState<AchievementsState | null>(null)
+  const [achievementsOpen, setAchievementsOpen] = useState(false)
+  // The player card's menu (profile, options, debug), placed under the card.
+  const [playerMenu, setPlayerMenu] = useState<{ right: number; top: number } | null>(null)
   // Notes that float up from the box (a Pokemon sold, or why it couldn't be).
   const notes = useFloatingNotes()
+  const unclaimedAchievements = achievements?.achievements.filter((a) => a.unlocked && !a.claimed).length ?? 0
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<{ mon: BoxPokemonView; x: number; y: number } | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
@@ -303,7 +314,18 @@ function MainMenu({
     )
   }
 
+  function refreshAchievements(): void {
+    window.api
+      .getAchievements()
+      .then(setAchievements)
+      .catch(() => setAchievements(null))
+  }
+
+  // Unlocked achievements show up on the nav button's count as they happen.
+  useEffect(() => window.api.onAchievementsUnlocked(refreshAchievements), [])
+
   function refreshAll(): void {
+    refreshAchievements()
     refreshRun()
     refreshBox()
     refreshProgression()
@@ -397,6 +419,34 @@ function MainMenu({
     setBusy(true)
     try {
       setBoxState(await window.api.useShinyPatch(monId))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // A form-change item (Rotom Catalog, Prison Bottle...): a new form, with a Smogon set for it.
+  async function changeForm(monId: string, form: string, at: { x: number; y: number }): Promise<void> {
+    setContextMenu(null)
+    setBusy(true)
+    try {
+      setBoxState(await window.api.changeForm(monId, form))
+      notes.show(`Changed into ${form} - it has a new set to match`, at)
+    } catch (e) {
+      notes.show(errorMessage(e), at, 'bad')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Fusing a legendary with its partner, or splitting them up.
+  async function fusionAction(action: () => Promise<BoxState>, done: string, at: { x: number; y: number }): Promise<void> {
+    setContextMenu(null)
+    setBusy(true)
+    try {
+      setBoxState(await action())
+      notes.show(done, at)
+    } catch (e) {
+      notes.show(errorMessage(e), at, 'bad')
     } finally {
       setBusy(false)
     }
@@ -525,42 +575,121 @@ function MainMenu({
           document.body
         )}
       <div className="menu-header">
-        <h1>pkmnPvE</h1>
+        <div className="menu-header-left">
+          <h1>pkmnPvE</h1>
+          {/* Both modes side by side - the lit one is where you are. */}
+          <div className="mode-switch" title="Switch between the classic game and Roguelite runs">
+            <button
+              className={`mode-switch-option mode-switch-classic${mode === 'classic' ? ' mode-switch-active' : ''}`}
+              onClick={(e) => mode !== 'classic' && toggleMode(e)}
+            >
+              <ItemSprite spritenum={POKE_BALL_SPRITENUM} className="mode-switch-icon" />
+              Classic
+            </button>
+            <button
+              className={`mode-switch-option mode-switch-roguelite${mode === 'roguelite' ? ' mode-switch-active' : ''}`}
+              onClick={(e) => mode !== 'roguelite' && toggleMode(e)}
+            >
+              <img className="mode-switch-icon" src="./icons/nav/roguelite.png" alt="" />
+              Roguelite
+            </button>
+          </div>
+        </div>
         <div className="menu-nav">
-          {/* The player's trainer, small, beside their money - opens their profile too. */}
-          <img
-            className="nav-trainer-sprite"
-            src={trainerSpriteUrl(trainerSprite)}
-            alt=""
-            title={`${username}'s trainer profile`}
-            onClick={() => setPlayerTrainerOpen(true)}
-          />
-          {money !== null && <span className="money-display">{formatMoney(money)}</span>}
+          {/* A run has no bag, shop or Game Corner of its own - these are the classic game's. */}
+          <div className="nav-actions">
+            <button className="nav-icon-button" title="Bag" disabled={mode === 'roguelite'} onClick={() => setBagOpen(true)}>
+              <img className="nav-icon" src="./icons/nav/bag.png" alt="Bag" />
+            </button>
+            <button className="nav-icon-button" title="Shop" disabled={mode === 'roguelite'} onClick={() => setShopOpen(true)}>
+              <img className="nav-icon nav-icon-smooth" src="./icons/nav/shop.png" alt="Shop" />
+            </button>
+            {/* The Coin Shop opens from inside the Game Corner's games. */}
+            <button
+              className="nav-icon-button"
+              title="Game Corner: slots and blackjack"
+              disabled={mode === 'roguelite'}
+              onClick={() => openGame(lastGame)}
+            >
+              <img className="nav-icon" src="./icons/nav/gamecorner.png" alt="Game Corner" />
+            </button>
+            <button
+              className="nav-icon-button"
+              title="Achievements"
+              onClick={() => {
+                refreshAchievements()
+                setAchievementsOpen(true)
+              }}
+            >
+              <img className="nav-icon" src="./icons/nav/achievements.png" alt="Achievements" />
+              {unclaimedAchievements > 0 && <span className="nav-achievements-badge">{unclaimedAchievements}</span>}
+            </button>
+          </div>
+          {/* The player: their trainer, name, title and money - opens a menu with the rarer things. */}
           <button
-            className={`mode-toggle mode-toggle-${mode}`}
-            title="Switch between the classic game and Roguelite runs"
-            onClick={toggleMode}
+            className={`nav-player-card${playerMenu ? ' nav-player-card-open' : ''}`}
+            title={`${username}'s menu`}
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect()
+              setPlayerMenu(playerMenu ? null : { right: window.innerWidth - rect.right, top: rect.bottom + 4 })
+            }}
           >
-            {mode === 'classic' ? '⚔ Classic' : '🎲 Roguelite'}
-          </button>
-          {/* The Coin Shop opens from inside the Game Corner's games. */}
-          <button disabled={mode === 'roguelite'} title="Game Corner: slots and blackjack" onClick={() => openGame(lastGame)}>
-            🎰 Game Corner
-          </button>
-          <button onClick={() => setPlayerTrainerOpen(true)}>{username}</button>
-          {/* A run has no bag or shop of its own - these are the classic game's. */}
-          <button disabled={mode === 'roguelite'} onClick={() => setBagOpen(true)}>
-            Bag
-          </button>
-          <button disabled={mode === 'roguelite'} onClick={() => setShopOpen(true)}>
-            Shop
-          </button>
-          {isAdmin && <button onClick={() => setDebugOpen(true)}>Debug</button>}
-          <button className="menu-nav-cog" title="Options" onClick={onOptions}>
-            ⚙
+            {/* The trainer itself goes straight to the Trainer Card; the rest of the card opens the menu. */}
+            <img
+              className="nav-trainer-sprite"
+              src={trainerSpriteUrl(trainerSprite)}
+              alt=""
+              title="Trainer Card"
+              onClick={(e) => {
+                e.stopPropagation()
+                setPlayerMenu(null)
+                setPlayerTrainerOpen(true)
+              }}
+            />
+            <span className="nav-player-text">
+              <span className="nav-player-name">{username}</span>
+              {achievements?.title && <span className="nav-player-title">{achievements.title}</span>}
+            </span>
+            {money !== null && <span className="nav-player-money">{formatMoney(money)}</span>}
+            <span className="nav-player-caret">▾</span>
           </button>
         </div>
       </div>
+      {playerMenu &&
+        createPortal(
+          <div className="context-menu-overlay" onMouseDown={() => setPlayerMenu(null)}>
+            <div
+              className="context-menu nav-player-menu"
+              style={{ right: playerMenu.right, top: playerMenu.top }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              {[
+                {
+                  label: 'Trainer Card',
+                  icon: <img className="nav-menu-icon" src="./icons/nav/trainercard.png" alt="" />,
+                  action: () => setPlayerTrainerOpen(true)
+                },
+                { label: 'Options', icon: <span className="nav-menu-icon">⚙</span>, action: onOptions },
+                ...(isAdmin
+                  ? [{ label: 'Debug', icon: <span className="nav-menu-icon">🛠</span>, action: () => setDebugOpen(true) }]
+                  : [])
+              ].map(({ label, icon, action }) => (
+                <button
+                  key={label}
+                  className="context-menu-item nav-menu-item"
+                  onClick={() => {
+                    setPlayerMenu(null)
+                    action()
+                  }}
+                >
+                  {icon}
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>,
+          document.body
+        )}
 
       {fightError && <p style={{ color: '#ff6b6b' }}>{fightError}</p>}
       {loadError && <p style={{ color: '#ff6b6b' }}>Failed to load your box: {loadError}</p>}
@@ -756,16 +885,12 @@ function MainMenu({
             ▲
           </button>
           {boxExpanded && (
-            <input
+            <SearchBar
               className="box-search"
-              type="search"
-              placeholder="Search name, type, move, ability, item…"
               value={boxSearch}
+              onChange={setBoxSearch}
+              placeholder="Search name, type, move, ability, item…"
               autoFocus
-              onChange={(e) => setBoxSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') setBoxSearch('')
-              }}
             />
           )}
           {boxExpanded && (
@@ -917,6 +1042,24 @@ function MainMenu({
           onLevelUp={() => void levelUp(contextMenu.mon.id)}
           canUseShinyPatch={contextMenu.mon.canUseShinyPatch ?? false}
           onUseShinyPatch={() => void useShinyPatch(contextMenu.mon.id)}
+          formChanges={contextMenu.mon.formChanges}
+          onChangeForm={(form) => void changeForm(contextMenu.mon.id, form, { x: contextMenu.x, y: contextMenu.y })}
+          fusions={contextMenu.mon.fusions}
+          onFuse={(partnerId) =>
+            void fusionAction(
+              () => window.api.fuseMon(contextMenu.mon.id, partnerId),
+              `Fused into ${contextMenu.mon.fusions?.find((f) => f.partnerId === partnerId)?.result}`,
+              { x: contextMenu.x, y: contextMenu.y }
+            )
+          }
+          unfuse={contextMenu.mon.unfuse}
+          onUnfuse={() =>
+            void fusionAction(
+              () => window.api.unfuseMon(contextMenu.mon.id),
+              `Unfused - ${contextMenu.mon.unfuse?.partnerSpecies} is back in your box`,
+              { x: contextMenu.x, y: contextMenu.y }
+            )
+          }
           favorite={!!contextMenu.mon.favorite}
           onToggleFavorite={() => void toggleFavorite(contextMenu.mon.id)}
           onEdit={() => openEditor(contextMenu.mon.id, false)}
@@ -936,10 +1079,25 @@ function MainMenu({
             refreshMoney()
             refreshBox()
           }}
+          onOpenShop={() => {
+            setBagOpen(false)
+            setShopOpen(true)
+          }}
         />
       )}
 
       {notes.layer}
+      {achievementsOpen && achievements && (
+        <AchievementsModal
+          state={achievements}
+          onChange={setAchievements}
+          onClaimed={(newMoney) => {
+            setMoney(newMoney)
+            refreshBox()
+          }}
+          onClose={() => setAchievementsOpen(false)}
+        />
+      )}
       {gameCorner === 'slots' && (
         <SlotMachine onClose={() => setGameCorner(null)} onOpenCoinShop={toCoinShop} onSwitchGame={() => openGame('blackjack')} />
       )}
@@ -965,6 +1123,11 @@ function MainMenu({
             refreshBox()
           }}
           onMoneyChange={setMoney}
+          onOpenBag={() => {
+            setShopOpen(false)
+            refreshBox()
+            setBagOpen(true)
+          }}
         />
       )}
     </div>

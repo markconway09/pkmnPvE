@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import ContextMenuPanel from './ContextMenuPanel'
 import ItemSprite from './ItemSprite'
-import type { EvolutionItemUse } from '../../shared/battle-types'
+import type { BoxPokemonView, EvolutionItemUse } from '../../shared/battle-types'
 
 // The Poke Ball item icon - an evolution already in the Pokedex.
 const POKE_BALL_SPRITENUM = 345
@@ -24,6 +24,14 @@ interface Props {
   onLevelUp?: () => void
   canUseShinyPatch?: boolean
   onUseShinyPatch?: () => void
+  // With a form-change item (Rotom Catalog, Prison Bottle...): the forms it can change into.
+  formChanges?: BoxPokemonView['formChanges']
+  onChangeForm?: (form: string) => void
+  // Fusing with a partner from the box, or splitting back up (see BoxPokemonView).
+  fusions?: BoxPokemonView['fusions']
+  onFuse?: (partnerId: string) => void
+  unfuse?: BoxPokemonView['unfuse']
+  onUnfuse?: () => void
   favorite?: boolean
   onToggleFavorite?: () => void
   onEdit?: () => void
@@ -49,6 +57,12 @@ function PokemonContextMenu({
   onLevelUp,
   canUseShinyPatch = false,
   onUseShinyPatch,
+  formChanges,
+  onChangeForm,
+  fusions = [],
+  onFuse,
+  unfuse,
+  onUnfuse,
   favorite = false,
   onToggleFavorite,
   onEdit,
@@ -78,7 +92,7 @@ function PokemonContextMenu({
         )}
         {onToggleFavorite && (
           <button className="context-menu-item" onClick={onToggleFavorite}>
-            {favorite ? 'Unfavorite' : '⭐ Favorite'}
+            {favorite ? 'Unfavorite' : '❤️ Favorite'}
           </button>
         )}
         {onAdminEdit && (
@@ -94,6 +108,35 @@ function PokemonContextMenu({
         {canUseShinyPatch && onUseShinyPatch && (
           <button className="context-menu-item" onClick={onUseShinyPatch}>
             ✨ Turn Shiny (use Shiny Patch)
+          </button>
+        )}
+        {onChangeForm &&
+          formChanges?.forms.map((form) => (
+            <button
+              key={form}
+              className="context-menu-item"
+              title={`Use the ${formChanges.itemName}`}
+              onClick={() => onChangeForm(form)}
+            >
+              <span className="context-menu-evo-target">
+                <ItemSprite spritenum={formChanges.spritenum} />
+                Change into {form}
+              </span>
+            </button>
+          ))}
+        {onFuse &&
+          fusions.map((fusion) => (
+            <button key={fusion.partnerId} className="context-menu-item" onClick={() => onFuse(fusion.partnerId)}>
+              <span className="context-menu-evo-target">
+                Fuse with {fusion.partnerSpecies} (Lv{fusion.partnerLevel}) → {fusion.result}
+              </span>
+              <span className="context-menu-evo-item">use the {fusion.itemName}</span>
+            </button>
+          ))}
+        {onUnfuse && unfuse && (
+          <button className="context-menu-item" onClick={onUnfuse}>
+            <span className="context-menu-evo-target">Unfuse (get {unfuse.partnerSpecies} back)</span>
+            <span className="context-menu-evo-item">use the {unfuse.itemName}</span>
           </button>
         )}
         {onChoose &&

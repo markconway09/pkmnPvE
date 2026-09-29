@@ -7,10 +7,11 @@ export type SlotSymbol = 'gholdengo' | 'ball' | 'high' | 'mid' | 'low' | 'cherry
 // Each reel, top to bottom, wrapping round: about thirty symbols (no blanks), two of
 // them Gholdengo - the jackpot. The other three Pokemon are tiers, not species: which
 // Pokemon stands for each is picked at random whenever the machine opens (see
-// SlotRules.pokemon), the stronger (by base stat total) the better it pays. Tuned (with the payouts below)
+// SlotRules.pokemon): a final-stage evolution on the big prize, a second stage on the
+// medium one and a first stage on the small one. Tuned (with the payouts below)
 // so that, over time, the machine pays back
-// about 130% of what's bet - in the player's favour on purpose, so coins grow the more
-// they spin; the same at any bet, since wins scale with it - something
+// about 101.5% of what's bet - slightly in the player's favour: coins go up and down with
+// luck but slowly grow on average; the same at any bet, since wins scale with it - something
 // wins on just over half of all spins, and three Gholdengo land about once in 700 spins.
 export const SLOT_REELS: SlotSymbol[][] = [
   [
@@ -49,15 +50,15 @@ export const SLOT_LINES: { rows: [number, number, number]; diagonal: boolean }[]
 // apart from the single cherry (x1, the smallest whole win), every result gives back
 // about the same share of the total - so the rarer it is, the more it pays.
 export const SLOT_PAYOUTS: Record<SlotSymbol, number> = {
-  gholdengo: 86,
-  ball: 26,
-  high: 6,
+  gholdengo: 50,
+  ball: 15,
+  high: 5,
   mid: 2,
   low: 1,
-  cherry: 20
+  cherry: 6
 }
 export const CHERRY_ONE = 1
-export const CHERRY_TWO = 4
+export const CHERRY_TWO = 2
 
 export interface SlotLineWin {
   // The line that won (its index in SLOT_LINES).
@@ -93,6 +94,9 @@ export function slotWins(stops: number[], bet: number): SlotLineWin[] {
 // Game Corner coins: bought with Poke Dollars (never sold back), bet on the slots, and
 // traded for prizes.
 export const COIN_PRICE = 20
+
+// The most either Game Corner game (slots or blackjack) takes on one bet.
+export const MAX_BET = 1000
 export const COIN_PACKS = [50, 250, 500, 2500]
 
 export interface CoinPrize {
@@ -101,12 +105,12 @@ export interface CoinPrize {
 }
 
 export const COIN_PRIZES: CoinPrize[] = [
-  { itemId: 'lockcapsule', coins: 50 },
-  { itemId: 'rarecandy', coins: 25 },
-  { itemId: 'randompokemon', coins: 250 },
-  { itemId: 'shinypatch', coins: 500 },
-  { itemId: 'expcandyl', coins: 500 },
-  { itemId: 'randomlegendary', coins: 5000 }
+  { itemId: 'lockcapsule', coins: 100 },
+  { itemId: 'rarecandy', coins: 50 },
+  { itemId: 'randompokemon', coins: 500 },
+  { itemId: 'shinypatch', coins: 1000 },
+  { itemId: 'expcandyl', coins: 1000 },
+  { itemId: 'randomlegendary', coins: 10000 }
 ]
 
 // Coins and Poke Dollars after a Game Corner purchase.
@@ -133,7 +137,8 @@ export type SlotPokemonTier = 'high' | 'mid' | 'low'
 
 export interface SlotRules {
   reels: SlotSymbol[][]
-  // The Pokemon each tier shows this time the machine is open - strongest on 'high'.
+  // The Pokemon each tier shows this time the machine is open, each picked on its own: a
+  // final stage on 'high', a second stage on 'mid', a first stage on 'low'.
   pokemon: Record<SlotPokemonTier, string>
   payouts: Record<SlotSymbol, number>
   cherryOne: number

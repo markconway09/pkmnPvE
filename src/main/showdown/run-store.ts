@@ -55,6 +55,7 @@ import {
 import { totalExpForSpeciesLevel, expProgressForLevel } from './exp'
 import { copyBoxMonSet, hasRegisteredSpecies } from './box-store'
 import { recordBestFloor } from './stats-store'
+import { countAchievement } from './achievement-progress'
 import { addItem } from './bag-store'
 import { addMoney } from './money-store'
 import { buildAutoSet, fillMoveset, listAutoSets, recommendedLearnableMoves } from './auto-sets'
@@ -280,11 +281,22 @@ const REWARD_CHANCES: SpecialItemChances = { mega: MEGA_CHANCE_REWARD, signature
 // Three held items, with a chance of a Mega Stone and (separately, rarer) one of the
 // other items made for one species (Rusted Shield, Light Ball...) - each for someone
 // on the team who isn't holding it yet, in a slot of its own.
+// Pairs of items for one Pokemon where one is enough: the orb, or the item that turns it
+// into its Origin Forme. Once the team holds either, the other stops being offered.
+const ALTERNATIVE_ITEMS = [
+  ['adamantorb', 'adamantcrystal'],
+  ['lustrousorb', 'lustrousglobe'],
+  ['griseousorb', 'griseouscore']
+]
+
 function rollItemOffer(current: StoredRun, chances: SpecialItemChances): string[] {
   const offer = pickItems(ITEM_OFFER_SIZE)
   const held = new Set(current.team.map((m) => toID(m.set.item ?? '')))
+  // Held already - or its other half is (see ALTERNATIVE_ITEMS).
+  const covered = (id: string): boolean =>
+    held.has(id) || ALTERNATIVE_ITEMS.some((pair) => pair.includes(id) && pair.some((other) => held.has(other)))
   const forTeam = (list: (species: string) => string[]): string[] =>
-    [...new Set(current.team.flatMap((m) => list(m.set.species)))].filter((id) => !held.has(id))
+    [...new Set(current.team.flatMap((m) => list(m.set.species)))].filter((id) => !covered(id))
   const stones = forTeam(megaStonesFor)
   const signature = forTeam(signatureItemsFor).filter((id) => !stones.includes(id))
   const slots = pickRandom([...offer.keys()], offer.length)
@@ -565,6 +577,13 @@ function endRun(current: StoredRun, status: 'lost' | 'won'): void {
   current.rewards = payRunRewards(current)
   recordBestFloor(current.floor)
   persist()
+  if (status === 'won') {
+    countAchievement('runsWon')
+    const difficulty = runDifficultyInfo(current.difficulty).id
+    if (difficulty === 'hard' || difficulty === 'extreme') countAchievement('hardRunsWon')
+  } else if (current.floor < 5) {
+    countAchievement('earlyRunLosses')
+  }
 }
 
 // A run's rewards, paid when it ends however it ends: what each boss beaten is worth on

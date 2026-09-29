@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { CoinBalance, SlotRules, SlotSpinResult } from '../shared/slots'
 import type { BlackjackView } from '../shared/blackjack'
+import type { AchievementClaimResult, AchievementsState } from '../shared/achievements'
 import type {
   AutoSetOption,
   AutoSetResult,
@@ -104,6 +105,9 @@ const api = {
   levelUpMon: (id: string): Promise<BoxState> => ipcRenderer.invoke('box:levelUp', id),
   toggleFavorite: (id: string): Promise<BoxState> => ipcRenderer.invoke('box:toggleFavorite', id),
   useShinyPatch: (id: string): Promise<BoxState> => ipcRenderer.invoke('box:useShinyPatch', id),
+  changeForm: (id: string, form: string): Promise<BoxState> => ipcRenderer.invoke('box:changeForm', id, form),
+  fuseMon: (id: string, partnerId: string): Promise<BoxState> => ipcRenderer.invoke('box:fuse', id, partnerId),
+  unfuseMon: (id: string): Promise<BoxState> => ipcRenderer.invoke('box:unfuse', id),
   listLoadouts: (): Promise<LoadoutView[]> => ipcRenderer.invoke('loadouts:list'),
   saveLoadout: (name: string): Promise<LoadoutView[]> => ipcRenderer.invoke('loadouts:save', name),
   updateLoadout: (id: string): Promise<LoadoutView[]> => ipcRenderer.invoke('loadouts:update', id),
@@ -116,6 +120,16 @@ const api = {
   sellMon: (id: string): Promise<{ sold: number; species: string; money: number; box: BoxState }> =>
     ipcRenderer.invoke('box:sell', id),
   getCoins: (): Promise<number> => ipcRenderer.invoke('coins:get'),
+  getAchievements: (): Promise<AchievementsState> => ipcRenderer.invoke('achievements:get'),
+  claimAchievement: (id: string): Promise<AchievementClaimResult> => ipcRenderer.invoke('achievements:claim', id),
+  setAchievementTitle: (title: string | null): Promise<AchievementsState> =>
+    ipcRenderer.invoke('achievements:setTitle', title),
+  // Achievements just unlocked (their names); returns a function to stop listening.
+  onAchievementsUnlocked: (listener: (names: string[]) => void): (() => void) => {
+    const handler = (_event: unknown, names: string[]): void => listener(names)
+    ipcRenderer.on('achievements:unlocked', handler)
+    return () => ipcRenderer.removeListener('achievements:unlocked', handler)
+  },
   buyCoins: (amount: number): Promise<CoinBalance> => ipcRenderer.invoke('coins:buy', amount),
   buyCoinPrize: (itemId: string): Promise<CoinBalance & { itemName: string }> => ipcRenderer.invoke('coins:prize', itemId),
   spinSlots: (bet: number): Promise<SlotSpinResult> => ipcRenderer.invoke('slots:spin', bet),

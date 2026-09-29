@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { BlackjackOutcome, BlackjackView } from '../../shared/blackjack'
-import BetSlider, { placedBet } from './BetSlider'
+import BetSlider, { maxBet, placedBet, useSavedBet } from './BetSlider'
 import GameCornerTabs from './GameCornerTabs'
 import PlayingCard from './PlayingCard'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
+import CoinIcon from './CoinIcon'
 
 interface Props {
   onClose: () => void
@@ -34,7 +35,7 @@ function totalLabel(total: { total: number; soft: boolean } | null): string {
  */
 function BlackjackTable({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JSX.Element {
   const [table, setTable] = useState<BlackjackView | null>(null)
-  const [betWanted, setBet] = useState(10)
+  const [betWanted, setBet] = useSavedBet('blackjack')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const actionsRef = useRef<HTMLDivElement>(null)
@@ -85,7 +86,8 @@ function BlackjackTable({ onClose, onOpenCoinShop, onSwitchGame }: Props): React
         <GameCornerTabs current="blackjack" disabled={playing} onSwitch={onSwitchGame} />
         <div className="slots-header">
           <h2>Blackjack</h2>
-          <span className="slots-coins">🪙 {coins === null ? '…' : coins.toLocaleString('en-US')} coins</span>
+          <span className="slots-coins">
+            <CoinIcon /> {coins === null ? '…' : coins.toLocaleString('en-US')} coins</span>
         </div>
 
         <div className="blackjack-felt">
@@ -104,7 +106,12 @@ function BlackjackTable({ onClose, onOpenCoinShop, onSwitchGame }: Props): React
             {table?.phase === 'done' && table.outcome
               ? OUTCOME_TEXT[table.outcome]
               : playing
-                ? `Bet 🪙 ${table!.bet.toLocaleString('en-US')}${table!.doubled ? ' (doubled)' : ''}`
+                ? (
+                  <>
+                    Bet <CoinIcon /> {table!.bet.toLocaleString('en-US')}
+                    {table!.doubled ? ' (doubled)' : ''}
+                  </>
+                )
                 : 'Place a bet and deal'}
           </div>
 
@@ -144,7 +151,7 @@ function BlackjackTable({ onClose, onOpenCoinShop, onSwitchGame }: Props): React
             </>
           ) : (
             <>
-              <BetSlider bet={bet} max={Math.max(1, coins ?? 1)} disabled={busy || !coins} onChange={setBet} />
+              <BetSlider bet={bet} max={maxBet(coins)} disabled={busy || !coins} onChange={setBet} />
               <button
                 className="slots-spin"
                 disabled={busy || coins === null || coins < bet}
@@ -169,8 +176,8 @@ function BlackjackTable({ onClose, onOpenCoinShop, onSwitchGame }: Props): React
         )}
 
         <div className="editor-actions">
-          <button onClick={onOpenCoinShop} disabled={playing}>
-            Coin Shop
+          <button className="coin-shop-button" onClick={onOpenCoinShop} disabled={playing}>
+            <CoinIcon /> Coin Shop
           </button>
           <button onClick={onClose} disabled={playing}>
             Close

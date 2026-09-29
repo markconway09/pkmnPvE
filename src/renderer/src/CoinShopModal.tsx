@@ -5,6 +5,7 @@ import { COIN_PACKS, COIN_PRICE, COIN_PRIZES } from '../../shared/slots'
 import ItemSprite from './ItemSprite'
 import { formatMoney } from './money'
 import { errorMessage, pointOf, useFloatingNotes } from './FloatingNotes'
+import CoinIcon from './CoinIcon'
 
 interface Props {
   onClose: () => void
@@ -69,7 +70,8 @@ function CoinShopModal({ onClose, onMoneyChange }: Props): React.JSX.Element {
         <div className="shop-header">
           <h2>Coin Shop</h2>
           <span className="coin-shop-balance">
-            <span className="slots-coins">🪙 {coins === null ? '…' : coins.toLocaleString('en-US')}</span>
+            <span className="slots-coins">
+              <CoinIcon /> {coins === null ? '…' : coins.toLocaleString('en-US')}</span>
             {money !== null && <span className="money-display">{formatMoney(money)}</span>}
           </span>
         </div>
@@ -80,7 +82,8 @@ function CoinShopModal({ onClose, onMoneyChange }: Props): React.JSX.Element {
             const price = amount * COIN_PRICE
             return (
               <div key={amount} className="coin-pack">
-                <span className="coin-pack-amount">🪙 {amount.toLocaleString('en-US')}</span>
+                <span className="coin-pack-amount">
+                  <CoinIcon /> {amount.toLocaleString('en-US')}</span>
                 <span className="shop-item-price">{formatMoney(price)}</span>
                 <button disabled={busy || money === null || money < price} onClick={(e) => buyPack(e, amount)}>
                   Buy
@@ -99,7 +102,8 @@ function CoinShopModal({ onClose, onMoneyChange }: Props): React.JSX.Element {
               <div key={prize.itemId} className="shop-item" title={item?.description}>
                 {item && <ItemSprite spritenum={item.spritenum} className="shop-item-icon" />}
                 <span className="shop-item-name">{item?.name ?? prize.itemId}</span>
-                <span className="shop-item-price">🪙 {prize.coins.toLocaleString('en-US')}</span>
+                <span className="shop-item-price">
+                  <CoinIcon /> {prize.coins.toLocaleString('en-US')}</span>
                 <button
                   disabled={busy || coins === null || coins < prize.coins}
                   onClick={(e) => buyPrize(e, prize.itemId)}
