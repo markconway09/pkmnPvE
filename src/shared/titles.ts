@@ -35,7 +35,7 @@ export const TITLE_PERKS: Record<Title, string> = {
   Tycoon: '10% off everything in the Shop',
   Survivor: 'Roguelite runs start with a free item pick',
   Daredevil: 'Roguelite runs start with a free item, move and ability pick',
-  'Golden Touch': 'The slots jackpot pays 10× more (×60 instead of ×50)',
+  'Golden Touch': 'The slots jackpot pays ×60 instead of ×50',
   'High Roller': 'Bet up to 2,000 coins in the Game Corner',
   'Edge Lord': "Plinko's edge slots pay double, at every risk",
   Heartless: 'Pokemon sell for 15% more',
