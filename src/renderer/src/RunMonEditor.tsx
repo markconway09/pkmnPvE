@@ -4,6 +4,7 @@ import type { RunMonEditInfo, RunMonView, RunView } from '../../shared/battle-ty
 import { toSpriteId } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
 import ItemSprite from './ItemSprite'
+import ShinyIcon from './ShinyIcon'
 import { TYPE_COLORS } from './moveAnimations'
 
 interface Props {
@@ -119,7 +120,7 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved }: Props): React.JSX.Ele
                       alt={info.species}
                     />
                     <span className="pokemon-editor-portrait-name">
-                      {mon?.shiny && '★ '}
+                      {mon?.shiny && <ShinyIcon />}
                       {info.species}
                       {mon ? ` · Lv ${mon.level}` : ''}
                     </span>

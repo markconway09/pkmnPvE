@@ -5,6 +5,7 @@ import { NON_HELD_ITEM_IDS, toSpriteId } from '../../shared/battle-types'
 import type { NatureOptionEntry } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
 import ItemSprite from './ItemSprite'
+import ShinyIcon from './ShinyIcon'
 import { itemIconStyle } from './itemIcon'
 import { TYPE_COLORS } from './moveAnimations'
 
@@ -485,7 +486,7 @@ function PokemonEditor({
                     )}
                     <SpriteImage style="2d-animated" spriteId={toSpriteId(set.species)} shiny={set.shiny} alt={set.species} />
                     <span className="pokemon-editor-portrait-name">
-                      {set.shiny && '★ '}
+                      {set.shiny && <ShinyIcon />}
                       {set.species} · Lv {set.level}
                       {onUseRareCandy && (
                         <button

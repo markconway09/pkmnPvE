@@ -1,7 +1,9 @@
 import { randomInt } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
-import type { CoinBalance, SlotRules, SlotSpinResult } from '../../shared/slots'
-import { COIN_PACKS, COIN_PRICE, COIN_PRIZES, MAX_BET, SLOT_REELS, SLOT_RULES, slotWins } from '../../shared/slots'
+import type { CoinBalance, SlotRules, SlotSpinResult, SlotSymbol } from '../../shared/slots'
+import { COIN_PACKS, COIN_PRICE, COIN_PRIZES, SLOT_PAYOUTS, SLOT_REELS, SLOT_RULES, slotWins } from '../../shared/slots'
+import { GOLDEN_TOUCH_JACKPOT_BONUS } from '../../shared/titles'
+import { betCap, hasTitle } from './title-perks'
 import { getMoney, spendMoney } from './money-store'
 import { addItem } from './bag-store'
 import { getEditorOptions, randomSlotPokemon } from './sim-access'
@@ -45,6 +47,14 @@ export function getCoins(): number {
   return getState().coins
 }
 
+/** The Debug menu: sets the coins outright (a whole number, never below zero). */
+export function setCoins(amount: number): number {
+  if (!Number.isFinite(amount)) throw new Error('Enter a number of coins')
+  getState().coins = Math.max(0, Math.floor(amount))
+  persist()
+  return getCoins()
+}
+
 /** Takes (negative) or pays (positive) coins for another Game Corner game - never below zero. */
 export function changeCoins(delta: number): number {
   if (getCoins() + delta < 0) throw new Error('Not enough coins - buy some at the Coin Shop')
@@ -77,10 +87,10 @@ export function buyCoinPrize(itemId: string): CoinBalance & { itemName: string }
 /** One pull of the slot machine: takes the bet (any whole number of coins it has), stops each reel at random, pays the rows. */
 export function spinSlots(bet: number): SlotSpinResult {
   if (!Number.isInteger(bet) || bet < 1) throw new Error('Bet at least 1 coin')
-  if (bet > MAX_BET) throw new Error(`Bet at most ${MAX_BET} coins`)
+  if (bet > betCap()) throw new Error(`Bet at most ${betCap()} coins`)
   if (getCoins() < bet) throw new Error('Not enough coins - buy some at the Coin Shop')
   const stops = SLOT_REELS.map((strip) => randomInt(strip.length))
-  const wins = slotWins(stops, bet)
+  const wins = slotWins(stops, bet, slotPayouts())
   const payout = wins.reduce((sum, w) => sum + w.payout, 0)
   getState().coins += payout - bet
   persist()
@@ -90,8 +100,14 @@ export function spinSlots(bet: number): SlotSpinResult {
   return { stops, wins, payout, coins: getCoins() }
 }
 
+// What three of each symbol pays - the jackpot a little more with the Golden Touch title.
+function slotPayouts(): Record<SlotSymbol, number> {
+  const bonus = hasTitle('Golden Touch') ? GOLDEN_TOUCH_JACKPOT_BONUS : 0
+  return { ...SLOT_PAYOUTS, gholdengo: SLOT_PAYOUTS.gholdengo + bonus }
+}
+
 /** The machine's rules for this time it's opened - with three freshly picked Pokemon. */
 export function getSlotRules(): SlotRules {
   const [high, mid, low] = randomSlotPokemon()
-  return { ...SLOT_RULES, pokemon: { high, mid, low } }
+  return { ...SLOT_RULES, payouts: slotPayouts(), pokemon: { high, mid, low } }
 }

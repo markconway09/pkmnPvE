@@ -2,6 +2,7 @@ import type { BoxPokemonView } from '../../shared/battle-types'
 import { toSpriteId } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
 import ItemSprite from './ItemSprite'
+import ShinyIcon from './ShinyIcon'
 
 interface Props {
   mon: BoxPokemonView
@@ -26,7 +27,7 @@ function PokemonIconVisual({ mon }: Props): React.JSX.Element {
       {(mon.favorite || mon.shiny) && (
         <span className="box-icon-badges">
           {mon.favorite && <span title="Favorite">❤️</span>}
-          {mon.shiny && <span title="Shiny">✨</span>}
+          {mon.shiny && <ShinyIcon />}
         </span>
       )}
       {mon.eligibleEvolutions && mon.eligibleEvolutions.length > 0 && (

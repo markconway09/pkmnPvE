@@ -76,13 +76,13 @@ export function slotSymbolAt(reel: number, stop: number, row: number): SlotSymbo
 }
 
 /** What each row pays with the reels stopped here (stops = each reel's middle symbol) for this bet. */
-export function slotWins(stops: number[], bet: number): SlotLineWin[] {
+export function slotWins(stops: number[], bet: number, payouts: Record<SlotSymbol, number> = SLOT_PAYOUTS): SlotLineWin[] {
   const wins: SlotLineWin[] = []
   SLOT_LINES.forEach(({ rows, diagonal }, line) => {
     const symbols = rows.map((row, reel) => slotSymbolAt(reel, stops[reel], row))
     const [first] = symbols
     if (symbols[1] === first && symbols[2] === first) {
-      wins.push({ line, symbol: first, count: 3, payout: SLOT_PAYOUTS[first] * bet })
+      wins.push({ line, symbol: first, count: 3, payout: payouts[first] * bet })
     } else if (first === 'cherry' && !diagonal) {
       const two = symbols[1] === 'cherry'
       wins.push({ line, symbol: 'cherry', count: two ? 2 : 1, payout: (two ? CHERRY_TWO : CHERRY_ONE) * bet })

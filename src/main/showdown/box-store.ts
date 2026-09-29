@@ -13,7 +13,6 @@ import {
   EXP_CANDY_EXP,
   FRIENDSHIP_PER_BATTLE,
   MAX_HAPPINESS,
-  POKEMON_SELL_PRICES,
   FRIENDSHIP_CHARM_ITEM_ID,
   FRIENDSHIP_CHARM_MULTIPLIER,
   FUSIONS,
@@ -57,6 +56,7 @@ import { playerDirFor, playerPathFor } from './save-paths'
 import { onPlayerChange } from './player-session'
 import { addMoney } from './money-store'
 import { countAchievement } from './achievement-progress'
+import { monSellPrice } from './title-perks'
 import { buildAutoSet, listAutoSets } from './auto-sets'
 
 interface StoredMon {
@@ -228,6 +228,7 @@ function toView(mon: StoredMon, arrival: number): BoxPokemonView {
     itemSpritenum,
     favorite: !!mon.favorite,
     rarityTier: speciesRarityTier(mon.set.species),
+    sellPrice: monSellPrice(speciesRarityTier(mon.set.species)),
     dexNum: speciesDexNum(mon.set.species),
     bst: bstOf(mon.set.species),
     arrival,
@@ -324,7 +325,7 @@ export function sellMon(id: string): { sold: number; species: string; money: num
   if (box.mons[index].fusedWith) throw new Error('Unfuse it first - its partner would be sold with it')
   const [mon] = box.mons.splice(index, 1)
   box.team = box.team.map((slot) => (slot === id ? null : slot))
-  const sold = POKEMON_SELL_PRICES[speciesRarityTier(mon.set.species)]
+  const sold = monSellPrice(speciesRarityTier(mon.set.species))
   const money = addMoney(sold)
   persist()
   countAchievement('pokemonSold')
@@ -346,7 +347,7 @@ export function sellMons(ids: string[]): { sold: number; count: number; money: n
   if (box.mons.length - selling.length < 1) throw new Error("You can't sell every Pokemon - keep at least one")
   box.mons = box.mons.filter((m) => !wanted.has(m.id))
   box.team = box.team.map((slot) => (slot && wanted.has(slot) ? null : slot))
-  const sold = selling.reduce((sum, m) => sum + POKEMON_SELL_PRICES[speciesRarityTier(m.set.species)], 0)
+  const sold = selling.reduce((sum, m) => sum + monSellPrice(speciesRarityTier(m.set.species)), 0)
   const money = addMoney(sold)
   persist()
   countAchievement('pokemonSold', selling.length)

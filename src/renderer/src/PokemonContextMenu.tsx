@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import ContextMenuPanel from './ContextMenuPanel'
 import ItemSprite from './ItemSprite'
+import ShinyIcon from './ShinyIcon'
 import type { BoxPokemonView, EvolutionItemUse } from '../../shared/battle-types'
 
 // The Poke Ball item icon - an evolution already in the Pokedex.
@@ -89,7 +90,9 @@ function PokemonContextMenu({
         )}
         {canUseShinyPatch && onUseShinyPatch && (
           <button className="context-menu-item" onClick={onUseShinyPatch}>
-            ✨ Turn Shiny (use Shiny Patch)
+            <span className="context-menu-evo-target">
+              <ShinyIcon /> Turn Shiny (use Shiny Patch)
+            </span>
           </button>
         )}
         {onChangeForm &&

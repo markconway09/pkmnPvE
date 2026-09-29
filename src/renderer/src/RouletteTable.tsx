@@ -9,8 +9,7 @@ import {
   betOdds,
   pocketColor
 } from '../../shared/roulette'
-import { MAX_BET } from '../../shared/slots'
-import BetSlider, { maxBet, placedBet, useSavedBet } from './BetSlider'
+import BetSlider, { maxBet, placedBet, useGameCornerPerks, useSavedBet } from './BetSlider'
 import GameCornerTabs, { type GameCornerGame } from './GameCornerTabs'
 import CoinIcon from './CoinIcon'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
@@ -78,6 +77,7 @@ function RouletteTable({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.
   const [coins, setCoins] = useState<number | null>(null)
   const [history, setHistory] = useState<number[]>([])
   const [chipWanted, setChip] = useSavedBet('roulette')
+  const perks = useGameCornerPerks()
   const [bets, setBets] = useState<Record<RouletteBetKey, number>>({})
   // Each chip placed, newest last - for Undo.
   const [placed, setPlaced] = useState<{ key: RouletteBetKey; amount: number }[]>([])
@@ -101,14 +101,14 @@ function RouletteTable({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.
     return () => pending.forEach((t) => clearTimeout(t))
   }, [])
 
-  const chip = placedBet(chipWanted, coins)
+  const chip = placedBet(chipWanted, coins, perks.betCap)
   const total = Object.values(bets).reduce((sum, n) => sum + n, 0)
 
   function place(key: RouletteBetKey, e: React.MouseEvent): void {
     if (spinning) return
     const at = { x: e.clientX, y: e.clientY - 10 }
-    if (total + chip > MAX_BET) {
-      notes.show(`The table takes at most ${MAX_BET.toLocaleString('en-US')} coins a spin`, at, 'bad')
+    if (total + chip > perks.betCap) {
+      notes.show(`The table takes at most ${perks.betCap.toLocaleString('en-US')} coins a spin`, at, 'bad')
       return
     }
     if (coins !== null && total + chip > coins) {
@@ -319,7 +319,7 @@ function RouletteTable({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.
         </div>
 
         <div className="slots-controls">
-          <BetSlider bet={chip} max={maxBet(coins)} disabled={spinning || !coins} onChange={setChip} />
+          <BetSlider bet={chip} max={maxBet(coins, perks.betCap)} disabled={spinning || !coins} onChange={setChip} />
         </div>
         <div className="slots-controls roulette-actions">
           <button disabled={spinning || placed.length === 0} onClick={undo}>

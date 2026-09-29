@@ -143,7 +143,7 @@ function BagModal({ onClose, onChanged, onOpenShop }: Props): React.JSX.Element 
     } else if (result.kind === 'item') {
       say(`Opened ${itemName}: you got ${result.name} - it's in your bag.`)
     } else {
-      const got = result.shiny ? `a ✨shiny✨ ${result.name}` : result.name
+      const got = result.shiny ? `a shiny ${result.name}` : result.name
       say(
         soldFor !== undefined
           ? `Opened ${itemName}: you got ${got} (Lv ${result.level}) and sold it for ${formatMoney(soldFor)}.`
@@ -213,7 +213,7 @@ function BagModal({ onClose, onChanged, onOpenShop }: Props): React.JSX.Element 
   }
 
   function describeRestore(result: RestoreFossilResult): string {
-    const got = result.shiny ? `a ✨shiny✨ ${result.species}` : result.species
+    const got = result.shiny ? `a shiny ${result.species}` : result.species
     return `Restored ${got} (Lv ${result.level}) - it's waiting in your box.`
   }
 

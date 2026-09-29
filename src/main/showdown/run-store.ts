@@ -56,6 +56,7 @@ import { totalExpForSpeciesLevel, expProgressForLevel } from './exp'
 import { copyBoxMonSet, hasRegisteredSpecies } from './box-store'
 import { recordBestFloor } from './stats-store'
 import { countAchievement } from './achievement-progress'
+import { hasTitle } from './title-perks'
 import { addItem } from './bag-store'
 import { addMoney } from './money-store'
 import { buildAutoSet, fillMoveset, listAutoSets, recommendedLearnableMoves } from './auto-sets'
@@ -91,11 +92,14 @@ interface StoredRun {
   team: RunMon[]
   choices: RunChoice[]
   itemOffer: string[] | null
-  // Why items are on offer: an item floor (worth a level too) or a trainer's reward.
-  itemOfferReason?: 'floor' | 'reward'
+  // Why items are on offer: an item floor (worth a level too), a trainer's reward, or a
+  // title's free pick at the start of the run.
+  itemOfferReason?: 'floor' | 'reward' | 'bonus'
   // A New Ability / New Move floor's four choices (ids), until one is given out - or a
   // beaten boss's reward ability (reason 'reward': no extra level for taking it).
-  pickOffer?: { kind: 'ability' | 'move'; options: string[]; reason?: 'floor' | 'reward' } | null
+  pickOffer?: { kind: 'ability' | 'move'; options: string[]; reason?: 'floor' | 'reward' | 'bonus' } | null
+  // A title's free picks still to come at the start of the run (Survivor, Daredevil), in order.
+  bonusPicks?: ('item' | 'move' | 'ability')[]
   // A Random Swap floor waiting on its choice.
   swapOffer?: boolean
   // The boss being fought on this floor, for its reward.
@@ -560,8 +564,29 @@ export function startRun(
     generation
   }
   run.choices = rollChoices(run)
+  // A title's free picks before the first floor: Daredevil an item, a move and an
+  // ability; Survivor an item.
+  if (hasTitle('Daredevil')) run.bonusPicks = ['item', 'move', 'ability']
+  else if (hasTitle('Survivor')) run.bonusPicks = ['item']
+  serveBonusPick(run)
   persist()
   return getRunView()!
+}
+
+// Puts the next free start-of-run pick on offer (nothing, once they're all taken). A free
+// pick is no floor: taking or skipping it doesn't move the run on or level anyone up.
+function serveBonusPick(current: StoredRun): void {
+  const next = current.bonusPicks?.shift()
+  if (next === 'item') {
+    current.itemOffer = rollItemOffer(current, ITEM_FLOOR_CHANCES)
+    current.itemOfferReason = 'bonus'
+  } else if (next) {
+    current.pickOffer = {
+      kind: next,
+      options: pickRandom(next === 'ability' ? RUN_ABILITIES : RUN_MOVES, PICK_OPTIONS),
+      reason: 'bonus'
+    }
+  }
 }
 
 /** Gives up on the run - it counts as lost. */
@@ -708,6 +733,15 @@ export function skipRunItem(): RunView {
 }
 
 function finishItemOffer(current: StoredRun): void {
+  if (current.itemOfferReason === 'bonus') {
+    // No next floor to clear the offer (a skipped one is still standing).
+    current.itemOffer = null
+    current.itemOfferReason = undefined
+    current.displacedItem = null
+    serveBonusPick(current)
+    persist()
+    return
+  }
   if (current.itemOfferReason !== 'reward') levelUpTeam(current, LEVELS_PER_QUIET_FLOOR)
   current.itemOfferReason = undefined
   current.displacedItem = null
@@ -967,6 +1001,12 @@ export function takePickNode(kind: 'ability' | 'move'): RunView {
 }
 
 function finishPick(current: StoredRun): RunView {
+  if (current.pickOffer?.reason === 'bonus') {
+    current.pickOffer = null
+    serveBonusPick(current)
+    persist()
+    return getRunView()!
+  }
   // A floor's pick is worth a level; a boss's reward ability isn't (the win already was).
   if (current.pickOffer?.reason !== 'reward') levelUpTeam(current, LEVELS_PER_QUIET_FLOOR)
   current.pickOffer = null

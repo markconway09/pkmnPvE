@@ -398,6 +398,8 @@ export interface BoxPokemonView extends PokemonSummary {
   // Its colour on the Random Pokemon roulette (see speciesRarityTier) - the box and
   // team squares are bordered with it.
   rarityTier?: RarityTier
+  // What selling it pays right now (its rarity's price, with a title's bonus).
+  sellPrice?: number
   // For sorting the box: its National Dex number, base stat total, and when it arrived
   // (its place in the box's arrival order - 0 the first ever).
   dexNum?: number
@@ -788,6 +790,9 @@ export interface AbilityEvent {
   slot: BattleSlotKey
   pokemon: string
   ability: string
+  // Set when it's a held item at work (Leftovers, Focus Sash, a berry...) rather than an
+  // ability - the banner then shows the item's icon. `ability` is the item's name.
+  itemSpritenum?: number
 }
 
 // A move being used, for the animation layer - which slot used it, which
@@ -1236,13 +1241,13 @@ export interface RunView {
   // Set after picking an item node: choose one of these to give to a team member.
   itemOffer: RunItemOffer[] | null
   // An item floor, or the reward for beating a trainer or boss.
-  itemOfferReason: 'floor' | 'reward' | null
+  itemOfferReason: 'floor' | 'reward' | 'bonus' | null
   // An item floor's offer that hasn't been rerolled yet (once per floor).
   canRerollItems: boolean
   // A New Ability / New Move floor: the four choices, until one is given to someone.
   pickOffer: { kind: 'ability' | 'move'; options: RunPickOption[] } | null
   // A floor's pick, or the reward for beating a boss.
-  pickReason: 'floor' | 'reward' | null
+  pickReason: 'floor' | 'reward' | 'bonus' | null
   // A Random Swap floor waiting on its choice: one Pokemon, the whole team, or neither.
   swapOffer: boolean
   // The level a swapped-in Pokemon arrives at (the next boss's).

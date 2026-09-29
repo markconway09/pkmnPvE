@@ -369,10 +369,6 @@ function MainMenu({
     }
   }
 
-  async function debugAddMoney(): Promise<void> {
-    setMoney(await window.api.debugAddMoney(1000))
-  }
-
   async function resetBossProgression(): Promise<void> {
     const progression = await window.api.resetProgression()
     setLevelCap(progression.levelCap)
@@ -1010,7 +1006,7 @@ function MainMenu({
               {formatMoney(
                 (boxState?.mons ?? [])
                   .filter((m) => boxSelection.has(m.id))
-                  .reduce((sum, m) => sum + POKEMON_SELL_PRICES[m.rarityTier ?? 'common'], 0)
+                  .reduce((sum, m) => sum + (m.sellPrice ?? POKEMON_SELL_PRICES[m.rarityTier ?? 'common']), 0)
               )}
               <span className="box-sell-hint">Click Pokemon to pick them - favorites can't be picked</span>
             </span>
@@ -1087,7 +1083,7 @@ function MainMenu({
             setDebugOpen(false)
             setShopPricesOpen(true)
           }}
-          onAddMoney={() => void debugAddMoney()}
+          onWalletChanged={setMoney}
           onResetBossProgress={() => void resetBossProgression()}
           onResetStats={() => void resetStats()}
           addRandomBusy={busy}
@@ -1196,7 +1192,7 @@ function MainMenu({
           onEdit={() => openEditor(contextMenu.mon.id, false)}
           onAdminEdit={isAdmin ? () => openEditor(contextMenu.mon.id, true) : undefined}
           onSell={() => void sellMon(contextMenu.mon.id)}
-          sellPrice={POKEMON_SELL_PRICES[contextMenu.mon.rarityTier ?? 'common']}
+          sellPrice={contextMenu.mon.sellPrice ?? POKEMON_SELL_PRICES[contextMenu.mon.rarityTier ?? 'common']}
           sellNeedsConfirm={!!contextMenu.mon.shiny || CONFIRM_SELL_TIERS.has(contextMenu.mon.rarityTier ?? 'common')}
           shiny={!!contextMenu.mon.shiny}
           onClose={() => setContextMenu(null)}

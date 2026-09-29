@@ -482,7 +482,13 @@ function RoguelitePanel({
       ) : pick ? (
         <div className="run-item-offer">
           <p className="run-reward-heading">
-            {run.pickReason === 'reward' ? 'Victory reward!' : pick.kind === 'ability' ? 'New Ability' : 'New Move'}
+            {run.pickReason === 'reward'
+              ? 'Victory reward!'
+              : run.pickReason === 'bonus'
+                ? `Title bonus: a free ${pick.kind === 'ability' ? 'ability' : 'move'}!`
+                : pick.kind === 'ability'
+                  ? 'New Ability'
+                  : 'New Move'}
           </p>
           {learner && chosenPick ? (
             <>
@@ -576,6 +582,7 @@ function RoguelitePanel({
       ) : offer ? (
         <div className="run-item-offer">
           {run.itemOfferReason === 'reward' && <p className="run-reward-heading">Victory reward!</p>}
+          {run.itemOfferReason === 'bonus' && <p className="run-reward-heading">Title bonus: a free item!</p>}
           <p className="box-empty-hint">
             {chosenItem ? 'Now click the Pokémon to give it to (it replaces what it holds).' : 'Pick one item.'}
           </p>

@@ -405,6 +405,40 @@ textarea,
   margin-top: 8px;
 }
 
+/* Debug: the player's money and coins, set outright. */
+.debug-wallet {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #1c212b;
+  border: 1px solid #2c3340;
+  border-radius: 6px;
+}
+
+.debug-wallet label {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  font-size: 12px;
+  color: #b7c0cf;
+}
+
+.debug-wallet input {
+  width: 100%;
+  box-sizing: border-box;
+  font-weight: bold;
+  color: #ffd76b;
+}
+
+.debug-wallet-saved {
+  margin: 0;
+  font-size: 12px;
+  color: #7fd08c;
+}
+
 .debug-reset-confirm,
 .confirm-button {
   border-color: #ff6b6b;
@@ -975,6 +1009,12 @@ textarea,
 .trainer-card-title select {
   color: #ffd76b;
   font-weight: bold;
+}
+
+/* The shown title's perk, under the picker. */
+.trainer-card-perk {
+  font-size: 11px;
+  color: #7fd08c;
 }
 
 .trainer-sprite-current-img {
@@ -1819,11 +1859,30 @@ textarea,
   color: #b7c0cf;
 }
 
-.sprite-shiny {
-  font-size: 13px;
-  line-height: 1;
-  color: #ffd84a;
-  text-shadow: 0 0 4px rgba(255, 216, 74, 0.7);
+/* The shiny star (see ShinyIcon), sized to the text around it. */
+.shiny-icon {
+  width: auto;
+  height: 1.15em;
+  vertical-align: -0.2em;
+  object-fit: contain;
+  filter: drop-shadow(0 0 2px rgba(255, 216, 74, 0.6));
+}
+
+.shiny-icon-large {
+  height: 0.95em;
+  margin: 0 6px;
+  vertical-align: -0.1em;
+}
+
+.box-icon-badges .shiny-icon {
+  height: 14px;
+}
+
+/* Not the portrait's own picture size (the edit windows size every image in there). */
+.pokemon-editor-portrait img.shiny-icon,
+.pokemon-editor-side .pokemon-editor-portrait img.shiny-icon {
+  width: auto;
+  height: 1.15em;
 }
 
 .sprite-level {
@@ -4493,6 +4552,19 @@ button:disabled {
   margin: 4px 0 0;
 }
 
+/* Everything under the reel, at one fixed height (room for the name, the line under it,
+   an error and the buttons), so the window keeps its size between cases. */
+.case-bottom {
+  height: 150px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.case-result p {
+  margin: 4px 0;
+}
+
 /* An item on the case strip: its little icon, blown up. */
 .case-card-item {
   margin: auto 0;
@@ -4800,8 +4872,21 @@ button:disabled {
 }
 
 .ability-popup-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   font-size: 15px;
   font-weight: bold;
+}
+
+/* A held item's banner: its icon beside the name, and a golden edge to tell it from an
+   ability's. */
+.ability-popup-item {
+  border-color: rgba(255, 215, 107, 0.7);
+}
+
+.ability-popup-icon {
+  flex-shrink: 0;
 }
 
 @keyframes ability-popup-in {
@@ -6153,10 +6238,12 @@ img.wild-location-icon {
 
 .achievements-modal {
   width: 760px;
+  overflow-x: hidden;
 }
 
 .achievements-count {
   margin-left: auto;
+  white-space: nowrap;
   color: #ffd76b;
   font-weight: bold;
 }
@@ -6916,4 +7003,37 @@ button.editor-evolution:disabled.editor-evolution-locked {
   fill: #f2f2f2;
   stroke: #222;
   stroke-width: 1;
+}
+
+/* "First to claim" in the Achievements header, and the flash on the one it scrolls to. */
+.achievements-claim-all {
+  white-space: nowrap;
+}
+/* Sticks to the top of the scrolling list without taking up any room in it. */
+.achievements-goto-float {
+  position: sticky;
+  top: 0;
+  height: 0;
+  z-index: 5;
+  display: flex;
+  justify-content: center;
+}
+.achievements-goto {
+  white-space: nowrap;
+  margin-top: 6px;
+  height: fit-content;
+  background: #3a3216;
+  border-color: #f5c542;
+  color: #ffd76b;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+}
+.achievements-goto:hover {
+  background: #4a4020;
+}
+@keyframes achievement-flash {
+  0%, 100% { box-shadow: none; }
+  30% { box-shadow: 0 0 0 3px #f5c542; }
+}
+.achievement.achievement-flash {
+  animation: achievement-flash 1.2s ease-out 2;
 }

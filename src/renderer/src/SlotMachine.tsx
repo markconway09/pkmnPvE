@@ -4,7 +4,7 @@ import type { SlotLineWin, SlotSpinResult, SlotSymbol } from '../../shared/slots
 import type { SlotRules } from '../../shared/slots'
 import { SLOT_LINES, SLOT_RULES } from '../../shared/slots'
 import ItemSprite from './ItemSprite'
-import BetSlider, { maxBet, placedBet, useSavedBet } from './BetSlider'
+import BetSlider, { maxBet, placedBet, useGameCornerPerks, useSavedBet } from './BetSlider'
 import GameCornerTabs, { type GameCornerGame } from './GameCornerTabs'
 import SpriteImage from './SpriteImage'
 import { toSpriteId } from '../../shared/battle-types'
@@ -51,12 +51,13 @@ function SymbolIcon({ symbol, pokemon }: { symbol: SlotSymbol; pokemon: SlotPoke
 /**
  * The Game Corner slot machine: three reels that stop on their own, left to right, on
  * where the main process already stopped them (see spinSlots). Every spin plays five
- * lines (the rows and both diagonals); the bet (a slider, up to every coin held or MAX_BET)
+ * lines (the rows and both diagonals); the bet (a slider, up to every coin held or the bet cap)
  * multiplies whatever they win, and the winning lines light up once the last reel stops.
  */
 function SlotMachine({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JSX.Element {
   const [coins, setCoins] = useState<number | null>(null)
   const [betWanted, setBet] = useSavedBet('slots')
+  const perks = useGameCornerPerks()
   const [spinning, setSpinning] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Each reel's middle symbol right now, and how it's drawn: the strip's offset and
@@ -93,7 +94,7 @@ function SlotMachine({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JS
     return () => timers.current.forEach(clearTimeout)
   }, [])
 
-  const bet = placedBet(betWanted, coins)
+  const bet = placedBet(betWanted, coins, perks.betCap)
 
   async function spin(): Promise<void> {
     if (spinning || coins === null || coins < bet) return
@@ -232,7 +233,7 @@ function SlotMachine({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JS
         </div>
 
         <div className="slots-controls">
-          <BetSlider bet={bet} max={maxBet(coins)} disabled={spinning || !coins} onChange={setBet} />
+          <BetSlider bet={bet} max={maxBet(coins, perks.betCap)} disabled={spinning || !coins} onChange={setBet} />
           <button
             ref={spinButtonRef}
             className="slots-spin"

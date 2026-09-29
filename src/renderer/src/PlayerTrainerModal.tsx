@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { LeagueMilestone, TrainerProfile } from '../../shared/battle-types'
 import type { AchievementsState } from '../../shared/achievements'
+import { titlePerk } from '../../shared/titles'
 import { trainerSpriteUrl } from './trainerSprite'
 import TrainerSpritePicker from './TrainerSpritePicker'
 
@@ -84,7 +85,10 @@ function PlayerTrainerModal({
                 </option>
               ))}
             </select>
-            <span className="trainer-sprite-change-hint">Earned from achievements</span>
+            {/* What the shown title does - only that one's perk is active. */}
+            <span className="trainer-card-perk">
+              {titles?.title ? titlePerk(titles.title) : 'Earned from achievements - each one has a perk'}
+            </span>
           </label>
         </div>
         {error && <p className="editor-error">{error}</p>}

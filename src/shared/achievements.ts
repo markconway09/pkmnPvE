@@ -489,7 +489,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     category: 'Game Corner',
     stat: 'naturalBlackjacks',
     goal: 1,
-    reward: { coins: 100 }
+    reward: { coins: 100, title: '9+10' }
   },
   {
     id: 'roulette100',

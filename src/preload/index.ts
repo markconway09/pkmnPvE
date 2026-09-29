@@ -4,6 +4,7 @@ import type { BlackjackView } from '../shared/blackjack'
 import type { AchievementClaimResult, AchievementsState } from '../shared/achievements'
 import type { CloudSave, CloudStatus } from '../shared/cloud'
 import type { RouletteSpin } from '../shared/roulette'
+import type { GameCornerPerks } from '../shared/titles'
 import type { PlinkoDrop, PlinkoRisk } from '../shared/plinko'
 import type {
   AutoSetOption,
@@ -153,6 +154,8 @@ const api = {
   hitBlackjack: (): Promise<BlackjackView> => ipcRenderer.invoke('blackjack:hit'),
   standBlackjack: (): Promise<BlackjackView> => ipcRenderer.invoke('blackjack:stand'),
   doubleBlackjack: (): Promise<BlackjackView> => ipcRenderer.invoke('blackjack:double'),
+  // What the player's title changes in the Game Corner (the bet cap, Plinko's edges).
+  getGameCornerPerks: (): Promise<GameCornerPerks> => ipcRenderer.invoke('gamecorner:perks'),
   getRouletteHistory: (): Promise<number[]> => ipcRenderer.invoke('roulette:history'),
   // The bets on the board: bet key ('n:17', 'red', 'dozen:2'...) -> coins on it.
   spinRoulette: (bets: Record<string, number>): Promise<RouletteSpin> => ipcRenderer.invoke('roulette:spin', bets),
@@ -174,7 +177,9 @@ const api = {
   listAutoSets: (species: string): Promise<AutoSetOption[]> => ipcRenderer.invoke('autoSets:list', species),
   buildAutoSet: (species: string, level: number, optionId: string, admin: boolean): Promise<AutoSetResult> =>
     ipcRenderer.invoke('autoSets:build', species, level, optionId, admin),
-  debugAddMoney: (amount: number): Promise<number> => ipcRenderer.invoke('money:debugAdd', amount),
+  // Debug menu (admins only): sets the money and coins outright.
+  debugSetWallet: (money: number, coins: number): Promise<{ money: number; coins: number }> =>
+    ipcRenderer.invoke('debug:setWallet', money, coins),
   listShop: (): Promise<ShopItemEntry[]> => ipcRenderer.invoke('shop:list'),
   buyItem: (itemId: string, quantity: number): Promise<{ success: boolean; money: number }> =>
     ipcRenderer.invoke('shop:buy', itemId, quantity),

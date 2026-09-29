@@ -16,6 +16,7 @@ import ProtectShield from './ProtectShield'
 import SideScreens from './SideScreens'
 import { spriteCandidates, type SpriteStyle } from './spriteStyle'
 import ItemSprite from './ItemSprite'
+import ShinyIcon from './ShinyIcon'
 
 interface Props {
   pokemon: ActivePokemonView | null
@@ -256,9 +257,18 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
           </div>
         )}
         {shownAbility && (
-          <div key={shownAbility.ability + shownAbility.slot} className={`ability-popup ability-popup-${align}`}>
+          <div
+            key={shownAbility.ability + shownAbility.slot}
+            className={`ability-popup ability-popup-${align}${shownAbility.itemSpritenum !== undefined ? ' ability-popup-item' : ''}`}
+          >
             <span className="ability-popup-mon">{shownAbility.pokemon}&apos;s</span>
-            <span className="ability-popup-name">{shownAbility.ability}</span>
+            <span className="ability-popup-name">
+              {/* A held item at work shows its icon. */}
+              {shownAbility.itemSpritenum !== undefined && (
+                <ItemSprite spritenum={shownAbility.itemSpritenum} className="ability-popup-icon" />
+              )}
+              {shownAbility.ability}
+            </span>
           </div>
         )}
         {phase === 'sending-out' && displayed.shiny && (
@@ -277,11 +287,7 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
               <ItemSprite spritenum={POKE_BALL_SPRITENUM} />
             </span>
           )}
-          {displayed.shiny && (
-            <span className="sprite-shiny" title="Shiny">
-              ★
-            </span>
-          )}
+          {displayed.shiny && <ShinyIcon />}
           <span className="sprite-level">Lv{displayed.level}</span>
           {displayed.status && (
             <span className={`status-badge status-${displayed.status}`}>

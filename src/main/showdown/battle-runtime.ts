@@ -17,6 +17,7 @@ import {
   liveMovePower,
   moveTypeEffectiveness,
   packTeam,
+  getItemSpritenum,
   heldItemForme,
   parseCondition,
   pokeballPrice,
@@ -58,7 +59,21 @@ import {
   ITEM_CHARM_DROP_MULTIPLIER,
   ITEM_CHARM_ITEM_ID
 } from '../../shared/battle-types'
-import { DEFAULT_POKEBALL_ID, EXP_CHARM_ITEM_ID, EXP_CHARM_MULTIPLIER, TRAINER_RUN_COST, prizeMoneyFor } from '../../shared/battle-types'
+import {
+  DEFAULT_POKEBALL_ID,
+  EXP_CHARM_ITEM_ID,
+  EXP_CHARM_MULTIPLIER,
+  RARE_CANDY_ITEM_ID,
+  TRAINER_RUN_COST,
+  prizeMoneyFor
+} from '../../shared/battle-types'
+import {
+  ACE_TRAINER_MONEY_MULTIPLIER,
+  BADGE_COLLECTOR_CANDY_CHANCE,
+  COLLECTOR_FREE_CATCH_CHANCE,
+  VETERAN_EXP_MULTIPLIER
+} from '../../shared/titles'
+import { hasTitle, shopPrice } from './title-perks'
 import type {
   ActivePokemonView,
   AiDifficulty,
@@ -216,6 +231,39 @@ function computeAbilityEvent(line: string): AbilityEvent | null {
   const of = parts.find((p) => p.startsWith('[of] '))?.slice('[of] '.length)
   const holder = cmd === '-heal' || !of ? parts[1] : of
   return withAbility(holder, from.slice('[from] ability: '.length))
+}
+
+// A held item doing something on this line, for the same banner as an ability (with the
+// item's icon): anything "[from] item: X" (Leftovers, Life Orb, Rocky Helmet - whose
+// holder is the [of] Pokemon - Black Sludge, Flame Orb...), an item used up or eaten
+// (-enditem: Focus Sash, a berry, a popped Air Balloon, Weakness Policy), one announcing
+// itself (-item: Air Balloon) or an -activate naming "item: X" (Quick Claw). Not an item
+// taken by a move (Knock Off, Thief, Trick) or revealed by an ability (Frisk - that's the
+// ability's own banner).
+function computeItemEvent(line: string): AbilityEvent | null {
+  if (!line.startsWith('|')) return null
+  const parts = line.slice(1).split('|')
+  const cmd = parts[0]
+  if (parts.includes('[silent]')) return null
+  const withItem = (ident: string | undefined, item: string | undefined): AbilityEvent | null => {
+    const slot = slotKeyFromIdent(ident)
+    const pokemon = ident?.split(': ')[1]
+    if (!slot || !pokemon || !item) return null
+    return { slot, pokemon, ability: item, itemSpritenum: getItemSpritenum(item) ?? undefined }
+  }
+  const fromMoveOrAbility = parts.some((p) => p.startsWith('[from] move:') || p.startsWith('[from] ability:'))
+  if (cmd === '-enditem' || cmd === '-item') {
+    if (fromMoveOrAbility || parts.includes('[from] stealeat')) return null
+    return withItem(parts[1], parts[2])
+  }
+  if (cmd === '-activate') {
+    const named = parts.slice(2).find((p) => p.startsWith('item: '))
+    if (named) return withItem(parts[1], named.slice('item: '.length))
+  }
+  const from = parts.find((p) => p.startsWith('[from] item: '))
+  if (!from) return null
+  const of = parts.find((p) => p.startsWith('[of] '))?.slice('[of] '.length)
+  return withItem(of ?? parts[1], from.slice('[from] item: '.length))
 }
 
 // A Pokemon Terastallizing or Mega Evolving on this line (Primal Reversion and Ultra
@@ -450,7 +498,8 @@ export class WildBattle {
         const event = computeFeedbackEvent(line)
         const moveEvent = this.computeMoveEvent(line, lines.slice(index + 1))
         const gimmickEvent = computeGimmickEvent(line)
-        const abilityEvent = computeAbilityEvent(line)
+        // An ability's banner, or else a held item's (they share the banner).
+        const abilityEvent = computeAbilityEvent(line) ?? computeItemEvent(line)
         let eventUsed = false
         for (const textLine of rendered.split('\n')) {
           if (!textLine.trim()) continue
@@ -482,19 +531,25 @@ export class WildBattle {
               if (!this.opponent.isBoss) countStat('trainersDefeated')
               // Per Pokemon on the team they actually sent out, or a flat sum for a
               // boss - either way plus the level cap as a percentage on top.
-              this.moneyGained = this.opponent.noPrizeMoney
-                ? 0
-                : prizeMoneyFor(!!this.opponent.isBoss, this.p2team.length, levelCap)
+              this.moneyGained = this.opponent.noPrizeMoney ? 0 : this.prizeMoney(levelCap)
               if (this.moneyGained > 0) addMoney(this.moneyGained)
             } else {
               countStat('wildDefeated')
             }
             const baseExp = this.p2team.reduce((sum, mon) => sum + expYieldFor(mon.species, mon.level), 0)
-            // The Exp. Charm: 1.5x exp.
-            const totalExp = hasItem(EXP_CHARM_ITEM_ID) ? Math.floor(baseExp * EXP_CHARM_MULTIPLIER) : baseExp
-            this.expGains = awardExpToTeam(totalExp)
+            // The Exp. Charm (1.5x) and the Veteran title (+10%) - they stack.
+            let totalExp = baseExp
+            if (hasItem(EXP_CHARM_ITEM_ID)) totalExp *= EXP_CHARM_MULTIPLIER
+            if (hasTitle('Veteran')) totalExp *= VETERAN_EXP_MULTIPLIER
+            this.expGains = awardExpToTeam(Math.floor(totalExp))
             awardFriendshipToTeam()
             this.itemDrops = this.rollItemDrops()
+            // Badge Collector: now and then, a bonus Rare Candy after any battle won.
+            if (hasTitle('Badge Collector') && Math.random() < BADGE_COLLECTOR_CANDY_CHANCE) {
+              const candy = getEditorOptions().items.find((i) => i.id === RARE_CANDY_ITEM_ID)
+              addItem(RARE_CANDY_ITEM_ID, 1)
+              if (candy) this.itemDrops.push({ itemId: candy.id, itemName: candy.name, spritenum: candy.spritenum })
+            }
           }
           this.wake()
         } else if (line === '|tie') {
@@ -784,14 +839,18 @@ export class WildBattle {
       this.caught = true
       return { money: getMoney(), pokeballs: getItemQuantity(DEFAULT_POKEBALL_ID) }
     }
-    // The Catching Charm: half the time, no Poke Ball and nothing paid.
-    const free = hasItem(CATCHING_CHARM_ITEM_ID) && Math.random() < CATCHING_CHARM_FREE_CHANCE
+    // The Catching Charm (half the time) and the Collector title (10%) each give a
+    // chance of the catch being free - no Poke Ball and nothing paid.
+    const free =
+      (hasItem(CATCHING_CHARM_ITEM_ID) && Math.random() < CATCHING_CHARM_FREE_CHANCE) ||
+      (hasTitle('Collector') && Math.random() < COLLECTOR_FREE_CATCH_CHANCE)
     if (free) {
       // Nothing spent.
     } else if (hasItem(DEFAULT_POKEBALL_ID)) {
       removeItem(DEFAULT_POKEBALL_ID, 1)
     } else {
-      const price = pokeballPrice()
+      // Bought at the Shop's price - with Tycoon's discount.
+      const price = shopPrice(pokeballPrice())
       if (!spendMoney(price)) throw new Error(`Not enough money to buy a Poke Ball (need ${price})`)
     }
     addCaughtMon(this.p2team[0])
@@ -807,9 +866,16 @@ export class WildBattle {
   private runCost(): number | null {
     if (!this.opponent?.trainerId) return 0
     if (this.opponent.isBoss || this.opponent.run) return null
-    // A friendly match (another player's team) has nothing riding on it.
-    if (this.opponent.noRewards) return 0
+    // A friendly match (another player's team) has nothing riding on it, and the
+    // Champion title runs from any trainer for free.
+    if (this.opponent.noRewards || hasTitle('Champion')) return 0
     return TRAINER_RUN_COST
+  }
+
+  // A trainer's or boss's prize money - with the Ace Trainer title's 10% on top.
+  private prizeMoney(levelCap: number): number {
+    const base = prizeMoneyFor(!!this.opponent?.isBoss, this.p2team.length, levelCap)
+    return hasTitle('Ace Trainer') ? Math.round(base * ACE_TRAINER_MONEY_MULTIPLIER) : base
   }
 
   assertCanRun(): void {
@@ -1253,9 +1319,7 @@ export class WildBattle {
     for (const drop of opponent?.drops ?? []) add(drop, opponent?.trainerId ? 'trainer' : 'wild')
     add(opponent?.teamDrop, 'team')
     return {
-      money: opponent?.trainerId && !opponent.noPrizeMoney
-        ? prizeMoneyFor(!!opponent.isBoss, this.p2team.length, getProgression().levelCap)
-        : null,
+      money: opponent?.trainerId && !opponent.noPrizeMoney ? this.prizeMoney(getProgression().levelCap) : null,
       items,
       randomDropChance: opponent?.randomDropChance ?? 0
     }

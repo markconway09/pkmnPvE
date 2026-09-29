@@ -1,14 +1,34 @@
 import { useEffect, useState } from 'react'
 import { MAX_BET } from '../../shared/slots'
+import { BLACKJACK_PAYOUT, type GameCornerPerks } from '../../shared/titles'
 import CoinIcon from './CoinIcon'
 
 interface Props {
   // The bet as placed (already kept between 1 and max - see placedBet).
   bet: number
-  // The most that can be bet: every coin held, up to MAX_BET (at least 1).
+  // The most that can be bet: every coin held, up to the bet cap (at least 1).
   max: number
   disabled: boolean
   onChange: (bet: number) => void
+}
+
+/**
+ * What the player's title changes in the Game Corner - the bet cap (High Roller) and
+ * Plinko's edge slots (Edge Lord). The usual rules until it's loaded.
+ */
+export function useGameCornerPerks(): GameCornerPerks {
+  const [perks, setPerks] = useState<GameCornerPerks>({
+    betCap: MAX_BET,
+    plinkoEdgeMultiplier: 1,
+    blackjackPayout: BLACKJACK_PAYOUT
+  })
+  useEffect(() => {
+    window.api
+      .getGameCornerPerks()
+      .then(setPerks)
+      .catch(() => {})
+  }, [])
+  return perks
 }
 
 /**
@@ -21,7 +41,8 @@ export function useSavedBet(game: 'slots' | 'blackjack' | 'roulette' | 'plinko')
   const [bet, setBet] = useState(() => {
     try {
       const saved = Number(localStorage.getItem(key))
-      return Number.isInteger(saved) && saved >= 1 ? Math.min(MAX_BET, saved) : 10
+      // Kept as saved - placedBet brings it within the cap and the coins held.
+      return Number.isInteger(saved) && saved >= 1 ? saved : 10
     } catch {
       return 10
     }
@@ -37,14 +58,14 @@ export function useSavedBet(game: 'slots' | 'blackjack' | 'roulette' | 'plinko')
   return [bet, saveBet]
 }
 
-/** The most that can be bet holding this many coins: all of them, up to MAX_BET. */
-export function maxBet(coins: number | null): number {
-  return Math.max(1, Math.min(MAX_BET, coins ?? 1))
+/** The most that can be bet holding this many coins: all of them, up to the bet cap. */
+export function maxBet(coins: number | null, cap: number = MAX_BET): number {
+  return Math.max(1, Math.min(cap, coins ?? 1))
 }
 
 /** The bet as it can actually be placed: at least 1, at most maxBet. */
-export function placedBet(bet: number, coins: number | null): number {
-  return Math.min(Math.max(1, bet), maxBet(coins))
+export function placedBet(bet: number, coins: number | null, cap: number = MAX_BET): number {
+  return Math.min(Math.max(1, bet), maxBet(coins, cap))
 }
 
 /**
@@ -86,7 +107,7 @@ function BetSlider({ bet, max, disabled, onChange }: Props): React.JSX.Element {
       <button className="slots-bet-step" title="Bet more" disabled={disabled || bet >= max} onClick={() => onChange(higher)}>
         +
       </button>
-      <label className="slots-bet-value" title={`Type a bet (1 up to ${MAX_BET}, or every coin you have if that's less)`}>
+      <label className="slots-bet-value" title={`Type a bet (1 up to ${max.toLocaleString('en-US')})`}>
         <CoinIcon />
         <input
           className="slots-bet-input"

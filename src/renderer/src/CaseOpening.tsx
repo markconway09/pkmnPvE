@@ -4,6 +4,7 @@ import type { OpenItemResult, RarityTier } from '../../shared/battle-types'
 import { CONFIRM_SELL_TIERS, toSpriteId } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
 import ItemSprite from './ItemSprite'
+import ShinyIcon from './ShinyIcon'
 import { formatMoney } from './money'
 import { playTick } from './ticks'
 
@@ -176,12 +177,15 @@ function CaseOpening({ itemName, result, onClose, onOpenAnother }: Props): React
           <div className="case-marker" />
         </div>
 
+        {/* Always the same height - spinning or showing any result - so the window never
+            changes size from one case to the next. */}
+        <div className="case-bottom">
         {done ? (
           <div className="case-result">
             <p className={`case-result-name case-tier-text-${winner.tier}`}>
-              {result.shiny && '✨ '}
+              {result.shiny && <ShinyIcon className="shiny-icon-large" />}
               {result.shiny ? `Shiny ${result.name}` : result.name}
-              {result.shiny && ' ✨'}
+              {result.shiny && <ShinyIcon className="shiny-icon-large" />}
               {result.isNew && <span className="case-new-badge">New</span>}
               {result.kind === 'item' && !!result.price && (
                 <span className="case-result-price">{formatMoney(result.price)}</span>
@@ -237,6 +241,7 @@ function CaseOpening({ itemName, result, onClose, onOpenAnother }: Props): React
         ) : (
           <p className="box-empty-hint case-skip-hint">Click to skip</p>
         )}
+        </div>
       </div>
     </div>,
     document.body

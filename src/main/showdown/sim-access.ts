@@ -52,8 +52,12 @@ import type {
 import { getShopPriceOverrides } from './shop-price-store'
 import { FOSSIL_SPECIES } from './fossils'
 import { REGIONAL_STARTER_SPECIES } from '../../shared/starters'
-// Only called inside functions (never while modules load), so the import cycle with bag-store is harmless.
+// Only called inside functions (never while modules load), so these import cycles
+// (bag-store, box-store and title-perks all use this module) are harmless.
 import { hasItem } from './bag-store'
+import { hasRegisteredSpecies } from './box-store'
+import { hasTitle } from './title-perks'
+import { PROFESSOR_UNREGISTERED_WEIGHT, SHINY_HUNTER_ODDS } from '../../shared/titles'
 
 // pokemon-showdown is CommonJS; Node's static named-export detection misses
 // some of these under ESM, so the package is loaded via require() instead.
@@ -395,10 +399,19 @@ export function generateRandomTrainerTeam(
 
 const WILD_SHINY_ODDS = 512
 
-/** A wild Pokemon's shiny roll: 1 in WILD_SHINY_ODDS, three times likelier with the Shiny Charm. */
+/**
+ * A wild Pokemon's shiny roll: 1 in WILD_SHINY_ODDS (1 in SHINY_HUNTER_ODDS with that
+ * title), three times likelier with the Shiny Charm - the two stack.
+ */
 function rollWildShiny(): boolean {
   const boost = hasItem(SHINY_CHARM_ITEM_ID) ? SHINY_CHARM_MULTIPLIER : 1
-  return Math.random() < boost / WILD_SHINY_ODDS
+  const odds = hasTitle('Shiny Hunter') ? SHINY_HUNTER_ODDS : WILD_SHINY_ODDS
+  return Math.random() < boost / odds
+}
+
+// The Professor title: species not in the Pokedex yet are likelier in the wild.
+function professorWeight(speciesName: string): number {
+  return hasTitle('Professor') && !hasRegisteredSpecies(speciesName) ? PROFESSOR_UNREGISTERED_WEIGHT : 1
 }
 
 // Pokemon handed to the player outright - a starter, a restored fossil, one
@@ -655,7 +668,7 @@ export function generateRandomWildMon(
       )
     }
     if (candidates.length > 0) {
-      const wild = weightedPick(candidates, (c) => wildRarityWeight(c.species))
+      const wild = weightedPick(candidates, (c) => wildRarityWeight(c.species) * professorWeight(c.species))
       // Overrides whatever the random set generator rolled, so the odds are
       // exactly WILD_SHINY_ODDS regardless of format. The generator leaves the
       // nature blank (and a de-evolved set is Hardy) - a wild Pokemon gets a

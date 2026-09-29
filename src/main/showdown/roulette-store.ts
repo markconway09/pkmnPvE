@@ -1,7 +1,7 @@
 import { randomInt } from 'node:crypto'
 import type { RouletteBetResult, RouletteSpin } from '../../shared/roulette'
 import { ROULETTE_NUMBERS, betOdds, betWins, isRouletteBet } from '../../shared/roulette'
-import { MAX_BET } from '../../shared/slots'
+import { betCap } from './title-perks'
 import { changeCoins, getCoins } from './game-corner-store'
 import { onPlayerChange } from './player-session'
 import { countAchievement } from './achievement-progress'
@@ -34,7 +34,7 @@ export function spinRoulette(bets: Record<string, number>): RouletteSpin {
     if (!Number.isInteger(amount)) throw new Error('Bets are whole coins')
   }
   const totalBet = entries.reduce((sum, [, amount]) => sum + amount, 0)
-  if (totalBet > MAX_BET) throw new Error(`The table takes at most ${MAX_BET} coins a spin`)
+  if (totalBet > betCap()) throw new Error(`The table takes at most ${betCap()} coins a spin`)
   if (getCoins() < totalBet) throw new Error('Not enough coins - buy some at the Coin Shop')
 
   changeCoins(-totalBet)

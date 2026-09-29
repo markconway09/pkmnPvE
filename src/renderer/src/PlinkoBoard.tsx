@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { PlinkoDrop, PlinkoRisk } from '../../shared/plinko'
 import { PLINKO_PAYOUTS, PLINKO_RISKS, PLINKO_RISK_LABELS, PLINKO_ROWS, PLINKO_SLOTS } from '../../shared/plinko'
-import BetSlider, { maxBet, placedBet, useSavedBet } from './BetSlider'
+import BetSlider, { maxBet, placedBet, useGameCornerPerks, useSavedBet } from './BetSlider'
 import GameCornerTabs, { type GameCornerGame } from './GameCornerTabs'
 import CoinIcon from './CoinIcon'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
@@ -57,6 +57,7 @@ function slotTone(multiplier: number): string {
 function PlinkoBoard({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JSX.Element {
   const [coins, setCoins] = useState<number | null>(null)
   const [betWanted, setBet] = useSavedBet('plinko')
+  const perks = useGameCornerPerks()
   const [risk, setRisk] = useState<PlinkoRisk>(() => {
     try {
       const saved = localStorage.getItem('pkmnpve.plinkoRisk') as PlinkoRisk | null
@@ -178,7 +179,7 @@ function PlinkoBoard({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JS
     setDropping(true)
     try {
       for (let i = 0; i < count; i++) {
-        if (!(await dropOne(placedBet(betWanted, coins)))) break
+        if (!(await dropOne(placedBet(betWanted, coins, perks.betCap)))) break
         if (i < count - 1) await new Promise((r) => setTimeout(r, MULTI_GAP_MS))
       }
     } finally {
@@ -186,8 +187,11 @@ function PlinkoBoard({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JS
     }
   }
 
-  const bet = placedBet(betWanted, coins)
-  const payouts = PLINKO_PAYOUTS[risk]
+  const bet = placedBet(betWanted, coins, perks.betCap)
+  // The edge slots pay double with the Edge Lord title.
+  const payouts = PLINKO_PAYOUTS[risk].map((m, slot) =>
+    slot === 0 || slot === PLINKO_SLOTS - 1 ? m * perks.plinkoEdgeMultiplier : m
+  )
 
   return createPortal(
     <div className="modal-overlay" onMouseDown={onClose}>
@@ -260,7 +264,7 @@ function PlinkoBoard({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JS
         </svg>
 
         <div className="slots-controls">
-          <BetSlider bet={bet} max={maxBet(coins)} disabled={dropping || !coins} onChange={setBet} />
+          <BetSlider bet={bet} max={maxBet(coins, perks.betCap)} disabled={dropping || !coins} onChange={setBet} />
           <button className="slots-spin" disabled={dropping || coins === null || coins < bet} onClick={() => void drop(1)}>
             Drop
           </button>

@@ -69,8 +69,8 @@ import {
   updateTeamMon
 } from './showdown/premade-teams-store'
 import { getNextBoss, getProgression, resetProgression, setBossOrder, setLevelCap } from './showdown/progression-store'
-import { addMoney, getMoney, resetMoney } from './showdown/money-store'
-import { buyCoinPrize, buyCoins, getCoins, getSlotRules, spinSlots } from './showdown/game-corner-store'
+import { getMoney, resetMoney, setMoney } from './showdown/money-store'
+import { buyCoinPrize, buyCoins, getCoins, getSlotRules, setCoins, spinSlots } from './showdown/game-corner-store'
 import {
   dealBlackjack,
   doubleBlackjack,
@@ -81,6 +81,7 @@ import {
 import { resetStatsCounters } from './showdown/stats-store'
 import { getRouletteHistory, spinRoulette } from './showdown/roulette-store'
 import { dropPlinko } from './showdown/plinko-store'
+import { getGameCornerPerks } from './showdown/title-perks'
 import type { PlinkoRisk } from '../shared/plinko'
 import { checkAchievements, claimAchievement, getAchievements, setAchievementTitle } from './showdown/achievement-store'
 import { getTrainerProfile } from './showdown/trainer-profile'
@@ -501,6 +502,7 @@ ipcMain.handle('coins:prize', (_event, itemId: string) => buyCoinPrize(itemId))
 ipcMain.handle('slots:spin', (_event, bet: number) => spinSlots(bet))
 ipcMain.handle('slots:rules', () => getSlotRules())
 ipcMain.handle('blackjack:view', () => getBlackjackView())
+ipcMain.handle('gamecorner:perks', () => getGameCornerPerks())
 ipcMain.handle('roulette:history', () => getRouletteHistory())
 ipcMain.handle('roulette:spin', (_event, bets: Record<string, number>) => spinRoulette(bets))
 ipcMain.handle('plinko:drop', (_event, bet: number, risk: PlinkoRisk) => dropPlinko(bet, risk))
@@ -508,9 +510,9 @@ ipcMain.handle('blackjack:deal', (_event, bet: number) => dealBlackjack(bet))
 ipcMain.handle('blackjack:hit', () => hitBlackjack())
 ipcMain.handle('blackjack:stand', () => standBlackjack())
 ipcMain.handle('blackjack:double', () => doubleBlackjack())
-ipcMain.handle('money:debugAdd', (_event, amount: number) => {
+ipcMain.handle('debug:setWallet', (_event, money: number, coins: number) => {
   requireAdmin()
-  return addMoney(amount)
+  return { money: setMoney(money), coins: setCoins(coins) }
 })
 ipcMain.handle('shop:list', () => listShop())
 ipcMain.handle('shop:buy', (_event, itemId: string, quantity: number) => buyItem(itemId, quantity))

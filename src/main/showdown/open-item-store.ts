@@ -1,13 +1,11 @@
 import type { OpenItemResult, RarityTier, ReelEntry, ShopItemEntry } from '../../shared/battle-types'
-import {
-  LOCK_CAPSULE_ITEM_ID,
-  POKEMON_SELL_PRICES,
-  RANDOM_LEGENDARY_ITEM_ID,
-  RANDOM_POKEMON_ITEM_ID
-} from '../../shared/battle-types'
+import { LOCK_CAPSULE_ITEM_ID, RANDOM_LEGENDARY_ITEM_ID, RANDOM_POKEMON_ITEM_ID } from '../../shared/battle-types'
+import { LEGEND_KEEPER_RESTRICTED_CHANCE } from '../../shared/titles'
+import { hasTitle, monSellPrice } from './title-perks'
 import {
   buildBasicSet,
   pickRandomLegendarySpecies,
+  pickRandomSwapSpecies,
   pickRandomUnevolvedAnySpecies,
   randomNatureName,
   rollGiftShiny,
@@ -48,7 +46,11 @@ export function openBagItem(itemId: string): OpenItemResult {
   else throw new Error("That item can't be opened")
 
   if (getItemQuantity(itemId) < 1) throw new Error("You don't have that item")
-  const species = pickSpecies()
+  // The Legend Keeper title: a Random Legendary is sometimes drawn from the box
+  // legendaries (Mewtwo, Kyogre, Koraidon...) alone.
+  const legendKeeperDraw =
+    itemId === RANDOM_LEGENDARY_ITEM_ID && hasTitle('Legend Keeper') && Math.random() < LEGEND_KEEPER_RESTRICTED_CHANCE
+  const species = legendKeeperDraw ? pickRandomSwapSpecies('restricted') : pickSpecies()
   const level = restoredLevel()
   const shiny = rollGiftShiny()
   // Checked before it's added, which registers it.
@@ -68,9 +70,9 @@ export function openBagItem(itemId: string): OpenItemResult {
     winnerIndex: REEL_WINNER_INDEX,
     remaining: getItemQuantity(itemId),
     isNew,
-    // It can be sold straight from the result, for its rarity's price.
+    // It can be sold straight from the result, for its rarity's price (with a title's bonus).
     monId,
-    sellPrice: POKEMON_SELL_PRICES[winner.tier]
+    sellPrice: monSellPrice(winner.tier)
   }
 }
 
@@ -114,7 +116,8 @@ function pickCapsuleItem(pool: ShopItemEntry[]): ShopItemEntry {
 
 function openLockCapsule(): OpenItemResult {
   if (getItemQuantity(LOCK_CAPSULE_ITEM_ID) < 1) throw new Error("You don't have that item")
-  const pool = listShop().filter((item) => item.id !== LOCK_CAPSULE_ITEM_ID && item.price > 0)
+  // At the Shop's own prices (not a title's discount), so the odds and colours stay put.
+  const pool = listShop(false).filter((item) => item.id !== LOCK_CAPSULE_ITEM_ID && item.price > 0)
   if (pool.length === 0) throw new Error('The shop has nothing to give')
   const item = pickCapsuleItem(pool)
   const isNew = getItemQuantity(item.id) === 0

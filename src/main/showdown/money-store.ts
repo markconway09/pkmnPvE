@@ -64,6 +64,14 @@ export function spendMoney(amount: number): boolean {
   return true
 }
 
+/** The Debug menu: sets the balance outright (a whole number, never below zero). */
+export function setMoney(amount: number): number {
+  if (!Number.isFinite(amount)) throw new Error('Enter an amount of money')
+  getState().amount = Math.max(0, Math.floor(amount))
+  persist()
+  return getState().amount
+}
+
 export function resetMoney(): void {
   state = defaultMoney()
   persist()

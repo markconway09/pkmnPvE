@@ -15,21 +15,23 @@ import {
   sellPriceFor
 } from './sim-access'
 import { lateItemsUnlocked } from './progression-store'
+import { shopPrice } from './title-perks'
 
 // What this player can actually buy right now - the late-game items stay out
-// until they're unlocked. The admin price editor still sees everything.
-function buyableCatalog(): ShopItemEntry[] {
-  if (lateItemsUnlocked()) return getShopCatalog()
-  return getShopCatalog().filter((i) => !isLateGameItem(i.id))
+// until they're unlocked. The admin price editor still sees everything. Prices are what
+// this player pays (the Tycoon title's discount), unless asked for the Shop's own.
+function buyableCatalog(discounted = true): ShopItemEntry[] {
+  const catalog = lateItemsUnlocked() ? getShopCatalog() : getShopCatalog().filter((i) => !isLateGameItem(i.id))
+  return discounted ? catalog.map((item) => ({ ...item, price: shopPrice(item.price) })) : catalog
 }
 
 /**
  * The shop's shelves: what can be bought, with the key items shown after the Recommended
  * ones - never for sale, just whether the player has each and the achievement that
- * unlocks it.
+ * unlocks it. `discounted` false gives the Shop's own prices (for the Lock Capsule's odds).
  */
-export function listShop(): ShopItemEntry[] {
-  const catalog = buyableCatalog()
+export function listShop(discounted = true): ShopItemEntry[] {
+  const catalog = buyableCatalog(discounted)
   const keyItems: ShopItemEntry[] = getEditorOptions()
     .items.filter((item) => KEY_ITEM_IDS.has(item.id))
     .map((item) => ({
