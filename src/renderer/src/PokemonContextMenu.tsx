@@ -19,9 +19,7 @@ interface Props {
   evolutionItems?: Record<string, EvolutionItemUse>
   // Evolutions already in the Pokedex (see BoxPokemonView.registeredEvolutions).
   registeredEvolutions?: string[]
-  canLevelUp?: boolean
   onChoose?: (targetSpecies: string) => void
-  onLevelUp?: () => void
   canUseShinyPatch?: boolean
   onUseShinyPatch?: () => void
   // With a form-change item (Rotom Catalog, Prison Bottle...): the forms it can change into.
@@ -32,8 +30,6 @@ interface Props {
   onFuse?: (partnerId: string) => void
   unfuse?: BoxPokemonView['unfuse']
   onUnfuse?: () => void
-  favorite?: boolean
-  onToggleFavorite?: () => void
   onEdit?: () => void
   // Only given to admins.
   onAdminEdit?: () => void
@@ -52,9 +48,7 @@ function PokemonContextMenu({
   evolutions = [],
   evolutionItems = {},
   registeredEvolutions: registered = [],
-  canLevelUp = false,
   onChoose,
-  onLevelUp,
   canUseShinyPatch = false,
   onUseShinyPatch,
   formChanges,
@@ -63,8 +57,6 @@ function PokemonContextMenu({
   onFuse,
   unfuse,
   onUnfuse,
-  favorite = false,
-  onToggleFavorite,
   onEdit,
   onAdminEdit,
   onSell,
@@ -90,19 +82,9 @@ function PokemonContextMenu({
             Edit Pokemon
           </button>
         )}
-        {onToggleFavorite && (
-          <button className="context-menu-item" onClick={onToggleFavorite}>
-            {favorite ? 'Unfavorite' : '❤️ Favorite'}
-          </button>
-        )}
         {onAdminEdit && (
           <button className="context-menu-item" onClick={onAdminEdit}>
             Admin Edit
-          </button>
-        )}
-        {canLevelUp && onLevelUp && (
-          <button className="context-menu-item" onClick={onLevelUp}>
-            Level Up (use Rare Candy)
           </button>
         )}
         {canUseShinyPatch && onUseShinyPatch && (
@@ -111,7 +93,8 @@ function PokemonContextMenu({
           </button>
         )}
         {onChangeForm &&
-          formChanges?.forms.map((form) => (
+          formChanges?.ready &&
+          formChanges.forms.map((form) => (
             <button
               key={form}
               className="context-menu-item"

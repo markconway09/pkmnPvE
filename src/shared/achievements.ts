@@ -42,6 +42,10 @@ export type AchievementStat =
   | 'slotCoinsWon'
   | 'blackjackWins'
   | 'naturalBlackjacks'
+  | 'rouletteSpins'
+  | 'rouletteNumberWins'
+  | 'plinkoDrops'
+  | 'plinkoEdges'
 
 export type AchievementCategory = 'Battle' | 'Collection' | 'Roguelite' | 'Game Corner' | 'Secret'
 export const ACHIEVEMENT_CATEGORIES: AchievementCategory[] = [
@@ -486,6 +490,42 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     stat: 'naturalBlackjacks',
     goal: 1,
     reward: { coins: 100 }
+  },
+  {
+    id: 'roulette100',
+    name: 'Round and Round',
+    description: 'Spin the roulette wheel 100 times',
+    category: 'Game Corner',
+    stat: 'rouletteSpins',
+    goal: 100,
+    reward: { coins: 100 }
+  },
+  {
+    id: 'luckynumber',
+    name: 'Lucky Number',
+    description: 'Win a roulette bet on a single number',
+    category: 'Game Corner',
+    stat: 'rouletteNumberWins',
+    goal: 1,
+    reward: { coins: 250 }
+  },
+  {
+    id: 'plinko500',
+    name: 'Ball Dropper',
+    description: 'Drop 500 balls in Plinko',
+    category: 'Game Corner',
+    stat: 'plinkoDrops',
+    goal: 500,
+    reward: { coins: 250 }
+  },
+  {
+    id: 'plinkoedge',
+    name: 'Edge Case',
+    description: "Land a Plinko ball in one of the edge slots",
+    category: 'Game Corner',
+    stat: 'plinkoEdges',
+    goal: 1,
+    reward: { coins: 500, title: 'Edge Lord' }
   },
 
   // Secret: shown as ??? until unlocked.

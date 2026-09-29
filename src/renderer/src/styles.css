@@ -19,6 +19,69 @@ textarea,
   user-select: text;
 }
 
+/* Slightly rounded corners everywhere, like the nav bar's buttons. :where() keeps these
+   at no weight at all, so anything that sets its own rounding (a pill, a circle, a
+   square-cornered segment) still gets its way. */
+:where(button, input, select, textarea) {
+  border-radius: 6px;
+}
+
+:where(.modal-panel) {
+  border-radius: 10px;
+}
+
+/* Menus and pickers round off their corners, and their rows are cut to fit. */
+:where(.context-menu, .selector-panel, .tooltip-panel) {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+:where(
+    .team-slot,
+    .box-icon-draggable,
+    .starter-grid,
+    .trainer-picker-grid,
+    .trainer-picker-option,
+    .trainer-list-row,
+    .wild-drop-row,
+    .battle-huds,
+    .trainer-hud-right,
+    .trainer-hud-large,
+    .sprite-info,
+    .log,
+    .target-picker,
+    .tooltip-moves,
+    .exp-gain-row,
+    .bag-item,
+    .galar-partner,
+    .shop-item,
+    .profile-stat,
+    .update-available,
+    .run-result-won,
+    .run-result-lost,
+    .case-card,
+    .slots-paytable,
+    .coin-pack,
+    .editor-section,
+    .game-corner-tab
+  ) {
+  border-radius: 6px;
+}
+
+:where(.box-grid, .battle-field, .case-viewport) {
+  border-radius: 8px;
+}
+
+/* Bars: rounded ends, with the fill kept inside them. */
+:where(.exp-bar-track, .hp-bar-track, .run-mon-hp) {
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+:where(.boost-badge, .box-icon-remove) {
+  border-radius: 4px;
+}
+
 .screen {
   display: flex;
   flex-direction: column;
@@ -423,17 +486,6 @@ textarea,
   overflow: hidden;
 }
 
-.box-expand-button {
-  font-size: 11px;
-  padding: 2px 8px;
-  line-height: 1.4;
-  transition: transform 0.35s ease;
-}
-
-.box-expand-button-flipped {
-  transform: rotate(180deg);
-}
-
 .battle-row-hint {
   text-align: center;
   margin-top: 6px;
@@ -711,37 +763,72 @@ textarea,
   margin: 0;
 }
 
-.loadouts-button {
-  font-size: 12px;
-  padding: 4px 10px;
-}
-
+/* Loadouts: the current team with a name box to save it, then each saved team as a card. */
 .loadouts-modal {
-  width: 480px;
+  width: 600px;
 }
 
-.loadout-save-row {
+.loadouts-count {
+  font-size: 13px;
+  color: #b7c0cf;
+}
+
+.loadout-card {
+  padding: 10px 12px;
+  background: #1a2230;
+  border: 1px solid #3a4150;
+  border-radius: 8px;
+}
+
+.loadout-card-current {
+  border-color: #3b6fb0;
+  background: #172233;
+}
+
+.loadout-card-active {
+  border-color: #3b8a4a;
+  box-shadow: 0 0 0 1px rgba(59, 138, 74, 0.4);
+}
+
+.loadout-list {
   display: flex;
+  flex-direction: column;
   gap: 8px;
-  margin: 10px 0;
+  max-height: 50vh;
+  overflow-y: auto;
 }
 
-.loadout-save-row input {
-  flex: 1;
+.loadout-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.loadout-card-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .loadout-preview {
   display: flex;
-  gap: 4px;
-  margin-bottom: 10px;
+  gap: 5px;
 }
 
 .loadout-preview-slot {
-  width: 32px;
-  height: 32px;
-  background: #232a36;
-  border: 1px solid #3a4150;
+  width: 44px;
+  height: 44px;
   flex-shrink: 0;
+  background: #11161e;
+  border: 2px dashed #2c3340;
+  border-radius: 6px;
+}
+
+.loadout-preview-filled {
+  border-style: solid;
+  background: #232a36;
 }
 
 .loadout-preview-slot img {
@@ -751,35 +838,82 @@ textarea,
   image-rendering: pixelated;
 }
 
-.loadout-list {
+.loadout-save-row {
   display: flex;
-  flex-direction: column;
   gap: 8px;
+  margin-top: 10px;
 }
 
-.loadout-row {
-  padding: 8px 10px;
-  background: #232a36;
-  border: 2px solid #3a4150;
+/* The same rounded look as the shop and bag search. */
+.loadout-name-input {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 14px;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 14px;
+  color: #e6e6e6;
+  background: #11161e;
+  border: 1px solid #3a4150;
+  border-radius: 18px;
 }
 
-.loadout-row-header {
-  margin-bottom: 6px;
+.loadout-name-input:focus {
+  outline: none;
+  border-color: #6bb0ff;
+  box-shadow: 0 0 0 3px rgba(107, 176, 255, 0.18);
 }
 
-.loadout-row-name {
+.loadout-save-row button {
+  border-radius: 18px;
+}
+
+.loadout-name {
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 14px;
   font-weight: bold;
-  cursor: pointer;
+  color: #e6e6e6;
 }
 
-.loadout-row-name:hover {
+.loadout-name:hover:not(:disabled) {
   color: #6bb0ff;
 }
 
-.loadout-row-actions {
+.loadout-name-edit {
+  font-size: 11px;
+  color: #7d8799;
+}
+
+.loadout-current-badge {
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: rgba(59, 138, 74, 0.25);
+  color: #7fd08c;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.loadout-actions {
   display: flex;
   gap: 6px;
-  margin-top: 6px;
+}
+
+.loadout-actions button {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.loadout-load:not(:disabled) {
+  border-color: #3b6fb0;
+  color: #b9dcff;
+}
+
+.loadout-delete-confirm {
+  border-color: #a8413a;
+  color: #ff9a8f;
 }
 
 .sprite-style-grid {
@@ -815,6 +949,32 @@ textarea,
   gap: 12px;
   padding: 10px 14px;
   max-width: 320px;
+}
+
+/* The Trainer Card's sprite and title, side by side. */
+.trainer-card-row {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.trainer-card-title {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 12px;
+  background: #1c212b;
+  border: 1px solid #2c3340;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #b7c0cf;
+}
+
+.trainer-card-title select {
+  color: #ffd76b;
+  font-weight: bold;
 }
 
 .trainer-sprite-current-img {
@@ -3718,10 +3878,8 @@ button:disabled {
 }
 
 /* Trainer profile → Pokédex */
-.pokedex-button {
-  display: block;
-  width: 100%;
-  margin-top: 8px;
+.challenge-modal {
+  width: 480px;
 }
 
 .pokedex-modal {
@@ -4345,27 +4503,32 @@ button:disabled {
 /* Box and team squares bordered with the Pokemon's roulette rarity (see
    speciesRarityTier): grey, blue, purple, pink, gold - same as the case opening. */
 .box-icon-draggable.rarity-common,
-.team-slot.rarity-common {
+.team-slot.rarity-common,
+.loadout-preview-slot.rarity-common {
   border-color: #6b7483;
 }
 
 .box-icon-draggable.rarity-uncommon,
-.team-slot.rarity-uncommon {
+.team-slot.rarity-uncommon,
+.loadout-preview-slot.rarity-uncommon {
   border-color: #4b8bff;
 }
 
 .box-icon-draggable.rarity-rare,
-.team-slot.rarity-rare {
+.team-slot.rarity-rare,
+.loadout-preview-slot.rarity-rare {
   border-color: #8847ff;
 }
 
 .box-icon-draggable.rarity-epic,
-.team-slot.rarity-epic {
+.team-slot.rarity-epic,
+.loadout-preview-slot.rarity-epic {
   border-color: #eb4b9b;
 }
 
 .box-icon-draggable.rarity-legendary,
-.team-slot.rarity-legendary {
+.team-slot.rarity-legendary,
+.loadout-preview-slot.rarity-legendary {
   border-color: #ffd23f;
   box-shadow: 0 0 6px rgba(255, 210, 63, 0.35);
 }
@@ -4983,6 +5146,7 @@ button:disabled {
 }
 
 .pokemon-editor-side .pokemon-editor-portrait {
+  position: relative;
   padding: 6px 0;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid #2c3340;
@@ -6174,4 +6338,582 @@ img.wild-location-icon {
   100% {
     opacity: 0;
   }
+}
+
+/* Options → Cloud saves: the Google Drive buttons and the list of exported saves. */
+.cloud-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.cloud-save-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.cloud-save {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  background: #1c212b;
+  border: 1px solid #2c3340;
+  border-radius: 6px;
+}
+
+.cloud-save-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cloud-save-date {
+  font-weight: bold;
+}
+
+.cloud-save-detail {
+  font-size: 12px;
+  color: #b7c0cf;
+}
+
+.cloud-message {
+  color: #7fd08c;
+}
+
+.cloud-save button.cloud-confirm {
+  border-color: #a8413a;
+  color: #ff9a8f;
+}
+
+/* The box heading doubles as the expand / collapse button. */
+.box-heading-button {
+  padding: 4px 12px;
+  border: 1px solid #3a4150;
+  border-radius: 6px;
+  background: #171b22;
+  font-size: 14px;
+  font-weight: bold;
+  color: #b7c0cf;
+}
+
+.box-heading-button:hover:not(:disabled) {
+  border-color: #3a4150;
+  background: #1c212b;
+}
+
+.box-heading-button-expanded {
+  color: #6bb0ff;
+}
+
+.box-select-button {
+  height: 38px;
+  border-radius: 19px;
+  padding: 0 16px;
+}
+
+/* Picking Pokemon to sell. */
+.box-sell-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 8px 12px;
+  background: #262216;
+  border: 1px solid #a8872e;
+  border-radius: 6px;
+}
+
+.box-sell-summary {
+  margin-right: auto;
+  font-weight: bold;
+  color: #ffd76b;
+}
+
+.box-sell-hint {
+  margin-left: 12px;
+  font-size: 12px;
+  font-weight: normal;
+  color: #b7c0cf;
+}
+
+.box-sell-confirm {
+  border-color: #a8413a;
+  color: #ff9a8f;
+}
+
+.box-icon-draggable.box-icon-selected {
+  outline: 3px solid #e8b923;
+  outline-offset: -3px;
+  background: rgba(232, 185, 35, 0.18);
+}
+
+.box-icon-draggable.box-icon-unselectable {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* The favorite heart in the corner of the editor's portrait (the portrait itself ignores
+   the mouse, so it switches clicks back on). */
+.pokemon-editor-favorite {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  font-size: 18px;
+  line-height: 30px;
+  cursor: pointer;
+  pointer-events: auto;
+  opacity: 0.75;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.pokemon-editor-favorite:hover {
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+.pokemon-editor-favorite-on {
+  opacity: 1;
+}
+
+/* The Rare Candy beside the level in the editor's portrait. */
+.pokemon-editor-portrait-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pokemon-editor-candy {
+  display: inline-flex;
+  padding: 1px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.pokemon-editor-candy:hover:not(:disabled) {
+  border-color: #6bb0ff;
+  background: rgba(107, 176, 255, 0.12);
+}
+
+.pokemon-editor-candy:disabled {
+  filter: grayscale(1);
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* The player's title beside "You" in battle. */
+.trainer-hud-title {
+  margin-left: 8px;
+  font-size: 0.8em;
+  font-weight: bold;
+  color: #ffd76b;
+}
+
+/* The edit window's evolutions: every one there is, greyed out (with what it takes)
+   until it's ready. */
+.editor-evolutions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.editor-evolution {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 6px;
+  text-align: left;
+}
+
+.editor-evolution-sprite {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.editor-evolution-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.editor-evolution-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.editor-evolution-method {
+  font-size: 10px;
+  color: #b7c0cf;
+}
+
+button.editor-evolution:disabled.editor-evolution-locked {
+  opacity: 0.45;
+  cursor: help;
+}
+
+.editor-evolution-locked .editor-evolution-sprite {
+  filter: grayscale(1);
+}
+
+/* ---- Game Corner: roulette ---- */
+.roulette-modal {
+  width: 760px;
+}
+
+.roulette-top {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin: 10px 0;
+}
+
+.roulette-wheel-wrap {
+  flex-shrink: 0;
+}
+
+.roulette-wheel {
+  width: 250px;
+  height: 250px;
+  display: block;
+}
+
+.roulette-wheel g {
+  transform-origin: 0 0;
+}
+
+.roulette-rim {
+  fill: #6b4a1f;
+  stroke: #e8b923;
+  stroke-width: 3;
+}
+
+.roulette-pocket {
+  stroke: #d8c79a;
+  stroke-width: 0.6;
+}
+
+.roulette-pocket-red {
+  fill: #b3261e;
+}
+
+.roulette-pocket-black {
+  fill: #1c1c22;
+}
+
+.roulette-pocket-green {
+  fill: #1f7a3a;
+}
+
+.roulette-pocket-number {
+  fill: #fff;
+  font-size: 9px;
+  font-weight: bold;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.roulette-hub {
+  fill: #3a2a12;
+  stroke: #e8b923;
+  stroke-width: 2;
+}
+
+.roulette-ball-top {
+  fill: #d8231a;
+}
+
+.roulette-ball-bottom {
+  fill: #f2f2f2;
+}
+
+.roulette-ball-band {
+  stroke: #222;
+  stroke-width: 5;
+}
+
+.roulette-ball-button {
+  fill: #f2f2f2;
+  stroke: #222;
+  stroke-width: 4;
+}
+
+.roulette-marker {
+  fill: #ffd76b;
+  stroke: #6b4a1f;
+  stroke-width: 1;
+}
+
+.roulette-ball {
+  fill: #fff;
+  stroke: #999;
+  stroke-width: 1;
+}
+
+.roulette-side {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.roulette-result {
+  font-size: 22px;
+  font-weight: bold;
+  text-transform: capitalize;
+}
+
+.roulette-result-red {
+  color: #ff6b5f;
+}
+
+.roulette-result-black {
+  color: #e6e6e6;
+}
+
+.roulette-result-green {
+  color: #5fd07d;
+}
+
+.roulette-result-detail {
+  font-size: 13px;
+  color: #ffd76b;
+}
+
+.roulette-history {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 24px;
+}
+
+.roulette-history-pocket {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: bold;
+  line-height: 24px;
+  text-align: center;
+  color: #fff;
+}
+
+.roulette-history-pocket:first-child {
+  outline: 2px solid #ffd76b;
+}
+
+.roulette-pocket-bg-red {
+  background: #b3261e;
+}
+
+.roulette-pocket-bg-black {
+  background: #1c1c22;
+  border: 1px solid #3a4150;
+}
+
+.roulette-pocket-bg-green {
+  background: #1f7a3a;
+}
+
+.roulette-total {
+  font-weight: bold;
+  color: #ffd76b;
+}
+
+/* The betting board: the zero, three rows of twelve numbers with the column bets at the
+   end, then the dozens and the even-money bets. */
+.roulette-board {
+  display: grid;
+  grid-template-columns: 38px repeat(12, minmax(0, 1fr)) 44px;
+  grid-template-rows: repeat(3, 36px) 32px 32px;
+  gap: 3px;
+  margin: 8px 0 12px;
+  padding: 10px;
+  background: #1f5e33;
+  border: 3px solid #6b4a1f;
+  border-radius: 8px;
+}
+
+.roulette-cell {
+  position: relative;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 3px;
+  background: transparent;
+  color: #fff;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.roulette-cell:hover:not(:disabled) {
+  border-color: #ffd76b;
+  background: rgba(255, 215, 107, 0.15);
+}
+
+.roulette-cell-red {
+  background: #9e241c;
+}
+
+.roulette-cell-black {
+  background: #1c1c22;
+}
+
+.roulette-cell-green {
+  background: #1f7a3a;
+}
+
+.roulette-cell-won {
+  box-shadow: 0 0 0 2px #ffd76b, 0 0 12px rgba(255, 215, 107, 0.8);
+}
+
+.roulette-cell-landed {
+  outline: 3px solid #fff;
+  outline-offset: -3px;
+}
+
+.roulette-chip {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 22px;
+  height: 22px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border: 2px dashed #fff;
+  border-radius: 11px;
+  background: #e8b923;
+  color: #3a2a12;
+  font-size: 10px;
+  line-height: 18px;
+  pointer-events: none;
+}
+
+.roulette-actions {
+  margin-top: 8px;
+}
+
+/* ---- Game Corner: Plinko ---- */
+.plinko-modal {
+  width: 600px;
+  overflow-x: hidden;
+}
+
+.plinko-risk {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 8px 0;
+  font-size: 13px;
+  color: #b7c0cf;
+}
+
+.plinko-risk-option {
+  padding: 5px 14px;
+  border-radius: 14px;
+  font-size: 13px;
+}
+
+.plinko-risk-active {
+  border-color: #ffd76b;
+  color: #ffd76b;
+  background: rgba(255, 215, 107, 0.08);
+}
+
+.plinko-board {
+  display: block;
+  width: 100%;
+  max-height: 430px;
+  margin: 4px 0 10px;
+  background: radial-gradient(ellipse at top, #243049, #141a24);
+  border: 2px solid #3a4150;
+  border-radius: 10px;
+}
+
+.plinko-peg {
+  fill: #cfd8e6;
+}
+
+.plinko-slot {
+  stroke: rgba(0, 0, 0, 0.4);
+  stroke-width: 1;
+}
+
+.plinko-slot-hot {
+  fill: #d8231a;
+}
+
+.plinko-slot-warm {
+  fill: #e0892c;
+}
+
+.plinko-slot-even {
+  fill: #c9a227;
+}
+
+.plinko-slot-cold {
+  fill: #4a5568;
+}
+
+.plinko-slot-text {
+  fill: #fff;
+  font-size: 9px;
+  font-weight: bold;
+  text-anchor: middle;
+}
+
+.plinko-slot-lit .plinko-slot {
+  animation: plinko-slot-pop 0.5s ease-out;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes plinko-slot-pop {
+  0% {
+    transform: translateY(0);
+    filter: brightness(1.8);
+  }
+  40% {
+    transform: translateY(4px);
+  }
+  100% {
+    transform: translateY(0);
+    filter: brightness(1);
+  }
+}
+
+.plinko-ball-top {
+  fill: #d8231a;
+}
+
+.plinko-ball-bottom {
+  fill: #f2f2f2;
+}
+
+.plinko-ball-band {
+  stroke: #222;
+  stroke-width: 1.4;
+}
+
+.plinko-ball-button {
+  fill: #f2f2f2;
+  stroke: #222;
+  stroke-width: 1;
 }

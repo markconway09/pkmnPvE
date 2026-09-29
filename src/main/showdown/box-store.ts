@@ -36,6 +36,7 @@ import {
   nationalDexSpecies,
   nationalDexForms,
   evolutionOptionsFor,
+  evolutionPathsFor,
   evolveSet,
   formChangedSet,
   formChangeFor,
@@ -196,10 +197,15 @@ function toView(mon: StoredMon, arrival: number): BoxPokemonView {
   const canLevelUpWithCandy = mon.set.level < getProgression().levelCap && hasItem(RARE_CANDY_ITEM_ID)
   const canUseShinyPatch = !mon.set.shiny && hasItem(SHINY_PATCH_ITEM_ID)
   const formChange = formChangeFor(mon.set.species)
-  const formChanges =
-    formChange && hasItem(formChange.itemId)
-      ? { forms: formChange.forms, itemName: itemName(formChange.itemId), spritenum: getItemSpritenumById(formChange.itemId) }
-      : undefined
+  // Listed whether or not the item's been unlocked yet (the edit window shows them greyed out).
+  const formChanges = formChange
+    ? {
+        forms: formChange.forms,
+        itemName: itemName(formChange.itemId),
+        spritenum: getItemSpritenumById(formChange.itemId),
+        ready: hasItem(formChange.itemId)
+      }
+    : undefined
   const fusion = fusionOptionsFor(mon)
   const itemSpritenum = mon.set.item ? getItemSpritenum(mon.set.item) : null
   return {
@@ -209,6 +215,11 @@ function toView(mon: StoredMon, arrival: number): BoxPokemonView {
     eligibleEvolutions,
     evolutionItems,
     registeredEvolutions: eligibleEvolutions.filter(hasRegisteredSpecies),
+    evolutionPaths: evolutionPathsFor(mon.set).map((path) => ({
+      ...path,
+      ready: eligibleEvolutions.includes(path.species),
+      registered: hasRegisteredSpecies(path.species)
+    })),
     canLevelUpWithCandy,
     canUseShinyPatch,
     formChanges,
@@ -319,6 +330,28 @@ export function sellMon(id: string): { sold: number; species: string; money: num
   countAchievement('pokemonSold')
   if (mon.set.shiny) countAchievement('shinySold')
   return { sold, species: mon.set.species, money, box: getBoxState() }
+}
+
+/**
+ * Sells several Pokemon at once (the expanded box's multi-select) - all or nothing: every
+ * one is checked first, and at least one Pokemon always stays behind.
+ */
+export function sellMons(ids: string[]): { sold: number; count: number; money: number; box: BoxState } {
+  const box = getState()
+  const wanted = new Set(ids)
+  const selling = box.mons.filter((m) => wanted.has(m.id))
+  if (selling.length === 0) throw new Error('Nothing to sell')
+  if (selling.length !== wanted.size) throw new Error('One of those Pokemon is no longer in the box')
+  if (selling.some((m) => m.fusedWith)) throw new Error('Unfuse it first - its partner would be sold with it')
+  if (box.mons.length - selling.length < 1) throw new Error("You can't sell every Pokemon - keep at least one")
+  box.mons = box.mons.filter((m) => !wanted.has(m.id))
+  box.team = box.team.map((slot) => (slot && wanted.has(slot) ? null : slot))
+  const sold = selling.reduce((sum, m) => sum + POKEMON_SELL_PRICES[speciesRarityTier(m.set.species)], 0)
+  const money = addMoney(sold)
+  persist()
+  countAchievement('pokemonSold', selling.length)
+  countAchievement('shinySold', selling.filter((m) => m.set.shiny).length)
+  return { sold, count: selling.length, money, box: getBoxState() }
 }
 
 export function setTeam(team: (string | null)[]): BoxState {
@@ -489,6 +522,35 @@ export function useExpCandy(itemId: string): ExpGainResult[] {
   if (team.every((m) => m.set.level >= levelCap)) throw new Error('Your whole team is already at the level cap')
   if (!removeItem(itemId, 1)) throw new Error("You don't have that item")
   return awardExpToTeam(amount)
+}
+
+/**
+ * Uses Exp. Candies one after another until the whole team is at the level cap or the
+ * candies run out. Each team member's results are added up across the candies used.
+ */
+export function useExpCandiesUntilCap(itemId: string): { used: number; results: ExpGainResult[]; allCapped: boolean } {
+  const teamAtCap = (): boolean => {
+    const levelCap = getProgression().levelCap
+    const byId = new Map(getState().mons.map((m) => [m.id, m]))
+    return getState().team.every((id) => !id || !byId.get(id) || byId.get(id)!.set.level >= levelCap)
+  }
+  let used = 0
+  let merged: ExpGainResult[] = []
+  // useExpCandy refuses (with the reason) when the team's already capped or there's none.
+  do {
+    const results = useExpCandy(itemId)
+    used++
+    merged =
+      merged.length === 0
+        ? results
+        : results.map((r, i) => ({
+            ...r,
+            gained: merged[i].gained + r.gained,
+            levelBefore: merged[i].levelBefore,
+            cappedOut: merged[i].cappedOut && r.cappedOut
+          }))
+  } while (hasItem(itemId) && !teamAtCap())
+  return { used, results: merged, allCapped: teamAtCap() }
 }
 
 // Every Pokemon on the team - the same ones awardExpToTeam pays out to - grows

@@ -25,6 +25,8 @@ import PokemonEditor from './PokemonEditor'
 import PokemonIconVisual from './PokemonIconVisual'
 import DebugMenu from './DebugMenu'
 import PlayerTrainerModal from './PlayerTrainerModal'
+import PokedexModal from './PokedexModal'
+import ChallengeModal from './ChallengeModal'
 import StarterPicker from './StarterPicker'
 import PokemonContextMenu from './PokemonContextMenu'
 import BagModal from './BagModal'
@@ -42,6 +44,8 @@ import BlackjackTable from './BlackjackTable'
 import type { GameCornerGame } from './GameCornerTabs'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
 import CoinShopModal from './CoinShopModal'
+import RouletteTable from './RouletteTable'
+import PlinkoBoard from './PlinkoBoard'
 import ItemSprite from './ItemSprite'
 import SearchBar from './SearchBar'
 import AchievementsModal from './AchievementsModal'
@@ -181,6 +185,8 @@ function MainMenu({
   const [busy, setBusy] = useState(false)
   const [editingMonId, setEditingMonId] = useState<string | null>(null)
   const [editingAdmin, setEditingAdmin] = useState(false)
+  // Bumped to reopen the edit window fresh (after evolving from it).
+  const [editorVersion, setEditorVersion] = useState(0)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [debugOpen, setDebugOpen] = useState(false)
   const [wildDropsOpen, setWildDropsOpen] = useState(false)
@@ -188,6 +194,10 @@ function MainMenu({
   const [loadoutsOpen, setLoadoutsOpen] = useState(false)
   // Folds the battle buttons away so the box gets the rest of the window.
   const [boxExpanded, setBoxExpanded] = useState(false)
+  // Picking Pokemon in the expanded box to sell at once (null: not picking).
+  const [boxSelection, setBoxSelection] = useState<Set<string> | null>(null)
+  // A pick with a shiny or a red/gold Pokemon in it asks for a second click.
+  const [confirmingBoxSell, setConfirmingBoxSell] = useState(false)
   const [rematchOpen, setRematchOpen] = useState(false)
   // Only there while the box is expanded - collapsing it clears the search.
   const [boxSearch, setBoxSearch] = useState('')
@@ -196,6 +206,8 @@ function MainMenu({
   const [boxSort, setBoxSort] = useState<BoxSortKey>('arrival')
   const [boxSortDescending, setBoxSortDescending] = useState(false)
   const [playerTrainerOpen, setPlayerTrainerOpen] = useState(false)
+  const [pokedexOpen, setPokedexOpen] = useState(false)
+  const [challengeOpen, setChallengeOpen] = useState(false)
   const [starterOpen, setStarterOpen] = useState(false)
   const [bagOpen, setBagOpen] = useState(false)
   const [shopOpen, setShopOpen] = useState(false)
@@ -388,6 +400,48 @@ function MainMenu({
     }
   }
 
+  // Favorites are kept safe from a bulk sell, and a fused Pokemon has to be unfused first.
+  const canBulkSell = (mon: BoxPokemonView): boolean => !mon.favorite && !mon.unfuse
+
+  function toggleBoxSelected(mon: BoxPokemonView): void {
+    if (!canBulkSell(mon)) return
+    setConfirmingBoxSell(false)
+    setBoxSelection((current) => {
+      const next = new Set(current ?? [])
+      if (next.has(mon.id)) next.delete(mon.id)
+      else next.add(mon.id)
+      return next
+    })
+  }
+
+  function stopBoxSelection(): void {
+    setBoxSelection(null)
+    setConfirmingBoxSell(false)
+  }
+
+  async function sellSelectedMons(e: React.MouseEvent): Promise<void> {
+    if (!boxSelection || boxSelection.size === 0) return
+    const at = { x: e.clientX, y: e.clientY }
+    const picked = (boxState?.mons ?? []).filter((m) => boxSelection.has(m.id))
+    const needsConfirm = picked.some((m) => m.shiny || CONFIRM_SELL_TIERS.has(m.rarityTier ?? 'common'))
+    if (needsConfirm && !confirmingBoxSell) {
+      setConfirmingBoxSell(true)
+      return
+    }
+    setBusy(true)
+    try {
+      const result = await window.api.sellMons([...boxSelection])
+      setBoxState(result.box)
+      setMoney(result.money)
+      notes.show(`Sold ${result.count} Pokemon for ${formatMoney(result.sold)}`, at)
+      stopBoxSelection()
+    } catch (err) {
+      notes.show(errorMessage(err), at, 'bad')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function sellMon(monId: string): Promise<void> {
     const at = contextMenu ? { x: contextMenu.x, y: contextMenu.y } : { x: window.innerWidth / 2, y: window.innerHeight / 2 }
     setContextMenu(null)
@@ -404,13 +458,24 @@ function MainMenu({
     }
   }
 
-  async function levelUp(monId: string): Promise<void> {
-    setContextMenu(null)
-    setBusy(true)
+  // Evolving from the edit window: the window then reopens on the evolved Pokemon (any
+  // unsaved changes in it are dropped - it's a new Pokemon to edit).
+  async function evolveFromEditor(monId: string, species: string): Promise<void> {
     try {
-      setBoxState(await window.api.levelUpMon(monId))
-    } finally {
-      setBusy(false)
+      setBoxState(await window.api.evolveMon(monId, species))
+      setEditorVersion((v) => v + 1)
+    } catch (e) {
+      notes.show(errorMessage(e), { x: window.innerWidth / 2, y: window.innerHeight / 3 }, 'bad')
+    }
+  }
+
+  // A form change from the edit window: it reopens on the new form, like evolving does.
+  async function changeFormFromEditor(monId: string, form: string): Promise<void> {
+    try {
+      setBoxState(await window.api.changeForm(monId, form))
+      setEditorVersion((v) => v + 1)
+    } catch (e) {
+      notes.show(errorMessage(e), { x: window.innerWidth / 2, y: window.innerHeight / 3 }, 'bad')
     }
   }
 
@@ -596,7 +661,7 @@ function MainMenu({
           </div>
         </div>
         <div className="menu-nav">
-          {/* A run has no bag, shop or Game Corner of its own - these are the classic game's. */}
+          {/* A run has no bag or shop of its own - these are the classic game's. */}
           <div className="nav-actions">
             <button className="nav-icon-button" title="Bag" disabled={mode === 'roguelite'} onClick={() => setBagOpen(true)}>
               <img className="nav-icon" src="./icons/nav/bag.png" alt="Bag" />
@@ -604,11 +669,11 @@ function MainMenu({
             <button className="nav-icon-button" title="Shop" disabled={mode === 'roguelite'} onClick={() => setShopOpen(true)}>
               <img className="nav-icon nav-icon-smooth" src="./icons/nav/shop.png" alt="Shop" />
             </button>
-            {/* The Coin Shop opens from inside the Game Corner's games. */}
+            {/* Open in either mode - its coins are the player's own, not a run's. The Coin
+                Shop opens from inside the Game Corner's games. */}
             <button
               className="nav-icon-button"
-              title="Game Corner: slots and blackjack"
-              disabled={mode === 'roguelite'}
+              title="Game Corner: slots, blackjack, roulette and Plinko"
               onClick={() => openGame(lastGame)}
             >
               <img className="nav-icon" src="./icons/nav/gamecorner.png" alt="Game Corner" />
@@ -669,7 +734,21 @@ function MainMenu({
                   icon: <img className="nav-menu-icon" src="./icons/nav/trainercard.png" alt="" />,
                   action: () => setPlayerTrainerOpen(true)
                 },
-                { label: 'Options', icon: <span className="nav-menu-icon">⚙</span>, action: onOptions },
+                {
+                  label: 'Pokédex',
+                  icon: <img className="nav-menu-icon" src="./icons/nav/pokedex.png" alt="" />,
+                  action: () => setPokedexOpen(true)
+                },
+                {
+                  label: 'Challenge a player',
+                  icon: <img className="nav-menu-icon" src="./icons/nav/challenge.png" alt="" />,
+                  action: () => setChallengeOpen(true)
+                },
+                {
+                  label: 'Options',
+                  icon: <img className="nav-menu-icon" src="./icons/nav/options.png" alt="" />,
+                  action: onOptions
+                },
                 ...(isAdmin
                   ? [{ label: 'Debug', icon: <span className="nav-menu-icon">🛠</span>, action: () => setDebugOpen(true) }]
                   : [])
@@ -865,24 +944,31 @@ function MainMenu({
         {!runInProgress && (
         <>
         <div className="team-heading-row">
-          <h2 className="options-heading">Team</h2>
-          <button className="loadouts-button" onClick={() => setLoadoutsOpen(true)}>
-            Loadouts
+          {/* The heading itself opens the saved team loadouts. */}
+          <button
+            className="box-heading-button"
+            title="Loadouts: save this team, or switch to a saved one"
+            onClick={() => setLoadoutsOpen(true)}
+          >
+            Team
           </button>
         </div>
-        <TeamRow team={team} monsById={monsById} onContextMenu={handleContextMenu} />
+        <TeamRow team={team} monsById={monsById} onEdit={(id) => openEditor(id, false)} onContextMenu={handleContextMenu} />
 
         <div className="team-heading-row">
-          <h2 className="options-heading">Box</h2>
+          {/* The heading itself expands the box (hiding the battle buttons) and collapses it again. */}
           <button
-            className={`box-expand-button${boxExpanded ? ' box-expand-button-flipped' : ''}`}
+            className={`box-heading-button${boxExpanded ? ' box-heading-button-expanded' : ''}`}
             title={boxExpanded ? 'Show the battle buttons again' : 'Hide the battle buttons for a bigger box'}
             onClick={() => {
-              if (boxExpanded) setBoxSearch('')
+              if (boxExpanded) {
+                setBoxSearch('')
+                stopBoxSelection()
+              }
               setBoxExpanded((v) => !v)
             }}
           >
-            ▲
+            Box
           </button>
           {boxExpanded && (
             <SearchBar
@@ -911,11 +997,43 @@ function MainMenu({
               </button>
             </span>
           )}
+          {boxExpanded && !boxSelection && (
+            <button className="box-select-button" onClick={() => setBoxSelection(new Set())}>
+              Select to sell
+            </button>
+          )}
         </div>
+        {boxSelection && (
+          <div className="box-sell-bar">
+            <span className="box-sell-summary">
+              {boxSelection.size} selected ·{' '}
+              {formatMoney(
+                (boxState?.mons ?? [])
+                  .filter((m) => boxSelection.has(m.id))
+                  .reduce((sum, m) => sum + POKEMON_SELL_PRICES[m.rarityTier ?? 'common'], 0)
+              )}
+              <span className="box-sell-hint">Click Pokemon to pick them - favorites can't be picked</span>
+            </span>
+            <button disabled={busy} onClick={stopBoxSelection}>
+              Cancel
+            </button>
+            <button
+              className={confirmingBoxSell ? 'box-sell-confirm' : undefined}
+              disabled={busy || boxSelection.size === 0}
+              onClick={(e) => void sellSelectedMons(e)}
+            >
+              {confirmingBoxSell ? 'Includes rare or shiny Pokemon - click again' : 'Sell selected'}
+            </button>
+          </div>
+        )}
         <BoxGrid
           mons={boxMons}
+          onEdit={(id) => openEditor(id, false)}
           onContextMenu={handleContextMenu}
           emptyHint={boxSearch.trim() ? 'No Pokemon in the box match that search.' : undefined}
+          selection={boxSelection}
+          onToggleSelect={toggleBoxSelected}
+          canSelect={canBulkSell}
         />
         </>
         )}
@@ -931,6 +1049,7 @@ function MainMenu({
 
       {editingMonId && (
         <PokemonEditor
+          key={`${editingMonId}-${editorVersion}`}
           source={{ kind: 'box', monId: editingMonId }}
           admin={editingAdmin}
           onClose={() => {
@@ -938,6 +1057,18 @@ function MainMenu({
             setEditingAdmin(false)
           }}
           onSaved={refreshBox}
+          favorite={!!monsById.get(editingMonId)?.favorite}
+          onToggleFavorite={() => void toggleFavorite(editingMonId)}
+          canUseRareCandy={!!monsById.get(editingMonId)?.canLevelUpWithCandy}
+          evolutionPaths={monsById.get(editingMonId)?.evolutionPaths}
+          onEvolve={(species) => void evolveFromEditor(editingMonId, species)}
+          formChanges={monsById.get(editingMonId)?.formChanges}
+          onChangeForm={(form) => void changeFormFromEditor(editingMonId, form)}
+          onUseRareCandy={async () => {
+            const box = await window.api.levelUpMon(editingMonId)
+            setBoxState(box)
+            return box.mons.find((m) => m.id === editingMonId)?.level ?? null
+          }}
         />
       )}
 
@@ -1014,10 +1145,14 @@ function MainMenu({
           trainerSprite={trainerSprite}
           onChangeTrainerSprite={onChangeTrainerSprite}
           username={username}
-          onChallengePlayer={onChallengePlayer}
+          onTitleChanged={refreshAchievements}
           onClose={() => setPlayerTrainerOpen(false)}
         />
       )}
+
+      {pokedexOpen && <PokedexModal onClose={() => setPokedexOpen(false)} />}
+
+      {challengeOpen && <ChallengeModal onChallengePlayer={onChallengePlayer} onClose={() => setChallengeOpen(false)} />}
 
       {starterOpen && (
         <StarterPicker
@@ -1037,9 +1172,7 @@ function MainMenu({
           evolutions={contextMenu.mon.eligibleEvolutions ?? []}
           evolutionItems={contextMenu.mon.evolutionItems}
           registeredEvolutions={contextMenu.mon.registeredEvolutions}
-          canLevelUp={contextMenu.mon.canLevelUpWithCandy ?? false}
           onChoose={(target) => void evolve(contextMenu.mon.id, target)}
-          onLevelUp={() => void levelUp(contextMenu.mon.id)}
           canUseShinyPatch={contextMenu.mon.canUseShinyPatch ?? false}
           onUseShinyPatch={() => void useShinyPatch(contextMenu.mon.id)}
           formChanges={contextMenu.mon.formChanges}
@@ -1060,8 +1193,6 @@ function MainMenu({
               { x: contextMenu.x, y: contextMenu.y }
             )
           }
-          favorite={!!contextMenu.mon.favorite}
-          onToggleFavorite={() => void toggleFavorite(contextMenu.mon.id)}
           onEdit={() => openEditor(contextMenu.mon.id, false)}
           onAdminEdit={isAdmin ? () => openEditor(contextMenu.mon.id, true) : undefined}
           onSell={() => void sellMon(contextMenu.mon.id)}
@@ -1099,10 +1230,16 @@ function MainMenu({
         />
       )}
       {gameCorner === 'slots' && (
-        <SlotMachine onClose={() => setGameCorner(null)} onOpenCoinShop={toCoinShop} onSwitchGame={() => openGame('blackjack')} />
+        <SlotMachine onClose={() => setGameCorner(null)} onOpenCoinShop={toCoinShop} onSwitchGame={openGame} />
       )}
       {gameCorner === 'blackjack' && (
-        <BlackjackTable onClose={() => setGameCorner(null)} onOpenCoinShop={toCoinShop} onSwitchGame={() => openGame('slots')} />
+        <BlackjackTable onClose={() => setGameCorner(null)} onOpenCoinShop={toCoinShop} onSwitchGame={openGame} />
+      )}
+      {gameCorner === 'roulette' && (
+        <RouletteTable onClose={() => setGameCorner(null)} onOpenCoinShop={toCoinShop} onSwitchGame={openGame} />
+      )}
+      {gameCorner === 'plinko' && (
+        <PlinkoBoard onClose={() => setGameCorner(null)} onOpenCoinShop={toCoinShop} onSwitchGame={openGame} />
       )}
       {coinShopOpen && (
         <CoinShopModal

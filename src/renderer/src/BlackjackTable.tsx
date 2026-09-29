@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { BlackjackOutcome, BlackjackView } from '../../shared/blackjack'
 import BetSlider, { maxBet, placedBet, useSavedBet } from './BetSlider'
-import GameCornerTabs from './GameCornerTabs'
+import GameCornerTabs, { type GameCornerGame } from './GameCornerTabs'
 import PlayingCard from './PlayingCard'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
 import CoinIcon from './CoinIcon'
@@ -10,7 +10,7 @@ import CoinIcon from './CoinIcon'
 interface Props {
   onClose: () => void
   onOpenCoinShop: () => void
-  onSwitchGame: () => void
+  onSwitchGame: (game: GameCornerGame) => void
 }
 
 const OUTCOME_TEXT: Record<BlackjackOutcome, string> = {

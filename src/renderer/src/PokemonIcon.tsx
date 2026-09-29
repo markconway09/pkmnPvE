@@ -3,7 +3,6 @@ import type { BoxPokemonView } from '../../shared/battle-types'
 import PokemonTooltipContent from './PokemonTooltipContent'
 import PokemonIconVisual from './PokemonIconVisual'
 import Tooltip from './Tooltip'
-import { useTapGuard } from './useTapGuard'
 
 interface Props {
   mon: BoxPokemonView
@@ -12,12 +11,25 @@ interface Props {
   onRemove?: (monId: string) => void
   draggable?: boolean
   onContextMenu?: (e: React.MouseEvent, mon: BoxPokemonView) => void
+  // Only while picking Pokemon to sell (see BoxGrid).
+  onClick?: () => void
+  // Picking Pokemon to sell: picked, or can't be picked (a favorite or a fused one).
+  selected?: boolean
+  unselectable?: boolean
 }
 
-function PokemonIcon({ mon, fill, onEdit, onRemove, draggable = false, onContextMenu }: Props): React.JSX.Element {
+function PokemonIcon({
+  mon,
+  fill,
+  onEdit,
+  onRemove,
+  draggable = false,
+  onContextMenu,
+  onClick,
+  selected = false,
+  unselectable = false
+}: Props): React.JSX.Element {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: mon.id, disabled: !draggable })
-  // A left click opens the same menu as a right click - but not a drag that ends where it began.
-  const tap = useTapGuard()
 
   return (
     <Tooltip
@@ -27,11 +39,11 @@ function PokemonIcon({ mon, fill, onEdit, onRemove, draggable = false, onContext
     >
       <div
         ref={setNodeRef}
-        className={`box-icon-draggable ${isDragging ? 'box-icon-dragging' : ''}${mon.rarityTier ? ` rarity-${mon.rarityTier}` : ''}`}
+        className={`box-icon-draggable ${isDragging ? 'box-icon-dragging' : ''}${mon.rarityTier ? ` rarity-${mon.rarityTier}` : ''}${selected ? ' box-icon-selected' : ''}${unselectable ? ' box-icon-unselectable' : ''}`}
+        // Right-click for the menu; double-click to edit it.
         onDoubleClick={() => onEdit?.(mon.id)}
         onContextMenu={onContextMenu ? (e) => onContextMenu(e, mon) : undefined}
-        onPointerDownCapture={tap.onPointerDownCapture}
-        onClick={onContextMenu ? (e) => tap.isTap() && onContextMenu(e, mon) : undefined}
+        onClick={onClick}
         {...attributes}
         {...listeners}
       >

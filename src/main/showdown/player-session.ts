@@ -46,6 +46,11 @@ function notifyPlayerChanged(): void {
   for (const listener of playerChangeListeners) listener()
 }
 
+/** After the save folder was replaced from outside (a cloud import): every store re-reads it. */
+export function reloadPlayerSave(): void {
+  notifyPlayerChanged()
+}
+
 function slugFor(name: string): string {
   return normalizeUsername(name).toLowerCase()
 }

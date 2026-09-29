@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { AutoSetOption, EditablePokemonSet, EditorOptions, SpeciesEditInfo, StatBlock } from '../../shared/battle-types'
+import type { AutoSetOption, EditablePokemonSet, EditorOptions, SpeciesEditInfo, StatBlock, BoxPokemonView } from '../../shared/battle-types'
 import { NON_HELD_ITEM_IDS, toSpriteId } from '../../shared/battle-types'
 import type { NatureOptionEntry } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
+import ItemSprite from './ItemSprite'
 import { itemIconStyle } from './itemIcon'
 import { TYPE_COLORS } from './moveAnimations'
 
@@ -33,7 +34,28 @@ interface Props {
   admin?: boolean
   onClose: () => void
   onSaved: () => void
+  // A box Pokemon's favorite heart, in the corner of its portrait: whether it's a
+  // favorite, and toggling that (straight away - not part of Save).
+  favorite?: boolean
+  onToggleFavorite?: () => void
+  // A box Pokemon's Rare Candy, beside its level: whether one can be used (there's one
+  // in the bag and it's under the level cap), and using it - which resolves to its new
+  // level (null if it didn't go up).
+  canUseRareCandy?: boolean
+  onUseRareCandy?: () => Promise<number | null>
+  // A box Pokemon's evolutions (see BoxPokemonView.evolutionPaths), listed under Auto-fill:
+  // a ready one evolves it on click, like the right-click menu.
+  evolutionPaths?: BoxPokemonView['evolutionPaths']
+  onEvolve?: (species: string) => void
+  // Its form changes (Rotom Catalog, Prison Bottle...), listed the same way.
+  formChanges?: BoxPokemonView['formChanges']
+  onChangeForm?: (form: string) => void
 }
+
+// The Rare Candy's icon (see ItemSprite).
+const RARE_CANDY_SPRITENUM = -2
+// The Poke Ball item icon - an evolution already in the Pokedex.
+const POKE_BALL_SPRITENUM = 345
 
 const STAT_LABELS: { key: keyof StatBlock; label: string }[] = [
   { key: 'hp', label: 'HP' },
@@ -92,7 +114,20 @@ function teraTypeStyle(type: string): React.CSSProperties {
 
 type ActiveSelector = 'species' | 'ability' | 'item' | 0 | 1 | 2 | 3 | null
 
-function PokemonEditor({ source, admin, onClose, onSaved }: Props): React.JSX.Element {
+function PokemonEditor({
+  source,
+  admin,
+  onClose,
+  onSaved,
+  favorite = false,
+  onToggleFavorite,
+  canUseRareCandy = false,
+  onUseRareCandy,
+  evolutionPaths,
+  onEvolve,
+  formChanges,
+  onChangeForm
+}: Props): React.JSX.Element {
   // Premade team rosters are admin/debug tooling, not the player's own
   // Pokemon - they keep every option (no bag restriction, no level-gated
   // movepool) regardless of whatever limits get added to the player-facing
@@ -265,6 +300,22 @@ function PokemonEditor({ source, admin, onClose, onSaved }: Props): React.JSX.El
     })
   }
 
+  // A Rare Candy used from beside the level: the level here follows, so saving afterwards
+  // keeps it (and the moves on offer are the new level's).
+  const [usingCandy, setUsingCandy] = useState(false)
+  async function useRareCandy(): Promise<void> {
+    if (!onUseRareCandy) return
+    setUsingCandy(true)
+    try {
+      const level = await onUseRareCandy()
+      if (level !== null) await updateLevel(level)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setUsingCandy(false)
+    }
+  }
+
   async function updateLevel(rawValue: number): Promise<void> {
     const level = Math.max(1, Math.min(100, Number.isFinite(rawValue) ? Math.round(rawValue) : 1))
     setSet((prev) => (prev ? { ...prev, level } : prev))
@@ -422,10 +473,31 @@ function PokemonEditor({ source, admin, onClose, onSaved }: Props): React.JSX.El
                 {/* The Pokemon itself, with what it holds and its ability right under it. */}
                 <div className="pokemon-editor-side">
                   <div className="pokemon-editor-portrait" title={set.shiny ? `Shiny ${set.species}` : set.species}>
+                    {onToggleFavorite && (
+                      <button
+                        type="button"
+                        className={`pokemon-editor-favorite${favorite ? ' pokemon-editor-favorite-on' : ''}`}
+                        title={favorite ? 'Favorite - click to unfavorite' : 'Click to favorite'}
+                        onClick={onToggleFavorite}
+                      >
+                        {favorite ? '❤️' : '🤍'}
+                      </button>
+                    )}
                     <SpriteImage style="2d-animated" spriteId={toSpriteId(set.species)} shiny={set.shiny} alt={set.species} />
                     <span className="pokemon-editor-portrait-name">
                       {set.shiny && '★ '}
                       {set.species} · Lv {set.level}
+                      {onUseRareCandy && (
+                        <button
+                          type="button"
+                          className="pokemon-editor-candy"
+                          disabled={!canUseRareCandy || usingCandy}
+                          title={canUseRareCandy ? 'Use a Rare Candy (+1 level)' : 'No Rare Candy in your bag, or already at the level cap'}
+                          onClick={() => void useRareCandy()}
+                        >
+                          <ItemSprite spritenum={RARE_CANDY_SPRITENUM} />
+                        </button>
+                      )}
                     </span>
                   </div>
                   <label className="editor-field">
@@ -598,6 +670,78 @@ function PokemonEditor({ source, admin, onClose, onSaved }: Props): React.JSX.El
                       </ul>
                     )}
                   </div>
+                  {onEvolve && evolutionPaths && evolutionPaths.length > 0 && (
+                    <div className="editor-section">
+                      <h3>Evolutions</h3>
+                      <div className="editor-evolutions">
+                        {evolutionPaths.map((evo) => (
+                          <button
+                            key={evo.species}
+                            type="button"
+                            className={`editor-evolution${evo.ready ? '' : ' editor-evolution-locked'}`}
+                            disabled={!evo.ready}
+                            title={evo.ready ? `Evolve into ${evo.species}` : `Not yet: ${evo.method}`}
+                            onClick={() => onEvolve(evo.species)}
+                          >
+                            <SpriteImage
+                              style="2d-static"
+                              className="editor-evolution-sprite"
+                              spriteId={toSpriteId(evo.species)}
+                              shiny={set.shiny}
+                              alt={evo.species}
+                            />
+                            <span className="editor-evolution-text">
+                              <span className="editor-evolution-name">
+                                {evo.species}
+                                {evo.registered && (
+                                  <span className="context-menu-caught" title="Already in your Pokédex">
+                                    <ItemSprite spritenum={POKE_BALL_SPRITENUM} />
+                                  </span>
+                                )}
+                              </span>
+                              <span className="editor-evolution-method">{evo.method}</span>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {onChangeForm && formChanges && formChanges.forms.length > 0 && (
+                    <div className="editor-section">
+                      <h3>Form changes</h3>
+                      <div className="editor-evolutions">
+                        {formChanges.forms.map((form) => (
+                          <button
+                            key={form}
+                            type="button"
+                            className={`editor-evolution${formChanges.ready ? '' : ' editor-evolution-locked'}`}
+                            disabled={!formChanges.ready}
+                            title={
+                              formChanges.ready
+                                ? `Change into ${form} (use the ${formChanges.itemName})`
+                                : `Needs the ${formChanges.itemName} - a key item unlocked by an achievement`
+                            }
+                            onClick={() => onChangeForm(form)}
+                          >
+                            <SpriteImage
+                              style="2d-static"
+                              className="editor-evolution-sprite"
+                              spriteId={toSpriteId(form)}
+                              shiny={set.shiny}
+                              alt={form}
+                            />
+                            <span className="editor-evolution-text">
+                              <span className="editor-evolution-name">{form}</span>
+                              <span className="editor-evolution-method">
+                                <ItemSprite spritenum={formChanges.spritenum} className="editor-form-item" />
+                                {formChanges.ready ? formChanges.itemName : `Needs the ${formChanges.itemName}`}
+                              </span>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { SPRITE_STYLES, SPRITE_STYLE_LABELS, spriteUrl, type SpriteStyle } from './spriteStyle'
 import UpdatesSection from './UpdatesSection'
 import BackgroundSection from './BackgroundSection'
+import CloudSavesSection from './CloudSavesSection'
 
 interface Props {
   username: string
@@ -46,6 +47,8 @@ function Options({
           </button>
         </div>
         <div className="options-modal-body">
+          <UpdatesSection />
+
           <h2 className="options-heading">Account</h2>
           <p className="editor-hint">Logged in as {username}</p>
           <div>
@@ -59,6 +62,8 @@ function Options({
               Log out
             </button>
           </div>
+
+          <CloudSavesSection />
 
           <h2 className="options-heading">Sprite style</h2>
           <div className="sprite-style-grid">
@@ -79,8 +84,6 @@ function Options({
           </div>
 
           <BackgroundSection background={background} onChange={onChangeBackground} />
-
-          <UpdatesSection />
         </div>
 
         <div className="editor-actions">

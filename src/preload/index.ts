@@ -2,6 +2,9 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { CoinBalance, SlotRules, SlotSpinResult } from '../shared/slots'
 import type { BlackjackView } from '../shared/blackjack'
 import type { AchievementClaimResult, AchievementsState } from '../shared/achievements'
+import type { CloudSave, CloudStatus } from '../shared/cloud'
+import type { RouletteSpin } from '../shared/roulette'
+import type { PlinkoDrop, PlinkoRisk } from '../shared/plinko'
 import type {
   AutoSetOption,
   AutoSetResult,
@@ -116,11 +119,22 @@ const api = {
   applyLoadout: (id: string): Promise<BoxState> => ipcRenderer.invoke('loadouts:apply', id),
   listBag: (): Promise<BagItemView[]> => ipcRenderer.invoke('bag:list'),
   useExpCandy: (itemId: string): Promise<ExpGainResult[]> => ipcRenderer.invoke('bag:useExpCandy', itemId),
+  useExpCandiesUntilCap: (itemId: string): Promise<{ used: number; results: ExpGainResult[]; allCapped: boolean }> =>
+    ipcRenderer.invoke('bag:useExpCandiesUntilCap', itemId),
   getMoney: (): Promise<number> => ipcRenderer.invoke('money:get'),
   sellMon: (id: string): Promise<{ sold: number; species: string; money: number; box: BoxState }> =>
     ipcRenderer.invoke('box:sell', id),
+  sellMons: (ids: string[]): Promise<{ sold: number; count: number; money: number; box: BoxState }> =>
+    ipcRenderer.invoke('box:sellMany', ids),
   getCoins: (): Promise<number> => ipcRenderer.invoke('coins:get'),
   getAchievements: (): Promise<AchievementsState> => ipcRenderer.invoke('achievements:get'),
+  // Cloud saves on Google Drive, for the logged-in player.
+  getCloudStatus: (): Promise<CloudStatus> => ipcRenderer.invoke('cloud:status'),
+  connectCloud: (): Promise<CloudStatus> => ipcRenderer.invoke('cloud:connect'),
+  disconnectCloud: (): Promise<CloudStatus> => ipcRenderer.invoke('cloud:disconnect'),
+  listCloudSaves: (): Promise<CloudSave[]> => ipcRenderer.invoke('cloud:list'),
+  exportToCloud: (): Promise<CloudSave[]> => ipcRenderer.invoke('cloud:export'),
+  importFromCloud: (fileId: string): Promise<void> => ipcRenderer.invoke('cloud:import', fileId),
   claimAchievement: (id: string): Promise<AchievementClaimResult> => ipcRenderer.invoke('achievements:claim', id),
   setAchievementTitle: (title: string | null): Promise<AchievementsState> =>
     ipcRenderer.invoke('achievements:setTitle', title),
@@ -139,6 +153,10 @@ const api = {
   hitBlackjack: (): Promise<BlackjackView> => ipcRenderer.invoke('blackjack:hit'),
   standBlackjack: (): Promise<BlackjackView> => ipcRenderer.invoke('blackjack:stand'),
   doubleBlackjack: (): Promise<BlackjackView> => ipcRenderer.invoke('blackjack:double'),
+  getRouletteHistory: (): Promise<number[]> => ipcRenderer.invoke('roulette:history'),
+  // The bets on the board: bet key ('n:17', 'red', 'dozen:2'...) -> coins on it.
+  spinRoulette: (bets: Record<string, number>): Promise<RouletteSpin> => ipcRenderer.invoke('roulette:spin', bets),
+  dropPlinko: (bet: number, risk: PlinkoRisk): Promise<PlinkoDrop> => ipcRenderer.invoke('plinko:drop', bet, risk),
   getTrainerProfile: (): Promise<TrainerProfile> => ipcRenderer.invoke('profile:get'),
   getPokedex: (): Promise<PokedexEntry[]> => ipcRenderer.invoke('profile:pokedex'),
   checkForUpdate: (): Promise<UpdateCheckResult> => ipcRenderer.invoke('update:check'),

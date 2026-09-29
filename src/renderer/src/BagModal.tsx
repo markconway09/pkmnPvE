@@ -167,6 +167,31 @@ function BagModal({ onClose, onChanged, onOpenShop }: Props): React.JSX.Element 
     }
   }
 
+  // Exp. Candies one after another until the whole team is at the level cap, or they run out.
+  function useExpCandiesUntilCap(item: BagItemView): Promise<void> {
+    return act(async () => {
+      const { used, results, allCapped } = await window.api.useExpCandiesUntilCap(item.id)
+      const levelUps = results.filter((r) => r.levelAfter > r.levelBefore).map((r) => `${r.species} → Lv ${r.levelAfter}`)
+      return [
+        `Used ${used}× ${item.name}.`,
+        levelUps.length > 0 ? levelUps.join(', ') + '.' : '',
+        allCapped ? 'Your whole team is at the level cap.' : 'Out of candies.'
+      ]
+        .filter(Boolean)
+        .join(' ')
+    })
+  }
+
+  // A double-click does what the item is for: use a candy, open a capsule, restore a fossil.
+  function useItem(e: React.MouseEvent, item: BagItemView): void {
+    if (selection || busy) return
+    lastPoint.current = pointOf(e)
+    if (item.teamExp !== null) void useExpCandy(item)
+    else if (item.opens) void openItem(item)
+    else if (item.fossil === 'single' && canAffordRestore) void restoreSingle(item)
+    else if (item.fossil === 'galar' && canAffordRestore) setGalarFossil(item)
+  }
+
   function useExpCandy(item: BagItemView): Promise<void> {
     return act(async () => {
       const results = await window.api.useExpCandy(item.id)
@@ -248,7 +273,9 @@ function BagModal({ onClose, onChanged, onOpenShop }: Props): React.JSX.Element 
                       className={`bag-item${selection?.has(item.id) ? ' bag-item-selected' : ''}${selection && item.sellPrice === null ? ' bag-item-unsellable' : ''}`}
                       title={item.description}
                       onContextMenu={(e) => openMenu(e, item)}
-                      onClick={(e) => openMenu(e, item)}
+                      // A left click only picks it while selecting items to sell.
+                      onClick={(e) => selection && openMenu(e, item)}
+                      onDoubleClick={(e) => useItem(e, item)}
                     >
                       <ItemSprite spritenum={item.spritenum} className="bag-item-icon" />
                       <span className="bag-item-name">{item.name}</span>
@@ -294,6 +321,16 @@ function BagModal({ onClose, onChanged, onOpenShop }: Props): React.JSX.Element 
               {menu.item.teamExp !== null && (
                 <button className="context-menu-item" disabled={busy} onClick={() => void useExpCandy(menu.item)}>
                   Use on team (+{menu.item.teamExp.toLocaleString('en-US')} exp each)
+                </button>
+              )}
+              {menu.item.teamExp !== null && (
+                <button
+                  className="context-menu-item"
+                  disabled={busy}
+                  title="Keeps using them until your whole team is at the level cap, or you run out"
+                  onClick={() => void useExpCandiesUntilCap(menu.item)}
+                >
+                  Use until the level cap (×{menu.item.quantity} left)
                 </button>
               )}
               {menu.item.opens && (

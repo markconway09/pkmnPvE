@@ -164,10 +164,12 @@ interface RunMonCardProps {
   index: number
   onClick?: () => void
   onContextMenu?: (e: React.MouseEvent) => void
+  // Double-click: edit it.
+  onEdit?: () => void
   selectable?: boolean
 }
 
-function RunMonCard({ mon, index, onClick, onContextMenu, selectable }: RunMonCardProps): React.JSX.Element {
+function RunMonCard({ mon, index, onClick, onContextMenu, onEdit, selectable }: RunMonCardProps): React.JSX.Element {
   const hpClass = mon.hpPercent > 50 ? 'hp-high' : mon.hpPercent > 20 ? 'hp-mid' : 'hp-low'
   // Drag it onto another card to move it there - the first one leads every battle.
   const drag = useDraggable({ id: `${RUN_MON_DRAG_PREFIX}${mon.id}` })
@@ -189,14 +191,15 @@ function RunMonCard({ mon, index, onClick, onContextMenu, selectable }: RunMonCa
           drop.isOver && !drag.isDragging ? ' team-slot-over' : ''
         }${drag.isDragging ? ' run-mon-card-dragging' : ''}`}
         // Not disabled even when there's nothing to click for - a disabled button gets no
-        // right-clicks, and the context menu needs them. A left click picks it as a target
-        // when something is being given, and otherwise opens the same menu (a drag that
-        // ends where it began doesn't count).
+        // right-clicks, and the context menu needs them. A left click only picks it as a
+        // target when something is being given (a drag that ends where it began doesn't
+        // count); right-click opens the menu, and a double-click edits it.
         onPointerDownCapture={tap.onPointerDownCapture}
-        onClick={(e) => {
-          if (!tap.isTap()) return
-          if (selectable) onClick?.()
-          else onContextMenu?.(e)
+        onClick={() => {
+          if (tap.isTap() && selectable) onClick?.()
+        }}
+        onDoubleClick={() => {
+          if (!selectable) onEdit?.()
         }}
         onContextMenu={onContextMenu}
       >
@@ -675,6 +678,9 @@ function RoguelitePanel({
               onContextMenu={(e) => {
                 e.preventDefault()
                 if (!busy) setMenu({ mon, x: e.clientX, y: e.clientY })
+              }}
+              onEdit={() => {
+                if (!busy) setEditingMonId(mon.id)
               }}
               onClick={() => target?.()}
             />

@@ -1899,6 +1899,28 @@ export function evolutionOptionsFor(set: PokemonSet): EvolutionOption[] {
 }
 
 /**
+ * Every Pokemon this one can evolve into, ready or not, with what it takes - "Level 36",
+ * "Use a Thunder Stone", "Max friendship (120/255)" - by the same rules as
+ * evolutionOptionsFor (which says which of these it can do right now).
+ */
+export function evolutionPathsFor(set: PokemonSet): { species: string; method: string }[] {
+  const itemNames = new Map(getEditorOptions().items.map((i) => [i.id, i.name]))
+  return Dex.species
+    .get(set.species)
+    .evos.map((name) => Dex.species.get(name))
+    .filter((evo) => evo.exists && !isBattleOnlyForme(evo))
+    .map((evo) => {
+      const requiredItems = evolutionItemsFor(evo)
+      let method: string
+      if (requiredItems) method = `Use a ${requiredItems.map((id) => itemNames.get(id) ?? id).join(' or ')}`
+      else if (evo.evoType === undefined) method = `Level ${evo.evoLevel ?? 1}`
+      else if (evo.evoType === 'useItem' || evo.evoType === 'levelHold') method = 'Any time'
+      else method = `Max friendship (${set.happiness ?? MAX_HAPPINESS}/${MAX_HAPPINESS})`
+      return { species: evo.name, method }
+    })
+}
+
+/**
  * Roguelite: what a run Pokemon can evolve into. There's no bag in a run, so an
  * evolution needs no item, trade or friendship - only the level the wild generator
  * would plausibly meet that stage at (its own level for a level-up evolution; 30, or

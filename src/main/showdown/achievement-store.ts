@@ -60,7 +60,11 @@ function currentStats(): Record<AchievementStat, number> {
     jackpots: counters.jackpots ?? 0,
     slotCoinsWon: counters.slotCoinsWon ?? 0,
     blackjackWins: counters.blackjackWins ?? 0,
-    naturalBlackjacks: counters.naturalBlackjacks ?? 0
+    naturalBlackjacks: counters.naturalBlackjacks ?? 0,
+    rouletteSpins: counters.rouletteSpins ?? 0,
+    rouletteNumberWins: counters.rouletteNumberWins ?? 0,
+    plinkoDrops: counters.plinkoDrops ?? 0,
+    plinkoEdges: counters.plinkoEdges ?? 0
   }
 }
 

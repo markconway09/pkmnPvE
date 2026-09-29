@@ -17,13 +17,18 @@ function UpdatesSection(): React.JSX.Element {
 
   useEffect(() => window.api.onUpdateProgress(setProgress), [])
 
+  // Checks straight away whenever Options opens - the button is there to check again.
+  useEffect(() => {
+    void runCheck()
+  }, [])
+
   // Keeps the update box in sight as it changes - the notes can push the button, the
-  // progress bar or an error past the bottom of the window, where an update in
-  // progress looked like nothing was happening at all.
+  // progress bar or an error out of view, where an update in progress looked like
+  // nothing was happening at all.
   const panelRef = useRef<HTMLDivElement>(null)
   const phase = progress?.phase ?? null
   useEffect(() => {
-    panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [check?.available, installing, phase, error])
 
   async function runCheck(): Promise<void> {

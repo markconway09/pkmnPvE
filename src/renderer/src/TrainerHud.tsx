@@ -6,6 +6,8 @@ import Tooltip from './Tooltip'
 
 interface Props {
   name: string
+  // The player's achievement title, in gold beside their name.
+  title?: string | null
   spriteId: string
   roster: RosterSlotView[]
   align: 'left' | 'right'
@@ -30,7 +32,7 @@ function ballTitle(slot: RosterSlotView | undefined): string | undefined {
   return slot.species
 }
 
-function TrainerHud({ name, spriteId, roster, align, size = 'small', rewards }: Props): React.JSX.Element {
+function TrainerHud({ name, title, spriteId, roster, align, size = 'small', rewards }: Props): React.JSX.Element {
   const slots = Array.from({ length: TEAM_SIZE }, (_, i) => roster[i])
   return (
     <div className={`trainer-hud trainer-hud-${align} trainer-hud-${size}`}>
@@ -42,7 +44,10 @@ function TrainerHud({ name, spriteId, roster, align, size = 'small', rewards }: 
         <img className="trainer-hud-sprite" src={trainerSpriteUrl(spriteId)} alt={name} />
       )}
       <div className="trainer-hud-info">
-        <div className="trainer-hud-name">{name}</div>
+        <div className="trainer-hud-name">
+          {name}
+          {title && <span className="trainer-hud-title">{title}</span>}
+        </div>
         <div className="trainer-hud-balls">
           {slots.map((slot, i) => (
             <span

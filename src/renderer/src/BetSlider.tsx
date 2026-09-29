@@ -16,7 +16,7 @@ interface Props {
  * starts at the last amount bet there, and placedBet brings it down to what's held if
  * that's less.
  */
-export function useSavedBet(game: 'slots' | 'blackjack'): [number, (bet: number) => void] {
+export function useSavedBet(game: 'slots' | 'blackjack' | 'roulette' | 'plinko'): [number, (bet: number) => void] {
   const key = `pkmnpve.lastBet.${game}`
   const [bet, setBet] = useState(() => {
     try {

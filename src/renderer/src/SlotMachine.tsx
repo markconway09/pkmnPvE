@@ -5,7 +5,7 @@ import type { SlotRules } from '../../shared/slots'
 import { SLOT_LINES, SLOT_RULES } from '../../shared/slots'
 import ItemSprite from './ItemSprite'
 import BetSlider, { maxBet, placedBet, useSavedBet } from './BetSlider'
-import GameCornerTabs from './GameCornerTabs'
+import GameCornerTabs, { type GameCornerGame } from './GameCornerTabs'
 import SpriteImage from './SpriteImage'
 import { toSpriteId } from '../../shared/battle-types'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
@@ -17,7 +17,7 @@ interface Props {
   // "Coin Shop" from inside the machine, for when the coins run out.
   onOpenCoinShop: () => void
   // The Game Corner's other game.
-  onSwitchGame: () => void
+  onSwitchGame: (game: GameCornerGame) => void
 }
 
 // One symbol's cell on a reel.

@@ -208,6 +208,36 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
   const [confirmingRun, setConfirmingRun] = useState(false)
   const [spriteStyle, setSpriteStyle] = useState<SpriteStyle>(loadSpriteStyle)
   const [trainerSprite, setTrainerSprite] = useState<string>(initialTrainerSprite)
+  // The player's achievement title, shown by their name in battle - read as each battle starts.
+  const [playerTitle, setPlayerTitle] = useState<string | null>(null)
+
+  // R presses the battle's Run button - the button itself, so a run that costs money or
+  // leaves a shiny still asks first (R again to confirm). Never while typing, and never
+  // the same button when it's showing "Cancel".
+  useEffect(() => {
+    if (screen !== 'battle') return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key.toLowerCase() !== 'r' || e.repeat || e.ctrlKey || e.altKey || e.metaKey) return
+      const target = e.target as HTMLElement | null
+      if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return
+      const button = [...document.querySelectorAll<HTMLButtonElement>('.run-cancel-button')].find(
+        (b) => !b.disabled && b.textContent?.trim() !== 'Cancel'
+      )
+      if (!button) return
+      e.preventDefault()
+      button.click()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [screen])
+  const inBattle = view !== null
+  useEffect(() => {
+    if (!inBattle) return
+    window.api
+      .getAchievements()
+      .then((state) => setPlayerTitle(state.title))
+      .catch(() => setPlayerTitle(null))
+  }, [inBattle])
   const logRef = useRef<HTMLDivElement>(null)
   const battleFieldRef = useRef<HTMLDivElement>(null)
   // Set when a revealed log line uses a move the animation spike knows about -
@@ -763,6 +793,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
           <div className="battle-huds-large">
             <TrainerHud
               name="You"
+              title={playerTitle}
               spriteId={trainerSprite}
               roster={displayedTeam.map((m) => ({ species: m.species, fainted: m.fainted, status: m.status }))}
               align="left"

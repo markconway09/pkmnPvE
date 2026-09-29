@@ -22,6 +22,7 @@ import {
   evolveMon,
   getBoxState,
   sellMon,
+  sellMons,
   getPokedex,
   getMonSet,
   getTeamPokemonSets,
@@ -37,7 +38,8 @@ import {
   resetBox,
   setTeam,
   updateMon,
-  useExpCandy
+  useExpCandy,
+  useExpCandiesUntilCap
 } from './showdown/box-store'
 import { getBagState, resetBag } from './showdown/bag-store'
 import { applyLoadout, deleteLoadout, listLoadouts, renameLoadout, saveLoadout, updateLoadout } from './showdown/loadout-store'
@@ -77,10 +79,21 @@ import {
   standBlackjack
 } from './showdown/blackjack-store'
 import { resetStatsCounters } from './showdown/stats-store'
+import { getRouletteHistory, spinRoulette } from './showdown/roulette-store'
+import { dropPlinko } from './showdown/plinko-store'
+import type { PlinkoRisk } from '../shared/plinko'
 import { checkAchievements, claimAchievement, getAchievements, setAchievementTitle } from './showdown/achievement-store'
 import { getTrainerProfile } from './showdown/trainer-profile'
 import { buildAutoSet, listAutoSets } from './showdown/auto-sets'
 import { checkForUpdate, installUpdate } from './updater'
+import {
+  connectCloud,
+  disconnectCloud,
+  exportToCloud,
+  getCloudStatus,
+  importFromCloud,
+  listCloudSaves
+} from './cloud/google-drive'
 import { chooseBackground, clearBackground, getBackground } from './showdown/background-store'
 import {
   completeRunGenerations,
@@ -440,6 +453,7 @@ ipcMain.handle('dex:move', (_event, id: string) => getMoveInfo(id))
 
 ipcMain.handle('box:list', () => getBoxState())
 ipcMain.handle('box:sell', (_event, id: string) => sellMon(id))
+ipcMain.handle('box:sellMany', (_event, ids: string[]) => sellMons(ids))
 ipcMain.handle('box:addRandom', () => {
   requireAdmin()
   return addRandomMon()
@@ -469,10 +483,17 @@ ipcMain.handle('loadouts:apply', (_event, id: string) => applyLoadout(id))
 
 ipcMain.handle('bag:list', () => getBagState())
 ipcMain.handle('bag:useExpCandy', (_event, itemId: string) => useExpCandy(itemId))
+ipcMain.handle('bag:useExpCandiesUntilCap', (_event, itemId: string) => useExpCandiesUntilCap(itemId))
 
 ipcMain.handle('money:get', () => getMoney())
 ipcMain.handle('coins:get', () => getCoins())
 ipcMain.handle('achievements:get', () => getAchievements())
+ipcMain.handle('cloud:status', () => getCloudStatus())
+ipcMain.handle('cloud:connect', () => connectCloud())
+ipcMain.handle('cloud:disconnect', () => disconnectCloud())
+ipcMain.handle('cloud:list', () => listCloudSaves())
+ipcMain.handle('cloud:export', () => exportToCloud())
+ipcMain.handle('cloud:import', (_event, fileId: string) => importFromCloud(fileId))
 ipcMain.handle('achievements:claim', (_event, id: string) => claimAchievement(id))
 ipcMain.handle('achievements:setTitle', (_event, title: string | null) => setAchievementTitle(title))
 ipcMain.handle('coins:buy', (_event, amount: number) => buyCoins(amount))
@@ -480,6 +501,9 @@ ipcMain.handle('coins:prize', (_event, itemId: string) => buyCoinPrize(itemId))
 ipcMain.handle('slots:spin', (_event, bet: number) => spinSlots(bet))
 ipcMain.handle('slots:rules', () => getSlotRules())
 ipcMain.handle('blackjack:view', () => getBlackjackView())
+ipcMain.handle('roulette:history', () => getRouletteHistory())
+ipcMain.handle('roulette:spin', (_event, bets: Record<string, number>) => spinRoulette(bets))
+ipcMain.handle('plinko:drop', (_event, bet: number, risk: PlinkoRisk) => dropPlinko(bet, risk))
 ipcMain.handle('blackjack:deal', (_event, bet: number) => dealBlackjack(bet))
 ipcMain.handle('blackjack:hit', () => hitBlackjack())
 ipcMain.handle('blackjack:stand', () => standBlackjack())

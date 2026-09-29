@@ -382,9 +382,12 @@ export interface BoxPokemonView extends PokemonSummary {
   canLevelUpWithCandy?: boolean
   // Not shiny yet, and there's a Shiny Patch in the bag to make it so.
   canUseShinyPatch?: boolean
+  // Every Pokemon it can evolve into, ready or not, with what it takes and whether it's
+  // already in the Pokedex (the edit window lists them all).
+  evolutionPaths?: { species: string; method: string; ready: boolean; registered: boolean }[]
   // A Pokemon with a form-change item for it in the bag (the Rotom Catalog, Prison Bottle,
   // Reveal Glass...): the forms it can change into, and the item.
-  formChanges?: { forms: string[]; itemName: string; spritenum: number }
+  formChanges?: { forms: string[]; itemName: string; spritenum: number; ready: boolean }
   // A plain Necrozma, Kyurem or Calyrex with its fusion item: each partner in the box it
   // can fuse with, and what they'd become.
   fusions?: { partnerId: string; partnerSpecies: string; partnerLevel: number; result: string; itemName: string }[]
