@@ -6,6 +6,7 @@ import {
   MERGE_MAX_STARS,
   MERGE_STAT_BONUS_PER_STAR,
   mergeStarsFor,
+  planMerge,
   toSpriteId
 } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
@@ -46,17 +47,22 @@ function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
   const candidates = keeper.mergeCandidates ?? []
   const chosen = candidates.filter((c) => picked.has(c.id))
   const copiesNow = keeper.copies ?? 1
-  const copiesAfter = copiesNow + chosen.reduce((sum, c) => sum + c.copies, 0)
+  // Past the top, the last one in only gives what fits and keeps the rest (see planMerge).
+  const plan = planMerge(copiesNow, chosen)
+  const copiesAfter = plan.copiesAfter
+  const whole = chosen.filter((c) => plan.whole.includes(c.id))
+  const partial = plan.partial ? chosen.find((c) => c.id === plan.partial!.id) : undefined
+  const keeperFull = copiesNow >= MERGE_MAX_COPIES
   const starsNow = mergeStarsFor(copiesNow)
   const starsAfter = mergeStarsFor(copiesAfter)
-  const tooMany = copiesAfter > MERGE_MAX_COPIES
-  const becomesShiny = !keeper.shiny && chosen.some((c) => c.shiny)
+  // Only those merged in whole pass anything on.
+  const becomesShiny = !keeper.shiny && whole.some((c) => c.shiny)
   // A favorite merged in passes its heart on.
-  const becomesFavorite = !keeper.favorite && chosen.some((c) => c.favorite)
+  const becomesFavorite = !keeper.favorite && whole.some((c) => c.favorite)
   // It takes the highest level of any that go in.
-  const levelAfter = Math.max(keeper.level, ...chosen.map((c) => c.level))
+  const levelAfter = Math.max(keeper.level, ...whole.map((c) => c.level))
   // Merging a favorite (or one off the team) away asks for a second click.
-  const needsConfirm = chosen.some((c) => c.favorite || c.onTeam)
+  const needsConfirm = whole.some((c) => c.favorite || c.onTeam)
   const nextAt = nextStarAt(copiesNow)
 
   function toggle(id: string): void {
@@ -108,11 +114,13 @@ function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
 
         <p className="editor-hint">
           Each star is {bonusText(1)} in classic battles and friendly matches (not Roguelite runs). Stars come
-          at 2, 4, 8, 16 and 32 copies. Merged-in Pokémon leave your box: a shiny makes {keeper.species} shiny, a favorite makes it a favorite,
+          at 2, 4, 8, 16 and 32 copies - past 32, the last one in keeps what's left over (and the stars that go with it). Merged-in Pokémon leave your box: a shiny makes {keeper.species} shiny, a favorite makes it a favorite,
           it keeps the higher level and friendship, and held items go back to your bag.
         </p>
 
-        {candidates.length === 0 ? (
+        {keeperFull ? (
+          <p className="box-empty-hint">{keeper.species} is fully merged at ★{MERGE_MAX_STARS}.</p>
+        ) : candidates.length === 0 ? (
           <p className="box-empty-hint">No other {keeper.species} to merge in.</p>
         ) : (
           <div className="merge-candidates">
@@ -148,10 +156,20 @@ function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
         )}
 
         {chosen.length > 0 && (
-          <p className={`merge-preview${tooMany ? ' editor-error' : ''}`}>
-            {tooMany
-              ? `That's ${copiesAfter} copies - ★${MERGE_MAX_STARS} only takes ${MERGE_MAX_COPIES}.`
-              : `After: ${copiesAfter} copies · ${starRow(starsAfter)}${starsAfter > starsNow ? ` (${bonusText(starsAfter)})` : ''}${levelAfter > keeper.level ? ` · Lv ${keeper.level} → ${levelAfter}` : ''}${becomesShiny ? ' · becomes shiny' : ''}${becomesFavorite ? ' · becomes a favorite' : ''}`}
+          <p className="merge-preview">
+            {`After: ${copiesAfter} copies · ${starRow(starsAfter)}${starsAfter > starsNow ? ` (${bonusText(starsAfter)})` : ''}${levelAfter > keeper.level ? ` · Lv ${keeper.level} → ${levelAfter}` : ''}${becomesShiny ? ' · becomes shiny' : ''}${becomesFavorite ? ' · becomes a favorite' : ''}`}
+            {partial && plan.partial && (
+              <span className="merge-overflow">
+                {partial.species} (Lv {partial.level}) gives {plan.partial.given} and keeps {plan.partial.left} cop
+                {plan.partial.left === 1 ? 'y' : 'ies'}
+                {mergeStarsFor(plan.partial.left) > 0 ? ` · ★${mergeStarsFor(plan.partial.left)}` : ''}
+              </span>
+            )}
+            {plan.unused.length > 0 && (
+              <span className="merge-overflow">
+                {plan.unused.length} not needed - it&apos;s full before {plan.unused.length === 1 ? 'it goes' : 'they go'} in
+              </span>
+            )}
           </p>
         )}
         {error && <p className="editor-error">{error}</p>}
@@ -162,7 +180,7 @@ function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
           </button>
           <button
             className={confirming ? 'confirm-button' : undefined}
-            disabled={busy || chosen.length === 0 || tooMany}
+            disabled={busy || chosen.length === 0 || keeperFull}
             onClick={() => void merge()}
             onBlur={() => setConfirming(false)}
           >

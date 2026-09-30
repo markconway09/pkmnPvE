@@ -981,6 +981,40 @@ export function mergeStarsFor(copies: number | undefined): number {
   return Math.min(MERGE_MAX_STARS, Math.floor(Math.log2(Math.max(1, copies ?? 1))))
 }
 
+/**
+ * How a merge fills a Pokemon up to the top (MERGE_MAX_COPIES): the others go in smallest
+ * first, each whole while it fits. The one that doesn't fit gives only what's needed and
+ * keeps the rest - staying in the box with fewer copies (and maybe fewer stars) - and any
+ * after that aren't touched.
+ */
+export interface MergePlan {
+  // Merged in whole (they leave the box).
+  whole: string[]
+  // The one merged in part: what it gives, and what it's left with.
+  partial: { id: string; given: number; left: number } | null
+  // Picked but not needed - the top was reached first.
+  unused: string[]
+  copiesAfter: number
+}
+
+export function planMerge(keeperCopies: number, others: { id: string; copies: number }[]): MergePlan {
+  let room = Math.max(0, MERGE_MAX_COPIES - keeperCopies)
+  const plan: MergePlan = { whole: [], partial: null, unused: [], copiesAfter: keeperCopies }
+  for (const other of [...others].sort((a, b) => a.copies - b.copies)) {
+    if (room <= 0) plan.unused.push(other.id)
+    else if (other.copies <= room) {
+      plan.whole.push(other.id)
+      room -= other.copies
+      plan.copiesAfter += other.copies
+    } else {
+      plan.partial = { id: other.id, given: room, left: other.copies - room }
+      plan.copiesAfter += room
+      room = 0
+    }
+  }
+  return plan
+}
+
 export function mergeStatMultiplier(stars: number): number {
   return 1 + MERGE_STAT_BONUS_PER_STAR * stars
 }

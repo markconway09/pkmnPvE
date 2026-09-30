@@ -43,7 +43,7 @@ export const TITLE_PERKS: Record<Title, string> = {
   Daredevil: 'Roguelite runs start with a free item, move and ability pick',
   'Golden Touch': 'The slots jackpot pays ×60 instead of ×50',
   'High Roller': 'Bet up to 2,000 coins in the Game Corner',
-  'Edge Lord': "Plinko's edge slots pay double, at every risk",
+  'Edge Lord': "Plinko's edge slots pay double and the slots next to them 25% more, at every risk",
   Heartless: 'Pokemon sell for 15% more',
   Broker: 'Grey, blue and purple Pokemon sell for double',
   '9+10': 'Blackjack pays 3:1 instead of 3:2',
@@ -73,6 +73,8 @@ export const TYCOON_SHOP_MULTIPLIER = 0.9
 export const GOLDEN_TOUCH_JACKPOT_BONUS = 10
 export const HIGH_ROLLER_BET_CAP = 2000
 export const EDGE_LORD_EDGE_MULTIPLIER = 2
+// ...and the slots next to the edges pay 25% more.
+export const EDGE_LORD_NEAR_EDGE_MULTIPLIER = 1.25
 export const HEARTLESS_SELL_MULTIPLIER = 1.15
 // Broker: these rarity tiers (grey, blue, purple) sell for double.
 export const BROKER_DOUBLE_TIERS = new Set(['common', 'uncommon', 'rare'])
@@ -92,8 +94,9 @@ export const STARLIGHT_RAID_CHARM_MULTIPLIER = 5
 // What the Game Corner's games need to know about the player's title.
 export interface GameCornerPerks {
   betCap: number
-  // Multiplies Plinko's two edge slots.
+  // Multiplies Plinko's two edge slots, and the two next to them.
   plinkoEdgeMultiplier: number
+  plinkoNearEdgeMultiplier: number
   // What a natural blackjack pays, to 1.
   blackjackPayout: number
 }

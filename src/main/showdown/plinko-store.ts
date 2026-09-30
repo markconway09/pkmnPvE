@@ -1,6 +1,6 @@
 import { randomInt } from 'node:crypto'
 import type { PlinkoDrop, PlinkoRisk } from '../../shared/plinko'
-import { PLINKO_PAYOUTS, PLINKO_RISKS, PLINKO_ROWS, PLINKO_SLOTS } from '../../shared/plinko'
+import { PLINKO_RISKS, PLINKO_ROWS, PLINKO_SLOTS, plinkoSlotMultiplier } from '../../shared/plinko'
 import { betCap, getGameCornerPerks } from './title-perks'
 import { changeCoins, getCoins } from './game-corner-store'
 import { countAchievement } from './achievement-progress'
@@ -19,8 +19,8 @@ export function dropPlinko(bet: number, risk: PlinkoRisk): PlinkoDrop {
   const path = Array.from({ length: PLINKO_ROWS }, () => randomInt(2) === 1)
   const slot = path.filter(Boolean).length
   const edge = slot === 0 || slot === PLINKO_SLOTS - 1
-  // The Edge Lord title doubles the edge slots.
-  const multiplier = PLINKO_PAYOUTS[risk][slot] * (edge ? getGameCornerPerks().plinkoEdgeMultiplier : 1)
+  // The Edge Lord title boosts the edge slots and the ones next to them.
+  const multiplier = plinkoSlotMultiplier(risk, slot, getGameCornerPerks())
   const payout = Math.floor(bet * multiplier)
   changeCoins(payout - bet)
 

@@ -8014,3 +8014,11 @@ button.editor-evolution:disabled.editor-evolution-locked {
 .pokemon-editor-main .pokemon-editor-layout {
   gap: 10px;
 }
+
+/* The merge preview's overflow lines: what stays behind past ★5. */
+.merge-overflow {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: #b7c0cf;
+}

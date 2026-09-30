@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { PlinkoDrop, PlinkoRisk } from '../../shared/plinko'
-import { PLINKO_PAYOUTS, PLINKO_RISKS, PLINKO_RISK_LABELS, PLINKO_ROWS, PLINKO_SLOTS } from '../../shared/plinko'
+import { PLINKO_PAYOUTS, PLINKO_RISKS, PLINKO_RISK_LABELS, PLINKO_ROWS, PLINKO_SLOTS, plinkoSlotMultiplier } from '../../shared/plinko'
 import BetSlider, { maxBet, placedBet, useGameCornerPerks, useSavedBet } from './BetSlider'
 import GameCornerTabs, { type GameCornerGame } from './GameCornerTabs'
 import CoinIcon from './CoinIcon'
@@ -235,10 +235,8 @@ function PlinkoBoard({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JS
   }
 
   const bet = placedBet(betWanted, coins, perks.betCap)
-  // The edge slots pay double with the Edge Lord title.
-  const payouts = PLINKO_PAYOUTS[risk].map((m, slot) =>
-    slot === 0 || slot === PLINKO_SLOTS - 1 ? m * perks.plinkoEdgeMultiplier : m
-  )
+  // The edge slots (and the ones next to them) pay more with the Edge Lord title.
+  const payouts = PLINKO_PAYOUTS[risk].map((_, slot) => plinkoSlotMultiplier(risk, slot, perks))
 
   return createPortal(
     <div className="modal-overlay" onMouseDown={onClose}>

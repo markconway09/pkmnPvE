@@ -20,6 +20,7 @@ export function useGameCornerPerks(): GameCornerPerks {
   const [perks, setPerks] = useState<GameCornerPerks>({
     betCap: MAX_BET,
     plinkoEdgeMultiplier: 1,
+    plinkoNearEdgeMultiplier: 1,
     blackjackPayout: BLACKJACK_PAYOUT
   })
   useEffect(() => {

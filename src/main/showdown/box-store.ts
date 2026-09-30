@@ -20,6 +20,7 @@ import {
   MERGE_MAX_COPIES,
   MERGE_MAX_STARS,
   mergeStarsFor,
+  planMerge,
   RARE_CANDY_ITEM_ID,
   ROTOM_CATALOG_ITEM_ID,
   SHINY_PATCH_ITEM_ID
@@ -468,6 +469,16 @@ export function updateMon(id: string, input: EditablePokemonSet, admin = false):
  * all), and their held items go back to the bag. They leave the box (and the team). All or nothing - every one is checked first.
  */
 export function mergeMons(keeperId: string, fodderIds: string[]): BoxState {
+  mergeInto(keeperId, fodderIds)
+  return getBoxState()
+}
+
+/**
+ * Merges the picked Pokemon into the keeper, up to the top (see planMerge): past it, the
+ * last one only gives what fits and keeps the rest. Only those merged in whole leave the
+ * box and pass on their shininess, heart, level and friendship. How many went in.
+ */
+function mergeInto(keeperId: string, fodderIds: string[]): number {
   const box = getState()
   const keeper = box.mons.find((m) => m.id === keeperId)
   if (!keeper) throw new Error(`Unknown Pokemon id: ${keeperId}`)
@@ -480,13 +491,20 @@ export function mergeMons(keeperId: string, fodderIds: string[]): BoxState {
   const species = dexFormOf(keeper.set.species)
   if (fodder.some((m) => dexFormOf(m.set.species) !== species)) throw new Error(`Only another ${species} can be merged in`)
   if (fodder.some((m) => m.fusedWith)) throw new Error('Unfuse it first - its partner would be merged away with it')
-  let copies = (keeper.copies ?? 1) + fodder.reduce((sum, m) => sum + (m.copies ?? 1), 0)
   if ((keeper.copies ?? 1) >= MERGE_MAX_COPIES) throw new Error(`${keeper.set.species} is already at ${MERGE_MAX_STARS} stars`)
-  if (copies > MERGE_MAX_COPIES) {
-    throw new Error(`That's ${copies} copies - ${MERGE_MAX_STARS} stars only takes ${MERGE_MAX_COPIES}, so merge fewer`)
-  }
+  const plan = planMerge(
+    keeper.copies ?? 1,
+    fodder.map((m) => ({ id: m.id, copies: m.copies ?? 1 }))
+  )
+  let copies = plan.copiesAfter
+  const whole = new Set(plan.whole)
   const wasShiny = !!keeper.set.shiny
-  for (const mon of fodder) {
+  // The overflow stays with the one merged in part.
+  if (plan.partial) {
+    const partial = fodder.find((m) => m.id === plan.partial!.id)!
+    partial.copies = plan.partial.left
+  }
+  for (const mon of fodder.filter((m) => whole.has(m.id))) {
     if (mon.set.item) addItem(toID(mon.set.item), 1)
     if (mon.set.shiny) keeper.set.shiny = true
     if (mon.set.gigantamax) keeper.set.gigantamax = true
@@ -502,25 +520,27 @@ export function mergeMons(keeperId: string, fodderIds: string[]): BoxState {
   // Alchemist: now and then a merge gives a bonus copy (never past the top).
   if (hasTitle('Alchemist') && copies < MERGE_MAX_COPIES && Math.random() < ALCHEMIST_BONUS_COPY_CHANCE) copies += 1
   keeper.copies = copies
-  box.mons = box.mons.filter((m) => !wanted.has(m.id))
-  box.team = box.team.map((slot) => (slot && wanted.has(slot) ? null : slot))
+  box.mons = box.mons.filter((m) => !whole.has(m.id))
+  box.team = box.team.map((slot) => (slot && whole.has(slot) ? null : slot))
   persist()
-  countAchievement('pokemonMerged', fodder.length)
+  const merged = whole.size + (plan.partial ? 1 : 0)
+  countAchievement('pokemonMerged', merged)
   if (!wasShiny && keeper.set.shiny) countAchievement('mergeShinied')
   recordAchievementBest('mergedStars', mergeStarsFor(copies))
-  return getBoxState()
+  return merged
 }
 
 /**
  * The expanded box's "select to merge": the picked Pokemon, species (form) by species,
  * each merged into the best of them - the most copies, then the highest level, then a
- * shiny, then a favorite. A group stops short of the 32-copy top (what's left stays in
- * the box), and a Pokemon with no other of its species picked is left alone.
+ * shiny, then a favorite. Past the 32-copy top the rest stays in the box (see planMerge),
+ * one already at the top is left out, and a Pokemon with no other of its species picked
+ * is left alone.
  */
 export function mergeSelectedMons(ids: string[]): { box: BoxState; merged: number; results: { species: string; stars: number }[] } {
   const box = getState()
   const wanted = new Set(ids)
-  const picked = box.mons.filter((m) => wanted.has(m.id) && !m.fusedWith)
+  const picked = box.mons.filter((m) => wanted.has(m.id) && !m.fusedWith && (m.copies ?? 1) < MERGE_MAX_COPIES)
   const groups = new Map<string, StoredMon[]>()
   for (const mon of picked) {
     const key = dexFormOf(mon.set.species)
@@ -538,19 +558,10 @@ export function mergeSelectedMons(ids: string[]): { box: BoxState; merged: numbe
         Number(!!b.favorite) - Number(!!a.favorite)
     )
     const [keeper, ...rest] = ranked
-    let room = MERGE_MAX_COPIES - (keeper.copies ?? 1)
-    // Smallest first, so as many fit as possible.
-    const fodder = rest
-      .sort((a, b) => (a.copies ?? 1) - (b.copies ?? 1))
-      .filter((m) => {
-        const copies = m.copies ?? 1
-        if (copies > room) return false
-        room -= copies
-        return true
-      })
-    if (fodder.length === 0) continue
-    mergeMons(keeper.id, fodder.map((m) => m.id))
-    merged += fodder.length
+    merged += mergeInto(
+      keeper.id,
+      rest.map((m) => m.id)
+    )
     results.push({ species: keeper.set.species, stars: mergeStarsFor(keeper.copies) })
   }
   if (merged === 0) throw new Error('Pick at least two of the same Pokemon to merge')

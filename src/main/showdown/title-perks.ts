@@ -5,6 +5,7 @@ import {
   BLACKJACK_PAYOUT,
   BROKER_DOUBLE_TIERS,
   EDGE_LORD_EDGE_MULTIPLIER,
+  EDGE_LORD_NEAR_EDGE_MULTIPLIER,
   HEARTLESS_SELL_MULTIPLIER,
   HIGH_ROLLER_BET_CAP,
   NINE_PLUS_TEN_BLACKJACK_PAYOUT,
@@ -57,6 +58,7 @@ export function getGameCornerPerks(): GameCornerPerks {
   return {
     betCap: betCap(),
     plinkoEdgeMultiplier: hasTitle('Edge Lord') ? EDGE_LORD_EDGE_MULTIPLIER : 1,
+    plinkoNearEdgeMultiplier: hasTitle('Edge Lord') ? EDGE_LORD_NEAR_EDGE_MULTIPLIER : 1,
     blackjackPayout: hasTitle('9+10') ? NINE_PLUS_TEN_BLACKJACK_PAYOUT : BLACKJACK_PAYOUT
   }
 }
