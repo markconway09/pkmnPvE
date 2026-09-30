@@ -1644,9 +1644,17 @@ export const RANDOM_POKEMON_LEGENDARY_CHANCE = 0.05
  * the other special Pokemon (mythicals, sub-legendaries, Ultra Beasts, paradoxes)
  * pink, and everything else by its base stat total.
  */
+// Gold: the restricted legendaries, plus Arceus (every form) - tagged Mythical, but a
+// box legendary in all but name.
+const GOLD_EXTRA_SPECIES = new Set(['Arceus'])
+
+function isGoldSpecies(species: ReturnType<typeof Dex.species.get>): boolean {
+  return species.tags.includes('Restricted Legendary') || GOLD_EXTRA_SPECIES.has(species.baseSpecies)
+}
+
 export function speciesRarityTier(speciesName: string): RarityTier {
   const species = Dex.species.get(speciesName)
-  if (species.tags.includes('Restricted Legendary')) return 'legendary'
+  if (isGoldSpecies(species)) return 'legendary'
   if (isLegendaryClass(species)) return 'epic'
   const bst = bstOf(species.name)
   if (bst >= 500) return 'rare'
@@ -1670,6 +1678,10 @@ export function pickRandomUnevolvedAnySpecies(): string {
  * a red one (legendary-class) - now and then a gold one (a restricted legendary). Fully
  * evolved only.
  */
+// Pokemon that do evolve, though the Dex lists no evolution for them: Meltan becomes
+// Melmetal with candies, not a level or an item.
+const NOT_FULLY_EVOLVED_IDS = new Set(['meltan'])
+
 export function pickRaidSpecies(
   chances: { gigantamax: number; restricted: number } = { gigantamax: RAID_GIGANTAMAX_CHANCE, restricted: RAID_RESTRICTED_CHANCE }
 ): { species: string; gigantamax: boolean } {
@@ -1682,9 +1694,10 @@ export function pickRaidSpecies(
         (!s.isNonstandard || s.isNonstandard === 'Past') &&
         !isBattleOnlyForme(s) &&
         isPlainSpecies(s) &&
-        s.evos.length === 0
+        s.evos.length === 0 &&
+        !NOT_FULLY_EVOLVED_IDS.has(s.id)
     )
-  const restricted = (s: ReturnType<typeof Dex.species.get>): boolean => s.tags.includes('Restricted Legendary')
+  const restricted = isGoldSpecies
   if (Math.random() < chances.gigantamax) {
     const gmax = pool.filter((s) => !!s.canGigantamax)
     if (gmax.length > 0) return { species: pickFrom(gmax), gigantamax: true }
@@ -1704,7 +1717,7 @@ export function pickRandomSwapSpecies(kind: 'normal' | 'legendary' | 'restricted
         !isBattleOnlyForme(s) &&
         isPlainSpecies(s)
     )
-  const restricted = (s: ReturnType<typeof Dex.species.get>): boolean => s.tags.includes('Restricted Legendary')
+  const restricted = isGoldSpecies
   // Not Cosmog or Cosmoem - tagged restricted, but hardly a jackpot.
   if (kind === 'restricted') return pickFrom(pool.filter((s) => restricted(s) && s.evos.length === 0))
   if (kind === 'legendary') return pickFrom(pool.filter((s) => isLegendaryClass(s) && !restricted(s)))
@@ -2422,15 +2435,45 @@ const ABILITY_IGNORING_ABILITIES = new Set(['moldbreaker', 'teravolt', 'turbobla
  * Wonder Guard...) - unless Mold Breaker or the move gets past them - and the
  * attacker's Scrappy / Mind's Eye and Tinted Lens.
  */
-export function moveTypeEffectiveness(battle: Battle, source: Pokemon, target: Pokemon, moveId: string): number | null {
-  const base = battle.dex.moves.get(moveId)
-  if (!base.exists || base.category === 'Status') return null
-  const move = battle.dex.getActiveMove(base.id)
+/**
+ * A move as it would be used right now, with its type worked out the way the sim does it:
+ * the move's own rule (Judgment's plate, Tera Blast's Tera type, Weather Ball's weather,
+ * Revelation Dance, Ivy Cudgel's mask...) and then its user's ability (Pixilate,
+ * Aerilate, Refrigerate, Galvanize, Normalize, Liquid Voice).
+ */
+function typedActiveMove(battle: Battle, source: Pokemon, target: Pokemon | null, moveId: string): ReturnType<Battle['dex']['getActiveMove']> {
+  const move = battle.dex.getActiveMove(moveId)
   try {
-    move.onModifyType?.call(battle, move, source, target)
+    move.onModifyType?.call(battle, move, source, target as Pokemon)
   } catch {
     // needs battle context the preview can't give - its printed type stands
   }
+  // (Typed loosely: the ability's handler isn't in its declared type.)
+  const ability = source.getAbility() as unknown as { onModifyType?: unknown }
+  if (!source.ignoringAbility() && ability.onModifyType) {
+    try {
+      ;(ability.onModifyType as (this: Battle, m: typeof move, s: Pokemon, t: Pokemon) => void).call(
+        battle,
+        move,
+        source,
+        target as Pokemon
+      )
+    } catch {
+      // the same
+    }
+  }
+  return move
+}
+
+/** A move's type right now (see typedActiveMove). */
+export function liveMoveType(battle: Battle, source: Pokemon, target: Pokemon | null, moveId: string): string {
+  return typedActiveMove(battle, source, target, moveId).type
+}
+
+export function moveTypeEffectiveness(battle: Battle, source: Pokemon, target: Pokemon, moveId: string): number | null {
+  const base = battle.dex.moves.get(moveId)
+  if (!base.exists || base.category === 'Status') return null
+  const move = typedActiveMove(battle, source, target, base.id)
   const sourceAbility = source.ignoringAbility() ? '' : toID(source.ability)
   const targetAbility =
     target.ignoringAbility() || move.ignoreAbility || ABILITY_IGNORING_ABILITIES.has(sourceAbility)

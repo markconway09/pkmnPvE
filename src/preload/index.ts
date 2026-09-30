@@ -138,6 +138,9 @@ const api = {
   // Merges duplicates into a Pokemon (see mergeMons).
   mergeMons: (keeperId: string, fodderIds: string[]): Promise<BoxState> =>
     ipcRenderer.invoke('box:merge', keeperId, fodderIds),
+  // The expanded box's "select to merge" (see mergeSelectedMons).
+  mergeSelectedMons: (ids: string[]): Promise<{ box: BoxState; merged: number; results: { species: string; stars: number }[] }> =>
+    ipcRenderer.invoke('box:mergeSelected', ids),
   listLoadouts: (): Promise<LoadoutView[]> => ipcRenderer.invoke('loadouts:list'),
   saveLoadout: (name: string): Promise<LoadoutView[]> => ipcRenderer.invoke('loadouts:save', name),
   updateLoadout: (id: string): Promise<LoadoutView[]> => ipcRenderer.invoke('loadouts:update', id),

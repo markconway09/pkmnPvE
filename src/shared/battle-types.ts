@@ -1096,6 +1096,9 @@ export interface LiveMovePower {
   varies: boolean
   // Doubled against a Dynamaxed foe (Behemoth Blade, Behemoth Bash, Dynamax Cannon).
   dynamaxBonus?: boolean
+  // Its type right now when that isn't its printed one: Judgment with a plate, Tera Blast
+  // once Terastallized, Weather Ball in the rain, a Normal move under Pixilate...
+  type?: string
 }
 
 export interface BattleView {

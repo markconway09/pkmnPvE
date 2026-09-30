@@ -42,6 +42,7 @@ import {
   fuseMon,
   unfuseMon,
   mergeMons,
+  mergeSelectedMons,
   getTeamMergeStars,
   readSavedTeamStarsOf,
   readSavedTeamOf,
@@ -538,6 +539,7 @@ ipcMain.handle('box:changeForm', (_event, id: string, form: string) => changeFor
 ipcMain.handle('box:fuse', (_event, id: string, partnerId: string) => fuseMon(id, partnerId))
 ipcMain.handle('box:unfuse', (_event, id: string) => unfuseMon(id))
 ipcMain.handle('box:merge', (_event, keeperId: string, fodderIds: string[]) => mergeMons(keeperId, fodderIds))
+ipcMain.handle('box:mergeSelected', (_event, ids: string[]) => mergeSelectedMons(ids))
 
 ipcMain.handle('loadouts:list', () => listLoadouts())
 ipcMain.handle('loadouts:save', (_event, name: string) => saveLoadout(name))

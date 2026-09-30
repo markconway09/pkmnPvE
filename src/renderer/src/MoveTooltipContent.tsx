@@ -31,7 +31,7 @@ function MoveTooltipContent({ moveId, fallbackName, power }: Props): React.JSX.E
     <div className="tooltip-panel">
       <div className="tooltip-title">{info.name}</div>
       <div className="tooltip-row">
-        <span className={`type-badge type-${info.type.toLowerCase()}`}>{info.type}</span>
+        <span className={`type-badge type-${(power?.type ?? info.type).toLowerCase()}`}>{power?.type ?? info.type}</span>
         <span className="tooltip-category">{info.category}</span>
       </div>
       <div className="tooltip-row">

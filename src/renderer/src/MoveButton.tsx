@@ -52,9 +52,11 @@ function MoveButton({ id, name, pp, maxpp, disabled, power, effectiveness, stabT
     }
   }, [id])
 
-  const typeClass = info ? `type-${info.type.toLowerCase()}` : ''
+  // Its type right now (Judgment with a plate, Tera Blast once Terastallized...).
+  const moveType = power?.type ?? info?.type
+  const typeClass = moveType ? `type-${moveType.toLowerCase()}` : ''
   const powerLabel = movePowerLabel(power)
-  const stab = info && stabTypes ? stabKind(info.type, stabTypes) : null
+  const stab = moveType && stabTypes ? stabKind(moveType, stabTypes) : null
 
   return (
     <Tooltip
@@ -75,7 +77,7 @@ function MoveButton({ id, name, pp, maxpp, disabled, power, effectiveness, stabT
               alt={info.category}
               title={info.category}
             />
-            {info.type}
+            {moveType}
           </span>
         )}
         {stab && info?.category !== 'Status' && (

@@ -16,6 +16,7 @@ import {
   getTypeEffectivenessMultiplier,
   getWildDropPool,
   liveMovePower,
+  liveMoveType,
   moveTypeEffectiveness,
   packTeam,
   getItemSpritenum,
@@ -1477,7 +1478,12 @@ export class WildBattle {
       const source = battle.sides[0].active[i]
       if (!source || source.fainted) return null
       const powers: Record<string, LiveMovePower> = {}
-      for (const move of activeData.moves) powers[move.id] = liveMovePower(battle, source, foes, move.id)
+      for (const move of activeData.moves) {
+        const power = liveMovePower(battle, source, foes, move.id)
+        // Its type right now, when that isn't its printed one (see liveMoveType).
+        const type = liveMoveType(battle, source, foes[0] ?? null, move.id)
+        powers[move.id] = type !== battle.dex.moves.get(move.id).type ? { ...power, type } : power
+      }
       return powers
     })
   }

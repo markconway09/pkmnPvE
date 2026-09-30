@@ -31,6 +31,9 @@ interface Props {
   onFuse?: (partnerId: string) => void
   unfuse?: BoxPokemonView['unfuse']
   onUnfuse?: () => void
+  // Its favorite heart, beside its name at the top - toggled straight away.
+  favorite?: boolean
+  onToggleFavorite?: () => void
   // Duplicates of it in the box: opens the merge window.
   mergeCount?: number
   onMerge?: () => void
@@ -63,6 +66,8 @@ function PokemonContextMenu({
   onUnfuse,
   mergeCount = 0,
   onMerge,
+  favorite = false,
+  onToggleFavorite,
   onEdit,
   onAdminEdit,
   onSell,
@@ -72,6 +77,10 @@ function PokemonContextMenu({
   onClose
 }: Props): React.JSX.Element {
   const [confirmingSell, setConfirmingSell] = useState(false)
+  // The Shiny Patch is used up, so it asks twice.
+  const [confirmingPatch, setConfirmingPatch] = useState(false)
+  // Shown straight away; the box catches up behind the menu.
+  const [isFavorite, setIsFavorite] = useState(favorite)
   return createPortal(
     <div
       className="context-menu-overlay"
@@ -82,7 +91,22 @@ function PokemonContextMenu({
       }}
     >
       <ContextMenuPanel x={x} y={y}>
-        <div className="context-menu-title">{species}</div>
+        <div className="context-menu-title">
+          {onToggleFavorite && (
+            <button
+              type="button"
+              className="context-menu-heart"
+              title={isFavorite ? 'Unfavorite' : 'Favorite'}
+              onClick={() => {
+                setIsFavorite(!isFavorite)
+                onToggleFavorite()
+              }}
+            >
+              {isFavorite ? '❤️' : '🤍'}
+            </button>
+          )}
+          {species}
+        </div>
         {onEdit && (
           <button className="context-menu-item" onClick={onEdit}>
             Edit Pokemon
@@ -94,9 +118,15 @@ function PokemonContextMenu({
           </button>
         )}
         {canUseShinyPatch && onUseShinyPatch && (
-          <button className="context-menu-item" onClick={onUseShinyPatch}>
+          <button
+            className={`context-menu-item${confirmingPatch ? ' context-menu-confirm' : ''}`}
+            onClick={() => {
+              if (!confirmingPatch) setConfirmingPatch(true)
+              else onUseShinyPatch()
+            }}
+          >
             <span className="context-menu-evo-target">
-              <ShinyIcon /> Turn Shiny (use Shiny Patch)
+              <ShinyIcon /> {confirmingPatch ? 'Use the Shiny Patch? Click again' : 'Turn Shiny (use Shiny Patch)'}
             </span>
           </button>
         )}

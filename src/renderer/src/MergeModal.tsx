@@ -51,6 +51,8 @@ function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
   const starsAfter = mergeStarsFor(copiesAfter)
   const tooMany = copiesAfter > MERGE_MAX_COPIES
   const becomesShiny = !keeper.shiny && chosen.some((c) => c.shiny)
+  // A favorite merged in passes its heart on.
+  const becomesFavorite = !keeper.favorite && chosen.some((c) => c.favorite)
   // It takes the highest level of any that go in.
   const levelAfter = Math.max(keeper.level, ...chosen.map((c) => c.level))
   // Merging a favorite (or one off the team) away asks for a second click.
@@ -106,7 +108,7 @@ function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
 
         <p className="editor-hint">
           Each star is {bonusText(1)} in classic battles and friendly matches (not Roguelite runs). Stars come
-          at 2, 4, 8, 16 and 32 copies. Merged-in Pokémon leave your box: a shiny makes {keeper.species} shiny,
+          at 2, 4, 8, 16 and 32 copies. Merged-in Pokémon leave your box: a shiny makes {keeper.species} shiny, a favorite makes it a favorite,
           it keeps the higher level and friendship, and held items go back to your bag.
         </p>
 
@@ -149,7 +151,7 @@ function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
           <p className={`merge-preview${tooMany ? ' editor-error' : ''}`}>
             {tooMany
               ? `That's ${copiesAfter} copies - ★${MERGE_MAX_STARS} only takes ${MERGE_MAX_COPIES}.`
-              : `After: ${copiesAfter} copies · ${starRow(starsAfter)}${starsAfter > starsNow ? ` (${bonusText(starsAfter)})` : ''}${levelAfter > keeper.level ? ` · Lv ${keeper.level} → ${levelAfter}` : ''}${becomesShiny ? ' · becomes shiny' : ''}`}
+              : `After: ${copiesAfter} copies · ${starRow(starsAfter)}${starsAfter > starsNow ? ` (${bonusText(starsAfter)})` : ''}${levelAfter > keeper.level ? ` · Lv ${keeper.level} → ${levelAfter}` : ''}${becomesShiny ? ' · becomes shiny' : ''}${becomesFavorite ? ' · becomes a favorite' : ''}`}
           </p>
         )}
         {error && <p className="editor-error">{error}</p>}

@@ -55,6 +55,7 @@ import AchievementsModal from './AchievementsModal'
 import type { AchievementsState } from '../../shared/achievements'
 import { LOCATION_BUTTON_BACKDROP, backdropUrl, locationIconUrl } from './battleScenery'
 import { formatMoney } from './money'
+import ShinyIcon from './ShinyIcon'
 
 interface Props {
   onFight: () => void
@@ -99,6 +100,15 @@ const BOX_SORTS: { key: BoxSortKey; label: string }[] = [
   { key: 'stars', label: 'Stars' }
 ]
 
+// The expanded box's filter chips: each one on narrows the box to Pokemon that pass it.
+type BoxFilterKey = 'favorite' | 'shiny' | 'stars' | 'duplicates'
+const BOX_FILTERS: { key: BoxFilterKey; icon: React.ReactNode; title: string; test: (m: BoxPokemonView) => boolean }[] = [
+  { key: 'favorite', icon: '❤️', title: 'Favorites only', test: (m) => !!m.favorite },
+  { key: 'shiny', icon: <ShinyIcon />, title: 'Shinies only', test: (m) => !!m.shiny },
+  { key: 'stars', icon: '★', title: 'Merged (starred) only', test: (m) => (m.mergeStars ?? 0) > 0 },
+  { key: 'duplicates', icon: '⧉', title: 'Duplicates only - Pokémon with another of their species', test: (m) => (m.mergeCandidates?.length ?? 0) > 0 }
+]
+
 // Ascending order for a sort key (the caller flips it for descending).
 function compareBoxMons(a: BoxPokemonView, b: BoxPokemonView, key: BoxSortKey): number {
   if (key === 'name') return a.species.localeCompare(b.species)
@@ -111,7 +121,7 @@ function compareBoxMons(a: BoxPokemonView, b: BoxPokemonView, key: BoxSortKey): 
 // The box search: every word typed has to match something about the Pokemon - its
 // species, a type, its ability, item or nature, or one of its moves ("fire", "u-turn").
 function matchesBoxSearch(mon: BoxPokemonView, search: string): boolean {
-  const words = search.toLowerCase().split(/s+/).filter(Boolean)
+  const words = search.toLowerCase().split(/\s+/).filter(Boolean)
   if (words.length === 0) return true
   const squash = (text: string): string => text.toLowerCase().replace(/[^a-z0-9]/g, '')
   const haystack = [mon.species, ...mon.types, mon.ability, mon.item, mon.nature, ...mon.moveIds].map(squash)
@@ -204,6 +214,11 @@ function MainMenu({
   const [boxExpanded, setBoxExpanded] = useState(false)
   // Picking Pokemon in the expanded box to sell at once (null: not picking).
   const [boxSelection, setBoxSelection] = useState<Set<string> | null>(null)
+  // The expanded box's filter chips, and whether its Select menu is open.
+  const [boxFilters, setBoxFilters] = useState<Set<BoxFilterKey>>(new Set())
+  const [selectMenuOpen, setSelectMenuOpen] = useState(false)
+  // What the box's selection is for: selling, or merging.
+  const [boxSelectMode, setBoxSelectMode] = useState<'sell' | 'merge'>('sell')
   // A pick with a shiny or a red/gold Pokemon in it asks for a second click.
   const [confirmingBoxSell, setConfirmingBoxSell] = useState(false)
   const [rematchOpen, setRematchOpen] = useState(false)
@@ -212,7 +227,7 @@ function MainMenu({
   // How the box is ordered (set from the expanded box): by arrival (catch order), name,
   // base stat total or Pokedex number, either way round.
   const [boxSort, setBoxSort] = useState<BoxSortKey>('arrival')
-  const [boxSortDescending, setBoxSortDescending] = useState(false)
+  const [boxSortDescending, setBoxSortDescending] = useState(true)
   const [playerTrainerOpen, setPlayerTrainerOpen] = useState(false)
   const [pokedexOpen, setPokedexOpen] = useState(false)
   const [challengeOpen, setChallengeOpen] = useState(false)
@@ -431,9 +446,12 @@ function MainMenu({
 
   // Favorites are kept safe from a bulk sell, and a fused Pokemon has to be unfused first.
   const canBulkSell = (mon: BoxPokemonView): boolean => !mon.favorite && !mon.unfuse
+  // Merging takes favorites (the heart carries over), but not a fused Pokemon.
+  const canBulkMerge = (mon: BoxPokemonView): boolean => !mon.unfuse
+  const canSelect = boxSelectMode === 'merge' ? canBulkMerge : canBulkSell
 
   function toggleBoxSelected(mon: BoxPokemonView): void {
-    if (!canBulkSell(mon)) return
+    if (!canSelect(mon)) return
     setConfirmingBoxSell(false)
     setBoxSelection((current) => {
       const next = new Set(current ?? [])
@@ -446,6 +464,63 @@ function MainMenu({
   function stopBoxSelection(): void {
     setBoxSelection(null)
     setConfirmingBoxSell(false)
+  }
+
+  // Merging: pick every Pokemon on show that has another of its species in the box.
+  function selectAllDuplicates(): void {
+    setConfirmingBoxSell(false)
+    setBoxSelection(new Set(boxMons.filter((m) => canBulkMerge(m) && (m.mergeCandidates?.length ?? 0) > 0).map((m) => m.id)))
+  }
+
+  // Back to the battle buttons: the box's search, filters and selection are cleared.
+  function collapseBox(): void {
+    setBoxSearch('')
+    setBoxFilters(new Set())
+    setSelectMenuOpen(false)
+    stopBoxSelection()
+    setBoxExpanded(false)
+  }
+
+  function startBoxSelection(mode: 'sell' | 'merge'): void {
+    setBoxSelectMode(mode)
+    setConfirmingBoxSell(false)
+    setBoxSelection(new Set())
+  }
+
+  // What merging the selection would do: the picked Pokemon grouped by species (the
+  // merge window's candidates are exactly the others of its species), and how many of
+  // them would go into another.
+  function mergePlan(): { groups: number; mergedAway: number } {
+    const picked = (boxState?.mons ?? []).filter((m) => boxSelection?.has(m.id))
+    const groups = new Map<string, number>()
+    for (const mon of picked) {
+      const key = [mon.id, ...(mon.mergeCandidates ?? []).map((c) => c.id)].sort()[0]
+      groups.set(key, (groups.get(key) ?? 0) + 1)
+    }
+    const merging = [...groups.values()].filter((n) => n >= 2)
+    return { groups: merging.length, mergedAway: merging.reduce((sum, n) => sum + n - 1, 0) }
+  }
+
+  async function mergeSelectedMons(e: React.MouseEvent): Promise<void> {
+    if (!boxSelection || boxSelection.size === 0) return
+    const at = { x: e.clientX, y: e.clientY }
+    // Merged-in Pokemon leave the box for good - always asks twice.
+    if (!confirmingBoxSell) {
+      setConfirmingBoxSell(true)
+      return
+    }
+    setBusy(true)
+    try {
+      const result = await window.api.mergeSelectedMons([...boxSelection])
+      setBoxState(result.box)
+      const stars = result.results.map((r) => `${r.species} ★${r.stars}`).join(', ')
+      notes.show(`Merged ${result.merged} Pokemon - ${stars}`, at)
+      stopBoxSelection()
+    } catch (err) {
+      notes.show(errorMessage(err), at, 'bad')
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function sellSelectedMons(e: React.MouseEvent): Promise<void> {
@@ -620,6 +695,7 @@ function MainMenu({
   const boxMons = (boxState?.mons ?? [])
     .filter((m) => !team.includes(m.id))
     .filter((m) => matchesBoxSearch(m, boxSearch))
+    .filter((m) => BOX_FILTERS.every((f) => !boxFilters.has(f.key) || f.test(m)))
     .sort(
       (a, b) =>
         Number(!!b.favorite) - Number(!!a.favorite) ||
@@ -657,7 +733,24 @@ function MainMenu({
   }, [eligibility, selectedLocation, onChangeWildLocation])
 
   return (
-    <div className="screen">
+    <div
+      className="screen"
+      // The expanded box collapses again from a click on the menu's background - not on
+      // anything in it (the header, a team card, the box, or a pop-up) - the empty space
+      // around the team counts - and not mid-selection.
+      onClick={(e) => {
+        if (!boxExpanded || boxSelection) return
+        const target = e.target as HTMLElement
+        if (
+          target.closest(
+            'button, input, select, a, label, .menu-header, .team-slot, .box-toolbar-attached, .box-grid, .modal-overlay, .context-menu-overlay, .context-menu, .tooltip-portal'
+          )
+        ) {
+          return
+        }
+        collapseBox()
+      }}
+    >
       {modePulse &&
         createPortal(
           <div
@@ -1018,88 +1111,170 @@ function MainMenu({
 
         {!runInProgress && (
         <>
-        <div className="team-heading-row">
-          {/* The heading itself opens the saved team loadouts. */}
-          <button
-            className="box-heading-button"
-            title="Loadouts: save this team, or switch to a saved one"
-            onClick={() => setLoadoutsOpen(true)}
-          >
-            Team
-          </button>
-        </div>
-        <TeamRow team={team} monsById={monsById} onEdit={(id) => openEditor(id, false)} onContextMenu={handleContextMenu} />
-
-        <div className="team-heading-row">
-          {/* The heading itself expands the box (hiding the battle buttons) and collapses it again. */}
-          <button
-            className={`box-heading-button${boxExpanded ? ' box-heading-button-expanded' : ''}`}
-            title={boxExpanded ? 'Show the battle buttons again' : 'Hide the battle buttons for a bigger box'}
-            onClick={() => {
-              if (boxExpanded) {
-                setBoxSearch('')
-                stopBoxSelection()
-              }
-              setBoxExpanded((v) => !v)
-            }}
-          >
-            Box
-          </button>
-          {boxExpanded && (
-            <SearchBar
-              className="box-search"
-              value={boxSearch}
-              onChange={setBoxSearch}
-              placeholder="Search name, type, move, ability, item…"
-              autoFocus
-            />
-          )}
-          {boxExpanded && (
-            <span className="box-sort">
-              <select value={boxSort} onChange={(e) => setBoxSort(e.target.value as BoxSortKey)} title="Order the box">
-                {BOX_SORTS.map((sort) => (
-                  <option key={sort.key} value={sort.key}>
-                    {sort.label}
-                  </option>
-                ))}
-              </select>
-              <button
-                className="box-sort-direction"
-                title={boxSortDescending ? 'Descending - click for ascending' : 'Ascending - click for descending'}
-                onClick={() => setBoxSortDescending((d) => !d)}
-              >
-                {boxSortDescending ? '↓' : '↑'}
+        {/* The team in a panel like the box's, the loadouts a section of its toolbar. */}
+        <div className="team-frame">
+          <div className="box-toolbar box-toolbar-attached box-toolbar-compact team-toolbar">
+            <span className="box-toolbar-section box-toolbar-title team-toolbar-title">
+              Team <span className="box-count">· {team.filter(Boolean).length}/{team.length}</span>
+            </span>
+            <span className="team-toolbar-spacer" />
+            <div className="box-toolbar-section">
+              <button className="team-loadouts-button" title="Save this team, or switch to a saved one" onClick={() => setLoadoutsOpen(true)}>
+                Loadouts
               </button>
-            </span>
-          )}
-          {boxExpanded && !boxSelection && (
-            <button className="box-select-button" onClick={() => setBoxSelection(new Set())}>
-              Select to sell
-            </button>
-          )}
-        </div>
-        {boxSelection && (
-          <div className="box-sell-bar">
-            <span className="box-sell-summary">
-              {boxSelection.size} selected ·{' '}
-              {formatMoney(
-                (boxState?.mons ?? [])
-                  .filter((m) => boxSelection.has(m.id))
-                  .reduce((sum, m) => sum + (m.sellPrice ?? POKEMON_SELL_PRICES[m.rarityTier ?? 'common']), 0)
-              )}
-              <span className="box-sell-hint">Click Pokemon to pick them - favorites can't be picked</span>
-            </span>
-            <button disabled={busy} onClick={stopBoxSelection}>
-              Cancel
-            </button>
-            <button
-              className={confirmingBoxSell ? 'box-sell-confirm' : undefined}
-              disabled={busy || boxSelection.size === 0}
-              onClick={(e) => void sellSelectedMons(e)}
-            >
-              {confirmingBoxSell ? 'Includes rare or shiny Pokemon - click again' : 'Sell selected'}
-            </button>
+            </div>
           </div>
+          <div className="team-panel">
+            <TeamRow team={team} monsById={monsById} onEdit={(id) => openEditor(id, false)} onContextMenu={handleContextMenu} />
+          </div>
+        </div>
+
+        {/* The box's toolbar - or, while picking Pokemon to sell or merge, the selection bar in its place. */}
+        {boxSelection ? (
+          <div className="box-toolbar box-toolbar-attached box-selection-bar">
+            <button className="box-selection-cancel" disabled={busy} title="Stop selecting" onClick={stopBoxSelection}>
+              ✕
+            </button>
+            <span className="box-selection-mode">{boxSelectMode === 'merge' ? 'Merging' : 'Selling'}</span>
+            <span className="box-selection-summary">
+              {boxSelection.size} selected ·{' '}
+              {boxSelectMode === 'merge'
+                ? (() => {
+                    const plan = mergePlan()
+                    return plan.mergedAway > 0
+                      ? `${plan.mergedAway} merged into ${plan.groups} Pokémon`
+                      : 'pick two or more of the same Pokémon'
+                  })()
+                : formatMoney(
+                    (boxState?.mons ?? [])
+                      .filter((m) => boxSelection.has(m.id))
+                      .reduce((sum, m) => sum + (m.sellPrice ?? POKEMON_SELL_PRICES[m.rarityTier ?? 'common']), 0)
+                  )}
+            </span>
+            <span className="box-selection-hint">
+              {boxSelectMode === 'merge'
+                ? 'Each species goes into its best copy (most stars, then highest level)'
+                : "Favorites can't be picked"}
+            </span>
+            {boxSelectMode === 'merge' && (
+              <button disabled={busy} onClick={selectAllDuplicates} title="Pick every Pokémon shown that has another of its species">
+                Select all duplicates
+              </button>
+            )}
+            {boxSelectMode === 'merge' ? (
+              <button
+                className={`box-selection-go${confirmingBoxSell ? ' box-sell-confirm' : ''}`}
+                disabled={busy || mergePlan().mergedAway === 0}
+                onClick={(e) => void mergeSelectedMons(e)}
+              >
+                {confirmingBoxSell ? 'Merge them? Click again' : 'Merge selected'}
+              </button>
+            ) : (
+              <button
+                className={`box-selection-go${confirmingBoxSell ? ' box-sell-confirm' : ''}`}
+                disabled={busy || boxSelection.size === 0}
+                onClick={(e) => void sellSelectedMons(e)}
+              >
+                {confirmingBoxSell ? 'Includes rare or shiny Pokemon - click again' : 'Sell selected'}
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            {
+              // One panel on top of the box, each option a section of it - a little shorter
+              // while the box is collapsed. The title expands and collapses the box (a click
+              // on the menu's background collapses it too).
+              <div className={`box-toolbar box-toolbar-attached${boxExpanded ? '' : ' box-toolbar-compact'}`}>
+                <button
+                  className="box-toolbar-section box-toolbar-title"
+                  title={boxExpanded ? 'Show the battle buttons again' : 'Hide the battle buttons for a bigger box'}
+                  onClick={() => (boxExpanded ? collapseBox() : setBoxExpanded(true))}
+                >
+                  Box <span className="box-count">· {boxMons.length}</span>
+                </button>
+                <div className="box-toolbar-section box-toolbar-search">
+                  <SearchBar
+                    key={boxExpanded ? 'expanded' : 'collapsed'}
+                    className="box-search"
+                    value={boxSearch}
+                    onChange={setBoxSearch}
+                    placeholder="Search name, type, move, ability, item…"
+                    autoFocus={boxExpanded}
+                  />
+                </div>
+                <div className="box-toolbar-section box-filters">
+                  {BOX_FILTERS.map((f) => (
+                    <button
+                      key={f.key}
+                      className={`box-filter-chip${boxFilters.has(f.key) ? ' box-filter-chip-on' : ''}`}
+                      title={f.title}
+                      onClick={() =>
+                        setBoxFilters((current) => {
+                          const next = new Set(current)
+                          if (next.has(f.key)) next.delete(f.key)
+                          else next.add(f.key)
+                          return next
+                        })
+                      }
+                    >
+                      {f.icon}
+                    </button>
+                  ))}
+                </div>
+                <div className="box-toolbar-section box-sort">
+                  <span className="box-sort-label">Sort</span>
+                  <select value={boxSort} onChange={(e) => setBoxSort(e.target.value as BoxSortKey)} title="Order the box">
+                    {BOX_SORTS.map((sort) => (
+                      <option key={sort.key} value={sort.key}>
+                        {sort.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="box-sort-direction"
+                    title={boxSortDescending ? 'Descending - click for ascending' : 'Ascending - click for descending'}
+                    onClick={() => setBoxSortDescending((d) => !d)}
+                  >
+                    {/* One arrow, turned to point up for ascending. */}
+                    <svg className={`box-sort-arrow${boxSortDescending ? '' : ' box-sort-arrow-up'}`} viewBox="0 0 16 16" aria-hidden="true">
+                      <path d="M8 2.5v10M3.5 8.5 8 13l4.5-4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="box-toolbar-section box-select-menu-wrap">
+                  <button className="box-select-button" onClick={() => setSelectMenuOpen((v) => !v)}>
+                    Select ▾
+                  </button>
+                  {selectMenuOpen && (
+                    <>
+                      <div className="box-select-menu-backdrop" onMouseDown={() => setSelectMenuOpen(false)} />
+                      <div className="context-menu box-select-menu">
+                        <button
+                          className="context-menu-item"
+                          onClick={() => {
+                            setSelectMenuOpen(false)
+                            startBoxSelection('sell')
+                          }}
+                        >
+                          Select to sell
+                        </button>
+                        <button
+                          className="context-menu-item"
+                          onClick={() => {
+                            setSelectMenuOpen(false)
+                            startBoxSelection('merge')
+                          }}
+                        >
+                          Select to merge
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            }
+          </>
         )}
         <BoxGrid
           mons={boxMons}
@@ -1108,7 +1283,7 @@ function MainMenu({
           emptyHint={boxSearch.trim() ? 'No Pokemon in the box match that search.' : undefined}
           selection={boxSelection}
           onToggleSelect={toggleBoxSelected}
-          canSelect={canBulkSell}
+          canSelect={canSelect}
         />
         </>
         )}
@@ -1274,6 +1449,13 @@ function MainMenu({
               { x: contextMenu.x, y: contextMenu.y }
             )
           }
+          favorite={!!contextMenu.mon.favorite}
+          onToggleFavorite={() => {
+            window.api
+              .toggleFavorite(contextMenu.mon.id)
+              .then(setBoxState)
+              .catch(() => {})
+          }}
           mergeCount={contextMenu.mon.mergeCandidates?.length ?? 0}
           onMerge={() => {
             setMergingId(contextMenu.mon.id)

@@ -7480,3 +7480,280 @@ button.editor-evolution:disabled.editor-evolution-locked {
   height: 100%;
   background: linear-gradient(90deg, #f0b93a, #ffd76b);
 }
+
+/* The favorite heart beside a Pokemon's name at the top of its right-click menu. */
+.context-menu-heart {
+  margin-right: 6px;
+  padding: 0 2px;
+  border: none;
+  background: none;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* The expanded box's toolbar: title and count, search, filter chips, sort and Select. */
+.box-toolbar {
+  gap: 8px;
+}
+
+.box-count {
+  font-weight: normal;
+  color: #8a93a3;
+}
+
+.box-filters {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.box-filter-chip {
+  min-width: 34px;
+  height: 34px;
+  padding: 0 8px;
+  font-size: 15px;
+  color: #ffd76b;
+  opacity: 0.55;
+}
+
+.box-filter-chip-on {
+  opacity: 1;
+  border-color: #ffd76b;
+  background: #3a3216;
+}
+
+.box-sort-label {
+  font-size: 12px;
+  color: #8a93a3;
+  margin-right: 4px;
+}
+
+.box-select-menu-wrap {
+  position: relative;
+}
+
+.box-select-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+}
+
+.box-select-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 51;
+  min-width: 170px;
+}
+
+/* While selecting, this bar takes the toolbar's place. */
+.box-selection-bar {
+  padding: 4px 8px;
+  border: 1px solid #b48cff;
+  border-radius: 8px;
+  background: #221d33;
+}
+
+.box-selection-cancel {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+}
+
+.box-selection-mode {
+  font-weight: bold;
+  color: #d9c8ff;
+}
+
+.box-selection-summary {
+  font-size: 13px;
+}
+
+.box-selection-hint {
+  flex: 1;
+  font-size: 11px;
+  color: #8a93a3;
+}
+
+/* The expanded box's toolbar: one panel joined to the top of the box, its options as
+   sections split by thin lines rather than separate buttons. */
+.box-toolbar-attached {
+  display: flex;
+  align-items: stretch;
+  margin: 16px 0 0;
+  border: 2px solid #3a4150;
+  border-bottom: 1px solid #3a4150;
+  border-radius: 12px 12px 0 0;
+  background: #1c212b;
+}
+
+.box-toolbar-attached + .box-grid {
+  margin-top: 0;
+  border-top: none;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.box-toolbar-section {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border: none;
+  border-left: 1px solid #3a4150;
+  border-radius: 0;
+  background: transparent;
+  cursor: default;
+  animation: none;
+}
+
+.box-toolbar-section:first-child {
+  border-left: none;
+}
+
+/* The title section is the collapse button itself. */
+.box-toolbar-title {
+  padding: 6px 16px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #d9dee8;
+  cursor: pointer;
+}
+
+.box-toolbar-title:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.box-toolbar-search {
+  flex: 1;
+}
+
+.box-toolbar-attached .search-bar.box-search {
+  flex: 1;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.box-toolbar-attached button:not(.box-toolbar-title),
+.box-toolbar-attached select {
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.box-toolbar-attached button:not(.box-toolbar-title):hover,
+.box-toolbar-attached select:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.box-toolbar-attached .box-filter-chip-on {
+  background: #3a3216;
+}
+
+.box-toolbar-attached .box-sort select {
+  height: 34px;
+}
+
+/* While selecting, the bar keeps the panel shape but isn't a collapse target. */
+.box-toolbar-attached.box-selection-bar {
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px;
+  border-color: #b48cff;
+  background: #221d33;
+  cursor: default;
+}
+
+.box-toolbar-attached.box-selection-bar button {
+  border: 1px solid #3a4150;
+  background: #232a36;
+}
+
+/* The box's toolbar while the box is collapsed, and the team's toolbar: a little shorter. */
+.box-toolbar-compact .box-toolbar-section {
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+
+.box-toolbar-compact .search-bar.box-search,
+.box-toolbar-compact .box-sort select,
+.box-toolbar-compact .box-filter-chip,
+.box-toolbar-compact .box-select-button,
+.box-toolbar-compact .box-sort-direction,
+.box-toolbar-compact .team-loadouts-button {
+  height: 28px;
+  min-height: 0;
+}
+
+.box-toolbar-compact .search-bar.box-search input {
+  height: 26px;
+}
+
+/* The team's panel, joined under its toolbar like the box. */
+.team-toolbar-title {
+  cursor: default;
+}
+
+.team-toolbar-title:hover {
+  background: transparent;
+}
+
+.team-toolbar-spacer {
+  flex: 1;
+}
+
+.team-loadouts-button {
+  padding: 0 14px;
+  font-weight: bold;
+  color: #b7c0cf;
+}
+
+.team-panel {
+  padding: 10px;
+  border: 2px solid #3a4150;
+  border-top: none;
+  background: rgba(23, 27, 34, 0.7);
+  backdrop-filter: blur(3px);
+}
+
+.team-panel .team-row {
+  margin-top: 0;
+}
+
+/* The team's toolbar and panel hug the team's width. */
+.team-frame {
+  display: flex;
+  flex-direction: column;
+  width: fit-content;
+  margin: 0 auto;
+}
+
+.team-panel {
+  border-radius: 0 0 12px 12px;
+}
+
+/* The box sort's direction arrow, and the shiny filter chip's star. */
+.box-sort-direction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #d9dee8;
+}
+
+.box-sort-arrow {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.2s ease;
+}
+
+.box-sort-arrow-up {
+  transform: rotate(180deg);
+}
+
+.box-filter-chip .shiny-icon {
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+}
