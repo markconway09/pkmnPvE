@@ -217,6 +217,8 @@ function MainMenu({
   // The expanded box's filter chips, and whether its Select menu is open.
   const [boxFilters, setBoxFilters] = useState<Set<BoxFilterKey>>(new Set())
   const [selectMenuOpen, setSelectMenuOpen] = useState(false)
+  // The sort order's menu (the same kind as Select's).
+  const [sortMenuOpen, setSortMenuOpen] = useState(false)
   // What the box's selection is for: selling, or merging.
   const [boxSelectMode, setBoxSelectMode] = useState<'sell' | 'merge'>('sell')
   // A pick with a shiny or a red/gold Pokemon in it asks for a second click.
@@ -477,6 +479,7 @@ function MainMenu({
     setBoxSearch('')
     setBoxFilters(new Set())
     setSelectMenuOpen(false)
+    setSortMenuOpen(false)
     stopBoxSelection()
     setBoxExpanded(false)
   }
@@ -1124,7 +1127,7 @@ function MainMenu({
               </button>
             </div>
           </div>
-          <div className="team-panel">
+          <div className="team-box-panel">
             <TeamRow team={team} monsById={monsById} onEdit={(id) => openEditor(id, false)} onContextMenu={handleContextMenu} />
           </div>
         </div>
@@ -1224,13 +1227,30 @@ function MainMenu({
                 </div>
                 <div className="box-toolbar-section box-sort">
                   <span className="box-sort-label">Sort</span>
-                  <select value={boxSort} onChange={(e) => setBoxSort(e.target.value as BoxSortKey)} title="Order the box">
-                    {BOX_SORTS.map((sort) => (
-                      <option key={sort.key} value={sort.key}>
-                        {sort.label}
-                      </option>
-                    ))}
-                  </select>
+                  <span className="box-select-menu-wrap">
+                    <button className="box-select-button box-sort-button" title="Order the box" onClick={() => setSortMenuOpen((v) => !v)}>
+                      {BOX_SORTS.find((sort) => sort.key === boxSort)?.label} ▾
+                    </button>
+                    {sortMenuOpen && (
+                      <>
+                        <div className="box-select-menu-backdrop" onMouseDown={() => setSortMenuOpen(false)} />
+                        <div className="context-menu box-select-menu box-sort-menu">
+                          {BOX_SORTS.map((sort) => (
+                            <button
+                              key={sort.key}
+                              className={`context-menu-item${sort.key === boxSort ? ' box-sort-menu-current' : ''}`}
+                              onClick={() => {
+                                setSortMenuOpen(false)
+                                setBoxSort(sort.key)
+                              }}
+                            >
+                              {sort.label}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </span>
                   <button
                     className="box-sort-direction"
                     title={boxSortDescending ? 'Descending - click for ascending' : 'Ascending - click for descending'}

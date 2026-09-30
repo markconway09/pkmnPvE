@@ -7710,7 +7710,7 @@ button.editor-evolution:disabled.editor-evolution-locked {
   color: #b7c0cf;
 }
 
-.team-panel {
+.team-box-panel {
   padding: 10px;
   border: 2px solid #3a4150;
   border-top: none;
@@ -7718,7 +7718,7 @@ button.editor-evolution:disabled.editor-evolution-locked {
   backdrop-filter: blur(3px);
 }
 
-.team-panel .team-row {
+.team-box-panel .team-row {
   margin-top: 0;
 }
 
@@ -7730,7 +7730,7 @@ button.editor-evolution:disabled.editor-evolution-locked {
   margin: 0 auto;
 }
 
-.team-panel {
+.team-box-panel {
   border-radius: 0 0 12px 12px;
 }
 
@@ -7756,4 +7756,261 @@ button.editor-evolution:disabled.editor-evolution-locked {
   width: 16px;
   height: 16px;
   pointer-events: none;
+}
+
+/* The battle's switch list: every card one line per row - a long name or item ends in
+   an ellipsis (the hover card has it in full) - so
+   the six cards fit the column without a scrollbar, shrinking on shorter windows. */
+.switch-column {
+  overflow-x: hidden;
+}
+
+.switch-column .team-member-info {
+  flex: 1;
+}
+
+.switch-column .team-member-name-row {
+  min-width: 0;
+}
+
+.switch-column .team-member-name,
+.switch-column .team-member-item-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.switch-column .status-badge {
+  flex-shrink: 0;
+}
+
+.switch-column .team-member-matchups {
+  gap: 6px;
+}
+
+@media (max-height: 860px) {
+  .switch-column .team-panel {
+    gap: 8px;
+  }
+
+  .switch-column .team-member {
+    gap: 6px;
+    padding: 7px 12px;
+  }
+
+  .switch-column .team-member-icon {
+    width: 54px;
+    height: 54px;
+  }
+
+  .switch-column .team-member-name {
+    font-size: 15px;
+  }
+}
+
+@media (max-height: 720px) {
+  .switch-column .team-panel {
+    gap: 6px;
+  }
+
+  .switch-column .team-member {
+    gap: 4px;
+    padding: 5px 10px;
+  }
+
+  .switch-column .team-member-icon {
+    width: 42px;
+    height: 42px;
+  }
+
+  .switch-column .team-member-info {
+    gap: 2px;
+  }
+
+  .switch-column .team-member-matchups {
+    margin-top: 0;
+  }
+}
+
+/* Cards take the column's width rather than their one-line text's. */
+.switch-column .team-panel {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.switch-column .team-member-slot,
+.switch-column .team-member {
+  min-width: 0;
+}
+
+.switch-column .team-member-top {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-height: 640px) {
+  .switch-column .team-member-icon {
+    width: 34px;
+    height: 34px;
+  }
+
+  .switch-column .team-member-name {
+    font-size: 14px;
+  }
+
+  .switch-column .team-member-item {
+    font-size: 12px;
+  }
+}
+
+/* The matchup chips wrap only when they would spill out of the card (a narrow column,
+   or doubles' two chips a group); very short windows tighten the cards further. */
+.switch-column .team-member-top {
+  gap: 10px;
+}
+
+.switch-column .team-member-matchups {
+  flex-wrap: wrap;
+  row-gap: 3px;
+}
+
+@media (max-height: 640px) {
+  .switch-column .team-panel {
+    gap: 4px;
+  }
+
+  .switch-column .team-member {
+    gap: 3px;
+    padding: 4px 8px;
+  }
+
+  .switch-column .team-member-top {
+    gap: 8px;
+  }
+}
+
+/* Doubles' switch list: a smaller sprite and tighter chips, so a card's two chips a
+   group still sit on one line. */
+.switch-column .team-panel-doubles .team-member-icon {
+  width: 46px;
+  height: 46px;
+}
+
+.switch-column .team-panel-doubles .team-member-top {
+  gap: 8px;
+}
+
+.switch-column .team-panel-doubles .team-member-matchups {
+  gap: 5px;
+}
+
+.switch-column .team-panel-doubles .matchup-group {
+  gap: 2px;
+  font-size: 12px;
+}
+
+.switch-column .team-panel-doubles .eff-chip {
+  padding: 0 3px;
+  font-size: 11px;
+  line-height: 17px;
+}
+
+/* ...and in a narrow column, the chips alone (the attack group first, then the defence
+   one - their tooltips still say which) beside an even smaller sprite. */
+@media (max-width: 1150px) {
+  .switch-column .team-panel-doubles .team-member-icon {
+    width: 38px;
+    height: 38px;
+  }
+
+  .switch-column .team-panel-doubles .matchup-group {
+    font-size: 0;
+  }
+}
+
+/* The sort order: a button like Select's, opening the same kind of menu, the current
+   order marked. */
+.box-sort-menu {
+  left: 0;
+  right: auto;
+  min-width: 190px;
+}
+
+.box-sort-menu-current {
+  color: #6bb0ff;
+  font-weight: bold;
+}
+
+.box-sort-menu-current::after {
+  content: ' ✓';
+}
+
+/* The editor: ability and item side by side under Nickname / Gender / Tera Type. */
+.pokemon-editor-inline.pokemon-editor-inline-pair {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.pokemon-editor-inline-pair .editor-field-with-icon input {
+  width: auto;
+}
+
+/* Evolutions and form changes in one row across the editor, each a strip of buttons. */
+.editor-previews-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+}
+
+.editor-previews-row:empty {
+  display: none;
+}
+
+.editor-previews-row .editor-section {
+  margin-top: 0;
+}
+
+/* Save / Cancel stay on screen at the bottom of the panel while the rest scrolls. */
+.editor-actions.editor-actions-pinned {
+  position: sticky;
+  bottom: -16px;
+  z-index: 3;
+  margin: 12px -20px -16px;
+  padding: 10px 20px 14px;
+  border-top: 1px solid #2c3340;
+  background: #171b22;
+}
+
+/* The editor's Stats heading, with the nature picker beside it. */
+.editor-stats-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.editor-stats-header h3 {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.editor-stats-header .editor-nature-field {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+/* ...each with its heading beside its buttons rather than over them, and the editor's
+   sections a touch closer together - so it fits without scrolling. */
+.editor-previews-row .editor-section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.editor-previews-row .editor-section h3 {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.pokemon-editor-main .pokemon-editor-layout {
+  gap: 10px;
 }

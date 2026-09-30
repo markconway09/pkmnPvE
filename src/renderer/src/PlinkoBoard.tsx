@@ -29,6 +29,9 @@ const ROW_MS = 95
 // Drop ×10: the gap between balls.
 const MULTI_GAP_MS = 220
 const MULTI_COUNT = 10
+// Holding Drop down: how long before it starts dropping on its own (a quick tap drops
+// just the one), then a ball every MULTI_GAP_MS until it's let go.
+const HOLD_DELAY_MS = 350
 
 // Where a ball is after `rights` of its first `row` bounces went right.
 function ballX(row: number, rights: number): number {
@@ -77,6 +80,9 @@ function PlinkoBoard({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JS
   const boardRef = useRef<SVGSVGElement>(null)
   // Which row each ball last ticked on, so each peg clicks once.
   const ticked = useRef(new Map<number, number>())
+  // Whether Drop is held down, and a way to cut short the wait between held drops.
+  const holding = useRef(false)
+  const wakeHold = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     window.api
@@ -162,14 +168,55 @@ function PlinkoBoard({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JS
     return [x0 + (x1 - x0) * t, y0 + (y1 - y0) * t * t - hop]
   }
 
-  async function dropOne(bet: number): Promise<boolean> {
+  async function dropOne(bet: number): Promise<PlinkoDrop | null> {
     try {
       const drop = await window.api.dropPlinko(bet, risk)
       setBalls((all) => [...all, { id: nextId.current++, drop, started: performance.now() }])
-      return true
+      return drop
     } catch (e) {
       setError(errorMessage(e))
-      return false
+      return null
+    }
+  }
+
+  // Drop pressed down: one ball straight away, then - still held after a moment - one
+  // after another until it's let go (or the next bet can't be covered).
+  async function holdDrop(): Promise<void> {
+    if (dropping) return
+    holding.current = true
+    const release = (): void => {
+      holding.current = false
+      wakeHold.current?.()
+    }
+    window.addEventListener('pointerup', release)
+    window.addEventListener('blur', release)
+    setError(null)
+    setDropping(true)
+    try {
+      let left = coins ?? 0
+      for (let i = 0; ; i++) {
+        const next = placedBet(betWanted, left, perks.betCap)
+        if (next < 1 || left < next) break
+        const dropped = await dropOne(next)
+        if (!dropped) break
+        left = dropped.coins
+        if (!holding.current) break
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, i === 0 ? HOLD_DELAY_MS : MULTI_GAP_MS)
+          wakeHold.current = () => {
+            clearTimeout(timer)
+            resolve()
+          }
+        })
+        wakeHold.current = null
+        if (!holding.current) break
+      }
+    } finally {
+      holding.current = false
+      wakeHold.current = null
+      window.removeEventListener('pointerup', release)
+      window.removeEventListener('blur', release)
+      setDropping(false)
     }
   }
 
@@ -265,7 +312,18 @@ function PlinkoBoard({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JS
 
         <div className="slots-controls">
           <BetSlider bet={bet} max={maxBet(coins, perks.betCap)} disabled={dropping || !coins} onChange={setBet} />
-          <button className="slots-spin" disabled={dropping || coins === null || coins < bet} onClick={() => void drop(1)}>
+          <button
+            className="slots-spin"
+            disabled={dropping || coins === null || coins < bet}
+            title="Hold to keep dropping"
+            onPointerDown={(e) => {
+              if (e.button === 0) void holdDrop()
+            }}
+            // The keyboard (Enter / Space) still drops one.
+            onClick={(e) => {
+              if (e.detail === 0) void drop(1)
+            }}
+          >
             Drop
           </button>
           <button

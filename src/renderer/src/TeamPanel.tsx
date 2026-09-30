@@ -74,7 +74,7 @@ function TeamMember({ mon, isActive, disabled, onClick, matchup }: TeamMemberPro
             </div>
             <span className="team-member-item">
               {itemSpritenum !== null && <ItemSprite spritenum={itemSpritenum} className="team-member-item-icon" />}
-              {mon.item || 'No item'}
+              <span className="team-member-item-name">{mon.item || 'No item'}</span>
             </span>
             {matchup && (matchup.offense.length > 0 || matchup.defense.length > 0) && (
               <div className="team-member-matchups">
@@ -129,8 +129,10 @@ interface Props {
 }
 
 function TeamPanel({ team, activeFlags, selectable, disabled, reservedSlots, matchups, onSwitch }: Props): React.JSX.Element {
+  // Doubles: two matchup chips a group (one per foe), so the cards go compact to keep them on one line.
+  const doubles = !!matchups?.some((m) => m.offense.length > 1 || m.defense.length > 1)
   return (
-    <div className="menu-panel team-panel">
+    <div className={`menu-panel team-panel${doubles ? ' team-panel-doubles' : ''}`}>
       {team.map((mon, i) => (
         <TeamMember
           key={i}

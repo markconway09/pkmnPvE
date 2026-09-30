@@ -499,7 +499,7 @@ function PokemonEditor({
           {options && set && speciesInfo && (
             <div className="pokemon-editor-layout" onFocus={handleFormFocus}>
               <div className="pokemon-editor-top">
-                {/* The Pokemon itself, with what it holds and its ability right under it. */}
+                {/* The Pokemon itself, with its merge stars under it. */}
                 <div className="pokemon-editor-side">
                   <div className="pokemon-editor-portrait" title={set.shiny ? `Shiny ${set.species}` : set.species}>
                     {onToggleFavorite && (
@@ -530,33 +530,6 @@ function PokemonEditor({
                     </span>
                   </div>
                   {mergeCopies !== undefined && <MergeProgress copies={mergeCopies} />}
-                  <label className="editor-field">
-                    <span>Ability</span>
-                    <input
-                      type="text"
-                      data-selector-field="ability"
-                      value={activeSelector === 'ability' ? abilityQuery : set.ability}
-                      placeholder={set.ability || 'Ability'}
-                      onChange={(e) => setAbilityQuery(e.target.value)}
-                      onKeyDown={handleSelectorKeyDown}
-                    />
-                  </label>
-                  <label className="editor-field">
-                    <span>Item</span>
-                    <div className="editor-field-with-icon">
-                      {set.item && currentItemSpritenum !== undefined && (
-                        <span style={itemIconStyle(currentItemSpritenum)} />
-                      )}
-                      <input
-                        type="text"
-                        data-selector-field="item"
-                        value={activeSelector === 'item' ? itemQuery : set.item}
-                        placeholder={set.item || '(None)'}
-                        onChange={(e) => setItemQuery(e.target.value)}
-                        onKeyDown={handleSelectorKeyDown}
-                      />
-                    </div>
-                  </label>
                 </div>
 
                 <div className="pokemon-editor-details">
@@ -594,6 +567,35 @@ function PokemonEditor({
                           </option>
                         ))}
                       </select>
+                    </label>
+                  </div>
+                  <div className="pokemon-editor-inline pokemon-editor-inline-pair">
+                    <label className="editor-field">
+                      <span>Ability</span>
+                      <input
+                        type="text"
+                        data-selector-field="ability"
+                        value={activeSelector === 'ability' ? abilityQuery : set.ability}
+                        placeholder={set.ability || 'Ability'}
+                        onChange={(e) => setAbilityQuery(e.target.value)}
+                        onKeyDown={handleSelectorKeyDown}
+                      />
+                    </label>
+                    <label className="editor-field">
+                      <span>Item</span>
+                      <div className="editor-field-with-icon">
+                        {set.item && currentItemSpritenum !== undefined && (
+                          <span style={itemIconStyle(currentItemSpritenum)} />
+                        )}
+                        <input
+                          type="text"
+                          data-selector-field="item"
+                          value={activeSelector === 'item' ? itemQuery : set.item}
+                          placeholder={set.item || '(None)'}
+                          onChange={(e) => setItemQuery(e.target.value)}
+                          onKeyDown={handleSelectorKeyDown}
+                        />
+                      </div>
                     </label>
                   </div>
                   {isAdmin && (
@@ -700,79 +702,83 @@ function PokemonEditor({
                       </ul>
                     )}
                   </div>
-                  {onEvolve && evolutionPaths && evolutionPaths.length > 0 && (
-                    <div className="editor-section">
-                      <h3>Evolutions</h3>
-                      <div className="editor-evolutions">
-                        {evolutionPaths.map((evo) => (
-                          <button
-                            key={evo.species}
-                            type="button"
-                            className={`editor-evolution${evo.ready ? '' : ' editor-evolution-locked'}`}
-                            disabled={!evo.ready}
-                            title={evo.ready ? `Evolve into ${evo.species}` : `Not yet: ${evo.method}`}
-                            onClick={() => onEvolve(evo.species)}
-                          >
-                            <SpriteImage
-                              style="2d-static"
-                              className="editor-evolution-sprite"
-                              spriteId={toSpriteId(evo.species)}
-                              shiny={set.shiny}
-                              alt={evo.species}
-                            />
-                            <span className="editor-evolution-text">
-                              <span className="editor-evolution-name">
-                                {evo.species}
-                                {evo.registered && (
-                                  <span className="context-menu-caught" title="Already in your Pokédex">
-                                    <ItemSprite spritenum={POKE_BALL_SPRITENUM} />
-                                  </span>
-                                )}
-                              </span>
-                              <span className="editor-evolution-method">{evo.method}</span>
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {onChangeForm && formChanges && formChanges.forms.length > 0 && (
-                    <div className="editor-section">
-                      <h3>Form changes</h3>
-                      <div className="editor-evolutions">
-                        {formChanges.forms.map((form) => (
-                          <button
-                            key={form}
-                            type="button"
-                            className={`editor-evolution${formChanges.ready ? '' : ' editor-evolution-locked'}`}
-                            disabled={!formChanges.ready}
-                            title={
-                              formChanges.ready
-                                ? `Change into ${form} (use the ${formChanges.itemName})`
-                                : `Needs the ${formChanges.itemName} - a key item unlocked by an achievement`
-                            }
-                            onClick={() => onChangeForm(form)}
-                          >
-                            <SpriteImage
-                              style="2d-static"
-                              className="editor-evolution-sprite"
-                              spriteId={toSpriteId(form)}
-                              shiny={set.shiny}
-                              alt={form}
-                            />
-                            <span className="editor-evolution-text">
-                              <span className="editor-evolution-name">{form}</span>
-                              <span className="editor-evolution-method">
-                                <ItemSprite spritenum={formChanges.spritenum} className="editor-form-item" />
-                                {formChanges.ready ? formChanges.itemName : `Needs the ${formChanges.itemName}`}
-                              </span>
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
+              </div>
+
+              {/* What it can evolve or change form into, in a row across the whole editor. */}
+              <div className="editor-previews-row">
+                {onEvolve && evolutionPaths && evolutionPaths.length > 0 && (
+                  <div className="editor-section">
+                    <h3>Evolutions</h3>
+                    <div className="editor-evolutions">
+                      {evolutionPaths.map((evo) => (
+                        <button
+                          key={evo.species}
+                          type="button"
+                          className={`editor-evolution${evo.ready ? '' : ' editor-evolution-locked'}`}
+                          disabled={!evo.ready}
+                          title={evo.ready ? `Evolve into ${evo.species}` : `Not yet: ${evo.method}`}
+                          onClick={() => onEvolve(evo.species)}
+                        >
+                          <SpriteImage
+                            style="2d-static"
+                            className="editor-evolution-sprite"
+                            spriteId={toSpriteId(evo.species)}
+                            shiny={set.shiny}
+                            alt={evo.species}
+                          />
+                          <span className="editor-evolution-text">
+                            <span className="editor-evolution-name">
+                              {evo.species}
+                              {evo.registered && (
+                                <span className="context-menu-caught" title="Already in your Pokédex">
+                                  <ItemSprite spritenum={POKE_BALL_SPRITENUM} />
+                                </span>
+                              )}
+                            </span>
+                            <span className="editor-evolution-method">{evo.method}</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {onChangeForm && formChanges && formChanges.forms.length > 0 && (
+                  <div className="editor-section">
+                    <h3>Form changes</h3>
+                    <div className="editor-evolutions">
+                      {formChanges.forms.map((form) => (
+                        <button
+                          key={form}
+                          type="button"
+                          className={`editor-evolution${formChanges.ready ? '' : ' editor-evolution-locked'}`}
+                          disabled={!formChanges.ready}
+                          title={
+                            formChanges.ready
+                              ? `Change into ${form} (use the ${formChanges.itemName})`
+                              : `Needs the ${formChanges.itemName} - a key item unlocked by an achievement`
+                          }
+                          onClick={() => onChangeForm(form)}
+                        >
+                          <SpriteImage
+                            style="2d-static"
+                            className="editor-evolution-sprite"
+                            spriteId={toSpriteId(form)}
+                            shiny={set.shiny}
+                            alt={form}
+                          />
+                          <span className="editor-evolution-text">
+                            <span className="editor-evolution-name">{form}</span>
+                            <span className="editor-evolution-method">
+                              <ItemSprite spritenum={formChanges.spritenum} className="editor-form-item" />
+                              {formChanges.ready ? formChanges.itemName : `Needs the ${formChanges.itemName}`}
+                            </span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="editor-section">
@@ -822,22 +828,25 @@ function PokemonEditor({
               </div>
 
               <div className="editor-section">
-                <h3>
-                  Stats{' '}
-                  <span className="editor-hint">
-                    (EVs {evTotal}/{EV_TOTAL_CAP})
-                  </span>
-                </h3>
-                <label className="editor-field editor-nature-field">
-                  <span>Nature</span>
-                  <select value={set.nature} onChange={(e) => update('nature', e.target.value)}>
-                    {options.natures.map((n) => (
-                      <option key={n.name} value={n.name}>
-                        {natureLabel(n)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                {/* The heading, with the nature picker on the same line. */}
+                <div className="editor-stats-header">
+                  <h3>
+                    Stats{' '}
+                    <span className="editor-hint">
+                      (EVs {evTotal}/{EV_TOTAL_CAP})
+                    </span>
+                  </h3>
+                  <label className="editor-field editor-nature-field">
+                    <span>Nature</span>
+                    <select value={set.nature} onChange={(e) => update('nature', e.target.value)}>
+                      {options.natures.map((n) => (
+                        <option key={n.name} value={n.name}>
+                          {natureLabel(n)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
                 {!!mergeStars && (
                   <p className="editor-hint merge-editor-hint">
                     <span className="merge-stars">{'★'.repeat(mergeStars)}</span> Merged: +{mergeStars * 10}% to all
@@ -914,7 +923,8 @@ function PokemonEditor({
             </div>
           )}
           {error && <p className="editor-error">{error}</p>}
-          <div className="editor-actions">
+          {/* Pinned to the bottom of the panel, however far it's scrolled. */}
+          <div className="editor-actions editor-actions-pinned">
             <button onClick={onClose} disabled={saving}>
               Cancel
             </button>
