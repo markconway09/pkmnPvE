@@ -19,7 +19,7 @@ function BagShopTabs({ current, onSwitch }: Props): React.JSX.Element {
   return (
     <div className="game-corner-tabs">
       {tab('bag', 'Bag', './icons/nav/bag.png')}
-      {tab('shop', 'Shop', './icons/nav/shop.png')}
+      {tab('shop', 'Shop', './icons/nav/shop.svg')}
     </div>
   )
 }

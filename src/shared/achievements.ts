@@ -42,6 +42,8 @@ export type AchievementStat =
   | 'goldRaidsWon'
   | 'flawlessRaids'
   | 'shinyRaidCatches'
+  // Days all three daily missions were finished (and the bonus claimed).
+  | 'dailySetsCompleted'
   // Roguelite.
   | 'bestFloor'
   | 'runsWon'
@@ -648,6 +650,16 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     stat: 'goldRaidsWon',
     goal: 1,
     reward: { items: [item('randomlegendary')] }
+  },
+
+  {
+    id: 'daily7',
+    name: 'Daily Grind',
+    description: 'Finish all three daily missions on 7 days',
+    category: 'Collection',
+    stat: 'dailySetsCompleted',
+    goal: 7,
+    reward: { title: 'Diligent' }
   },
 
   // Secret: shown as ??? until unlocked.

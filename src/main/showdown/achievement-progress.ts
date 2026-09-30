@@ -1,3 +1,5 @@
+import type { MissionStat } from '../../shared/missions'
+import { recordMission } from './mission-store'
 import { readFileSync, writeFileSync } from 'node:fs'
 import type { AchievementStat } from '../../shared/achievements'
 import { playerPathFor } from './save-paths'
@@ -54,9 +56,23 @@ export function recordAchievementBest(stat: AchievementStat, value: number): voi
   persistAchievementProgress()
 }
 
-/** Adds to one of the achievement-only tallies. */
+// The daily missions that count the same things as these tallies.
+const MISSION_STATS: Partial<Record<AchievementStat, MissionStat>> = {
+  slotSpins: 'slotSpins',
+  blackjackWins: 'blackjackWins',
+  rouletteSpins: 'rouletteSpins',
+  plinkoDrops: 'plinkoDrops',
+  evolutions: 'evolutions',
+  pokemonSold: 'sold',
+  pokemonMerged: 'merges',
+  raidsWon: 'raidsWon'
+}
+
+/** Adds to one of the achievement-only tallies (and any daily mission counting the same). */
 export function countAchievement(stat: AchievementStat, amount = 1): void {
   if (amount <= 0) return
+  const mission = MISSION_STATS[stat]
+  if (mission) recordMission(mission, amount)
   const counters = getAchievementProgress().counters
   counters[stat] = (counters[stat] ?? 0) + amount
   persistAchievementProgress()

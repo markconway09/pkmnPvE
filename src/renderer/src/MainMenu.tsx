@@ -30,6 +30,8 @@ import ChallengeModal from './ChallengeModal'
 import StarterPicker from './StarterPicker'
 import PokemonContextMenu from './PokemonContextMenu'
 import MergeModal from './MergeModal'
+import MissionsModal from './MissionsModal'
+import type { MissionsState } from '../../shared/missions'
 import BagModal from './BagModal'
 import ShopModal from './ShopModal'
 import WildDropsModal from './WildDropsModal'
@@ -342,8 +344,25 @@ function MainMenu({
   // Unlocked achievements show up on the nav button's count as they happen.
   useEffect(() => window.api.onAchievementsUnlocked(refreshAchievements), [])
 
+  // Daily missions: the day's three, and whether their window is open.
+  const [missions, setMissions] = useState<MissionsState | null>(null)
+  const [missionsOpen, setMissionsOpen] = useState(false)
+  function refreshMissions(): void {
+    window.api
+      .getMissions()
+      .then(setMissions)
+      .catch(() => {})
+  }
+  useEffect(() => window.api.onMissionsChanged(refreshMissions), [])
+  // Rewards waiting: finished missions not yet claimed, and the bonus.
+  const claimableMissions = missions
+    ? missions.missions.filter((m) => m.progress >= m.goal && !m.claimed).length +
+      (missions.bonusReady && !missions.bonusClaimed ? 1 : 0)
+    : 0
+
   function refreshAll(): void {
     refreshAchievements()
+    refreshMissions()
     refreshRun()
     refreshBox()
     refreshProgression()
@@ -682,7 +701,7 @@ function MainMenu({
               <img className="nav-icon" src="./icons/nav/bag.png" alt="Bag" />
             </button>
             <button className="nav-icon-button" title="Shop" disabled={mode === 'roguelite'} onClick={() => setShopOpen(true)}>
-              <img className="nav-icon nav-icon-smooth" src="./icons/nav/shop.png" alt="Shop" />
+              <img className="nav-icon nav-icon-smooth" src="./icons/nav/shop.svg" alt="Shop" />
             </button>
             {/* Open in either mode - its coins are the player's own, not a run's. The Coin
                 Shop opens from inside the Game Corner's games. */}
@@ -692,6 +711,18 @@ function MainMenu({
               onClick={() => openGame(lastGame)}
             >
               <img className="nav-icon" src="./icons/nav/gamecorner.png" alt="Game Corner" />
+            </button>
+            <button
+              className="nav-icon-button"
+              title="Daily Missions"
+              onClick={() => {
+                // A new day's missions, if the date has turned while the menu was open.
+                refreshMissions()
+                setMissionsOpen(true)
+              }}
+            >
+              <img className="nav-icon" src="./icons/nav/missions.png" alt="Daily Missions" />
+              {claimableMissions > 0 && <span className="nav-achievements-badge">{claimableMissions}</span>}
             </button>
             <button
               className="nav-icon-button"
@@ -1103,6 +1134,7 @@ function MainMenu({
           onSaved={refreshBox}
           favorite={!!monsById.get(editingMonId)?.favorite}
           mergeStars={monsById.get(editingMonId)?.mergeStars ?? 0}
+          mergeCopies={monsById.get(editingMonId)?.copies}
           onToggleFavorite={() => void toggleFavorite(editingMonId)}
           canUseRareCandy={!!monsById.get(editingMonId)?.canLevelUpWithCandy}
           evolutionPaths={monsById.get(editingMonId)?.evolutionPaths}
@@ -1280,6 +1312,18 @@ function MainMenu({
       )}
 
       {notes.layer}
+      {missionsOpen && missions && (
+        <MissionsModal
+          state={missions}
+          onChange={setMissions}
+          onClaimed={(newMoney) => {
+            setMoney(newMoney)
+            refreshBox()
+            refreshEligibility()
+          }}
+          onClose={() => setMissionsOpen(false)}
+        />
+      )}
       {achievementsOpen && achievements && (
         <AchievementsModal
           state={achievements}

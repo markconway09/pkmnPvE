@@ -4,6 +4,7 @@ import type { RouletteBetKey, RouletteSpin } from '../../shared/roulette'
 import {
   BET_LABELS,
   EVEN_MONEY_BETS,
+  ROULETTE_MAX_FULL_BETS,
   WHEEL_ORDER,
   betLabel,
   betOdds,
@@ -107,8 +108,14 @@ function RouletteTable({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.
   function place(key: RouletteBetKey, e: React.MouseEvent): void {
     if (spinning) return
     const at = { x: e.clientX, y: e.clientY - 10 }
-    if (total + chip > perks.betCap) {
-      notes.show(`The table takes at most ${perks.betCap.toLocaleString('en-US')} coins a spin`, at, 'bad')
+    // Up to the bet cap on each spot, and five times it on the whole board.
+    if ((bets[key] ?? 0) + chip > perks.betCap) {
+      notes.show(`Each spot takes at most ${perks.betCap.toLocaleString('en-US')} coins`, at, 'bad')
+      return
+    }
+    const tableCap = perks.betCap * ROULETTE_MAX_FULL_BETS
+    if (total + chip > tableCap) {
+      notes.show(`The table takes at most ${tableCap.toLocaleString('en-US')} coins a spin`, at, 'bad')
       return
     }
     if (coins !== null && total + chip > coins) {
@@ -338,7 +345,9 @@ function RouletteTable({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.
         </div>
         <p className="editor-hint slots-hint">
           Click the board to place a chip (the bet above), right-click to take a bet back. A number pays 35 to 1, a
-          dozen or column 2 to 1, the rest 1 to 1 - and the zero beats every outside bet.
+          dozen or column 2 to 1, the rest 1 to 1 - and the zero beats every outside bet. Each spot takes up to{' '}
+          {perks.betCap.toLocaleString('en-US')} coins, the whole board up to{' '}
+          {(perks.betCap * ROULETTE_MAX_FULL_BETS).toLocaleString('en-US')}.
         </p>
         {error && <p className="editor-error">{error}</p>}
         {coins !== null && coins < 1 && !spinning && (

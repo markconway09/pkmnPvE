@@ -1,3 +1,4 @@
+import type { MissionClaimResult, MissionsState } from '../shared/missions'
 import { contextBridge, ipcRenderer } from 'electron'
 import type { CoinBalance, SlotRules, SlotSpinResult } from '../shared/slots'
 import type { BlackjackView } from '../shared/blackjack'
@@ -104,6 +105,17 @@ const api = {
   submitChoice: (choice: string): Promise<BattleView> => ipcRenderer.invoke('battle:choose', choice),
   // replaceRunMonId: in a run with a full team, who the new Pokemon replaces.
   catchWildPokemon: (replaceRunMonId?: string): Promise<CatchResult> => ipcRenderer.invoke('battle:catch', replaceRunMonId),
+  // Daily missions.
+  getMissions: (): Promise<MissionsState> => ipcRenderer.invoke('missions:get'),
+  claimMission: (slot: number): Promise<MissionClaimResult> => ipcRenderer.invoke('missions:claim', slot),
+  claimMissionBonus: (): Promise<MissionClaimResult> => ipcRenderer.invoke('missions:claimBonus'),
+  rerollMission: (slot: number): Promise<MissionsState> => ipcRenderer.invoke('missions:reroll', slot),
+  // A mission's progress changed (the names of any just finished).
+  onMissionsChanged: (listener: (finished: string[]) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, finished: string[]): void => listener(finished)
+    ipcRenderer.on('missions:changed', handler)
+    return () => ipcRenderer.removeListener('missions:changed', handler)
+  },
   // A Max Raid (uses up a Raid Crystal).
   startRaidBattle: (): Promise<BattleView> => ipcRenderer.invoke('battle:startRaid'),
   runFromBattle: (): Promise<void> => ipcRenderer.invoke('battle:run'),

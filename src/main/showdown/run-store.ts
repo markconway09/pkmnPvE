@@ -67,6 +67,7 @@ import { copyBoxMonSet, hasRegisteredSpecies } from './box-store'
 import { recordBestFloor } from './stats-store'
 import { countAchievement } from './achievement-progress'
 import { hasTitle } from './title-perks'
+import { recordMission } from './mission-store'
 import { addItem } from './bag-store'
 import { addMoney } from './money-store'
 import { buildAutoSet, fillMoveset, listAutoSets, recommendedLearnableMoves } from './auto-sets'
@@ -684,6 +685,7 @@ function payRunRewards(current: StoredRun): RunRewardLine[] {
 }
 
 function nextFloor(current: StoredRun): void {
+  recordMission('runFloors')
   current.floor += 1
   current.itemOffer = null
   current.itemRerolled = false
@@ -1199,6 +1201,8 @@ export function finishRunBattleWon(
 ): { expGains: ExpGainResult[]; fainted: string[]; itemReward: boolean } {
   const wasBoss = kind === 'boss'
   const current = activeRun()
+  if (kind === 'trainer') recordMission('runTrainerWins')
+  if (wasBoss) recordMission('runBossWins')
   const fainted = applyOutcome(current, outcome)
   // A beaten boss brings everyone up to its own level (the cap it was fought at) -
   // nobody is left behind for the next stretch - then raises the cap.

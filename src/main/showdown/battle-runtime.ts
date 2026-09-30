@@ -44,6 +44,7 @@ import type { RaidView } from '../../shared/battle-types'
 import { RAID_PLACEHOLDER_NAME, raidPlaceholderSet } from './raid'
 import { RAID_LEADER_EXTRA_COPIES } from '../../shared/titles'
 import { countAchievement } from './achievement-progress'
+import { recordMission } from './mission-store'
 import { AIPlayer, type AiMovePower } from './battle-ai'
 
 // Moves that only work on the user's first turn after coming out.
@@ -691,6 +692,7 @@ export class WildBattle {
               recordTrainerWin(this.opponent.trainerId, !!this.opponent.isBoss)
               // Bosses are tallied by the progression's own list of beaten bosses.
               if (!this.opponent.isBoss) countStat('trainersDefeated')
+              else recordMission('bossWins')
               // Per Pokemon on the team they actually sent out, or a flat sum for a
               // boss - either way plus the level cap as a percentage on top.
               this.moneyGained = this.opponent.noPrizeMoney ? 0 : this.prizeMoney(levelCap)

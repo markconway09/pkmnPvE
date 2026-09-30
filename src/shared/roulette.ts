@@ -7,6 +7,10 @@
 
 export const ROULETTE_NUMBERS = 37
 
+// Each spot on the board takes up to the bet cap, and a spin up to this many times it
+// (five full bets spread over the board).
+export const ROULETTE_MAX_FULL_BETS = 5
+
 // The pockets round the wheel, clockwise from the zero.
 export const WHEEL_ORDER = [
   0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7,

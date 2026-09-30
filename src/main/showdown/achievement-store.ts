@@ -61,6 +61,7 @@ function currentStats(): Record<AchievementStat, number> {
     goldRaidsWon: counters.goldRaidsWon ?? 0,
     flawlessRaids: counters.flawlessRaids ?? 0,
     shinyRaidCatches: counters.shinyRaidCatches ?? 0,
+    dailySetsCompleted: counters.dailySetsCompleted ?? 0,
     shinySold: counters.shinySold ?? 0,
     runsWon: counters.runsWon ?? 0,
     hardRunsWon: counters.hardRunsWon ?? 0,

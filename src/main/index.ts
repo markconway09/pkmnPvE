@@ -54,6 +54,7 @@ import {
 } from './showdown/box-store'
 import { getBagState, getItemQuantity, hasItem, removeItem, resetBag } from './showdown/bag-store'
 import { generateRaidBoss } from './showdown/raid'
+import { claimMission, claimMissionBonus, getMissions, rerollMission } from './showdown/mission-store'
 import { applyLoadout, deleteLoadout, listLoadouts, renameLoadout, saveLoadout, updateLoadout } from './showdown/loadout-store'
 import {
   listAllAbilities,
@@ -399,6 +400,12 @@ ipcMain.handle('battle:startRaid', async () => {
   activeBattle = battle
   return activeBattle.getInitialView()
 })
+
+// ---- Daily missions (see mission-store.ts) ----
+ipcMain.handle('missions:get', () => getMissions())
+ipcMain.handle('missions:claim', (_event, slot: number) => claimMission(slot))
+ipcMain.handle('missions:claimBonus', () => claimMissionBonus())
+ipcMain.handle('missions:reroll', (_event, slot: number) => rerollMission(slot))
 
 ipcMain.handle('battle:eligibility', (): BattleEligibility => {
   const progression = getProgression()

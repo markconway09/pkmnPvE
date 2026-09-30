@@ -26,6 +26,7 @@ export type Title =
   | 'Raid Leader'
   | 'Gigantamax Hunter'
   | 'Starlight'
+  | 'Diligent'
 
 // What each title does, for the title pickers.
 export const TITLE_PERKS: Record<Title, string> = {
@@ -50,7 +51,8 @@ export const TITLE_PERKS: Record<Title, string> = {
   Alchemist: '10% chance a merge adds a bonus copy',
   'Raid Leader': 'Raid bosses are caught with 2 extra copies',
   'Gigantamax Hunter': 'Raid bosses Gigantamax more often (65% instead of 50%)',
-  Starlight: 'Raid bosses are 3× as likely to be shiny (5× with the Shiny Charm)'
+  Starlight: 'Raid bosses are 3× as likely to be shiny (5× with the Shiny Charm)',
+  Diligent: 'One extra daily mission reroll'
 }
 
 /** A title's perk, for showing beside it ("" for a title without one). */
@@ -82,6 +84,7 @@ export const FIVE_STAR_RESTRICTED_CHANCE = 0.3
 export const ALCHEMIST_BONUS_COPY_CHANCE = 0.1
 export const RAID_LEADER_EXTRA_COPIES = 2
 export const GIGANTAMAX_HUNTER_CHANCE = 0.65
+export const DILIGENT_EXTRA_REROLLS = 1
 // Starlight's raid boss shiny multiplier - in place of the Shiny Charm's 3x, not on top of it.
 export const STARLIGHT_RAID_MULTIPLIER = 3
 export const STARLIGHT_RAID_CHARM_MULTIPLIER = 5

@@ -1,3 +1,5 @@
+import type { MissionStat } from '../../shared/missions'
+import { recordMission } from './mission-store'
 import { readFileSync, writeFileSync } from 'node:fs'
 import type { PlayerStats } from '../../shared/battle-types'
 import { playerPathFor } from './save-paths'
@@ -55,9 +57,18 @@ export function recordBestFloor(floor: number): void {
   persist()
 }
 
+// The daily missions counting the same things as these stats.
+const MISSION_STATS: Partial<Record<keyof StoredStats, MissionStat>> = {
+  wildDefeated: 'wildWins',
+  trainersDefeated: 'trainerWins',
+  wildCaught: 'catches'
+}
+
 export function countStat(key: Exclude<keyof StoredStats, 'bestFloor'>): void {
   getState()[key] += 1
   persist()
+  const mission = MISSION_STATS[key]
+  if (mission) recordMission(mission)
 }
 
 export function resetStatsCounters(): void {

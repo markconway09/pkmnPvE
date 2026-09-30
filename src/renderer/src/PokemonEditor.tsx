@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { AutoSetOption, EditablePokemonSet, EditorOptions, SpeciesEditInfo, StatBlock, BoxPokemonView } from '../../shared/battle-types'
-import { NON_HELD_ITEM_IDS, mergeStatMultiplier, toSpriteId } from '../../shared/battle-types'
+import { MERGE_MAX_STARS, NON_HELD_ITEM_IDS, mergeStarsFor, mergeStatMultiplier, toSpriteId } from '../../shared/battle-types'
+import { starRow } from './MergeModal'
 import type { NatureOptionEntry } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
 import ItemSprite from './ItemSprite'
@@ -53,6 +54,29 @@ interface Props {
   onChangeForm?: (form: string) => void
   // A box Pokemon's merge stars: the Stat column shows them (+10% each, in classic battles).
   mergeStars?: number
+  // And how many copies it's made of - its progress to the next star, under the portrait.
+  mergeCopies?: number
+}
+
+// A box Pokemon's stars and how far it is to the next one (stars at 2, 4, 8, 16, 32 copies).
+function MergeProgress({ copies }: { copies: number }): React.JSX.Element {
+  const stars = mergeStarsFor(copies)
+  const maxed = stars >= MERGE_MAX_STARS
+  const from = 2 ** stars
+  const to = 2 ** (stars + 1)
+  const percent = maxed ? 100 : ((copies - from) / (to - from)) * 100
+  return (
+    <div className="editor-merge" title={stars > 0 ? `+${stars * 10}% to all stats in classic battles` : 'Merge duplicates in to earn stars'}>
+      <span className="merge-stars">{starRow(stars)}</span>
+      <div className="editor-merge-bar">
+        <div className="editor-merge-fill" style={{ width: `${percent}%` }} />
+      </div>
+      <span className="editor-merge-text">
+        {copies} cop{copies === 1 ? 'y' : 'ies'}
+        {maxed ? ' · fully merged' : ` · ${to - copies} more for ★${stars + 1}`}
+      </span>
+    </div>
+  )
 }
 
 // The Rare Candy's icon (see ItemSprite).
@@ -130,7 +154,8 @@ function PokemonEditor({
   onEvolve,
   formChanges,
   onChangeForm,
-  mergeStars
+  mergeStars,
+  mergeCopies
 }: Props): React.JSX.Element {
   // Premade team rosters are admin/debug tooling, not the player's own
   // Pokemon - they keep every option (no bag restriction, no level-gated
@@ -504,6 +529,7 @@ function PokemonEditor({
                       )}
                     </span>
                   </div>
+                  {mergeCopies !== undefined && <MergeProgress copies={mergeCopies} />}
                   <label className="editor-field">
                     <span>Ability</span>
                     <input
