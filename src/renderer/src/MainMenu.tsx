@@ -353,6 +353,14 @@ function MainMenu({
 
   useEffect(refreshAll, [])
 
+  // The Max Raid button counts Raid Crystals: bought in the Shop or the Coin Shop, or
+  // sold from the bag - so it's brought up to date once those are all closed again.
+  const itemWindowOpen = shopOpen || coinShopOpen || bagOpen || gameCorner !== null
+  useEffect(() => {
+    if (!itemWindowOpen) refreshEligibility()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemWindowOpen])
+
   async function addRandom(): Promise<void> {
     setBusy(true)
     try {
@@ -720,7 +728,20 @@ function MainMenu({
             />
             <span className="nav-player-text">
               <span className="nav-player-name">{username}</span>
-              {achievements?.title && <span className="nav-player-title">{achievements.title}</span>}
+              {/* The title too goes to the Trainer Card, where it's picked. */}
+              {achievements?.title && (
+                <span
+                  className="nav-player-title"
+                  title="Trainer Card"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setPlayerMenu(null)
+                    setPlayerTrainerOpen(true)
+                  }}
+                >
+                  {achievements.title}
+                </span>
+              )}
             </span>
             {money !== null && <span className="nav-player-money">{formatMoney(money)}</span>}
             <span className="nav-player-caret">▾</span>
