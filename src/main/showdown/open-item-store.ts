@@ -72,7 +72,7 @@ export function openBagItem(itemId: string): OpenItemResult {
     isNew,
     // It can be sold straight from the result, for its rarity's price (with a title's bonus).
     monId,
-    sellPrice: monSellPrice(winner.tier)
+    sellPrice: monSellPrice(winner.tier, shiny)
   }
 }
 

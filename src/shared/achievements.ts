@@ -27,10 +27,21 @@ export type AchievementStat =
   | 'forcesOwned'
   | 'shayminOwned'
   | 'deoxysOwned'
+  | 'zygardeOwned'
   | 'money'
   | 'evolutions'
   | 'pokemonSold'
   | 'shinySold'
+  // Merging and Max Raids.
+  | 'pokemonMerged'
+  // The most stars a Pokemon has reached by merging (a raid catch's own stars don't count).
+  | 'mergedStars'
+  | 'mergeShinied'
+  | 'raidsWon'
+  | 'gmaxSpecies'
+  | 'goldRaidsWon'
+  | 'flawlessRaids'
+  | 'shinyRaidCatches'
   // Roguelite.
   | 'bestFloor'
   | 'runsWon'
@@ -47,10 +58,11 @@ export type AchievementStat =
   | 'plinkoDrops'
   | 'plinkoEdges'
 
-export type AchievementCategory = 'Battle' | 'Collection' | 'Roguelite' | 'Game Corner' | 'Secret'
+export type AchievementCategory = 'Battle' | 'Collection' | 'Merges & Raids' | 'Roguelite' | 'Game Corner' | 'Secret'
 export const ACHIEVEMENT_CATEGORIES: AchievementCategory[] = [
   'Battle',
   'Collection',
+  'Merges & Raids',
   'Roguelite',
   'Game Corner',
   'Secret'
@@ -362,6 +374,15 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     reward: { keyItems: ['meteorite'] }
   },
   {
+    id: 'zygarde',
+    name: 'Order Keeper',
+    description: 'Own a Zygarde (any form)',
+    category: 'Collection',
+    stat: 'zygardeOwned',
+    goal: 1,
+    reward: { keyItems: ['zygardecube'] }
+  },
+  {
     id: 'evolve1',
     name: 'What?',
     description: 'Evolve a Pokémon',
@@ -528,7 +549,135 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     reward: { coins: 500, title: 'Edge Lord' }
   },
 
+  // Merges & Raids
+  {
+    id: 'merge1',
+    name: 'Better Together',
+    description: 'Merge a Pokémon',
+    category: 'Merges & Raids',
+    stat: 'pokemonMerged',
+    goal: 1,
+    reward: { money: 1000 }
+  },
+  {
+    id: 'star3',
+    name: 'Rising Star',
+    description: 'Merge a Pokémon up to ★3',
+    category: 'Merges & Raids',
+    stat: 'mergedStars',
+    goal: 3,
+    reward: { items: [item('wishingpiece', 2)] }
+  },
+  {
+    id: 'star5',
+    name: 'Superstar',
+    description: 'Merge a Pokémon up to ★5',
+    category: 'Merges & Raids',
+    stat: 'mergedStars',
+    goal: 5,
+    reward: { title: 'Five-Star' }
+  },
+  {
+    id: 'merge50',
+    name: 'Fusion Lab',
+    description: 'Merge 50 duplicates',
+    category: 'Merges & Raids',
+    stat: 'pokemonMerged',
+    goal: 50,
+    reward: { money: 10000, items: [item('randompokemon')] }
+  },
+  {
+    id: 'merge250',
+    name: 'Alchemist',
+    description: 'Merge 250 duplicates',
+    category: 'Merges & Raids',
+    stat: 'pokemonMerged',
+    goal: 250,
+    reward: { title: 'Alchemist' }
+  },
+  {
+    id: 'raid1',
+    name: 'Wish Upon a Star',
+    description: 'Win a Max Raid',
+    category: 'Merges & Raids',
+    stat: 'raidsWon',
+    goal: 1,
+    reward: { items: [item('wishingpiece')] }
+  },
+  {
+    id: 'raid10',
+    name: 'Raid Regular',
+    description: 'Win 10 Max Raids',
+    category: 'Merges & Raids',
+    stat: 'raidsWon',
+    goal: 10,
+    reward: { items: [item('wishingpiece', 3)] }
+  },
+  {
+    id: 'raid50',
+    name: 'Raid Leader',
+    description: 'Win 50 Max Raids',
+    category: 'Merges & Raids',
+    stat: 'raidsWon',
+    goal: 50,
+    reward: { title: 'Raid Leader' }
+  },
+  {
+    id: 'gmax1',
+    name: 'Gigantic!',
+    description: 'Own a Gigantamax Pokémon',
+    category: 'Merges & Raids',
+    stat: 'gmaxSpecies',
+    goal: 1,
+    reward: { items: [item('wishingpiece', 2)] }
+  },
+  {
+    id: 'gmax10',
+    name: 'G-Max Collector',
+    description: 'Own 10 different Gigantamax species',
+    category: 'Merges & Raids',
+    stat: 'gmaxSpecies',
+    goal: 10,
+    reward: { title: 'Gigantamax Hunter' }
+  },
+  {
+    id: 'goldraid',
+    name: 'Legend of the Den',
+    description: 'Win a Max Raid against a gold boss',
+    category: 'Merges & Raids',
+    stat: 'goldRaidsWon',
+    goal: 1,
+    reward: { items: [item('randomlegendary')] }
+  },
+
   // Secret: shown as ??? until unlocked.
+  {
+    id: 'mergeshiny',
+    name: 'All That Glitters',
+    description: 'Make a Pokémon shiny by merging a shiny into it',
+    category: 'Secret',
+    stat: 'mergeShinied',
+    goal: 1,
+    reward: { items: [item('shinypatch')] }
+  },
+  {
+    id: 'flawlessraid',
+    name: 'Flawless Raid',
+    description: 'Win a Max Raid without any of your Pokémon fainting',
+    category: 'Secret',
+    stat: 'flawlessRaids',
+    goal: 1,
+    reward: { coins: 5000 }
+  },
+  {
+    id: 'shinyraid',
+    name: 'Wish Come True',
+    description: 'Catch a shiny raid boss',
+    category: 'Secret',
+    stat: 'shinyRaidCatches',
+    goal: 1,
+    reward: { title: 'Starlight' }
+  },
   {
     id: 'sellshiny',
     name: 'Heartless',

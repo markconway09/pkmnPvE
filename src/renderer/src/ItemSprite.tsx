@@ -36,7 +36,9 @@ const SYNTHETIC_SPRITES: Record<number, string> = {
   '-21': './sprites/misc/prisonbottle.png', // Prison Bottle (Serebii)
   '-22': './sprites/misc/revealglass.png', // Reveal Glass (Serebii)
   '-23': './sprites/misc/gracidea.png', // Gracidea (Serebii)
-  '-24': './sprites/misc/meteorite.png' // Meteorite (Serebii)
+  '-24': './sprites/misc/meteorite.png', // Meteorite (Serebii)
+  '-25': './sprites/misc/zygardecube.png', // Zygarde Cube (Serebii)
+  '-26': './sprites/misc/raidcrystal.png' // Raid Crystal (Serebii's Crystal Cluster)
 }
 
 function ItemSprite({ spritenum, className }: Props): React.JSX.Element {

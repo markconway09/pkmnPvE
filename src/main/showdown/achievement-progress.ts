@@ -46,6 +46,14 @@ export function persistAchievementProgress(): void {
   writeFileSync(playerPathFor('achievements.json'), JSON.stringify(getAchievementProgress()), 'utf8')
 }
 
+/** Raises one of the achievement-only tallies to this value, if it's a new best. */
+export function recordAchievementBest(stat: AchievementStat, value: number): void {
+  const counters = getAchievementProgress().counters
+  if (value <= (counters[stat] ?? 0)) return
+  counters[stat] = value
+  persistAchievementProgress()
+}
+
 /** Adds to one of the achievement-only tallies. */
 export function countAchievement(stat: AchievementStat, amount = 1): void {
   if (amount <= 0) return

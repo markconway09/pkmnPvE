@@ -1,13 +1,29 @@
 import { useEffect, useState } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
-import type { BoxPokemonView, RunChoice, RunDifficulty, RunMonView, RunNodeKind, RunView } from '../../shared/battle-types'
+import type {
+  BoxPokemonView,
+  RogueliteBossClass,
+  RunBossReward,
+  RunChoice,
+  RunConsumableId,
+  RunDifficulty,
+  RunMonView,
+  RunNodeKind,
+  RunShopTile,
+  RunView
+} from '../../shared/battle-types'
 import {
   POKEMON_GENERATIONS,
   ROGUELITE_BOSS_COUNT,
   ROGUELITE_BOSS_EVERY,
   ROGUELITE_FINAL_FLOOR,
+  ROGUELITE_MAX_TEAM,
   ROGUELITE_START_LEVEL,
+  RUN_CONSUMABLES,
+  RUN_CONSUMABLE_PRICE,
   RUN_DIFFICULTIES,
+  RUN_GEM_ICON,
+  RUN_SHOP_TILE_PRICES,
   WILD_LOCATIONS,
   rogueliteBossClassAt,
   rogueliteBossLabelAt,
@@ -17,6 +33,7 @@ import PokemonIconVisual from './PokemonIconVisual'
 import PokemonTooltipContent from './PokemonTooltipContent'
 import Tooltip from './Tooltip'
 import ItemSprite from './ItemSprite'
+import { formatMoney } from './money'
 import RunMonContextMenu from './RunMonContextMenu'
 import RunMonEditor from './RunMonEditor'
 import { useTapGuard } from './useTapGuard'
@@ -131,6 +148,98 @@ function NodeIcon({ choice }: { choice: RunChoice }): React.JSX.Element {
     )
   }
   return <span className="run-node-emoji">❔</span>
+}
+
+// A boss floor's shop picks, in order: each plays out like the floor of the same name.
+const SHOP_TILES: RunShopTile[] = ['ability', 'move', 'item', 'swap']
+const SHOP_TILE_LABELS: Record<RunShopTile, string> = {
+  ability: 'New Ability',
+  move: 'New Move',
+  item: 'New Item',
+  swap: 'Random Swap'
+}
+
+function GemIcon(): React.JSX.Element {
+  return <img className="run-gem-icon" src={RUN_GEM_ICON} alt="Gems" />
+}
+
+const gemPrice = (price: number): React.JSX.Element =>
+  price === 0 ? (
+    <span className="run-shop-price">Free</span>
+  ) : (
+    <span className="run-shop-price">
+      <GemIcon />
+      {price}
+    </span>
+  )
+
+// A difficulty's end-of-run rewards as icons: what every boss is worth, then the extras
+// only some classes of boss give.
+const EXP_CANDY_REWARDS: Record<string, { name: string; spritenum: number }> = {
+  expcandys: { name: 'Exp. Candy S', spritenum: -5 },
+  expcandym: { name: 'Exp. Candy M', spritenum: -6 },
+  expcandyl: { name: 'Exp. Candy L', spritenum: -7 }
+}
+// The bag's icons for them: the GS Ball and the Master Ball.
+const RANDOM_POKEMON_SPRITENUM = -10
+const RANDOM_LEGENDARY_SPRITENUM = 276
+// The Raid Crystal's icon (see ItemSprite).
+const RAID_CRYSTAL_SPRITENUM = -26
+const BOSS_CLASS_NAMES: Record<RogueliteBossClass, string> = {
+  gymLeader: 'Gym Leaders',
+  eliteFour: 'Elite Four',
+  champion: 'Champion'
+}
+
+function RewardChip({ spritenum, label }: { spritenum?: number; label: string }): React.JSX.Element {
+  return (
+    <span className="achievement-reward-chip run-reward-chip">
+      {spritenum !== undefined && <ItemSprite spritenum={spritenum} />}
+      {label}
+    </span>
+  )
+}
+
+function RunRewardChips({ reward }: { reward: RunBossReward }): React.JSX.Element {
+  const candy = EXP_CANDY_REWARDS[reward.expCandy]
+  const randomPokemon = <RewardChip spritenum={RANDOM_POKEMON_SPRITENUM} label="Random Pokémon" />
+  const randomLegendary = <RewardChip spritenum={RANDOM_LEGENDARY_SPRITENUM} label="Random Legendary" />
+  // The extras for particular classes, grouped by which classes get them.
+  const extras = new Map<string, React.JSX.Element[]>()
+  const addExtra = (classes: RunBossReward['randomPokemon'], chip: React.JSX.Element): void => {
+    if (!Array.isArray(classes)) return
+    const key = classes.map((c) => BOSS_CLASS_NAMES[c]).join(' & ')
+    extras.set(key, [...(extras.get(key) ?? []), chip])
+  }
+  addExtra(reward.randomPokemon, randomPokemon)
+  addExtra(reward.randomLegendary, randomLegendary)
+  const crystals = reward.raidCrystals ? (
+    <RewardChip
+      spritenum={RAID_CRYSTAL_SPRITENUM}
+      label={reward.raidCrystals.count > 1 ? `${reward.raidCrystals.count}× Raid Crystal` : 'Raid Crystal'}
+    />
+  ) : null
+  if (reward.raidCrystals && crystals) addExtra(reward.raidCrystals.from, crystals)
+  return (
+    <div className="run-reward-groups">
+      <div className="run-reward-group">
+        <span className="run-reward-group-label">Every boss</span>
+        <div className="run-reward-group-chips">
+          {reward.randomLegendary === 'all' && randomLegendary}
+          {reward.randomPokemon === 'all' && randomPokemon}
+        {reward.raidCrystals?.from === 'all' && crystals}
+          {candy && <RewardChip spritenum={candy.spritenum} label={candy.name} />}
+          <RewardChip label={formatMoney(reward.money)} />
+        </div>
+      </div>
+      {[...extras].map(([classes, chips]) => (
+        <div key={classes} className="run-reward-group">
+          <span className="run-reward-group-label">{classes}</span>
+          <div className="run-reward-group-chips">{chips}</div>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 // The copy a run starts with: the same Pokemon at Lv 5, holding nothing.
@@ -276,6 +385,27 @@ function RoguelitePanel({
   const [confirmingTeamSwap, setConfirmingTeamSwap] = useState(false)
   const [swapBusy, setSwapBusy] = useState(false)
   const [swapError, setSwapError] = useState<string | null>(null)
+  // A consumable being used: Full Restore and Ability Capsule then take a click on a team
+  // member (the capsule then its ability), Revive a pick from the fainted.
+  const [using, setUsing] = useState<RunConsumableId | null>(null)
+  const [capsuleMon, setCapsuleMon] = useState<RunMonView | null>(null)
+  const [itemBusy, setItemBusy] = useState(false)
+  const [itemError, setItemError] = useState<string | null>(null)
+
+  // Using a consumable or buying in the shop - the run as it stands afterwards.
+  async function runItemAction(action: () => Promise<RunView>): Promise<void> {
+    setItemBusy(true)
+    setItemError(null)
+    try {
+      onRunUpdated(await action())
+      setUsing(null)
+      setCapsuleMon(null)
+    } catch (e) {
+      setItemError(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']*': (?:Error: )?/, '') : String(e))
+    } finally {
+      setItemBusy(false)
+    }
+  }
 
   async function doSwap(action: () => Promise<RunView>): Promise<void> {
     setSwapBusy(true)
@@ -339,8 +469,9 @@ function RoguelitePanel({
             <p className="run-difficulty-text">
               <strong>{runDifficultyInfo(difficulty).rules}</strong>
               <br />
-              Rewards at the end of the run: {runDifficultyInfo(difficulty).rewardText}
+              Rewards at the end of the run, for each boss beaten:
             </p>
+            <RunRewardChips reward={runDifficultyInfo(difficulty).reward} />
             <label className="run-generation-row">
               <span>Bosses from</span>
               <select
@@ -376,7 +507,12 @@ function RoguelitePanel({
   const pickName = pick?.options.find((o) => o.id === chosenPick)?.name
   // What clicking a team member does right now, if anything.
   const pickTarget = (mon: RunMonView): (() => void) | null => {
-    if (busy || swapBusy) return null
+    if (busy || swapBusy || itemBusy) return null
+    if (using === 'fullrestore') {
+      return mon.hpPercent < 100 || mon.status ? () => void runItemAction(() => window.api.useRunFullRestore(mon.id)) : null
+    }
+    if (using === 'abilitycapsule') return () => setCapsuleMon(mon)
+    if (using) return null
     if (run.swapOffer && swapMode === 'one') return () => void doSwap(() => window.api.swapRunMon(mon.id))
     if (offer && chosenItem) {
       return () => {
@@ -405,6 +541,25 @@ function RoguelitePanel({
     return null
   }
   const displacedFrom = displaced ? run.team.find((m) => m.id === displaced.fromMonId) : undefined
+  const shop = run.consumables.bossShop
+  // One of the floor's options as a tile.
+  const choiceTile = (choice: RunChoice, index: number): React.JSX.Element => {
+    const location = choice.kind === 'wild' ? locationOf(choice) : undefined
+    return (
+      <button
+        key={index}
+        className={`big-battle-button run-node-button run-node-${choice.kind}${location?.id === 'lab' ? ' run-node-lab' : ''}${location ? ' run-node-located' : ''}`}
+        style={location ? { backgroundImage: `url(${backdropUrl(LOCATION_BUTTON_BACKDROP[location.id])})` } : undefined}
+        disabled={busy}
+        title={NODE_INFO[choice.kind].hint}
+        onClick={() => onChoose(index)}
+      >
+        <NodeIcon choice={choice} />
+        <span>{location ? location.label : choice.kind === 'boss' ? run.nextBossLabel : NODE_INFO[choice.kind].label}</span>
+        {location && <span className="run-node-sub">Wild Pokémon</span>}
+      </button>
+    )
+  }
   return (
     <div className="run-panel">
       <div className="run-status-row">
@@ -418,6 +573,10 @@ function RoguelitePanel({
         <span className={`run-difficulty-tag run-difficulty-${run.difficulty}`}>
           {runDifficultyInfo(run.difficulty).label}
           {run.generation ? ` · Gen ${run.generation}` : ''}
+        </span>
+        <span className="run-gems" title="Gems: 1 per trainer, 2 per boss - spend them in the shop on boss floors">
+          <GemIcon />
+          <strong>{run.consumables.gems}</strong>
         </span>
         <span>Opponents Lv {run.opponentLevel}</span>
         <span>Level Cap: {run.levelCap}</span>
@@ -583,6 +742,7 @@ function RoguelitePanel({
         <div className="run-item-offer">
           {run.itemOfferReason === 'reward' && <p className="run-reward-heading">Victory reward!</p>}
           {run.itemOfferReason === 'bonus' && <p className="run-reward-heading">Title bonus: a free item!</p>}
+          {run.itemOfferReason === 'shop' && <p className="run-reward-heading">New Item</p>}
           <p className="box-empty-hint">
             {chosenItem ? 'Now click the Pokémon to give it to (it replaces what it holds).' : 'Pick one item.'}
           </p>
@@ -648,28 +808,63 @@ function RoguelitePanel({
             </button>
           </div>
         </div>
-      ) : (
-        <div className="run-choice-grid">
-          {run.choices.map((choice, index) => {
-            const location = choice.kind === 'wild' ? locationOf(choice) : undefined
-            return (
-              <button
-                key={index}
-                className={`big-battle-button run-node-button run-node-${choice.kind}${location?.id === 'lab' ? ' run-node-lab' : ''}${location ? ' run-node-located' : ''}`}
-                style={
-                  location ? { backgroundImage: `url(${backdropUrl(LOCATION_BUTTON_BACKDROP[location.id])})` } : undefined
-                }
-                disabled={busy}
-                title={NODE_INFO[choice.kind].hint}
-                onClick={() => onChoose(index)}
-              >
-                <NodeIcon choice={choice} />
-                <span>{location ? location.label : choice.kind === 'boss' ? run.nextBossLabel : NODE_INFO[choice.kind].label}</span>
-                {location && <span className="run-node-sub">Wild Pokémon</span>}
-              </button>
-            )
-          })}
+      ) : shop ? (
+        // A boss floor: the shop's items on the left, the boss in the middle and the shop's
+        // picks on the right - tiles like a normal floor's.
+        <div className="run-boss-floor">
+          <div className="run-boss-shop-items">
+            <p className="run-reward-heading">
+              Shop <span className="run-shop-balance">You have <GemIcon />{run.consumables.gems}</span>
+            </p>
+            {RUN_CONSUMABLES.map((c) => {
+              const locked = run.consumables.locked.includes(c.id)
+              return (
+                <Tooltip
+                  key={c.id}
+                  placement="below"
+                  content={
+                    <div className="tooltip-panel">
+                      <div className="tooltip-title">{c.name}</div>
+                      <div className="tooltip-desc">{locked ? `Not on ${runDifficultyInfo(run.difficulty).label}.` : c.description}</div>
+                    </div>
+                  }
+                >
+                  <button
+                    className="run-item-button run-shop-button"
+                    disabled={busy || itemBusy || locked || run.consumables.gems < RUN_CONSUMABLE_PRICE}
+                    onClick={() => void runItemAction(() => window.api.buyRunConsumable(c.id))}
+                  >
+                    <img className="run-consumable-icon" src={c.icon} alt="" />
+                    <span>{c.name}</span>
+                    {gemPrice(RUN_CONSUMABLE_PRICE)}
+                  </button>
+                </Tooltip>
+              )
+            })}
+          </div>
+          <div className="run-choice-grid">{run.choices.map(choiceTile)}</div>
+          <div className="run-choice-grid run-boss-shop-tiles">
+            {SHOP_TILES.map((tile) => {
+              const used = shop.usedTiles.includes(tile)
+              const price = RUN_SHOP_TILE_PRICES[tile]
+              return (
+                <button
+                  key={tile}
+                  className={`big-battle-button run-node-button run-node-${tile}`}
+                  disabled={busy || itemBusy || used || run.consumables.gems < price}
+                  title={used ? 'Already bought on this floor' : NODE_INFO[tile].hint}
+                  onClick={() => void runItemAction(() => window.api.buyRunShopTile(tile))}
+                >
+                  <NodeIcon choice={{ kind: tile }} />
+                  <span>{SHOP_TILE_LABELS[tile]}</span>
+                  {used ? <span className="run-node-sub">Bought</span> : gemPrice(price)}
+                </button>
+              )
+            })}
+          </div>
         </div>
+      ) : (
+        <div className="run-choice-grid">{run.choices.map(choiceTile)}</div>
       )}
 
       <h2 className="options-heading run-team-heading">Run Team</h2>
@@ -694,7 +889,117 @@ function RoguelitePanel({
           )
         })}
       </div>
-      {movingFrom ? (
+      <div className="run-consumables">
+        {RUN_CONSUMABLES.map((c) => {
+          const count = run.consumables.counts[c.id]
+          const locked = run.consumables.locked.includes(c.id)
+          return (
+            <Tooltip
+              key={c.id}
+              placement="below"
+              content={
+                <div className="tooltip-panel">
+                  <div className="tooltip-title">{c.name}</div>
+                  <div className="tooltip-desc">
+                    {locked ? `Not on ${runDifficultyInfo(run.difficulty).label} - there's no healing.` : c.description}
+                  </div>
+                </div>
+              }
+            >
+              <button
+                className={`run-consumable${using === c.id ? ' run-consumable-chosen' : ''}`}
+                disabled={busy || itemBusy || locked || count < 1}
+                onClick={() => {
+                  setItemError(null)
+                  setCapsuleMon(null)
+                  setUsing(using === c.id ? null : c.id)
+                }}
+              >
+                <img className="run-consumable-icon" src={c.icon} alt={c.name} />
+                <span className="run-consumable-count">×{count}</span>
+              </button>
+            </Tooltip>
+          )
+        })}
+      </div>
+      {itemError && <p className="editor-error">{itemError}</p>}
+
+      {using === 'revive' && (
+        <div className="run-item-offer">
+          <p className="box-empty-hint">
+            {run.consumables.fainted.length === 0
+              ? 'Nobody has fainted this run.'
+              : run.team.length >= ROGUELITE_MAX_TEAM
+                ? 'Your team is full - a revived Pokémon needs a free spot.'
+                : `Pick who to revive - they come back at half HP, at Lv ${run.consumables.reviveLevel}.`}
+          </p>
+          <div className="run-item-row">
+            {run.consumables.fainted.map((mon) => (
+              <button
+                key={mon.id}
+                className="run-item-button"
+                disabled={busy || itemBusy || run.team.length >= ROGUELITE_MAX_TEAM}
+                onClick={() => void runItemAction(() => window.api.useRunRevive(mon.id))}
+              >
+                {mon.species}
+                <span className="run-shop-price">Lv {mon.level}</span>
+              </button>
+            ))}
+            <button className="run-item-button run-item-skip" onClick={() => setUsing(null)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {using === 'abilitycapsule' && capsuleMon && (
+        <div className="run-item-offer">
+          <p className="box-empty-hint">
+            Which ability should {capsuleMon.species} have?
+            {capsuleMon.abilityLocked ? ' (It replaces the ability from its New Ability pick.)' : ''}
+          </p>
+          <div className="run-item-row">
+            {capsuleMon.abilityChoices.map((a) => {
+              const current = a.name === capsuleMon.ability
+              return (
+                <Tooltip
+                  key={a.id}
+                  placement="below"
+                  content={
+                    <div className="tooltip-panel">
+                      <div className="tooltip-title">{a.name}</div>
+                      <div className="tooltip-desc">{a.description}</div>
+                    </div>
+                  }
+                >
+                  <button
+                    className="run-item-button"
+                    disabled={busy || itemBusy || current}
+                    onClick={() => void runItemAction(() => window.api.useRunAbilityCapsule(capsuleMon.id, a.id))}
+                  >
+                    {a.name}
+                    {current && <span className="run-shop-price">Current</span>}
+                  </button>
+                </Tooltip>
+              )
+            })}
+            <button className="run-item-button run-item-skip" onClick={() => setCapsuleMon(null)}>
+              Back
+            </button>
+          </div>
+        </div>
+      )}
+
+      {using === 'fullrestore' || (using === 'abilitycapsule' && !capsuleMon) ? (
+        <p className="box-empty-hint">
+          {using === 'fullrestore'
+            ? 'Click the Pokémon to fully heal.'
+            : 'Click the Pokémon to use the Ability Capsule on.'}{' '}
+          <button className="run-forfeit-button" onClick={() => setUsing(null)}>
+            Cancel
+          </button>
+        </p>
+      ) : movingFrom ? (
         <p className="box-empty-hint">
           Click the Pokémon to give {movingFrom.species}&apos;s {movingFrom.item} to - if it holds something, they swap.{' '}
           <button className="run-forfeit-button" onClick={() => setMovingFrom(null)}>

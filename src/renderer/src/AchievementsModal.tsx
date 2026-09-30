@@ -96,7 +96,7 @@ function AchievementsModal({ state, onChange, onClaimed, onClose }: Props): Reac
         {unclaimed > 0 && (
           <div className="achievements-goto-float">
             <button className="achievements-goto" onClick={goToFirstClaimable} title="Scroll to the first reward to claim">
-              ↓ First to claim
+              Claim ↓
             </button>
           </div>
         )}

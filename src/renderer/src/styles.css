@@ -7037,3 +7037,370 @@ button.editor-evolution:disabled.editor-evolution-locked {
 .achievement.achievement-flash {
   animation: achievement-flash 1.2s ease-out 2;
 }
+
+/* Roguelite gems and consumables. */
+.run-gem-icon {
+  width: 18px;
+  height: 18px;
+  image-rendering: pixelated;
+  vertical-align: middle;
+}
+
+.run-gems {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.run-consumables {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.run-consumable {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px 4px 6px;
+}
+
+.run-consumable-chosen {
+  border-color: #b48cff;
+  background: #2a2340;
+}
+
+.run-consumable:disabled {
+  opacity: 0.4;
+}
+
+.run-consumable-icon {
+  width: 32px;
+  height: 32px;
+  image-rendering: pixelated;
+}
+
+.run-consumable-count {
+  font-weight: bold;
+  color: #e6ebf2;
+}
+
+/* A boss floor: shop items | boss | the shop's picks in a 2x2 grid. */
+.run-boss-floor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+/* As wide as the tile grid on the other side, so the boss sits in the middle. */
+.run-boss-shop-items {
+  width: 312px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.run-boss-shop-items > * {
+  width: 230px;
+}
+
+.run-boss-shop-items .run-reward-heading {
+  text-align: center;
+}
+
+.run-boss-shop-items .run-shop-button {
+  width: 100%;
+}
+
+.run-boss-shop-items .run-shop-button .run-shop-price {
+  margin-left: auto;
+}
+
+.run-choice-grid.run-boss-shop-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, 150px);
+  max-width: none;
+}
+
+.run-boss-shop-tiles .run-shop-price {
+  font-size: 14px;
+}
+
+.run-shop-balance {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 10px;
+  font-size: 13px;
+  font-weight: normal;
+  color: #b7c0cf;
+}
+
+.run-shop-button .run-consumable-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.run-shop-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 4px;
+  font-size: 12px;
+  color: #ffd76b;
+}
+
+/* A run difficulty's rewards, as icon chips. */
+.run-reward-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.run-reward-group {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  align-items: center;
+  gap: 6px;
+}
+
+.run-reward-group-label {
+  font-size: 11px;
+  color: #8a93a3;
+}
+
+.run-reward-group-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.run-reward-chip {
+  min-height: 28px;
+  box-sizing: border-box;
+  font-size: 12px;
+  gap: 4px;
+}
+
+/* Merging duplicates: the star badge, the merge window and the editor's boosted stats. */
+.box-icon-stars {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: -1px;
+  color: #ffd76b;
+  text-shadow: 0 0 2px #000, 0 0 2px #000;
+  pointer-events: none;
+}
+
+.merge-stars {
+  color: #ffd76b;
+  letter-spacing: 1px;
+}
+
+.merge-modal {
+  width: 560px;
+}
+
+.merge-keeper {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.merge-keeper-icon {
+  position: relative;
+  width: 96px;
+  height: 110px;
+  flex: none;
+}
+
+.merge-keeper-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.merge-keeper-info .merge-stars {
+  font-size: 20px;
+}
+
+.merge-bonus {
+  color: #9fd89f;
+}
+
+.merge-candidates {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.merge-candidate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 6px;
+  font-size: 12px;
+}
+
+.merge-candidate-picked {
+  border-color: #ffd76b;
+  background: #3a3216;
+}
+
+.merge-candidate-sprite {
+  width: 56px;
+  height: 56px;
+  image-rendering: pixelated;
+  object-fit: contain;
+}
+
+.merge-candidate-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: bold;
+}
+
+.merge-candidate-meta {
+  color: #b7c0cf;
+}
+
+.merge-candidate-note {
+  font-size: 10px;
+  color: #8a93a3;
+}
+
+.merge-preview {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #ffd76b;
+}
+
+.merge-editor-hint {
+  margin: 4px 0;
+}
+
+/* With merge stars the column holds both: the stat, then the boosted one in gold. */
+.editor-ev-stat.editor-ev-stat-wide {
+  width: 76px;
+  white-space: nowrap;
+}
+
+.editor-ev-stat-merged {
+  margin-left: 8px;
+  color: #ffd76b;
+}
+
+/* Max Raids: the menu button, the Dynamaxed boss and the catch on the result window. */
+.raid-battle-button {
+  position: relative;
+}
+
+.raid-battle-icon {
+  image-rendering: pixelated;
+  object-fit: contain;
+}
+
+.raid-battle-count {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-size: 12px;
+  color: #b7c0cf;
+}
+
+.sprite.sprite-dynamax {
+  filter: drop-shadow(0 0 8px rgba(255, 40, 80, 0.9)) drop-shadow(0 0 18px rgba(255, 40, 80, 0.55));
+}
+
+/* A Dynamaxed boss's picture grows to this size (animated), which pushes its name and HP
+   bar further down the field. */
+.sprite-slot.right .sprite-image-wrap {
+  transition:
+    width 1.4s cubic-bezier(0.2, 0.9, 0.3, 1.15),
+    height 1.4s cubic-bezier(0.2, 0.9, 0.3, 1.15);
+}
+
+.sprite-slot.right.sprite-slot-dynamax {
+  width: auto;
+}
+
+.sprite-slot.right.sprite-slot-dynamax .sprite-image-wrap {
+  width: 210px;
+  height: 210px;
+}
+
+.dynamax-badge {
+  background: linear-gradient(90deg, #c2185b, #e53935);
+  color: #fff;
+}
+
+.raid-catch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0;
+  padding: 8px 12px;
+  border: 1px solid #ffd76b;
+  border-radius: 6px;
+  background: #3a3216;
+}
+
+.raid-catch-sprite {
+  width: 64px;
+  height: 64px;
+  image-rendering: pixelated;
+  object-fit: contain;
+}
+
+.raid-catch-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Max Raids before they're unlocked: the button, and the Raid Crystal in the Coin Shop. */
+.raid-battle-locked .raid-battle-icon,
+.shop-item-locked .shop-item-icon {
+  filter: grayscale(1) brightness(0.6);
+}
+
+.shop-item-locked {
+  opacity: 0.7;
+}
+
+/* A ★5 Pokemon's gold glow, behind its sprite in the box and on the team. */
+.box-icon-star-glow {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 215, 90, 0.8) 0%, rgba(255, 190, 40, 0.4) 40%, rgba(255, 190, 40, 0) 70%);
+  transform: translateX(-50%);
+  animation: star-glow-pulse 2.4s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.box-icon-star-glow ~ .box-icon-img {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes star-glow-pulse {
+  0%, 100% { opacity: 0.75; transform: translateX(-50%) scale(0.92); }
+  50% { opacity: 1; transform: translateX(-50%) scale(1.06); }
+}

@@ -29,6 +29,7 @@ import PokedexModal from './PokedexModal'
 import ChallengeModal from './ChallengeModal'
 import StarterPicker from './StarterPicker'
 import PokemonContextMenu from './PokemonContextMenu'
+import MergeModal from './MergeModal'
 import BagModal from './BagModal'
 import ShopModal from './ShopModal'
 import WildDropsModal from './WildDropsModal'
@@ -60,6 +61,8 @@ interface Props {
   wildLevelCap: number
   onChangeWildLevelCap: (levelCap: number) => void
   onTrainerFight: () => void
+  // A Max Raid (uses up a Raid Crystal).
+  onRaidFight: () => void
   onBossFight: () => void
   onBossRematch: (trainerId: string) => void
   onOptions: () => void
@@ -85,12 +88,13 @@ const WILD_LEVEL_CAP_MIN = 15
 const POKE_BALL_SPRITENUM = 345
 
 // The orders the expanded box can be sorted in.
-type BoxSortKey = 'arrival' | 'name' | 'bst' | 'dex'
+type BoxSortKey = 'arrival' | 'name' | 'bst' | 'dex' | 'stars'
 const BOX_SORTS: { key: BoxSortKey; label: string }[] = [
   { key: 'arrival', label: 'Catch date' },
   { key: 'name', label: 'Name' },
   { key: 'bst', label: 'Base stat total' },
-  { key: 'dex', label: 'Pokédex number' }
+  { key: 'dex', label: 'Pokédex number' },
+  { key: 'stars', label: 'Stars' }
 ]
 
 // Ascending order for a sort key (the caller flips it for descending).
@@ -98,6 +102,7 @@ function compareBoxMons(a: BoxPokemonView, b: BoxPokemonView, key: BoxSortKey): 
   if (key === 'name') return a.species.localeCompare(b.species)
   if (key === 'bst') return (a.bst ?? 0) - (b.bst ?? 0)
   if (key === 'dex') return (a.dexNum ?? 0) - (b.dexNum ?? 0)
+  if (key === 'stars') return (a.mergeStars ?? 0) - (b.mergeStars ?? 0)
   return (a.arrival ?? 0) - (b.arrival ?? 0)
 }
 
@@ -129,6 +134,7 @@ function MainMenu({
   wildLevelCap,
   onChangeWildLevelCap,
   onTrainerFight,
+  onRaidFight,
   onBossFight,
   onBossRematch,
   onOptions,
@@ -500,6 +506,9 @@ function MainMenu({
   }
 
   // Fusing a legendary with its partner, or splitting them up.
+  // The Pokemon whose merge window is open.
+  const [mergingId, setMergingId] = useState<string | null>(null)
+
   async function fusionAction(action: () => Promise<BoxState>, done: string, at: { x: number; y: number }): Promise<void> {
     setContextMenu(null)
     setBusy(true)
@@ -588,6 +597,8 @@ function MainMenu({
       (a, b) =>
         Number(!!b.favorite) - Number(!!a.favorite) ||
         sortDirection * compareBoxMons(a, b, boxSort) ||
+        // The same stars: Pokedex order, lowest first either way.
+        (boxSort === 'stars' ? (a.dexNum ?? 0) - (b.dexNum ?? 0) : 0) ||
         (a.arrival ?? 0) - (b.arrival ?? 0)
     )
   const teamCount = team.filter(Boolean).length
@@ -898,6 +909,22 @@ function MainMenu({
               />
               <span>{allBossesDefeated ? 'Boss Rematch' : 'Boss Battle'}</span>
             </button>
+            <button
+              className={`big-battle-button raid-battle-button${eligibility && !eligibility.raidsUnlocked ? ' raid-battle-locked' : ''}`}
+              disabled={fightBusy || teamEmpty || !eligibility?.raidsUnlocked || !eligibility?.wishingPieces}
+              title={
+                eligibility && !eligibility.raidsUnlocked
+                  ? `Max Raids open up once you beat ${eligibility.raidUnlockBoss ?? 'the right boss'}`
+                  : eligibility?.wishingPieces
+                  ? `A doubles battle against a Dynamaxed ★3 boss - win to catch it. Uses a Raid Crystal (you have ${eligibility.wishingPieces}).`
+                  : 'Needs a Raid Crystal - the Shop and the Game Corner sell them'
+              }
+              onClick={onRaidFight}
+            >
+              <img className="big-battle-icon raid-battle-icon" src="./sprites/misc/raidcrystal.png" alt="" />
+              <span>{eligibility && !eligibility.raidsUnlocked ? '🔒 Max Raid' : 'Max Raid'}</span>
+              {eligibility?.raidsUnlocked && <span className="raid-battle-count">×{eligibility.wishingPieces}</span>}
+            </button>
           </div>
           {nextBoss && <p className="box-empty-hint battle-row-hint">{bossHint}</p>}
 
@@ -1054,6 +1081,7 @@ function MainMenu({
           }}
           onSaved={refreshBox}
           favorite={!!monsById.get(editingMonId)?.favorite}
+          mergeStars={monsById.get(editingMonId)?.mergeStars ?? 0}
           onToggleFavorite={() => void toggleFavorite(editingMonId)}
           canUseRareCandy={!!monsById.get(editingMonId)?.canLevelUpWithCandy}
           evolutionPaths={monsById.get(editingMonId)?.evolutionPaths}
@@ -1065,6 +1093,18 @@ function MainMenu({
             setBoxState(box)
             return box.mons.find((m) => m.id === editingMonId)?.level ?? null
           }}
+        />
+      )}
+
+      {mergingId && monsById.get(mergingId) && (
+        <MergeModal
+          keeper={monsById.get(mergingId)!}
+          onMerged={(box, stars) => {
+            setBoxState(box)
+            setMergingId(null)
+            notes.show(stars > 0 ? `Merged - now ★${stars}` : 'Merged', { x: window.innerWidth / 2, y: window.innerHeight / 2 })
+          }}
+          onClose={() => setMergingId(null)}
         />
       )}
 
@@ -1181,6 +1221,11 @@ function MainMenu({
               { x: contextMenu.x, y: contextMenu.y }
             )
           }
+          mergeCount={contextMenu.mon.mergeCandidates?.length ?? 0}
+          onMerge={() => {
+            setMergingId(contextMenu.mon.id)
+            setContextMenu(null)
+          }}
           unfuse={contextMenu.mon.unfuse}
           onUnfuse={() =>
             void fusionAction(

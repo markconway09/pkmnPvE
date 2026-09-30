@@ -31,6 +31,9 @@ interface Props {
   onFuse?: (partnerId: string) => void
   unfuse?: BoxPokemonView['unfuse']
   onUnfuse?: () => void
+  // Duplicates of it in the box: opens the merge window.
+  mergeCount?: number
+  onMerge?: () => void
   onEdit?: () => void
   // Only given to admins.
   onAdminEdit?: () => void
@@ -58,6 +61,8 @@ function PokemonContextMenu({
   onFuse,
   unfuse,
   onUnfuse,
+  mergeCount = 0,
+  onMerge,
   onEdit,
   onAdminEdit,
   onSell,
@@ -114,11 +119,17 @@ function PokemonContextMenu({
           fusions.map((fusion) => (
             <button key={fusion.partnerId} className="context-menu-item" onClick={() => onFuse(fusion.partnerId)}>
               <span className="context-menu-evo-target">
-                Fuse with {fusion.partnerSpecies} (Lv{fusion.partnerLevel}) → {fusion.result}
+                Fuse with {fusion.partnerFavorite && '❤️ '}
+                {fusion.partnerSpecies} (Lv{fusion.partnerLevel}) → {fusion.result}
               </span>
               <span className="context-menu-evo-item">use the {fusion.itemName}</span>
             </button>
           ))}
+        {onMerge && mergeCount > 0 && (
+          <button className="context-menu-item" onClick={onMerge}>
+            <span className="context-menu-evo-target">★ Merge duplicates ({mergeCount})</span>
+          </button>
+        )}
         {onUnfuse && unfuse && (
           <button className="context-menu-item" onClick={onUnfuse}>
             <span className="context-menu-evo-target">Unfuse (get {unfuse.partnerSpecies} back)</span>

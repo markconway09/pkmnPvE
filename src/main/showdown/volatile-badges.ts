@@ -96,7 +96,10 @@ export const PARTIAL_TRAP_MOVES = new Set([
   'magmastorm',
   'infestation',
   'snaptrap',
-  'thundercage'
+  'thundercage',
+  // A Gigantamax raid boss's traps (both foes, 4-5 turns).
+  'gmaxsandblast',
+  'gmaxcentiferno'
 ])
 
 /** "move: Taunt" / "ability: Flash Fire" / "Leech Seed" -> "taunt" / "flashfire" / "leechseed". */

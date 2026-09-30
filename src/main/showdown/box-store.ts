@@ -7,6 +7,7 @@ import type {
   EditablePokemonSet,
   EvolutionItemUse,
   ExpGainResult,
+  MergeCandidateView,
   PokedexEntry
 } from '../../shared/battle-types'
 import {
@@ -16,6 +17,9 @@ import {
   FRIENDSHIP_CHARM_ITEM_ID,
   FRIENDSHIP_CHARM_MULTIPLIER,
   FUSIONS,
+  MERGE_MAX_COPIES,
+  MERGE_MAX_STARS,
+  mergeStarsFor,
   RARE_CANDY_ITEM_ID,
   ROTOM_CATALOG_ITEM_ID,
   SHINY_PATCH_ITEM_ID
@@ -55,8 +59,9 @@ import { addItem, bagItemUse, hasItem, removeItem } from './bag-store'
 import { playerDirFor, playerPathFor } from './save-paths'
 import { onPlayerChange } from './player-session'
 import { addMoney } from './money-store'
-import { countAchievement } from './achievement-progress'
-import { monSellPrice } from './title-perks'
+import { countAchievement, recordAchievementBest } from './achievement-progress'
+import { hasTitle, monSellPrice } from './title-perks'
+import { ALCHEMIST_BONUS_COPY_CHANCE } from '../../shared/titles'
 import { buildAutoSet, listAutoSets } from './auto-sets'
 
 interface StoredMon {
@@ -66,6 +71,8 @@ interface StoredMon {
   favorite?: boolean
   // A fused Necrozma, Kyurem or Calyrex: the partner inside it, handed back on unfusing.
   fusedWith?: StoredMon
+  // Copies merged into it, itself included (see mergeStarsFor) - 1 when left out.
+  copies?: number
 }
 
 interface StoredBox {
@@ -183,7 +190,35 @@ export function getPokedex(): PokedexEntry[] {
   ])
 }
 
-function toView(mon: StoredMon, arrival: number): BoxPokemonView {
+// The box's Pokemon by Pokedex form (see dexFormOf: Alolan Vulpix apart from Vulpix, but a
+// Mega or a plated Arceus with its base), for who can merge with whom. A fused
+// one can take in a duplicate but can't be merged away (its partner would go with it).
+function mergeGroups(mons: StoredMon[]): Map<string, StoredMon[]> {
+  const groups = new Map<string, StoredMon[]>()
+  for (const mon of mons) {
+    const key = dexFormOf(mon.set.species)
+    groups.set(key, [...(groups.get(key) ?? []), mon])
+  }
+  return groups
+}
+
+function mergeCandidatesFor(mon: StoredMon, groups: Map<string, StoredMon[]>): MergeCandidateView[] {
+  const team = new Set(getState().team)
+  return (groups.get(dexFormOf(mon.set.species)) ?? [])
+    .filter((other) => other.id !== mon.id && !other.fusedWith)
+    .map((other) => ({
+      id: other.id,
+      species: other.set.species,
+      level: other.set.level,
+      shiny: !!other.set.shiny,
+      favorite: !!other.favorite,
+      copies: other.copies ?? 1,
+      onTeam: team.has(other.id),
+      item: other.set.item ?? ''
+    }))
+}
+
+function toView(mon: StoredMon, arrival: number, groups?: Map<string, StoredMon[]>): BoxPokemonView {
   const { percent } = expProgressForLevel(mon.set.species, mon.set.level, mon.exp)
   const usable = evolutionOptionsFor(mon.set).filter((o) => o.requiredItems === null || o.requiredItems.some(hasItem))
   const eligibleEvolutions = usable.map((o) => o.species)
@@ -227,8 +262,12 @@ function toView(mon: StoredMon, arrival: number): BoxPokemonView {
     unfuse: fusion.unfuse,
     itemSpritenum,
     favorite: !!mon.favorite,
+    copies: mon.copies ?? 1,
+    mergeStars: mergeStarsFor(mon.copies),
+    gigantamax: !!mon.set.gigantamax,
+    mergeCandidates: groups ? mergeCandidatesFor(mon, groups) : undefined,
     rarityTier: speciesRarityTier(mon.set.species),
-    sellPrice: monSellPrice(speciesRarityTier(mon.set.species)),
+    sellPrice: monSellPrice(speciesRarityTier(mon.set.species), !!mon.set.shiny, mon.copies),
     dexNum: speciesDexNum(mon.set.species),
     bst: bstOf(mon.set.species),
     arrival,
@@ -249,7 +288,10 @@ export function boxAchievementStats(): {
   forces: number
   shaymin: number
   deoxys: number
+  zygarde: number
   shiny: number
+  // How many Gigantamax species it holds.
+  gmaxSpecies: number
   legendaryClass: number
   restricted: number
   dexSpecies: number
@@ -268,7 +310,9 @@ export function boxAchievementStats(): {
     forces: box.mons.filter((m) => FORCES_OF_NATURE.has(baseSpeciesOf(m.set.species))).length,
     shaymin: box.mons.filter((m) => baseSpeciesOf(m.set.species) === 'Shaymin').length,
     deoxys: box.mons.filter((m) => baseSpeciesOf(m.set.species) === 'Deoxys').length,
+    zygarde: box.mons.filter((m) => baseSpeciesOf(m.set.species) === 'Zygarde').length,
     shiny: box.mons.filter((m) => m.set.shiny).length,
+    gmaxSpecies: new Set(box.mons.filter((m) => m.set.gigantamax).map((m) => dexFormOf(m.set.species))).size,
     legendaryClass: tiers.filter((t) => t === 'epic' || t === 'legendary').length,
     restricted: tiers.filter((t) => t === 'legendary').length,
     dexSpecies: species,
@@ -278,7 +322,8 @@ export function boxAchievementStats(): {
 }
 
 export function getBoxState(): BoxState {
-  return { mons: getState().mons.map((mon, i) => toView(mon, i)), team: [...getState().team] }
+  const groups = mergeGroups(getState().mons)
+  return { mons: getState().mons.map((mon, i) => toView(mon, i, groups)), team: [...getState().team] }
 }
 
 export function addRandomMon(): BoxState {
@@ -294,15 +339,17 @@ export function addRandomMon(): BoxState {
 // it hands over, its EVs (random-battle sets come with 85 in every stat) are
 // wiped so it starts untrained, and it joins with no friendship - that's
 // earned by battling alongside it (see awardFriendshipToTeam).
-export function addCaughtMon(set: PokemonSet): BoxState {
+export function addCaughtMon(set: PokemonSet, extras: { copies?: number; gigantamax?: boolean } = {}): BoxState {
   const caught: PokemonSet = {
     ...set,
     item: '',
     happiness: 0,
     evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }
   }
+  // A Max Raid's boss: its Gigantamax form, and its merge stars as copies.
+  if (extras.gigantamax) caught.gigantamax = true
   const exp = totalExpForSpeciesLevel(caught.species, caught.level)
-  getState().mons.push({ id: randomUUID(), set: caught, exp })
+  getState().mons.push({ id: randomUUID(), set: caught, exp, ...(extras.copies && extras.copies > 1 ? { copies: extras.copies } : {}) })
   persist()
   return getBoxState()
 }
@@ -325,7 +372,7 @@ export function sellMon(id: string): { sold: number; species: string; money: num
   if (box.mons[index].fusedWith) throw new Error('Unfuse it first - its partner would be sold with it')
   const [mon] = box.mons.splice(index, 1)
   box.team = box.team.map((slot) => (slot === id ? null : slot))
-  const sold = monSellPrice(speciesRarityTier(mon.set.species))
+  const sold = monSellPrice(speciesRarityTier(mon.set.species), !!mon.set.shiny, mon.copies)
   const money = addMoney(sold)
   persist()
   countAchievement('pokemonSold')
@@ -347,7 +394,7 @@ export function sellMons(ids: string[]): { sold: number; count: number; money: n
   if (box.mons.length - selling.length < 1) throw new Error("You can't sell every Pokemon - keep at least one")
   box.mons = box.mons.filter((m) => !wanted.has(m.id))
   box.team = box.team.map((slot) => (slot && wanted.has(slot) ? null : slot))
-  const sold = selling.reduce((sum, m) => sum + monSellPrice(speciesRarityTier(m.set.species)), 0)
+  const sold = selling.reduce((sum, m) => sum + monSellPrice(speciesRarityTier(m.set.species), !!m.set.shiny, m.copies), 0)
   const money = addMoney(sold)
   persist()
   countAchievement('pokemonSold', selling.length)
@@ -415,6 +462,60 @@ export function updateMon(id: string, input: EditablePokemonSet, admin = false):
   return getBoxState()
 }
 
+/**
+ * Merges duplicates into a Pokemon: their copies add to its own (see mergeStarsFor), a
+ * shiny one makes it shiny, it keeps the higher friendship and the higher level (exp and
+ * all), and their held items go back to the bag. They leave the box (and the team). All or nothing - every one is checked first.
+ */
+export function mergeMons(keeperId: string, fodderIds: string[]): BoxState {
+  const box = getState()
+  const keeper = box.mons.find((m) => m.id === keeperId)
+  if (!keeper) throw new Error(`Unknown Pokemon id: ${keeperId}`)
+  const wanted = new Set(fodderIds)
+  if (wanted.size === 0) throw new Error('Pick at least one Pokemon to merge in')
+  if (wanted.has(keeperId)) throw new Error("A Pokemon can't be merged into itself")
+  const fodder = box.mons.filter((m) => wanted.has(m.id))
+  if (fodder.length !== wanted.size) throw new Error('One of those Pokemon is no longer in the box')
+  // Only the same form: an alternate form (Alolan, Therian, a Rotom appliance) is its own species here.
+  const species = dexFormOf(keeper.set.species)
+  if (fodder.some((m) => dexFormOf(m.set.species) !== species)) throw new Error(`Only another ${species} can be merged in`)
+  if (fodder.some((m) => m.fusedWith)) throw new Error('Unfuse it first - its partner would be merged away with it')
+  let copies = (keeper.copies ?? 1) + fodder.reduce((sum, m) => sum + (m.copies ?? 1), 0)
+  if ((keeper.copies ?? 1) >= MERGE_MAX_COPIES) throw new Error(`${keeper.set.species} is already at ${MERGE_MAX_STARS} stars`)
+  if (copies > MERGE_MAX_COPIES) {
+    throw new Error(`That's ${copies} copies - ${MERGE_MAX_STARS} stars only takes ${MERGE_MAX_COPIES}, so merge fewer`)
+  }
+  const wasShiny = !!keeper.set.shiny
+  for (const mon of fodder) {
+    if (mon.set.item) addItem(toID(mon.set.item), 1)
+    if (mon.set.shiny) keeper.set.shiny = true
+    if (mon.set.gigantamax) keeper.set.gigantamax = true
+    keeper.set.happiness = Math.max(keeper.set.happiness ?? 0, mon.set.happiness ?? 0)
+    // A higher-level one brings its level up with it, exp and all.
+    if (mon.set.level > keeper.set.level || (mon.set.level === keeper.set.level && mon.exp > keeper.exp)) {
+      keeper.set.level = mon.set.level
+      keeper.exp = mon.exp
+    }
+  }
+  // Alchemist: now and then a merge gives a bonus copy (never past the top).
+  if (hasTitle('Alchemist') && copies < MERGE_MAX_COPIES && Math.random() < ALCHEMIST_BONUS_COPY_CHANCE) copies += 1
+  keeper.copies = copies
+  box.mons = box.mons.filter((m) => !wanted.has(m.id))
+  box.team = box.team.map((slot) => (slot && wanted.has(slot) ? null : slot))
+  persist()
+  countAchievement('pokemonMerged', fodder.length)
+  if (!wasShiny && keeper.set.shiny) countAchievement('mergeShinied')
+  recordAchievementBest('mergedStars', mergeStarsFor(copies))
+  return getBoxState()
+}
+
+/** Each team member's merge stars, in the same order as getTeamPokemonSets. */
+export function getTeamMergeStars(): number[] {
+  const byId = new Map(getState().mons.map((m) => [m.id, m]))
+  return getState()
+    .team.flatMap((id) => (id !== null && byId.has(id) ? [mergeStarsFor(byId.get(id)!.copies)] : []))
+}
+
 export function getTeamPokemonSets(): PokemonSet[] {
   const byId = new Map(getState().mons.map((m) => [m.id, m.set]))
   const sets: PokemonSet[] = []
@@ -432,6 +533,15 @@ export function getTeamPokemonSets(): PokemonSet[] {
  * a fight can't change anything of theirs. Empty if they have no team yet.
  */
 export function readSavedTeamOf(playerSlug: string): PokemonSet[] {
+  return readSavedTeamMons(playerSlug).map((m) => structuredClone(m.set))
+}
+
+/** That player's team members' merge stars, in the same order as readSavedTeamOf. */
+export function readSavedTeamStarsOf(playerSlug: string): number[] {
+  return readSavedTeamMons(playerSlug).map((m) => mergeStarsFor(m.copies))
+}
+
+function readSavedTeamMons(playerSlug: string): StoredMon[] {
   let saved: StoredBox
   try {
     saved = JSON.parse(readFileSync(join(playerDirFor(playerSlug), 'box.json'), 'utf8')) as StoredBox
@@ -440,13 +550,11 @@ export function readSavedTeamOf(playerSlug: string): PokemonSet[] {
     throw new Error("That player's save couldn't be read")
   }
   if (!Array.isArray(saved.mons) || !Array.isArray(saved.team)) return []
-  const byId = new Map(saved.mons.map((m) => [m.id, m.set]))
-  const sets: PokemonSet[] = []
-  for (const id of saved.team) {
-    const set = id ? byId.get(id) : undefined
-    if (set) sets.push(structuredClone(set))
-  }
-  return sets
+  const byId = new Map(saved.mons.map((m) => [m.id, m]))
+  return saved.team.flatMap((id) => {
+    const mon = id ? byId.get(id) : undefined
+    return mon ? [mon] : []
+  })
 }
 
 /** The highest level on a team (0 for an empty one). */
@@ -632,6 +740,7 @@ function fusionOptionsFor(mon: StoredMon): Pick<BoxPokemonView, 'fusions' | 'unf
         partnerId: m.id,
         partnerSpecies: m.set.species,
         partnerLevel: m.set.level,
+        partnerFavorite: !!m.favorite,
         result: rule.result,
         itemName: itemName(rule.itemId)
       }))

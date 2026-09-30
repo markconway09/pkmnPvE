@@ -106,7 +106,7 @@ export interface CoinPrize {
 
 export const COIN_PRIZES: CoinPrize[] = [
   { itemId: 'lockcapsule', coins: 100 },
-  { itemId: 'rarecandy', coins: 50 },
+  { itemId: 'wishingpiece', coins: 2500 },
   { itemId: 'randompokemon', coins: 500 },
   { itemId: 'shinypatch', coins: 1000 },
   { itemId: 'expcandyl', coins: 1000 },

@@ -13,7 +13,9 @@ import type {
   RunDifficulty,
   RunNodeKind,
   RunRewardLine,
-  RunView
+  RunView,
+  RunConsumableId,
+  RunShopTile
 } from '../../shared/battle-types'
 import {
   ROGUELITE_BOSS_COUNT,
@@ -25,9 +27,16 @@ import {
   RANDOM_LEGENDARY_ITEM_ID,
   ROGUELITE_BOSS_CLASSES,
   RANDOM_POKEMON_ITEM_ID,
+  WISHING_PIECE_ITEM_ID,
   rogueliteBossClassAt,
   rogueliteBossLabelAt,
   runDifficultyInfo,
+  runLockedConsumables,
+  RUN_CONSUMABLES,
+  RUN_CONSUMABLE_PRICE,
+  RUN_GEMS_PER_BOSS,
+  RUN_GEMS_PER_TRAINER,
+  RUN_SHOP_TILE_PRICES,
   WILD_LOCATIONS
 } from '../../shared/battle-types'
 import {
@@ -50,6 +59,7 @@ import {
   buildBasicSet,
   pickRandomSwapSpecies,
   randomNatureName,
+  speciesAbilityChoices,
   type PokemonSet
 } from './sim-access'
 import { totalExpForSpeciesLevel, expProgressForLevel } from './exp'
@@ -93,11 +103,11 @@ interface StoredRun {
   choices: RunChoice[]
   itemOffer: string[] | null
   // Why items are on offer: an item floor (worth a level too), a trainer's reward, or a
-  // title's free pick at the start of the run.
-  itemOfferReason?: 'floor' | 'reward' | 'bonus'
+  // title's free pick at the start of the run - or one bought in a boss floor's shop.
+  itemOfferReason?: 'floor' | 'reward' | 'bonus' | 'shop'
   // A New Ability / New Move floor's four choices (ids), until one is given out - or a
   // beaten boss's reward ability (reason 'reward': no extra level for taking it).
-  pickOffer?: { kind: 'ability' | 'move'; options: string[]; reason?: 'floor' | 'reward' | 'bonus' } | null
+  pickOffer?: { kind: 'ability' | 'move'; options: string[]; reason?: 'floor' | 'reward' | 'bonus' | 'shop' } | null
   // A title's free picks still to come at the start of the run (Survivor, Daredevil), in order.
   bonusPicks?: ('item' | 'move' | 'ability')[]
   // A Random Swap floor waiting on its choice.
@@ -117,6 +127,16 @@ interface StoredRun {
   generation?: number | null
   // Paid out when the run ended - kept for the result banner.
   rewards?: RunRewardLine[]
+  // The run's own currency: from trainers and bosses, spent in a boss floor's shop.
+  gems?: number
+  // Consumables on hand (see RUN_CONSUMABLES).
+  consumables?: Partial<Record<RunConsumableId, number>>
+  // Team members that fainted, newest first - a Revive can bring one back.
+  fainted?: RunMon[]
+  // What's been bought from this boss floor's shop (one of each pick per floor).
+  shopTilesUsed?: RunShopTile[]
+  // A Random Swap bought in the shop - no floor to finish afterwards.
+  swapReason?: 'shop'
 }
 
 // The run's level cap only goes up by beating a boss - a ceiling, not something to
@@ -387,7 +407,7 @@ const RUN_ABILITIES = [
   'intrepidsword', 'dauntlessshield', 'soulheart', 'moxie', 'prankster', 'parentalbond',
   'protean', 'multiscale', 'shadowshield', 'contrary', 'guts', 'filter', 'regenerator',
   'speedboost', 'waterbubble', 'technician', 'serenegrace', 'noguard', 'neutralizinggas',
-  'poisonheal', 'levitate', 'lightningrod', 'stormdrain', 'simple', 'stamina'
+  'poisonheal', 'levitate', 'lightningrod', 'stormdrain', 'simple', 'stamina', 'galewings', 'purepower'
 ]
 // ...and a New Move floor.
 const RUN_MOVES = [
@@ -397,7 +417,8 @@ const RUN_MOVES = [
   'infernalparade', 'triplearrows', 'dragonascent', 'dragondance', 'extremespeed',
   'gigatonhammer', 'bloodmoon', 'boomburst', 'psychoboost', 'flareblitz', 'volttackle',
   'makeitrain', 'headlongrush', 'pyroball', 'wavecrash', 'steameruption', 'behemothbash',
-  'behemothblade', 'dynamaxcannon', 'clangingscales', 'aeroblast', 'diamondstorm', 'fishiousrend'
+  'behemothblade', 'dynamaxcannon', 'clangingscales', 'aeroblast', 'diamondstorm', 'fishiousrend',
+  'thousandarrows', 'thousandwaves', 'paraboliccharge', 'doubleironbash', 'fakeout', 'watershuriken', 'jetpunch'
 ]
 const PICK_OPTIONS = 4
 // The Lab takes the place of one wild option this often.
@@ -445,6 +466,7 @@ function toView(mon: RunMon): RunMonView {
       return { id, name: getMoveInfo(id)?.name ?? move, locked: locked.has(id) }
     }),
     abilityLocked: !!mon.lockedAbility,
+    abilityChoices: speciesAbilityChoices(mon.set.species),
     id: mon.id,
     exp: mon.exp,
     expPercent: percent,
@@ -510,7 +532,19 @@ export function getRunView(): RunView | null {
     starterSpecies: current.starterSpecies,
     difficulty: current.difficulty ?? 'normal',
     generation: current.generation ?? null,
-    rewards: current.rewards ?? []
+    rewards: current.rewards ?? [],
+    consumables: {
+      gems: current.gems ?? 0,
+      counts: Object.fromEntries(RUN_CONSUMABLES.map((c) => [c.id, current.consumables?.[c.id] ?? 0])) as Record<
+        RunConsumableId,
+        number
+      >,
+      locked: runLockedConsumables(current.difficulty ?? 'normal'),
+      fainted: (current.fainted ?? []).map(toView),
+      reviveLevel: reviveLevel(current),
+      bossShop:
+        current.status === 'active' && isBossFloor(current.floor) ? { usedTiles: current.shopTilesUsed ?? [] } : null
+    }
   }
 }
 
@@ -561,7 +595,11 @@ export function startRun(
     usedBossIds: [],
     starterSpecies: set.species,
     difficulty: runDifficultyInfo(difficulty).id,
-    generation
+    generation,
+    gems: 0,
+    // Easy starts with a Full Restore in hand.
+    consumables: difficulty === 'easy' ? { fullrestore: 1 } : {},
+    fainted: []
   }
   run.choices = rollChoices(run)
   // A title's free picks before the first floor: Daredevil an item, a move and an
@@ -627,6 +665,9 @@ function payRunRewards(current: StoredRun): RunRewardLine[] {
     give(reward.expCandy)
     if (appliesTo(reward.randomPokemon, i)) give(RANDOM_POKEMON_ITEM_ID)
     if (appliesTo(reward.randomLegendary, i)) give(RANDOM_LEGENDARY_ITEM_ID)
+    if (reward.raidCrystals && appliesTo(reward.raidCrystals.from, i)) {
+      for (let n = 0; n < reward.raidCrystals.count; n++) give(WISHING_PIECE_ITEM_ID)
+    }
   }
   const catalog = new Map(getEditorOptions().items.map((item) => [item.id, item]))
   const lines: RunRewardLine[] = []
@@ -646,6 +687,7 @@ function nextFloor(current: StoredRun): void {
   current.floor += 1
   current.itemOffer = null
   current.itemRerolled = false
+  current.shopTilesUsed = []
   current.choices = rollChoices(current)
 }
 
@@ -733,12 +775,14 @@ export function skipRunItem(): RunView {
 }
 
 function finishItemOffer(current: StoredRun): void {
-  if (current.itemOfferReason === 'bonus') {
-    // No next floor to clear the offer (a skipped one is still standing).
+  if (current.itemOfferReason === 'bonus' || current.itemOfferReason === 'shop') {
+    // No next floor to clear the offer (a skipped one is still standing) - a free pick or
+    // one bought in the shop doesn't move the run on.
+    const bonus = current.itemOfferReason === 'bonus'
     current.itemOffer = null
     current.itemOfferReason = undefined
     current.displacedItem = null
-    serveBonusPick(current)
+    if (bonus) serveBonusPick(current)
     persist()
     return
   }
@@ -960,6 +1004,12 @@ const swapKind = (): 'normal' | 'legendary' => (Math.random() < SWAP_LEGENDARY_C
 
 function finishSwap(current: StoredRun): RunView {
   current.swapOffer = false
+  if (current.swapReason === 'shop') {
+    // Bought in a boss floor's shop: the floor (the boss) is still ahead.
+    current.swapReason = undefined
+    persist()
+    return getRunView()!
+  }
   levelUpTeam(current, LEVELS_PER_QUIET_FLOOR)
   nextFloor(current)
   persist()
@@ -1001,9 +1051,10 @@ export function takePickNode(kind: 'ability' | 'move'): RunView {
 }
 
 function finishPick(current: StoredRun): RunView {
-  if (current.pickOffer?.reason === 'bonus') {
+  if (current.pickOffer?.reason === 'bonus' || current.pickOffer?.reason === 'shop') {
+    const bonus = current.pickOffer.reason === 'bonus'
     current.pickOffer = null
-    serveBonusPick(current)
+    if (bonus) serveBonusPick(current)
     persist()
     return getRunView()!
   }
@@ -1126,6 +1177,8 @@ function applyOutcome(current: StoredRun, outcome: RunBattleOutcome[]): string[]
     if (!result) return true
     if (result.fainted) {
       fainted.push(mon.set.species)
+      // Remembered for a Revive.
+      current.fainted = [{ ...mon, hp: 0, status: null }, ...(current.fainted ?? [])]
       return false
     }
     mon.hp = result.hp
@@ -1153,6 +1206,7 @@ export function finishRunBattleWon(
     ? levelTeamTo(current, runBossLevel(current.bossesBeaten))
     : levelUpTeam(current, kind === 'trainer' ? LEVELS_PER_TRAINER_WIN : LEVELS_PER_WILD_WIN)
   if (wasBoss) current.bossesBeaten += 1
+  if (kind === 'trainer' || wasBoss) current.gems = (current.gems ?? 0) + (wasBoss ? RUN_GEMS_PER_BOSS : RUN_GEMS_PER_TRAINER)
   if (wasBoss && !runDifficultyInfo(current.difficulty).noHealing) {
     // A beaten boss patches the team up for the next stretch.
     for (const mon of current.team) {
@@ -1226,4 +1280,122 @@ export function addRunCatch(set: PokemonSet, replaceRunMonId?: string): void {
 
 export function runTeamIsFull(): boolean {
   return (getRun()?.team.length ?? 0) >= ROGUELITE_MAX_TEAM
+}
+
+// ---- Consumables and the boss floor shop ----
+
+// A revived Pokemon comes back at this floor's opponent level (never past the cap).
+function reviveLevel(current: StoredRun): number {
+  return Math.min(runOpponentLevel(current.floor), runLevelCap(current.bossesBeaten))
+}
+
+function requireConsumableAllowed(current: StoredRun, id: RunConsumableId): void {
+  if (!RUN_CONSUMABLES.some((c) => c.id === id)) throw new Error("That isn't a run item")
+  if (runLockedConsumables(current.difficulty ?? 'normal').includes(id)) {
+    throw new Error(`${RUN_CONSUMABLES.find((c) => c.id === id)!.name} can't be used on ${runDifficultyInfo(current.difficulty).label}`)
+  }
+}
+
+// Takes one of a consumable, or says there's none left.
+function spendConsumable(current: StoredRun, id: RunConsumableId): void {
+  requireConsumableAllowed(current, id)
+  const have = current.consumables?.[id] ?? 0
+  if (have < 1) throw new Error(`You don't have a ${RUN_CONSUMABLES.find((c) => c.id === id)!.name}`)
+  current.consumables = { ...current.consumables, [id]: have - 1 }
+}
+
+/** Full Restore: one team member back to full HP with no status. */
+export function useRunFullRestore(runMonId: string): RunView {
+  const current = activeRun()
+  const mon = runMon(current, runMonId)
+  if (mon.hp >= 1 && !mon.status) throw new Error(`${mon.set.species} is already fully healthy`)
+  spendConsumable(current, 'fullrestore')
+  mon.hp = 1
+  mon.status = null
+  persist()
+  return getRunView()!
+}
+
+/** Revive: a Pokemon that fainted this run rejoins the team, at half HP and this floor's opponent level. */
+export function useRunRevive(faintedId: string): RunView {
+  const current = activeRun()
+  if (current.team.length >= ROGUELITE_MAX_TEAM) throw new Error('Your run team is full')
+  const index = (current.fainted ?? []).findIndex((m) => m.id === faintedId)
+  if (index === -1) throw new Error("That Pokemon hasn't fainted this run")
+  spendConsumable(current, 'revive')
+  const [mon] = current.fainted!.splice(index, 1)
+  const level = reviveLevel(current)
+  mon.set.level = level
+  mon.exp = totalExpForSpeciesLevel(mon.set.species, level)
+  mon.hp = 0.5
+  mon.status = null
+  refreshMonMoves(mon)
+  current.team.push(mon)
+  persist()
+  return getRunView()!
+}
+
+/** Ability Capsule: a team member's ability becomes one of its species' normal or hidden abilities. */
+export function useRunAbilityCapsule(runMonId: string, abilityId: string): RunView {
+  const current = activeRun()
+  const mon = runMon(current, runMonId)
+  const choice = speciesAbilityChoices(mon.set.species).find((a) => a.id === toID(abilityId))
+  if (!choice) throw new Error(`${mon.set.species} can't have that ability`)
+  if (toID(mon.set.ability) === choice.id) throw new Error(`${mon.set.species} already has ${choice.name}`)
+  spendConsumable(current, 'abilitycapsule')
+  // It replaces a New Ability pick too - that one no longer carries through evolution.
+  mon.set.ability = choice.name
+  mon.lockedAbility = undefined
+  persist()
+  return getRunView()!
+}
+
+// The shop is on boss floors, and not while something else is waiting on a choice.
+function requireShop(current: StoredRun): void {
+  if (!isBossFloor(current.floor)) throw new Error('The shop is only on boss floors')
+  if (current.itemOffer || current.displacedItem || current.pickOffer || current.swapOffer) {
+    throw new Error('Finish what you picked first')
+  }
+}
+
+function spendGems(current: StoredRun, price: number): void {
+  const gems = current.gems ?? 0
+  if (gems < price) throw new Error(`That costs ${price} gem${price === 1 ? '' : 's'} - you have ${gems}`)
+  current.gems = gems - price
+}
+
+/** Buys a consumable in a boss floor's shop. */
+export function buyRunConsumable(id: RunConsumableId): RunView {
+  const current = activeRun()
+  requireShop(current)
+  requireConsumableAllowed(current, id)
+  spendGems(current, RUN_CONSUMABLE_PRICE)
+  current.consumables = { ...current.consumables, [id]: (current.consumables?.[id] ?? 0) + 1 }
+  persist()
+  return getRunView()!
+}
+
+/**
+ * Buys one of a boss floor's picks - New Ability, New Move, New Item or a Random Swap -
+ * each once per floor. It plays out like the floor of the same name, except that it
+ * doesn't move the run on: the boss is still waiting after it.
+ */
+export function buyRunShopTile(tile: RunShopTile): RunView {
+  const current = activeRun()
+  requireShop(current)
+  if (!(tile in RUN_SHOP_TILE_PRICES)) throw new Error("The shop doesn't sell that")
+  if (current.shopTilesUsed?.includes(tile)) throw new Error('Already bought on this floor')
+  spendGems(current, RUN_SHOP_TILE_PRICES[tile])
+  current.shopTilesUsed = [...(current.shopTilesUsed ?? []), tile]
+  if (tile === 'item') {
+    current.itemOffer = rollItemOffer(current, ITEM_FLOOR_CHANCES)
+    current.itemOfferReason = 'shop'
+  } else if (tile === 'swap') {
+    current.swapOffer = true
+    current.swapReason = 'shop'
+  } else {
+    current.pickOffer = { kind: tile, options: pickRandom(tile === 'ability' ? RUN_ABILITIES : RUN_MOVES, PICK_OPTIONS), reason: 'shop' }
+  }
+  persist()
+  return getRunView()!
 }

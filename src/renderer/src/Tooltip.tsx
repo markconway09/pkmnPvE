@@ -27,7 +27,17 @@ function Tooltip({ content, placement = 'above', className, children }: Props): 
       const width = tooltip.offsetWidth
       const height = tooltip.offsetHeight
 
-      let top = placement === 'above' ? triggerRect.top - height - MARGIN : triggerRect.bottom + MARGIN
+      // Above or below as asked - flipped to the other side when it won't fit there but
+      // will on the other (a team card near the top of the screen shows it below instead
+      // of squashed down over the card), or to whichever side has more room when neither fits.
+      const aboveTop = triggerRect.top - height - MARGIN
+      const belowTop = triggerRect.bottom + MARGIN
+      const fitsAbove = aboveTop >= MARGIN
+      const fitsBelow = belowTop + height <= window.innerHeight - MARGIN
+      let goAbove = placement === 'above'
+      if (goAbove && !fitsAbove) goAbove = fitsBelow ? false : triggerRect.top > window.innerHeight - triggerRect.bottom
+      else if (!goAbove && !fitsBelow) goAbove = fitsAbove ? true : triggerRect.top > window.innerHeight - triggerRect.bottom
+      let top = goAbove ? aboveTop : belowTop
       let left = triggerRect.left
       if (placement === 'right') {
         top = triggerRect.top

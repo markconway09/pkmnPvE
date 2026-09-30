@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ItemOptionEntry } from '../../shared/battle-types'
 import { COIN_PACKS, COIN_PRICE, COIN_PRIZES } from '../../shared/slots'
+import { WISHING_PIECE_ITEM_ID } from '../../shared/battle-types'
 import ItemSprite from './ItemSprite'
 import { formatMoney } from './money'
 import { errorMessage, pointOf, useFloatingNotes } from './FloatingNotes'
@@ -23,6 +24,15 @@ function CoinShopModal({ onClose, onMoneyChange }: Props): React.JSX.Element {
   const [items, setItems] = useState<Map<string, ItemOptionEntry>>(new Map())
   const [busy, setBusy] = useState(false)
   const notes = useFloatingNotes()
+
+  // The Raid Crystal is locked until Max Raids open (see BattleEligibility.raidsUnlocked).
+  const [raidLock, setRaidLock] = useState<{ unlocked: boolean; boss: string | null } | null>(null)
+  useEffect(() => {
+    window.api
+      .getBattleEligibility()
+      .then((e) => setRaidLock({ unlocked: e.raidsUnlocked, boss: e.raidUnlockBoss }))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     Promise.all([window.api.getCoins(), window.api.getMoney(), window.api.getEditorOptions()])
@@ -98,17 +108,22 @@ function CoinShopModal({ onClose, onMoneyChange }: Props): React.JSX.Element {
         <div className="shop-grid">
           {COIN_PRIZES.map((prize) => {
             const item = items.get(prize.itemId)
+            const locked = prize.itemId === WISHING_PIECE_ITEM_ID && !raidLock?.unlocked
             return (
-              <div key={prize.itemId} className="shop-item" title={item?.description}>
+              <div
+                key={prize.itemId}
+                className={`shop-item${locked ? ' shop-item-locked' : ''}`}
+                title={locked ? `Unlocks once you beat ${raidLock?.boss ?? 'the right boss'}` : item?.description}
+              >
                 {item && <ItemSprite spritenum={item.spritenum} className="shop-item-icon" />}
                 <span className="shop-item-name">{item?.name ?? prize.itemId}</span>
                 <span className="shop-item-price">
                   <CoinIcon /> {prize.coins.toLocaleString('en-US')}</span>
                 <button
-                  disabled={busy || coins === null || coins < prize.coins}
+                  disabled={busy || locked || coins === null || coins < prize.coins}
                   onClick={(e) => buyPrize(e, prize.itemId)}
                 >
-                  Trade
+                  {locked ? '🔒 Locked' : 'Trade'}
                 </button>
               </div>
             )

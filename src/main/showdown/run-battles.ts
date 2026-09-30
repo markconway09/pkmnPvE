@@ -52,7 +52,7 @@ export function createRunBattle(choice: RunChoice): WildBattle {
         : (generateRandomWildMon(opponentLevel + 4, location) ?? generateRandomWildMon(opponentLevel + 4, null))
     if (!wild) throw new Error('Could not find a wild Pokemon for this floor')
     wild.level = Math.max(opponentLevel - WILD_LEVEL_SPREAD, Math.min(opponentLevel, wild.level))
-    opponent = { team: [wild], name: 'Wild', difficulty: rules.aiOverride ?? 'easy', run }
+    opponent = { team: [wild], name: 'Wild', difficulty: rules.wildAi, run }
   } else if (kind === 'trainer') {
     // Any regular trainer lends a name, a sprite and a difficulty; the team is a
     // random one sized and levelled for the floor.

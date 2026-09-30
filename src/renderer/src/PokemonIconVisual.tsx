@@ -1,5 +1,5 @@
 import type { BoxPokemonView } from '../../shared/battle-types'
-import { toSpriteId } from '../../shared/battle-types'
+import { MERGE_MAX_STARS, toSpriteId } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
 import ItemSprite from './ItemSprite'
 import ShinyIcon from './ShinyIcon'
@@ -13,6 +13,8 @@ function PokemonIconVisual({ mon }: Props): React.JSX.Element {
 
   return (
     <>
+      {/* A fully merged (★5) Pokemon glows gold behind its sprite. */}
+      {mon.mergeStars === MERGE_MAX_STARS && <span className="box-icon-star-glow" />}
       <SpriteImage
         style="2d-static"
         className="box-icon-img"
@@ -28,6 +30,11 @@ function PokemonIconVisual({ mon }: Props): React.JSX.Element {
         <span className="box-icon-badges">
           {mon.favorite && <span title="Favorite">❤️</span>}
           {mon.shiny && <ShinyIcon />}
+        </span>
+      )}
+      {!!mon.mergeStars && (
+        <span className="box-icon-stars" title={`Merged ★${mon.mergeStars}: +${mon.mergeStars * 10}% to all stats in classic battles`}>
+          {'★'.repeat(mon.mergeStars)}
         </span>
       )}
       {mon.eligibleEvolutions && mon.eligibleEvolutions.length > 0 && (

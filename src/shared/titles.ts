@@ -21,6 +21,11 @@ export type Title =
   | 'Heartless'
   | 'Broker'
   | '9+10'
+  | 'Five-Star'
+  | 'Alchemist'
+  | 'Raid Leader'
+  | 'Gigantamax Hunter'
+  | 'Starlight'
 
 // What each title does, for the title pickers.
 export const TITLE_PERKS: Record<Title, string> = {
@@ -30,7 +35,7 @@ export const TITLE_PERKS: Record<Title, string> = {
   Champion: 'Running from trainers is free',
   Collector: '10% chance a catch is free',
   Professor: "Pokemon you haven't registered turn up more often in the wild",
-  'Shiny Hunter': 'Wild shiny odds 1 in 400 instead of 1 in 512',
+  'Shiny Hunter': 'Wild shiny odds 1 in 384 instead of 1 in 512 (not raid bosses)',
   'Legend Keeper': 'Random Legendary is likelier to give a box legendary',
   Tycoon: '10% off everything in the Shop',
   Survivor: 'Roguelite runs start with a free item pick',
@@ -40,7 +45,12 @@ export const TITLE_PERKS: Record<Title, string> = {
   'Edge Lord': "Plinko's edge slots pay double, at every risk",
   Heartless: 'Pokemon sell for 15% more',
   Broker: 'Grey, blue and purple Pokemon sell for double',
-  '9+10': 'Blackjack pays 3:1 instead of 3:2'
+  '9+10': 'Blackjack pays 3:1 instead of 3:2',
+  'Five-Star': 'Gold legendaries turn up twice as often as raid bosses',
+  Alchemist: '10% chance a merge adds a bonus copy',
+  'Raid Leader': 'Raid bosses are caught with 2 extra copies',
+  'Gigantamax Hunter': 'Raid bosses Gigantamax more often (65% instead of 50%)',
+  Starlight: 'Raid bosses are 3× as likely to be shiny (5× with the Shiny Charm)'
 }
 
 /** A title's perk, for showing beside it ("" for a title without one). */
@@ -54,7 +64,7 @@ export const BADGE_COLLECTOR_CANDY_CHANCE = 0.1
 export const COLLECTOR_FREE_CATCH_CHANCE = 0.1
 // How much likelier an unregistered species is in the wild (a weight on the pick).
 export const PROFESSOR_UNREGISTERED_WEIGHT = 2
-export const SHINY_HUNTER_ODDS = 400
+export const SHINY_HUNTER_ODDS = 384
 // With Legend Keeper, how often a Random Legendary is drawn from the box legendaries alone.
 export const LEGEND_KEEPER_RESTRICTED_CHANCE = 0.15
 export const TYCOON_SHOP_MULTIPLIER = 0.9
@@ -67,6 +77,14 @@ export const BROKER_DOUBLE_TIERS = new Set(['common', 'uncommon', 'rare'])
 // A natural blackjack's payout, to 1: 3:2 normally, 3:1 with 9+10.
 export const BLACKJACK_PAYOUT = 1.5
 export const NINE_PLUS_TEN_BLACKJACK_PAYOUT = 3
+// Max Raid and merging perks.
+export const FIVE_STAR_RESTRICTED_CHANCE = 0.3
+export const ALCHEMIST_BONUS_COPY_CHANCE = 0.1
+export const RAID_LEADER_EXTRA_COPIES = 2
+export const GIGANTAMAX_HUNTER_CHANCE = 0.65
+// Starlight's raid boss shiny multiplier - in place of the Shiny Charm's 3x, not on top of it.
+export const STARLIGHT_RAID_MULTIPLIER = 3
+export const STARLIGHT_RAID_CHARM_MULTIPLIER = 5
 
 // What the Game Corner's games need to know about the player's title.
 export interface GameCornerPerks {

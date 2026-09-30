@@ -20,6 +20,12 @@ interface Props {
   runFainted?: string[]
   // A run's trainer or boss beaten: a held item to pick waits on the run menu.
   runItemReward?: boolean
+  // A won Max Raid: the boss that joined the box.
+  raidCatch?: { species: string; shiny: boolean } | null
+  raidStars?: number
+  raidGigantamax?: boolean
+  // A Max Raid (won or lost).
+  isRaid?: boolean
   onClose: () => void
 }
 
@@ -34,6 +40,10 @@ function BattleResultModal({
   runBattle = false,
   runFainted = [],
   runItemReward = false,
+  raidCatch = null,
+  raidStars = 0,
+  raidGigantamax = false,
+  isRaid = false,
   onClose
 }: Props): React.JSX.Element {
   const [confirmingLeave, setConfirmingLeave] = useState(false)
@@ -101,7 +111,7 @@ function BattleResultModal({
 
   let heading = 'The battle ended in a tie.'
   if (winner === 'You') heading = 'You won the battle!'
-  else if (winner) heading = isWildBattle ? 'You lost to the wild pokemon!' : `${winner} won the battle!`
+  else if (winner) heading = isRaid ? 'You lost the raid!' : isWildBattle ? 'You lost to the wild pokemon!' : `${winner} won the battle!`
   if (runBattle && winner !== 'You') heading = 'Your run is over!'
 
   return createPortal(
@@ -133,6 +143,28 @@ function BattleResultModal({
             <button type="button" disabled={busy} onClick={() => setReplacing(null)}>
               Keep my team
             </button>
+          </div>
+        )}
+        {raidCatch && (
+          <div className="raid-catch">
+            <SpriteImage
+              style="2d-static"
+              className="raid-catch-sprite"
+              spriteId={toSpriteId(raidCatch.species)}
+              shiny={raidCatch.shiny}
+              alt={raidCatch.species}
+            />
+            <div className="raid-catch-text">
+              <strong>
+                Caught {raidCatch.shiny ? 'a shiny ' : ''}
+                {raidCatch.species}!
+              </strong>
+              <span className="merge-stars">{'★'.repeat(raidStars)}</span>
+              <span className="box-empty-hint">
+                It joined your box as ★{raidStars} ({2 ** raidStars} copies merged)
+                {raidGigantamax ? ' - and it can Gigantamax' : ''}.
+              </span>
+            </div>
           </div>
         )}
         {error && <p className="editor-error">{error}</p>}

@@ -8,6 +8,7 @@ import {
   buildPokemonSummary,
   effectDisplayName,
   findRosterIndex,
+  sameBaseSpecies,
   generateRandomSingle,
   getEditorOptions,
   getMoveInfo,
@@ -22,6 +23,7 @@ import {
   parseCondition,
   pokeballPrice,
   speciesStatsAndTypes,
+  speciesRarityTier,
   toID,
   type PokemonSet
 } from './sim-access'
@@ -36,6 +38,12 @@ import {
   withoutBadge
 } from './volatile-badges'
 import type { Pokemon as SimPokemon } from 'pokemon-showdown/dist/sim/pokemon.js'
+import type { Battle as SimBattle } from 'pokemon-showdown/dist/sim/battle.js'
+import { RAID_ATTACKS_PER_TURN, RAID_HP_MULTIPLIER, mergeStatMultiplier } from '../../shared/battle-types'
+import type { RaidView } from '../../shared/battle-types'
+import { RAID_PLACEHOLDER_NAME, raidPlaceholderSet } from './raid'
+import { RAID_LEADER_EXTRA_COPIES } from '../../shared/titles'
+import { countAchievement } from './achievement-progress'
 import { AIPlayer, type AiMovePower } from './battle-ai'
 
 // Moves that only work on the user's first turn after coming out.
@@ -312,6 +320,9 @@ export interface OpponentConfig {
   // status it had (one entry per team member, in order), and how it ends goes back
   // to the run - never to the box, bag, money, stats or boss progress.
   run?: { conditions: { hp: number; status: string | null }[]; kind: RunNodeKind }
+  // A Max Raid: the one opponent is Dynamaxed all battle (Gigantamax if it can) and
+  // joins the box when beaten - no Poke Ball needed.
+  raid?: { gigantamax: boolean; stars: number }
 }
 
 class HumanPlayer extends BattlePlayer {
@@ -392,10 +403,14 @@ export class WildBattle {
     p1team: PokemonSet[],
     formatId = 'gen9customgame',
     generationFormat = 'gen9randombattle',
-    opponent?: OpponentConfig
+    opponent?: OpponentConfig,
+    // Each team member's merge stars, in team order (classic battles and friendly
+    // matches only): +10% to all its stats per star.
+    mergeStars: { p1?: number[]; p2?: number[] } = {}
   ) {
     if (p1team.length === 0) throw new Error('Cannot start a battle with an empty team')
     this.opponent = opponent
+    this.mergeStars = { p1: mergeStars.p1 ?? [], p2: mergeStars.p2 ?? [] }
     this.human = new HumanPlayer(this.streams.p1, () => this.wake())
     this.ai = new AIPlayer(this.streams.p2, 'p2', opponent?.difficulty ?? 'easy', (slot, moveId) =>
       this.aiMovePower(slot, moveId)
@@ -410,14 +425,141 @@ export class WildBattle {
 
     const spec = { formatid: formatId }
     const p1spec = { name: 'You', team: packTeam(this.p1team) }
-    const p2spec = { name: opponent?.name ?? 'Wild', team: packTeam(this.p2team) }
+    // A raid's side also brings the placeholder that keeps the doubles battle running (see raid.ts).
+    const p2spec = {
+      name: opponent?.name ?? 'Wild',
+      team: packTeam(opponent?.raid ? [...this.p2team, raidPlaceholderSet()] : this.p2team)
+    }
 
     // Straight to the battle stream, which handles each write as it comes: with only
     // p1 in, their Pokemon exist but the battle hasn't started, so a run's carried-over
     // HP and status can be set before anyone is sent out.
     void this.battleStream.write(`>start ${JSON.stringify(spec)}\n>player p1 ${JSON.stringify(p1spec)}`)
     if (opponent?.run) this.applyRunConditions(opponent.run.conditions)
+    this.installMergeBoosts()
+    this.applyMergeBoosts(0, this.mergeStars.p1)
     void this.battleStream.write(`>player p2 ${JSON.stringify(p2spec)}`)
+    // p2's Pokemon only exist once they've joined (and the battle has begun) - at full
+    // HP, so a bigger max HP is simply full too.
+    this.applyMergeBoosts(1, this.mergeStars.p2)
+    if (opponent?.raid) this.setUpRaid(opponent.raid)
+  }
+
+  // A raid's boss Dynamaxes as it's sent out, for the whole battle (Dynamax ends when its
+  // turn count reaches 3 - this one's never will), and the placeholder faints the moment
+  // it arrives, leaving the boss alone on its side.
+  private setUpRaid(raid: NonNullable<OpponentConfig['raid']>): void {
+    const battle = this.battleStream.battle
+    const side = battle?.sides[1]
+    if (!battle || !side) return
+    const boss = side.pokemon[0]
+    if (!boss) return
+    // Showdown only keeps a set's Gigantamax flag in Gen 8.
+    if (raid.gigantamax) (boss as { gigantamax: boolean }).gigantamax = true
+    // Extra HP before it's sent out - Dynamaxing doubles it again on top.
+    boss.baseMaxhp = Math.floor(boss.baseMaxhp * RAID_HP_MULTIPLIER)
+    boss.maxhp = Math.floor(boss.maxhp * RAID_HP_MULTIPLIER)
+    boss.hp = boss.maxhp
+    const onSwitchIn = function (this: SimBattle, pokemon: SimPokemon): void {
+      if (pokemon.side !== side) return
+      if (pokemon.name === RAID_PLACEHOLDER_NAME) {
+        pokemon.faint()
+        return
+      }
+      if (!pokemon.volatiles['dynamax']) {
+        pokemon.addVolatile('dynamax')
+        ;(pokemon.volatiles['dynamax'] as { turns?: number }).turns = -1e9
+      }
+    }
+    battle.onEvent('SwitchIn', battle.format, onSwitchIn as never)
+
+    // It attacks more than once a turn: after each of its moves (up to its count for the
+    // turn) it goes again straight away, with its best attack (a Max Move, as it's
+    // Dynamaxed) at whichever foe that hurts most - never one immune to it.
+    let turnSeen = -1
+    let attacksThisTurn = 0
+    const onAfterMove = function (this: SimBattle, source: SimPokemon): void {
+      if (source !== boss || source.fainted) return
+      if (turnSeen !== this.turn) {
+        turnSeen = this.turn
+        attacksThisTurn = 0
+      }
+      attacksThisTurn++
+      if (attacksThisTurn >= RAID_ATTACKS_PER_TURN) return
+      const foes = source.foes()
+      const attacks = source.moveSlots.filter((slot) => slot.pp > 0 && this.dex.moves.get(slot.id).category !== 'Status')
+      if (foes.length === 0 || attacks.length === 0) return
+      // Each attack against each foe: its power, times how well its type lands (with the
+      // boss's own STAB) - the best pairing wins, ties at random.
+      const ownTypes = source.getTypes()
+      let best: { slotId: string; foe: SimPokemon; score: number } | null = null
+      for (const slot of attacks) {
+        const move = this.dex.moves.get(slot.id)
+        for (const foe of foes) {
+          const hits = this.dex.getImmunity(move.type, foe) ? 2 ** this.dex.getEffectiveness(move.type, foe) : 0
+          const score = (move.basePower || 60) * hits * (ownTypes.includes(move.type) ? 1.5 : 1) * (1 + this.random(10) / 100)
+          if (!best || score > best.score) best = { slotId: slot.id, foe, score }
+        }
+      }
+      if (!best || best.score <= 0) return
+      const maxMove = this.actions.getMaxMove(this.dex.moves.get(best.slotId), source)
+      const [action] = this.queue.resolveAction({
+        choice: 'move',
+        pokemon: source,
+        moveid: best.slotId,
+        targetLoc: source.getLocOf(best.foe),
+        maxMove: maxMove ? maxMove.id : undefined
+      } as never)
+      if (action) this.queue.prioritizeAction(action as never)
+    }
+    battle.onEvent('AfterMove', battle.format, onAfterMove as never)
+  }
+
+  private raidCatch: RaidView['caught'] = null
+  // The weather in play, for naming it in the log when it ends.
+  private textWeather: string | null = null
+
+  private readonly mergeStars: { p1: number[]; p2: number[] }
+
+  // Merge stars: every Attack, Defense, Sp. Atk, Sp. Def and Speed the sim works out goes
+  // through these (the same hooks items and abilities use, so it lasts through Mega
+  // Evolution and form changes), for any Pokemon given a boost below.
+  private installMergeBoosts(): void {
+    const battle = this.battleStream.battle
+    if (!battle || ![...this.mergeStars.p1, ...this.mergeStars.p2].some((s) => s > 0)) return
+    const boost = function (this: SimBattle, _value: number, pokemon: SimPokemon | null): void {
+      const multiplier = pokemon?.m?.mergeBoost as number | undefined
+      if (multiplier) this.chainModify(multiplier)
+    }
+    for (const stat of ['Atk', 'Def', 'SpA', 'SpD', 'Spe']) battle.onEvent(`Modify${stat}`, battle.format, boost as never)
+  }
+
+  // Marks each boosted Pokemon on this side (by its place in the team, which the sim keeps
+  // on its set) and raises its max HP the same way.
+  private applyMergeBoosts(sideIndex: 0 | 1, stars: number[]): void {
+    const side = this.battleStream.battle?.sides[sideIndex]
+    if (!side || !stars.some((s) => s > 0)) return
+    for (const mon of side.pokemon) {
+      const count = stars[side.team.indexOf(mon.set)] ?? 0
+      if (!count) continue
+      const multiplier = mergeStatMultiplier(count)
+      const ratio = mon.maxhp > 0 ? mon.hp / mon.maxhp : 1
+      mon.m.mergeBoost = multiplier
+      mon.baseMaxhp = Math.floor(mon.baseMaxhp * multiplier)
+      mon.maxhp = Math.floor(mon.maxhp * multiplier)
+      mon.hp = ratio >= 1 ? mon.maxhp : Math.max(1, Math.round(ratio * mon.maxhp))
+    }
+  }
+
+  // The battle screen's stats for a boosted Pokemon (its tooltip and effective stats).
+  private withMergeStats(view: ActivePokemonView, side: 'p1' | 'p2'): ActivePokemonView {
+    const count = view.rosterIndex !== undefined ? (this.mergeStars[side][view.rosterIndex] ?? 0) : 0
+    if (!count) return view
+    const multiplier = mergeStatMultiplier(count)
+    const stats = { ...view.stats }
+    for (const key of Object.keys(stats) as (keyof typeof stats)[]) stats[key] = Math.floor(stats[key] * multiplier)
+    view.stats = stats
+    return view
   }
 
   private applyRunConditions(conditions: { hp: number; status: string | null }[]): void {
@@ -479,6 +621,8 @@ export class WildBattle {
       const liveEffects = this.readLiveEffects()
       const lastUpkeepIndex = lines.lastIndexOf('|upkeep')
       for (const [index, line] of lines.entries()) {
+        // A raid's placeholder never shows: not sent out, not fainting, not in the log.
+        if (this.opponent?.raid && line.includes(`: ${RAID_PLACEHOLDER_NAME}`)) continue
         const hpBefore: Record<SlotKey, number | null> = {
           p1a: this.active.p1a?.hpPercent ?? null,
           p1b: this.active.p1b?.hpPercent ?? null,
@@ -489,12 +633,30 @@ export class WildBattle {
         this.applyFieldEffectLine(line, liveEffects, index < lastUpkeepIndex ? 1 : 0)
 
         const { args, kwArgs } = BattleTextParser.parseBattleLine(line)
+        // Weather ending is just "-weather|none": the parser names what ended from [from],
+        // which Showdown's own client fills in from its state - so this does the same.
+        if (args[0] === '-weather') {
+          if (args[1] && args[1] !== 'none') this.textWeather = args[1]
+          else {
+            if (!kwArgs.from && this.textWeather) kwArgs.from = this.textWeather
+            this.textWeather = null
+          }
+        }
         // The parser would say "Wild won the battle!" - a wild encounter has no
         // trainer to name, so phrase the loss from the player's side instead.
+        // A raid boss Dynamaxing reads as such (the parser has no line for it), and the silent
+        // HP top-up that comes with it stays silent.
+        const dynamaxStart = /^\|-start\|p2[ab]: ([^|]+)\|Dynamax(\|Gmax)?/.exec(line)
         const rendered =
           line.startsWith('|win|') && !this.opponent?.trainerId && line !== '|win|You'
-            ? 'You lost to the wild pokemon!'
-            : this.textParser.parseArgs(args, kwArgs) || ''
+            ? this.opponent?.raid
+              ? 'You lost the raid!'
+              : 'You lost to the wild pokemon!'
+            : dynamaxStart
+              ? `The raid boss ${dynamaxStart[1]} ${dynamaxStart[2] ? 'Gigantamaxed' : 'Dynamaxed'}!`
+              : this.opponent?.raid && line.startsWith('|-heal|') && line.includes('[silent]')
+                ? ''
+                : this.textParser.parseArgs(args, kwArgs) || ''
         const event = computeFeedbackEvent(line)
         const moveEvent = this.computeMoveEvent(line, lines.slice(index + 1))
         const gimmickEvent = computeGimmickEvent(line)
@@ -536,6 +698,7 @@ export class WildBattle {
             } else {
               countStat('wildDefeated')
             }
+            if (this.opponent?.raid) this.catchRaidBoss(this.opponent.raid)
             const baseExp = this.p2team.reduce((sum, mon) => sum + expYieldFor(mon.species, mon.level), 0)
             // The Exp. Charm (1.5x) and the Veteran title (+10%) - they stack.
             let totalExp = baseExp
@@ -744,11 +907,13 @@ export class WildBattle {
     fainted: boolean,
     status: string | null,
     set: PokemonSet | null,
-    switchSeq = 0
+    switchSeq = 0,
+    rosterIndex?: number
   ): ActivePokemonView {
     const summary = buildPokemonSummary(species, set)
     return {
       ...summary,
+      rosterIndex: rosterIndex !== undefined && rosterIndex >= 0 ? rosterIndex : undefined,
       baseTypes: [...summary.types],
       item: set ? (this.heldItems.get(set) ?? set.item) : '',
       hpPercent,
@@ -768,16 +933,34 @@ export class WildBattle {
   private buildTeamView(): ActivePokemonView[] {
     const request = this.human.latestRequest
     if (!request) return []
-    return request.side.pokemon.map((mon) => {
-      // side.pokemon isn't in fixed roster order - it's reordered so the
-      // currently active Pokemon comes first - so match by species instead
-      // of position, same as switch/drag tracking does.
+    const simSide = this.battleStream.battle?.sides[0]
+    return request.side.pokemon.map((mon, i) => {
+      // side.pokemon isn't in fixed roster order - it's reordered so the currently
+      // active Pokemon comes first. The sim's own list is in that same order, and each
+      // of its Pokemon keeps the set it was built from, which says where it is in the
+      // roster - so two of the same species are still told apart. (By species otherwise.)
       const species = mon.details.split(',')[0].trim()
       const { hpPercent, fainted, status } = parseCondition(mon.condition)
-      const rosterIndex = findRosterIndex(this.p1team, species)
+      const live = simSide?.pokemon[i]
+      let rosterIndex = live ? simSide.team.indexOf(live.set) : -1
+      if (rosterIndex < 0 || !sameBaseSpecies(this.p1team[rosterIndex].species, species)) {
+        rosterIndex = findRosterIndex(this.p1team, species)
+      }
       const set = rosterIndex >= 0 ? this.p1team[rosterIndex] : null
-      return this.buildActiveView(species, hpPercent, fainted, status, set)
+      return this.withMergeStats(this.buildActiveView(species, hpPercent, fainted, status, set, 0, rosterIndex), 'p1')
     })
+  }
+
+  // Which roster member just came into this slot. The switch line only names the
+  // species, so with two of the same one on a team the sim is asked which of them is
+  // in the slot (each of its Pokemon keeps the set it was built from, in roster order).
+  private switchedInRosterIndex(slotKey: SlotKey, team: PokemonSet[], species: string): number {
+    const candidates = team.flatMap((set, i) => (sameBaseSpecies(set.species, species) ? [i] : []))
+    if (candidates.length <= 1) return candidates[0] ?? findRosterIndex(team, species)
+    const simSide = this.battleStream.battle?.sides[slotKey.startsWith('p1') ? 0 : 1]
+    const live = simSide?.active[slotKey.charCodeAt(2) - 'a'.charCodeAt(0)]
+    const index = live ? simSide.team.indexOf(live.set) : -1
+    return candidates.includes(index) ? index : candidates[0]
   }
 
   // Unlike p1, the opponent has no per-turn "request" to read fainted/status
@@ -790,10 +973,11 @@ export class WildBattle {
   private opponentRoster(): RosterSlotView[] {
     const side = this.battleStream.battle?.sides[1]
     if (!side) return this.p2team.map((mon) => ({ species: mon.species, fainted: false, status: null }))
-    return side.pokemon.map((mon) => ({
+    return side.pokemon.filter((mon) => !(this.opponent?.raid && mon.name === RAID_PLACEHOLDER_NAME)).map((mon) => ({
       species: mon.species?.name ?? mon.name,
       fainted: mon.fainted,
-      status: mon.status || null
+      status: mon.status || null,
+      rosterIndex: side.team.indexOf(mon.set)
     }))
   }
 
@@ -829,8 +1013,25 @@ export class WildBattle {
   // defeated wild Pokemon (no held item) joins the box. Only a genuine wild
   // encounter (no trainerId) that the player just won can be caught, and
   // only once per battle.
+  // A beaten raid boss always joins the box: its stars as copies, and its Gigantamax form.
+  private catchRaidBoss(raid: NonNullable<OpponentConfig['raid']>): void {
+    const boss = this.p2team[0]
+    // Raid Leader: a couple of extra copies on top of the boss's stars.
+    const copies = 2 ** raid.stars + (hasTitle('Raid Leader') ? RAID_LEADER_EXTRA_COPIES : 0)
+    addCaughtMon(boss, { copies, gigantamax: raid.gigantamax })
+    this.raidCatch = { species: boss.species, shiny: !!boss.shiny }
+    this.caught = true
+    countStat('wildCaught')
+    countAchievement('raidsWon')
+    if (speciesRarityTier(boss.species) === 'legendary') countAchievement('goldRaidsWon')
+    if (boss.shiny) countAchievement('shinyRaidCatches')
+    // None of the player's Pokemon fainted.
+    if (!this.battleStream.battle?.sides[0].pokemon.some((p) => p.fainted)) countAchievement('flawlessRaids')
+  }
+
   catchWildPokemon(replaceRunMonId?: string): CatchResult {
     if (!this.ended || this.winner !== 'You') throw new Error('You have not won this battle yet')
+    if (this.opponent?.raid) throw new Error('A raid boss is caught as soon as it is beaten')
     if (this.opponent?.trainerId) throw new Error('Only a wild Pokemon can be caught')
     if (this.caught) throw new Error('This Pokemon has already been caught')
     if (this.opponent?.run) {
@@ -997,11 +1198,14 @@ export class WildBattle {
       const species = parts[2].split(',')[0].trim()
       const { hpPercent, fainted, status } = parseCondition(parts[3])
       const team = side === 'p1' ? this.p1team : this.p2team
-      const rosterIndex = findRosterIndex(team, species)
+      const rosterIndex = this.switchedInRosterIndex(slotKey, team, species)
       const set = rosterIndex >= 0 ? team[rosterIndex] : null
       this.switchSeq[slotKey]++
       this.addedType[slotKey] = null
-      this.active[slotKey] = this.buildActiveView(species, hpPercent, fainted, status, set, this.switchSeq[slotKey])
+      this.active[slotKey] = this.withMergeStats(
+        this.buildActiveView(species, hpPercent, fainted, status, set, this.switchSeq[slotKey], rosterIndex),
+        side
+      )
       // A wild battle is the one with no trainer (trainerId) on the other side.
       if (side === 'p2' && !this.opponent?.trainerId) this.active[slotKey]!.caughtBefore = hasRegisteredSpecies(species)
       // Terastallizing lasts the whole battle: one that switches back in says so in its details.
@@ -1028,6 +1232,7 @@ export class WildBattle {
       current.baseTypes = [...types]
       this.addedType[slotKey] = null
       current.stats = stats
+      this.withMergeStats(current, side)
     } else if (cmd === '-transform') {
       // The target's ident (e.g. "p2a: Ditto"), not a species name - look up what
       // that slot's Pokemon currently looks like and copy its appearance.
@@ -1095,12 +1300,19 @@ export class WildBattle {
         this.addedType[slotKey] = parts[3]
       } else if (parts[2] === 'Substitute') {
         current.substituted = true
+      } else if (parts[2] === 'Dynamax') {
+        current.dynamaxed = true
+        current.gigantamax = parts[3] === 'Gmax'
       } else {
         const badge = badgeFor(parts[2], parts[3])
         if (badge) current.volatiles = withBadge(current.volatiles, badge)
       }
     } else if (cmd === '-end') {
       if (parts[2] === 'Substitute') current.substituted = false
+      if (parts[2] === 'Dynamax') {
+        current.dynamaxed = false
+        current.gigantamax = false
+      }
       // A trap ends under the move's name ("Wrap"), tagged [partiallytrapped].
       current.volatiles = parts.includes('[partiallytrapped]')
         ? withoutBadge(current.volatiles, 'partiallytrapped')
@@ -1300,7 +1512,11 @@ export class WildBattle {
       rewards: this.rewardsView(),
       runBattle: !!this.opponent?.run,
       runFainted: this.runFainted,
-      runItemReward: this.runItemReward
+      runItemReward: this.runItemReward,
+      bossBattle: !!this.opponent?.isBoss,
+      raid: this.opponent?.raid
+        ? { gigantamax: this.opponent.raid.gigantamax, stars: this.opponent.raid.stars, caught: this.raidCatch }
+        : null
     }
   }
 

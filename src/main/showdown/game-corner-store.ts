@@ -6,7 +6,8 @@ import { GOLDEN_TOUCH_JACKPOT_BONUS } from '../../shared/titles'
 import { betCap, hasTitle } from './title-perks'
 import { getMoney, spendMoney } from './money-store'
 import { addItem } from './bag-store'
-import { getEditorOptions, randomSlotPokemon } from './sim-access'
+import { getEditorOptions, isLateGameItem, randomSlotPokemon } from './sim-access'
+import { lateItemsUnlocked } from './progression-store'
 import { playerPathFor } from './save-paths'
 import { onPlayerChange } from './player-session'
 import { countAchievement } from './achievement-progress'
@@ -76,6 +77,8 @@ export function buyCoins(amount: number): CoinBalance {
 export function buyCoinPrize(itemId: string): CoinBalance & { itemName: string } {
   const prize = COIN_PRIZES.find((p) => p.itemId === itemId)
   if (!prize) throw new Error("That isn't one of the prizes")
+  // Late items (the Raid Crystal) wait for the same boss as the Shop's.
+  if (isLateGameItem(prize.itemId) && !lateItemsUnlocked()) throw new Error("That prize isn't unlocked yet")
   if (getCoins() < prize.coins) throw new Error(`That prize costs ${prize.coins.toLocaleString('en-US')} coins`)
   getState().coins -= prize.coins
   persist()

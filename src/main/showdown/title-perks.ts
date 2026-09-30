@@ -1,5 +1,5 @@
 import type { RarityTier } from '../../shared/battle-types'
-import { POKEMON_SELL_PRICES } from '../../shared/battle-types'
+import { POKEMON_SELL_PRICES, SHINY_SELL_BONUS } from '../../shared/battle-types'
 import type { GameCornerPerks, Title } from '../../shared/titles'
 import {
   BLACKJACK_PAYOUT,
@@ -30,7 +30,13 @@ export function hasTitle(title: Title): boolean {
 }
 
 /** What a Pokemon of this rarity sells for, with Heartless or Broker. */
-export function monSellPrice(tier: RarityTier): number {
+export function monSellPrice(tier: RarityTier, shiny = false, copies = 1): number {
+  // A merged Pokemon pays for every copy that went into it.
+  return rarityPrice(tier) * Math.max(1, copies) + (shiny ? SHINY_SELL_BONUS : 0)
+}
+
+// Its rarity's price, with a title's bonus.
+function rarityPrice(tier: RarityTier): number {
   const base = POKEMON_SELL_PRICES[tier]
   if (hasTitle('Broker') && BROKER_DOUBLE_TIERS.has(tier)) return base * 2
   if (hasTitle('Heartless')) return Math.round(base * HEARTLESS_SELL_MULTIPLIER)

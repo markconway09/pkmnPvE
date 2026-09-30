@@ -20,7 +20,7 @@ import TeamPanel, { type TeamMatchup } from './TeamPanel'
 import TrainerHud from './TrainerHud'
 import BattleResultModal from './BattleResultModal'
 import FieldEffectsOverlay from './FieldEffectsOverlay'
-import { backdropUrl, randomBackdropId } from './battleScenery'
+import { backdropUrl, battleBackdropId, randomBackdropId } from './battleScenery'
 import Options from './Options'
 import MainMenu from './MainMenu'
 import TrainerList from './TrainerList'
@@ -137,10 +137,27 @@ function sameMon(a: string, b: string): boolean {
   return a === b || a.startsWith(`${b}-`) || b.startsWith(`${a}-`)
 }
 
-function lookupState(states: Map<string, MonState>, species: string): MonState | undefined {
-  const exact = states.get(species)
+// Who a team state belongs to: its roster slot when the main process says (so two of
+// the same species don't share one), otherwise its species.
+interface MonIdentity {
+  species: string
+  rosterIndex?: number
+}
+function stateKey(mon: MonIdentity): string {
+  return mon.rosterIndex !== undefined ? `#${mon.rosterIndex}` : mon.species
+}
+
+// The same team member: by roster slot when both know it, by species otherwise.
+function sameMember(a: MonIdentity, b: MonIdentity): boolean {
+  if (a.rosterIndex !== undefined && b.rosterIndex !== undefined) return a.rosterIndex === b.rosterIndex
+  return sameMon(a.species, b.species)
+}
+
+function lookupState(states: Map<string, MonState>, mon: MonIdentity): MonState | undefined {
+  const exact = states.get(stateKey(mon))
   if (exact) return exact
-  for (const [name, state] of states) if (sameMon(name, species)) return state
+  if (mon.rosterIndex !== undefined) return undefined
+  for (const [name, state] of states) if (!name.startsWith('#') && sameMon(name, mon.species)) return state
   return undefined
 }
 
@@ -158,8 +175,12 @@ function replayStates(
   for (let i = from; i < upTo; i++) {
     for (const mon of snapshots[i]?.[side] ?? []) {
       if (!mon) continue
-      for (const name of [...states.keys()]) if (name !== mon.species && sameMon(name, mon.species)) states.delete(name)
-      states.set(mon.species, { hpPercent: mon.hpPercent, fainted: mon.fainted, status: mon.status })
+      const key = stateKey(mon)
+      // Keyed by species, a forme change (Charizard -> Charizard-Mega-X) replaces the old entry.
+      if (mon.rosterIndex === undefined) {
+        for (const name of [...states.keys()]) if (name !== key && sameMon(name, mon.species)) states.delete(name)
+      }
+      states.set(key, { hpPercent: mon.hpPercent, fainted: mon.fainted, status: mon.status })
     }
   }
   return states
@@ -363,8 +384,9 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
   const [settled, setSettled] = useState<SettledTeams | null>(null)
   useEffect(() => {
     if (!view || !caughtUp) return
-    const toStates = (mons: { species: string; hpPercent?: number; fainted: boolean; status: string | null }[]) =>
-      new Map(mons.map((m) => [m.species, { hpPercent: m.hpPercent, fainted: m.fainted, status: m.status }]))
+    const toStates = (
+      mons: { species: string; rosterIndex?: number; hpPercent?: number; fainted: boolean; status: string | null }[]
+    ) => new Map(mons.map((m) => [stateKey(m), { hpPercent: m.hpPercent, fainted: m.fainted, status: m.status }]))
     setSettled({ logLength: view.log.length, team: toStates(view.team), roster: toStates(view.opponentRoster) })
   }, [view, caughtUp])
   // A new battle starts its log from nothing - the last battle's teams mean nothing to it.
@@ -376,16 +398,16 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
   const teamStates = rewinding ? replayStates(settled.team, view.logStates, settled.logLength, visibleLogCount, 'p1') : null
   const rosterStates = rewinding ? replayStates(settled.roster, view.logStates, settled.logLength, visibleLogCount, 'p2') : null
   const displayedTeam: ActivePokemonView[] = (view?.team ?? []).map((mon) => {
-    const state = teamStates && lookupState(teamStates, mon.species)
+    const state = teamStates && lookupState(teamStates, mon)
     return state ? { ...mon, hpPercent: state.hpPercent ?? mon.hpPercent, fainted: state.fainted, status: state.status } : mon
   })
   const displayedRoster = (view?.opponentRoster ?? []).map((mon) => {
-    const state = rosterStates && lookupState(rosterStates, mon.species)
+    const state = rosterStates && lookupState(rosterStates, mon)
     return state ? { ...mon, fainted: state.fainted, status: state.status } : mon
   })
   // Who's marked as out on the field - from the field itself while the turn plays.
   const displayedActiveFlags = rewinding
-    ? displayedTeam.map((mon) => field.p1.some((a) => !!a && !a.fainted && sameMon(a.species, mon.species)))
+    ? displayedTeam.map((mon) => field.p1.some((a) => !!a && !a.fainted && sameMember(a, mon)))
     : activeFlags
   // Only the line just revealed carries a result to flash - see BattleSprite,
   // which keeps it on screen for a bit after this goes back to null.
@@ -426,12 +448,28 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
     }
   }
 
+  async function startRaidBattle(): Promise<void> {
+    setError(null)
+    setBusy(true)
+    try {
+      const initial = await skipTeamPreview(await window.api.startRaidBattle())
+      setBackdrop(battleBackdropId(initial))
+      setView(initial)
+      setRevealedCount(0)
+      setScreen('battle')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function startTrainerBattle(boss: boolean, rematchTrainerId?: string): Promise<void> {
     setError(null)
     setBusy(true)
     try {
       const initial = await skipTeamPreview(await window.api.startTrainerBattle(boss, rematchTrainerId))
-      setBackdrop(randomBackdropId())
+      setBackdrop(battleBackdropId(initial))
       setView(initial)
       setRevealedCount(0)
       setScreen('battle')
@@ -449,7 +487,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
   async function startRunBattle(started: BattleView, location?: WildLocationId): Promise<void> {
     setError(null)
     const initial = await skipTeamPreview(started)
-    setBackdrop(randomBackdropId(location))
+    setBackdrop(battleBackdropId(initial, location))
     setView(initial)
     setRevealedCount(0)
     setScreen('battle')
@@ -740,6 +778,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
           wildLevelCap={wildLevelCap}
           onChangeWildLevelCap={setWildLevelCap}
           onTrainerFight={() => void startTrainerBattle(false)}
+          onRaidFight={() => void startRaidBattle()}
           onBossFight={() => void startTrainerBattle(true)}
           onBossRematch={(trainerId) => void startTrainerBattle(true, trainerId)}
           onOptions={() => setOptionsOpen(true)}
@@ -872,7 +911,11 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
             expGains={view.expGains}
             itemDrops={view.itemDrops}
             moneyGained={view.moneyGained}
-            canCatch={view.winner === 'You' && !view.opponentTrainer}
+            canCatch={view.winner === 'You' && !view.opponentTrainer && !view.raid}
+            raidCatch={view.raid?.caught ?? null}
+            raidStars={view.raid?.stars ?? 0}
+            raidGigantamax={!!view.raid?.gigantamax}
+            isRaid={!!view.raid}
             isWildBattle={!view.opponentTrainer}
             opponentShiny={!!view.p2[0]?.shiny}
             runBattle={view.runBattle}

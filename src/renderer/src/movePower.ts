@@ -6,7 +6,9 @@ export function movePowerLabel(power: LiveMovePower | undefined | null): string 
   if (power.varies) return 'BP varies'
   if (power.fixedDamage !== null) return `Dmg ${power.fixedDamage}`
   if (power.basePower === null) return null
-  return power.basePowerMax !== null ? `BP ${power.basePower}–${power.basePowerMax}` : `BP ${power.basePower}`
+  const label = power.basePowerMax !== null ? `BP ${power.basePower}–${power.basePowerMax}` : `BP ${power.basePower}`
+  // Doubled against a Dynamaxed foe (Behemoth Blade and co.).
+  return power.dynamaxBonus ? `${label} (2×)` : label
 }
 
 /** The wording for a move's tooltip, where the printed power is replaced by what it is right now. */
@@ -16,5 +18,6 @@ export function movePowerText(power: LiveMovePower | undefined | null, printed: 
   if (power.fixedDamage !== null) return `${power.fixedDamage} (fixed damage)`
   if (power.basePower === null) return '—'
   const value = power.basePowerMax !== null ? `${power.basePower}–${power.basePowerMax}` : String(power.basePower)
+  if (power.dynamaxBonus) return `${value} (doubled against a Dynamaxed foe)`
   return power.dynamic ? `${value} (right now)` : value
 }

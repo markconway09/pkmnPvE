@@ -29,6 +29,8 @@ import type {
   BossRematchInfo,
   RunChoiceResult,
   RunDifficulty,
+  RunConsumableId,
+  RunShopTile,
   RunMonEdit,
   RunMonEditInfo,
   RunMovesPreview,
@@ -85,6 +87,13 @@ const api = {
   swapRunMon: (runMonId: string): Promise<RunView> => ipcRenderer.invoke('run:swapMon', runMonId),
   swapRunTeam: (): Promise<RunView> => ipcRenderer.invoke('run:swapTeam'),
   skipRunSwap: (): Promise<RunView> => ipcRenderer.invoke('run:skipSwap'),
+  // Roguelite consumables (outside battle) and a boss floor's shop.
+  useRunFullRestore: (runMonId: string): Promise<RunView> => ipcRenderer.invoke('run:fullRestore', runMonId),
+  useRunRevive: (faintedId: string): Promise<RunView> => ipcRenderer.invoke('run:revive', faintedId),
+  useRunAbilityCapsule: (runMonId: string, abilityId: string): Promise<RunView> =>
+    ipcRenderer.invoke('run:abilityCapsule', runMonId, abilityId),
+  buyRunConsumable: (id: RunConsumableId): Promise<RunView> => ipcRenderer.invoke('run:buyConsumable', id),
+  buyRunShopTile: (tile: RunShopTile): Promise<RunView> => ipcRenderer.invoke('run:buyShopTile', tile),
   listAllAbilities: (): Promise<{ id: string; name: string }[]> => ipcRenderer.invoke('dex:abilities'),
   rerollRunItems: (): Promise<RunView> => ipcRenderer.invoke('run:rerollItems'),
   evolveRunMon: (runMonId: string, targetSpecies: string, newMoves: boolean): Promise<RunView> =>
@@ -95,6 +104,8 @@ const api = {
   submitChoice: (choice: string): Promise<BattleView> => ipcRenderer.invoke('battle:choose', choice),
   // replaceRunMonId: in a run with a full team, who the new Pokemon replaces.
   catchWildPokemon: (replaceRunMonId?: string): Promise<CatchResult> => ipcRenderer.invoke('battle:catch', replaceRunMonId),
+  // A Max Raid (uses up a Raid Crystal).
+  startRaidBattle: (): Promise<BattleView> => ipcRenderer.invoke('battle:startRaid'),
   runFromBattle: (): Promise<void> => ipcRenderer.invoke('battle:run'),
   getBattleEligibility: (): Promise<BattleEligibility> => ipcRenderer.invoke('battle:eligibility'),
   getMoveInfo: (id: string): Promise<MoveInfo | null> => ipcRenderer.invoke('dex:move', id),
@@ -112,6 +123,9 @@ const api = {
   changeForm: (id: string, form: string): Promise<BoxState> => ipcRenderer.invoke('box:changeForm', id, form),
   fuseMon: (id: string, partnerId: string): Promise<BoxState> => ipcRenderer.invoke('box:fuse', id, partnerId),
   unfuseMon: (id: string): Promise<BoxState> => ipcRenderer.invoke('box:unfuse', id),
+  // Merges duplicates into a Pokemon (see mergeMons).
+  mergeMons: (keeperId: string, fodderIds: string[]): Promise<BoxState> =>
+    ipcRenderer.invoke('box:merge', keeperId, fodderIds),
   listLoadouts: (): Promise<LoadoutView[]> => ipcRenderer.invoke('loadouts:list'),
   saveLoadout: (name: string): Promise<LoadoutView[]> => ipcRenderer.invoke('loadouts:save', name),
   updateLoadout: (id: string): Promise<LoadoutView[]> => ipcRenderer.invoke('loadouts:update', id),

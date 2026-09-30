@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { AutoSetOption, EditablePokemonSet, EditorOptions, SpeciesEditInfo, StatBlock, BoxPokemonView } from '../../shared/battle-types'
-import { NON_HELD_ITEM_IDS, toSpriteId } from '../../shared/battle-types'
+import { NON_HELD_ITEM_IDS, mergeStatMultiplier, toSpriteId } from '../../shared/battle-types'
 import type { NatureOptionEntry } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
 import ItemSprite from './ItemSprite'
@@ -51,6 +51,8 @@ interface Props {
   // Its form changes (Rotom Catalog, Prison Bottle...), listed the same way.
   formChanges?: BoxPokemonView['formChanges']
   onChangeForm?: (form: string) => void
+  // A box Pokemon's merge stars: the Stat column shows them (+10% each, in classic battles).
+  mergeStars?: number
 }
 
 // The Rare Candy's icon (see ItemSprite).
@@ -127,7 +129,8 @@ function PokemonEditor({
   evolutionPaths,
   onEvolve,
   formChanges,
-  onChangeForm
+  onChangeForm,
+  mergeStars
 }: Props): React.JSX.Element {
   // Premade team rosters are admin/debug tooling, not the player's own
   // Pokemon - they keep every option (no bag restriction, no level-gated
@@ -809,13 +812,19 @@ function PokemonEditor({
                     ))}
                   </select>
                 </label>
+                {!!mergeStars && (
+                  <p className="editor-hint merge-editor-hint">
+                    <span className="merge-stars">{'★'.repeat(mergeStars)}</span> Merged: +{mergeStars * 10}% to all
+                    stats in classic battles - shown in gold beside each stat.
+                  </p>
+                )}
                 <div className="editor-ev-row editor-ev-header">
                   <span className="editor-ev-label" />
                   <span className="editor-ev-base">Base</span>
                   <span className="editor-ev-iv">IVs</span>
                   <span className="editor-ev-spacer" />
                   <span className="editor-ev-input-head">EVs</span>
-                  <span className="editor-ev-stat">Stat</span>
+                  <span className={`editor-ev-stat${mergeStars ? ' editor-ev-stat-wide' : ''}`}>Stat</span>
                 </div>
                 {STAT_LABELS.map(({ key, label }) => {
                   const natureMark =
@@ -859,10 +868,18 @@ function PokemonEditor({
                         }
                         onChange={(e) => handleEvInput(key, e.target.value)}
                       />
-                      <span className={`editor-ev-stat${natureMark}`}>
+                      <span className={`editor-ev-stat${natureMark}${mergeStars ? ' editor-ev-stat-wide' : ''}`}>
                         {baseStats
                           ? finalStat(key, baseStats[key], set.level, set.ivs[key], set.evs[key], nature)
                           : '—'}
+                        {!!mergeStars && baseStats && (
+                          <span className="editor-ev-stat-merged" title={`With the ★${mergeStars} merge bonus`}>
+                            {Math.floor(
+                              finalStat(key, baseStats[key], set.level, set.ivs[key], set.evs[key], nature) *
+                                mergeStatMultiplier(mergeStars)
+                            )}
+                          </span>
+                        )}
                       </span>
                     </div>
                   )

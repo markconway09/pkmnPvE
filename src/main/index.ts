@@ -5,6 +5,8 @@ import type {
   BossRematchInfo,
   RunChoiceResult,
   RunDifficulty,
+  RunConsumableId,
+  RunShopTile,
   RunMonEdit,
   RunView,
   BossStep,
@@ -14,7 +16,13 @@ import type {
   Trainer
 } from '../shared/battle-types'
 import type { ItemQuantity, WildLocationId } from '../shared/battle-types'
-import { WILD_LOCATIONS, WILD_RANDOM_DROP_CHANCE, normalizeUsername, usernameProblem } from '../shared/battle-types'
+import {
+  WILD_LOCATIONS,
+  WILD_RANDOM_DROP_CHANCE,
+  WISHING_PIECE_ITEM_ID,
+  normalizeUsername,
+  usernameProblem
+} from '../shared/battle-types'
 import { WildBattle, getMoveInfo } from './showdown/battle-runtime'
 import {
   addRandomMon,
@@ -33,6 +41,9 @@ import {
   changeForm,
   fuseMon,
   unfuseMon,
+  mergeMons,
+  getTeamMergeStars,
+  readSavedTeamStarsOf,
   readSavedTeamOf,
   scaleTeamToLevel,
   resetBox,
@@ -41,7 +52,8 @@ import {
   useExpCandy,
   useExpCandiesUntilCap
 } from './showdown/box-store'
-import { getBagState, resetBag } from './showdown/bag-store'
+import { getBagState, getItemQuantity, hasItem, removeItem, resetBag } from './showdown/bag-store'
+import { generateRaidBoss } from './showdown/raid'
 import { applyLoadout, deleteLoadout, listLoadouts, renameLoadout, saveLoadout, updateLoadout } from './showdown/loadout-store'
 import {
   listAllAbilities,
@@ -68,7 +80,7 @@ import {
   setPremadeTeamDrop,
   updateTeamMon
 } from './showdown/premade-teams-store'
-import { getNextBoss, getProgression, resetProgression, setBossOrder, setLevelCap } from './showdown/progression-store'
+import { getNextBoss, getProgression, resetProgression, setBossOrder, setLevelCap, lateItemsUnlocked } from './showdown/progression-store'
 import { getMoney, resetMoney, setMoney } from './showdown/money-store'
 import { buyCoinPrize, buyCoins, getCoins, getSlotRules, setCoins, spinSlots } from './showdown/game-corner-store'
 import {
@@ -116,6 +128,11 @@ import {
   swapRunMon,
   swapRunTeam,
   skipRunSwap,
+  useRunFullRestore,
+  useRunRevive,
+  useRunAbilityCapsule,
+  buyRunConsumable,
+  buyRunShopTile,
   previewStarterMoves,
   previewEvolutionMoves,
   getRunMonEditInfo,
@@ -245,7 +262,7 @@ ipcMain.handle('battle:start', async (_event, locationId?: WildLocationId, level
     difficulty: 'easy',
     drops: wildDrop ? [wildDrop] : undefined,
     randomDropChance: WILD_RANDOM_DROP_CHANCE
-  })
+  }, { p1: getTeamMergeStars() })
   return activeBattle.getInitialView()
 })
 
@@ -309,7 +326,7 @@ ipcMain.handle('battle:startTrainer', async (_event, boss: boolean, rematchTrain
     teamDrop,
     isBoss: trainer.isBoss,
     noPrizeMoney: !!(boss && rematchTrainerId)
-  })
+  }, { p1: getTeamMergeStars() })
   return activeBattle.getInitialView()
 })
 
@@ -334,7 +351,7 @@ ipcMain.handle('battle:startPlayer', async (_event, username: string, doubles = 
     trainerId: `player:${player.slug}`,
     spriteId: player.trainerSprite ?? 'red',
     noRewards: true
-  })
+  }, { p1: getTeamMergeStars(), p2: readSavedTeamStarsOf(player.slug) })
   return activeBattle.getInitialView()
 })
 
@@ -352,6 +369,35 @@ ipcMain.handle('battle:run', () => {
 ipcMain.handle('battle:catch', (_event, replaceRunMonId?: string) => {
   if (!activeBattle) throw new Error('No active battle')
   return activeBattle.catchWildPokemon(replaceRunMonId)
+})
+
+// A Max Raid, paid for with a Raid Crystal (taken once the battle is set up): a doubles
+// battle against one Dynamaxed boss at the level cap (see raid.ts and WildBattle's raid).
+// The boss whose defeat opens Max Raids (and the Shop's late items), by name.
+function raidUnlockBossName(): string | null {
+  const step = getProgression().bossOrder.find((s) => s.unlocksLateItems)
+  return step ? (listTrainers().find((t) => t.id === step.trainerId)?.name ?? null) : null
+}
+
+ipcMain.handle('battle:startRaid', async () => {
+  if (!lateItemsUnlocked()) {
+    const boss = raidUnlockBossName()
+    throw new Error(`Max Raids open up once you beat ${boss ?? 'the right boss'}`)
+  }
+  const p1team = getTeamPokemonSets()
+  if (p1team.length === 0) throw new Error('Your team is empty - add Pokemon and assign them to your team first')
+  if (!hasItem(WISHING_PIECE_ITEM_ID)) throw new Error('You need a Raid Crystal to start a Max Raid - the Shop and the Game Corner sell them')
+  const boss = generateRaidBoss(getProgression().levelCap)
+  const battle = new WildBattle(
+    p1team,
+    'gen9doublescustomgame',
+    'gen9randombattle',
+    { team: [boss.set], name: 'Wild', difficulty: 'normal', raid: { gigantamax: boss.gigantamax, stars: boss.stars } },
+    { p1: getTeamMergeStars(), p2: [boss.stars] }
+  )
+  removeItem(WISHING_PIECE_ITEM_ID, 1)
+  activeBattle = battle
+  return activeBattle.getInitialView()
 })
 
 ipcMain.handle('battle:eligibility', (): BattleEligibility => {
@@ -380,7 +426,10 @@ ipcMain.handle('battle:eligibility', (): BattleEligibility => {
     hasTrainer,
     hasBoss: !!nextBoss?.ready,
     nextBoss,
-    allBossesDefeated: allBossesDefeated()
+    allBossesDefeated: allBossesDefeated(),
+    wishingPieces: getItemQuantity(WISHING_PIECE_ITEM_ID),
+    raidsUnlocked: lateItemsUnlocked(),
+    raidUnlockBoss: raidUnlockBossName()
   }
 })
 
@@ -424,6 +473,13 @@ ipcMain.handle('run:reorder', (_event, runMonIds: string[]) => reorderRunTeam(ru
 ipcMain.handle('run:swapMon', (_event, runMonId: string) => swapRunMon(runMonId))
 ipcMain.handle('run:swapTeam', () => swapRunTeam())
 ipcMain.handle('run:skipSwap', () => skipRunSwap())
+ipcMain.handle('run:fullRestore', (_event, runMonId: string) => useRunFullRestore(runMonId))
+ipcMain.handle('run:revive', (_event, faintedId: string) => useRunRevive(faintedId))
+ipcMain.handle('run:abilityCapsule', (_event, runMonId: string, abilityId: string) =>
+  useRunAbilityCapsule(runMonId, abilityId)
+)
+ipcMain.handle('run:buyConsumable', (_event, id: RunConsumableId) => buyRunConsumable(id))
+ipcMain.handle('run:buyShopTile', (_event, tile: RunShopTile) => buyRunShopTile(tile))
 
 ipcMain.handle('run:choose', async (_event, index: number): Promise<RunChoiceResult> => {
   const choice = runChoiceAt(index)
@@ -474,6 +530,7 @@ ipcMain.handle('box:useShinyPatch', (_event, id: string) => useShinyPatch(id))
 ipcMain.handle('box:changeForm', (_event, id: string, form: string) => changeForm(id, form))
 ipcMain.handle('box:fuse', (_event, id: string, partnerId: string) => fuseMon(id, partnerId))
 ipcMain.handle('box:unfuse', (_event, id: string) => unfuseMon(id))
+ipcMain.handle('box:merge', (_event, keeperId: string, fodderIds: string[]) => mergeMons(keeperId, fodderIds))
 
 ipcMain.handle('loadouts:list', () => listLoadouts())
 ipcMain.handle('loadouts:save', (_event, name: string) => saveLoadout(name))

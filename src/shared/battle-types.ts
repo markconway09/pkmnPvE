@@ -36,6 +36,8 @@ export const EXP_CANDY_EXP: Record<string, number> = {
 // Spent from a Pokemon's right-click menu to make it shiny. Not a real Dex item -
 // see getEditorOptions() in sim-access.ts.
 export const SHINY_PATCH_ITEM_ID = 'shinypatch'
+// Starts a Max Raid Battle from the Classic menu (used up when the raid begins).
+export const WISHING_PIECE_ITEM_ID = 'wishingpiece'
 
 // Key items: never bought or sold - each is unlocked by an achievement and kept for good.
 // The Rotom Catalog changes a Rotom's form from its right-click menu; the Exp. Charm gives
@@ -65,6 +67,7 @@ export const PRISON_BOTTLE_ITEM_ID = 'prisonbottle'
 export const REVEAL_GLASS_ITEM_ID = 'revealglass'
 export const GRACIDEA_ITEM_ID = 'gracidea'
 export const METEORITE_ITEM_ID = 'meteorite'
+export const ZYGARDE_CUBE_ITEM_ID = 'zygardecube'
 export const KEY_ITEM_IDS = new Set([
   ROTOM_CATALOG_ITEM_ID,
   EXP_CHARM_ITEM_ID,
@@ -79,7 +82,8 @@ export const KEY_ITEM_IDS = new Set([
   PRISON_BOTTLE_ITEM_ID,
   REVEAL_GLASS_ITEM_ID,
   GRACIDEA_ITEM_ID,
-  METEORITE_ITEM_ID
+  METEORITE_ITEM_ID,
+  ZYGARDE_CUBE_ITEM_ID
 ])
 
 // The form-change key items: with one in the bag, a Pokemon in its group can be changed
@@ -95,7 +99,8 @@ export const FORM_CHANGES: { itemId: string; forms: string[] }[] = [
   { itemId: REVEAL_GLASS_ITEM_ID, forms: ['Landorus', 'Landorus-Therian'] },
   { itemId: REVEAL_GLASS_ITEM_ID, forms: ['Enamorus', 'Enamorus-Therian'] },
   { itemId: GRACIDEA_ITEM_ID, forms: ['Shaymin', 'Shaymin-Sky'] },
-  { itemId: METEORITE_ITEM_ID, forms: ['Deoxys', 'Deoxys-Attack', 'Deoxys-Defense', 'Deoxys-Speed'] }
+  { itemId: METEORITE_ITEM_ID, forms: ['Deoxys', 'Deoxys-Attack', 'Deoxys-Defense', 'Deoxys-Speed'] },
+  { itemId: ZYGARDE_CUBE_ITEM_ID, forms: ['Zygarde', 'Zygarde-10%'] }
 ]
 
 export interface FusionRule {
@@ -123,6 +128,7 @@ export const NON_HELD_ITEM_IDS = new Set([
   BLACK_AUGURITE_ITEM_ID,
   PEAT_BLOCK_ITEM_ID,
   SHINY_PATCH_ITEM_ID,
+  WISHING_PIECE_ITEM_ID,
   ...KEY_ITEM_IDS,
   ...OPENABLE_ITEM_IDS,
   ...Object.keys(EXP_CANDY_EXP)
@@ -315,6 +321,12 @@ export interface VolatileBadge {
 }
 
 export interface ActivePokemonView extends PokemonSummary {
+  // Dynamaxed right now (a Max Raid's boss), and in its Gigantamax form.
+  dynamaxed?: boolean
+  gigantamax?: boolean
+  // Where it is in its side's roster (the order the team was built in) - tells two of
+  // the same species apart.
+  rosterIndex?: number
   /**
    * What its types are without any change made in battle - "types" (from
    * PokemonSummary) is what they are right now, so the two differ after Soak,
@@ -390,11 +402,26 @@ export interface BoxPokemonView extends PokemonSummary {
   formChanges?: { forms: string[]; itemName: string; spritenum: number; ready: boolean }
   // A plain Necrozma, Kyurem or Calyrex with its fusion item: each partner in the box it
   // can fuse with, and what they'd become.
-  fusions?: { partnerId: string; partnerSpecies: string; partnerLevel: number; result: string; itemName: string }[]
+  fusions?: {
+    partnerId: string
+    partnerSpecies: string
+    partnerLevel: number
+    // The partner is a favorite - shown with a heart so it isn't fused away by mistake.
+    partnerFavorite?: boolean
+    result: string
+    itemName: string
+  }[]
   // A fused one, with its fusion item: who unfusing hands back.
   unfuse?: { partnerSpecies: string; itemName: string }
   itemSpritenum?: number | null
   favorite?: boolean
+  // Caught Gigantamax (from a Max Raid): it takes its Gigantamax form when it Dynamaxes.
+  gigantamax?: boolean
+  // How many copies have been merged into it (1 = none), and the stars that makes.
+  copies?: number
+  mergeStars?: number
+  // The same species elsewhere in the box, that could be merged into this one.
+  mergeCandidates?: MergeCandidateView[]
   // Its colour on the Random Pokemon roulette (see speciesRarityTier) - the box and
   // team squares are bordered with it.
   rarityTier?: RarityTier
@@ -627,6 +654,33 @@ export interface BattleEligibility {
   nextBoss: NextBossInfo | null
   // Every boss in the order is beaten - the Boss Battle button opens the rematch menu.
   allBossesDefeated: boolean
+  // Raid Crystals in the bag - each starts one Max Raid.
+  wishingPieces: number
+  // Max Raids open (with the Exp. Candies and evolution items in the Shop) once the boss
+  // flagged to unlock late items is beaten - named here for the locked button's hint.
+  raidsUnlocked: boolean
+  raidUnlockBoss: string | null
+}
+
+// ---- Max Raids ----
+// A Raid Crystal starts one: a doubles battle, the player's two against one boss that's
+// Dynamaxed (Gigantamax when it can) for the whole fight, at the level cap and with 3
+// merge stars. Winning catches it, stars and all.
+export const RAID_STARS = 3
+// A raid boss's HP is this many times its own before Dynamaxing doubles it again, and it
+// attacks this many times a turn.
+export const RAID_HP_MULTIPLIER = 2
+export const RAID_ATTACKS_PER_TURN = 2
+// What a raid's boss is: a Gigantamax Pokemon this often, otherwise a red Pokemon, or a
+// gold one (restricted legendary) this often.
+export const RAID_GIGANTAMAX_CHANCE = 0.5
+export const RAID_RESTRICTED_CHANCE = 0.15
+
+export interface RaidView {
+  gigantamax: boolean
+  stars: number
+  // Won: the boss joined the box.
+  caught: { species: string; shiny: boolean } | null
 }
 
 export const POKEMON_TYPES: string[] = [
@@ -819,6 +873,8 @@ export interface RosterSlotView {
   species: string
   fainted: boolean
   status: string | null
+  // Where it is in the roster (see ActivePokemonView.rosterIndex).
+  rosterIndex?: number
 }
 
 export interface TrainerBattleInfo {
@@ -913,6 +969,38 @@ export const POKEMON_SELL_PRICES: Record<RarityTier, number> = {
   legendary: 50000
 }
 
+// ---- Merging duplicates ----
+// Merging a duplicate into a Pokemon adds its copies to it: stars go up each time the
+// copies double (2 = 1 star, 4 = 2 stars ... 32 = 5 stars), and each star is +10% to all
+// its stats in classic battles and friendly matches (never in a Roguelite run).
+export const MERGE_MAX_STARS = 5
+export const MERGE_MAX_COPIES = 2 ** MERGE_MAX_STARS
+export const MERGE_STAT_BONUS_PER_STAR = 0.1
+
+export function mergeStarsFor(copies: number | undefined): number {
+  return Math.min(MERGE_MAX_STARS, Math.floor(Math.log2(Math.max(1, copies ?? 1))))
+}
+
+export function mergeStatMultiplier(stars: number): number {
+  return 1 + MERGE_STAT_BONUS_PER_STAR * stars
+}
+
+// A duplicate that could be merged into a Pokemon (see BoxPokemonView.mergeCandidates).
+export interface MergeCandidateView {
+  id: string
+  species: string
+  level: number
+  shiny: boolean
+  favorite: boolean
+  copies: number
+  onTeam: boolean
+  // Its held item goes back to the bag.
+  item: string
+}
+
+// A shiny sells for this much more, whatever its rarity (on top of any title's bonus).
+export const SHINY_SELL_BONUS = 5000
+
 // Selling one of these asks for a second click first (as does selling a shiny).
 export const CONFIRM_SELL_TIERS = new Set<RarityTier>(['epic', 'legendary'])
 
@@ -1006,6 +1094,8 @@ export interface LiveMovePower {
   dynamic: boolean
   // Different every time it's used (Magnitude, Present, Psywave).
   varies: boolean
+  // Doubled against a Dynamaxed foe (Behemoth Blade, Behemoth Bash, Dynamax Cannon).
+  dynamaxBonus?: boolean
 }
 
 export interface BattleView {
@@ -1050,6 +1140,10 @@ export interface BattleView {
   runFainted: string[]
   // Won a run's trainer or boss battle: an item reward waits on the run menu.
   runItemReward: boolean
+  // Against a boss (Classic or Roguelite) - it's fought in the gym.
+  bossBattle?: boolean
+  // A Max Raid (see RaidView) - null for any other battle.
+  raid?: RaidView | null
   // What winning this battle can pay out, for the opponent's hover tooltip - null
   // for a friendly match against another player's team, which pays nothing.
   rewards: BattleRewardsView | null
@@ -1114,6 +1208,8 @@ export interface RunBossReward {
   // Only for bosses of these classes (all bosses when left out).
   randomPokemon?: RogueliteBossClass[] | 'all'
   randomLegendary?: RogueliteBossClass[] | 'all'
+  // Raid Crystals: for these bosses, this many each.
+  raidCrystals?: { from: RogueliteBossClass[] | 'all'; count: number }
 }
 
 export interface RunDifficultyInfo {
@@ -1124,8 +1220,10 @@ export interface RunDifficultyInfo {
   // The rewards, in words.
   rewardText: string
   reward: RunBossReward
-  // Every opponent's AI is set to this (null keeps each trainer's own).
+  // Every trainer's and boss's AI is set to this (null keeps each trainer's own).
   aiOverride: AiDifficulty | null
+  // The AI wild Pokemon use.
+  wildAi: AiDifficulty
   // Extra Pokemon on every trainer's and boss's team (up to 6).
   extraOpponentMons: number
   // Every boss brings a full team of 6.
@@ -1138,10 +1236,11 @@ export const RUN_DIFFICULTIES: RunDifficultyInfo[] = [
   {
     id: 'easy',
     label: 'Easy',
-    rules: 'Every opponent uses the Normal AI.',
+    rules: 'Trainers and bosses use the Normal AI, and you start with a Full Restore.',
     rewardText: 'Per boss: Exp. Candy S and ₽1,000. Beating the Champion: a Random Pokémon.',
     reward: { money: 1000, expCandy: 'expcandys', randomPokemon: ['champion'] },
     aiOverride: 'normal',
+    wildAi: 'easy',
     extraOpponentMons: 0,
     fullBossTeams: false,
     noHealing: false
@@ -1150,9 +1249,15 @@ export const RUN_DIFFICULTIES: RunDifficultyInfo[] = [
     id: 'normal',
     label: 'Normal',
     rules: 'No changes.',
-    rewardText: 'Per boss: Exp. Candy M and ₽5,000. Each Elite Four member and the Champion: a Random Pokémon.',
-    reward: { money: 5000, expCandy: 'expcandym', randomPokemon: ['eliteFour', 'champion'] },
+    rewardText: 'Per boss: Exp. Candy M and ₽5,000. Each Elite Four member and the Champion: a Random Pokémon and a Raid Crystal.',
+    reward: {
+      money: 5000,
+      expCandy: 'expcandym',
+      randomPokemon: ['eliteFour', 'champion'],
+      raidCrystals: { from: ['eliteFour', 'champion'], count: 1 }
+    },
     aiOverride: null,
+    wildAi: 'easy',
     extraOpponentMons: 0,
     fullBossTeams: false,
     noHealing: false
@@ -1160,10 +1265,17 @@ export const RUN_DIFFICULTIES: RunDifficultyInfo[] = [
   {
     id: 'hard',
     label: 'Hard',
-    rules: 'Every opponent uses the Hard AI, and every team has one more Pokémon.',
-    rewardText: 'Per boss: a Random Pokémon, Exp. Candy M and ₽10,000. Beating the Champion: a Random Legendary.',
-    reward: { money: 10000, expCandy: 'expcandym', randomPokemon: 'all', randomLegendary: ['champion'] },
+    rules: 'Trainers and bosses use the Hard AI, wild Pokémon the Normal AI, and every team has one more Pokémon.',
+    rewardText: 'Per boss: a Random Pokémon, a Raid Crystal, Exp. Candy M and ₽10,000. Beating the Champion: a Random Legendary.',
+    reward: {
+      money: 10000,
+      expCandy: 'expcandym',
+      randomPokemon: 'all',
+      randomLegendary: ['champion'],
+      raidCrystals: { from: 'all', count: 1 }
+    },
     aiOverride: 'hard',
+    wildAi: 'normal',
     extraOpponentMons: 1,
     fullBossTeams: false,
     noHealing: false
@@ -1171,10 +1283,11 @@ export const RUN_DIFFICULTIES: RunDifficultyInfo[] = [
   {
     id: 'extreme',
     label: 'Extreme',
-    rules: 'Everything in Hard, every boss brings 6 Pokémon, and there is no healing at all.',
-    rewardText: 'Per boss: a Random Legendary, Exp. Candy L and ₽20,000.',
-    reward: { money: 20000, expCandy: 'expcandyl', randomLegendary: 'all' },
+    rules: 'Everything in Hard, but wild Pokémon use the Hard AI too, every boss brings 6 Pokémon, and there is no healing at all.',
+    rewardText: 'Per boss: a Random Legendary, 2 Raid Crystals, Exp. Candy L and ₽20,000.',
+    reward: { money: 20000, expCandy: 'expcandyl', randomLegendary: 'all', raidCrystals: { from: 'all', count: 2 } },
     aiOverride: 'hard',
+    wildAi: 'hard',
     extraOpponentMons: 1,
     fullBossTeams: true,
     noHealing: true
@@ -1213,6 +1326,8 @@ export interface RunMonView extends BoxPokemonView {
   moveList: { id: string; name: string; locked: boolean }[]
   // Its ability came from a New Ability floor (and stays through evolution).
   abilityLocked: boolean
+  // The abilities an Ability Capsule can give it: its species' normal and hidden ones.
+  abilityChoices: { id: string; name: string; description: string }[]
 }
 
 export interface RunItemOffer {
@@ -1241,13 +1356,13 @@ export interface RunView {
   // Set after picking an item node: choose one of these to give to a team member.
   itemOffer: RunItemOffer[] | null
   // An item floor, or the reward for beating a trainer or boss.
-  itemOfferReason: 'floor' | 'reward' | 'bonus' | null
+  itemOfferReason: 'floor' | 'reward' | 'bonus' | 'shop' | null
   // An item floor's offer that hasn't been rerolled yet (once per floor).
   canRerollItems: boolean
   // A New Ability / New Move floor: the four choices, until one is given to someone.
   pickOffer: { kind: 'ability' | 'move'; options: RunPickOption[] } | null
   // A floor's pick, or the reward for beating a boss.
-  pickReason: 'floor' | 'reward' | 'bonus' | null
+  pickReason: 'floor' | 'reward' | 'bonus' | 'shop' | null
   // A Random Swap floor waiting on its choice: one Pokemon, the whole team, or neither.
   swapOffer: boolean
   // The level a swapped-in Pokemon arrives at (the next boss's).
@@ -1261,9 +1376,72 @@ export interface RunView {
   generation: number | null
   // What the run paid out when it ended (empty while it's still going).
   rewards: RunRewardLine[]
+  // Gems, consumables, fainted Pokemon to revive and the boss floor's shop.
+  consumables: RunConsumablesView
 }
 
 export type RunChoiceResult = { run: RunView } | { battle: BattleView; location?: WildLocationId }
+
+// ---- Roguelite consumables and gems ----
+// Items used from the run screen (never in battle), bought with gems - the run's own
+// currency - in the shop on every boss floor.
+export type RunConsumableId = 'fullrestore' | 'revive' | 'abilitycapsule'
+
+export interface RunConsumableInfo {
+  id: RunConsumableId
+  name: string
+  description: string
+  // Under the renderer's public folder.
+  icon: string
+}
+
+export const RUN_CONSUMABLES: RunConsumableInfo[] = [
+  {
+    id: 'fullrestore',
+    name: 'Full Restore',
+    description: 'Fully heals one Pokémon: all its HP back and no status.',
+    icon: './icons/run-fullrestore.png'
+  },
+  {
+    id: 'revive',
+    name: 'Revive',
+    description: "Brings back a Pokémon that fainted this run, at half HP and this floor's opponent level.",
+    icon: './icons/run-revive.png'
+  },
+  {
+    id: 'abilitycapsule',
+    name: 'Ability Capsule',
+    description: "Changes a Pokémon's ability to one of its species' normal or hidden abilities.",
+    icon: './icons/run-abilitycapsule.png'
+  }
+]
+
+export const RUN_GEM_ICON = './icons/run-gem.png'
+// Gems for beating a trainer and a boss.
+export const RUN_GEMS_PER_TRAINER = 1
+export const RUN_GEMS_PER_BOSS = 2
+// What each consumable costs in a boss floor's shop.
+export const RUN_CONSUMABLE_PRICE = 1
+// A boss floor's shop also sells one of each of these picks (Random Swap is free).
+export type RunShopTile = 'ability' | 'move' | 'item' | 'swap'
+export const RUN_SHOP_TILE_PRICES: Record<RunShopTile, number> = { ability: 1, move: 1, item: 1, swap: 0 }
+// The consumables a difficulty doesn't allow: Extreme has no healing of any kind.
+export function runLockedConsumables(difficulty: RunDifficulty): RunConsumableId[] {
+  return runDifficultyInfo(difficulty).noHealing ? ['fullrestore', 'revive'] : []
+}
+
+export interface RunConsumablesView {
+  gems: number
+  counts: Record<RunConsumableId, number>
+  // Greyed out on this difficulty (see runLockedConsumables).
+  locked: RunConsumableId[]
+  // Team members that fainted this run, newest first - a Revive brings one back.
+  fainted: RunMonView[]
+  // The level a revived Pokemon comes back at (this floor's opponents').
+  reviveLevel: number
+  // On a boss floor: the shop, and the picks already bought from it this floor.
+  bossShop: { usedTiles: RunShopTile[] } | null
+}
 
 export function toSpriteId(species: string): string {
   return species.toLowerCase().replace(/[^a-z0-9]/g, '')

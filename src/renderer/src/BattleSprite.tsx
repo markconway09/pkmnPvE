@@ -185,7 +185,8 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
     }
   }, [pokemon])
 
-  const spriteId = displayed ? toSpriteId(displayed.species) : ''
+  // Gigantamax: its own picture (e.g. charizardgmax), the usual one if there's none.
+  const spriteId = displayed ? toSpriteId(displayed.species) + (displayed.gigantamax ? 'gmax' : '') : ''
   const isShiny = !!displayed?.shiny
   useEffect(() => {
     setFallbackStep(0)
@@ -201,16 +202,21 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
     phase === 'recalling' && 'sprite-recalling',
     phase === 'sending-out' && 'sprite-sending-out',
     displayed.substituted && 'sprite-substituted',
+    displayed.dynamaxed && 'sprite-dynamax',
     shownFeedback?.emphasis && `sprite-emphasis-${shownFeedback.emphasis}`
   ]
     .filter(Boolean)
     .join(' ')
-  const candidates = spriteCandidates(spriteStyle, facing, spriteId, displayed.shiny)
+  const candidates = [
+    ...spriteCandidates(spriteStyle, facing, spriteId, displayed.shiny),
+    ...(displayed.gigantamax ? spriteCandidates(spriteStyle, facing, toSpriteId(displayed.species), displayed.shiny) : [])
+  ]
   const src = candidates[Math.min(fallbackStep, candidates.length - 1)]
 
   return (
     <Tooltip
-      className={slotClass}
+      // A Dynamaxed raid boss grows (see .sprite-slot-dynamax) and pushes its HP bar down.
+      className={`${slotClass}${displayed.dynamaxed ? ' sprite-slot-dynamax' : ''}`}
       placement={align === 'right' ? 'below' : 'above'}
       content={<PokemonTooltipContent pokemon={displayed} />}
     >
@@ -295,9 +301,14 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
             </span>
           )}
         </div>
-        {displayed.terastallized || displayed.megaEvolved ? (
+        {displayed.terastallized || displayed.megaEvolved || displayed.dynamaxed ? (
           // Shown whether or not it changed its types - a Fire Tera on a Fire type is still a Tera.
           <div className="sprite-types">
+            {displayed.dynamaxed && (
+              <span className="type-badge gimmick-badge dynamax-badge" title={displayed.gigantamax ? 'Gigantamaxed' : 'Dynamaxed'}>
+                {displayed.gigantamax ? 'G-Max' : 'Dynamax'}
+              </span>
+            )}
             {displayed.megaEvolved && (
               <span className="type-badge gimmick-badge mega-badge" title="Mega Evolved">
                 <img className="gimmick-badge-icon" src="./sprites/misc/mega-icon.webp" alt="" />

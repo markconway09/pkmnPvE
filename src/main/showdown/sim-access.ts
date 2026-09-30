@@ -16,6 +16,9 @@ import {
   LOCK_CAPSULE_ITEM_ID,
   RARE_CANDY_ITEM_ID,
   SHINY_PATCH_ITEM_ID,
+  WISHING_PIECE_ITEM_ID,
+  RAID_GIGANTAMAX_CHANCE,
+  RAID_RESTRICTED_CHANCE,
   KEY_ITEM_IDS,
   ROTOM_CATALOG_ITEM_ID,
   EXP_CHARM_ITEM_ID,
@@ -29,6 +32,7 @@ import {
   CATCHING_CHARM_ITEM_ID,
   ITEM_CHARM_ITEM_ID,
   FORM_CHANGES,
+  ZYGARDE_CUBE_ITEM_ID,
   PRISON_BOTTLE_ITEM_ID,
   REVEAL_GLASS_ITEM_ID,
   GRACIDEA_ITEM_ID,
@@ -57,7 +61,12 @@ import { REGIONAL_STARTER_SPECIES } from '../../shared/starters'
 import { hasItem } from './bag-store'
 import { hasRegisteredSpecies } from './box-store'
 import { hasTitle } from './title-perks'
-import { PROFESSOR_UNREGISTERED_WEIGHT, SHINY_HUNTER_ODDS } from '../../shared/titles'
+import {
+  PROFESSOR_UNREGISTERED_WEIGHT,
+  SHINY_HUNTER_ODDS,
+  STARLIGHT_RAID_CHARM_MULTIPLIER,
+  STARLIGHT_RAID_MULTIPLIER
+} from '../../shared/titles'
 
 // pokemon-showdown is CommonJS; Node's static named-export detection misses
 // some of these under ESM, so the package is loaded via require() instead.
@@ -127,6 +136,11 @@ export function computeStats(
     spd: calc('spd', baseStats.spd),
     spe: calc('spe', baseStats.spe)
   }
+}
+
+/** Whether two species names are the same Pokemon, forme aside (see findRosterIndex). */
+export function sameBaseSpecies(a: string, b: string): boolean {
+  return toID(Dex.species.get(a).baseSpecies) === toID(Dex.species.get(b).baseSpecies)
 }
 
 export function findRosterIndex(team: PokemonSet[], speciesName: string): number {
@@ -400,12 +414,19 @@ export function generateRandomTrainerTeam(
 const WILD_SHINY_ODDS = 512
 
 /**
- * A wild Pokemon's shiny roll: 1 in WILD_SHINY_ODDS (1 in SHINY_HUNTER_ODDS with that
- * title), three times likelier with the Shiny Charm - the two stack.
+ * A wild Pokemon's or a raid boss's shiny roll: 1 in WILD_SHINY_ODDS, 3x as likely with the
+ * Shiny Charm. Shiny Hunter shortens the odds for wild Pokemon only; Starlight raises a
+ * raid boss's chances instead (3x, or 5x with the charm).
  */
-function rollWildShiny(): boolean {
-  const boost = hasItem(SHINY_CHARM_ITEM_ID) ? SHINY_CHARM_MULTIPLIER : 1
-  const odds = hasTitle('Shiny Hunter') ? SHINY_HUNTER_ODDS : WILD_SHINY_ODDS
+export function rollWildShiny(raid = false): boolean {
+  const charm = hasItem(SHINY_CHARM_ITEM_ID)
+  let boost = charm ? SHINY_CHARM_MULTIPLIER : 1
+  let odds = WILD_SHINY_ODDS
+  if (raid) {
+    if (hasTitle('Starlight')) boost = charm ? STARLIGHT_RAID_CHARM_MULTIPLIER : STARLIGHT_RAID_MULTIPLIER
+  } else if (hasTitle('Shiny Hunter')) {
+    odds = SHINY_HUNTER_ODDS
+  }
   return Math.random() < boost / odds
 }
 
@@ -793,6 +814,15 @@ const RANDOM_POKEMON_ITEM: ItemOptionEntry = {
   spritenum: -10
 }
 
+// -26 is Serebii's Crystal Cluster icon (see ItemSprite).
+const WISHING_PIECE_ITEM: ItemOptionEntry = {
+  id: WISHING_PIECE_ITEM_ID,
+  name: 'Raid Crystal',
+  description: 'Starts a Max Raid Battle from the Classic menu - it is used up when the raid begins.',
+  spritenum: -26
+}
+const WISHING_PIECE_PRICE = 25000
+
 // -9 is Serebii's Lock Capsule icon (see ItemSprite).
 const LOCK_CAPSULE_ITEM: ItemOptionEntry = {
   id: LOCK_CAPSULE_ITEM_ID,
@@ -869,7 +899,7 @@ const MORE_CHARMS: ItemOptionEntry[] = [
   }
 ]
 
-// The form-change key items (see FORM_CHANGES). -21 to -24 are Serebii's icons (see ItemSprite).
+// The form-change key items (see FORM_CHANGES). -21 to -25 are Serebii's icons (see ItemSprite).
 const FORM_CHANGE_ITEMS: ItemOptionEntry[] = [
   {
     id: PRISON_BOTTLE_ITEM_ID,
@@ -894,6 +924,12 @@ const FORM_CHANGE_ITEMS: ItemOptionEntry[] = [
     name: 'Meteorite',
     description: 'Right-click a Deoxys to change it between its Normal, Attack, Defense and Speed Formes.',
     spritenum: -24
+  },
+  {
+    id: ZYGARDE_CUBE_ITEM_ID,
+    name: 'Zygarde Cube',
+    description: 'Right-click a Zygarde to change it between its 50% and 10% Formes.',
+    spritenum: -25
   }
 ]
 
@@ -992,6 +1028,7 @@ export function getEditorOptions(): EditorOptions {
       RANDOM_LEGENDARY_ITEM,
       LOCK_CAPSULE_ITEM,
       SHINY_PATCH_ITEM,
+      WISHING_PIECE_ITEM,
       ROTOM_CATALOG_ITEM,
       EXP_CHARM_ITEM,
       SHINY_CHARM_ITEM,
@@ -1190,11 +1227,12 @@ function getEvolutionOnlyItemIds(): Set<string> {
 
 /**
  * Items kept out of the shop until the boss flagged `unlocksLateItems` is
- * beaten (see lateItemsUnlocked in progression-store.ts): the Exp. Candies
- * and the evolution items. Drops are never affected.
+ * beaten (see lateItemsUnlocked in progression-store.ts): the Exp. Candies, the
+ * evolution items, and the Raid Crystal (Max Raids open up at the same time). Drops are
+ * never affected.
  */
 export function isLateGameItem(itemId: string): boolean {
-  return itemId in EXP_CANDY_EXP || getEvolutionOnlyItemIds().has(itemId)
+  return itemId in EXP_CANDY_EXP || itemId === WISHING_PIECE_ITEM_ID || getEvolutionOnlyItemIds().has(itemId)
 }
 
 let cachedWildDropPool: ItemOptionEntry[] | null = null
@@ -1214,6 +1252,7 @@ export function getWildDropPool(): ItemOptionEntry[] {
       (item) =>
         !OPENABLE_ITEM_IDS.has(item.id) &&
         item.id !== SHINY_PATCH_ITEM_ID && // shop-only
+        item.id !== WISHING_PIECE_ITEM_ID && // the Shop and the Game Corner only
         (shopIds.has(item.id) || evolutionIds.has(item.id))
     )
   }
@@ -1241,6 +1280,7 @@ export function getDefaultShopCatalog(): ShopItemEntry[] {
       if (
         item.id === RARE_CANDY_ITEM_ID ||
         item.id === SHINY_PATCH_ITEM_ID ||
+        item.id === WISHING_PIECE_ITEM_ID ||
         OPENABLE_ITEM_IDS.has(item.id) ||
         item.id in EXP_CANDY_PRICE ||
         evolutionOnlyIds.has(item.id)
@@ -1263,6 +1303,7 @@ export function getDefaultShopCatalog(): ShopItemEntry[] {
       if (item.id === LOCK_CAPSULE_ITEM_ID) return { ...item, price: LOCK_CAPSULE_PRICE, category: 'Recommended' }
       if (item.id in EXP_CANDY_PRICE) return { ...item, price: EXP_CANDY_PRICE[item.id], category: 'Recommended' }
       if (item.id === SHINY_PATCH_ITEM_ID) return { ...item, price: SHINY_PATCH_PRICE, category: 'Recommended' }
+      if (item.id === WISHING_PIECE_ITEM_ID) return { ...item, price: WISHING_PIECE_PRICE, category: 'Recommended' }
       if (evolutionOnlyIds.has(item.id)) return { ...item, price: COMPETITIVE_ITEM_PRICE, category: 'Evolution Items' }
       const dexItem = Dex.items.get(item.id)
       const category = shopCategoryFor(dexItem)
@@ -1406,8 +1447,16 @@ function powerBasedRequiredLevel(moveId: string): number {
 // Every move it has ever been able to learn, in any generation - Emolga's Knock Off and
 // Beedrill's Fell Stinger are Gen 5-7 / 6-7 only (from Gen 8 they're gone), yet Smogon's
 // sets use them. anyGeneration false narrows it to the latest generation's list alone.
+// Moves a species can learn here that its Showdown learnset doesn't list: Zacian and
+// Zamazenta's signature moves, which in the games only their Crowned formes have.
+const EXTRA_LEARNABLE: Record<string, string[]> = {
+  zacian: ['behemothblade'],
+  zamazenta: ['behemothbash']
+}
+
 export function learnableMoveIds(speciesId: string, level: number, anyGeneration = true): string[] {
   const merged = new Map<string, string[]>()
+  for (const moveId of EXTRA_LEARNABLE[speciesId] ?? []) merged.set(moveId, ['9L1'])
   // Species dropped from the current regional dex ("isNonstandard: Past",
   // e.g. Caterpie, Pidgey, Carvanha - about a third of the whole Dex) have no
   // gen9-tagged sources in their learnset at all, only historical gen1-8
@@ -1473,7 +1522,7 @@ export function getSpeciesEditInfo(speciesName: string, level: number): SpeciesE
       basePower: m.basePower,
       accuracy: m.accuracy,
       pp: m.pp,
-      description: m.shortDesc || m.desc || '',
+      description: moveDescription(m),
       target: m.target,
       contact: !!m.flags?.contact,
       multihit: !!m.multihit,
@@ -1616,6 +1665,34 @@ export function pickRandomUnevolvedAnySpecies(): string {
  * legendary-class one (legendary, mythical, ultra beast or paradox - short of the
  * restricted ones), or a restricted legendary (Mewtwo, Kyogre, Koraidon...).
  */
+/**
+ * A Max Raid's boss: a Pokemon with a Gigantamax form (RAID_GIGANTAMAX_CHANCE), or else
+ * a red one (legendary-class) - now and then a gold one (a restricted legendary). Fully
+ * evolved only.
+ */
+export function pickRaidSpecies(
+  chances: { gigantamax: number; restricted: number } = { gigantamax: RAID_GIGANTAMAX_CHANCE, restricted: RAID_RESTRICTED_CHANCE }
+): { species: string; gigantamax: boolean } {
+  const pool = Dex.species
+    .all()
+    .filter(
+      (s) =>
+        s.exists &&
+        s.num > 0 &&
+        (!s.isNonstandard || s.isNonstandard === 'Past') &&
+        !isBattleOnlyForme(s) &&
+        isPlainSpecies(s) &&
+        s.evos.length === 0
+    )
+  const restricted = (s: ReturnType<typeof Dex.species.get>): boolean => s.tags.includes('Restricted Legendary')
+  if (Math.random() < chances.gigantamax) {
+    const gmax = pool.filter((s) => !!s.canGigantamax)
+    if (gmax.length > 0) return { species: pickFrom(gmax), gigantamax: true }
+  }
+  const gold = Math.random() < chances.restricted
+  return { species: pickFrom(pool.filter((s) => (gold ? restricted(s) : isLegendaryClass(s) && !restricted(s)))), gigantamax: false }
+}
+
 export function pickRandomSwapSpecies(kind: 'normal' | 'legendary' | 'restricted'): string {
   const pool = Dex.species
     .all()
@@ -1865,6 +1942,18 @@ export function listAllAbilities(): { id: string; name: string }[] {
     .filter((a) => a.exists && a.num > 0 && a.isNonstandard !== 'CAP')
     .map((a) => ({ id: a.id, name: a.name }))
     .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/** A species' normal and hidden abilities (not a special one like Battle Bond), for an Ability Capsule. */
+export function speciesAbilityChoices(speciesName: string): { id: string; name: string; description: string }[] {
+  const species = Dex.species.get(speciesName)
+  const seen = new Set<string>()
+  return [species.abilities[0], species.abilities[1], species.abilities.H].flatMap((name) => {
+    if (!name || seen.has(toID(name))) return []
+    seen.add(toID(name))
+    const info = abilityInfo(name)
+    return info ? [info] : []
+  })
 }
 
 /** An ability's name and short description, for the New Ability choices. */
@@ -2198,6 +2287,41 @@ const NO_POWER: LiveMovePower = { basePower: null, basePowerMax: null, fixedDama
 // in the fight - so they're reported as varying rather than asked.
 const RANDOM_POWER_MOVES = new Set(['magnitude', 'present', 'psywave', 'ficklebeam'])
 
+// The power the sim's rule would give these moves next use, without running the rule
+// (which changes the Pokemon's volatiles as it goes). null for any other move.
+function sideEffectFreePower(moveId: string, basePower: number, source: Pokemon): number | null {
+  if (moveId === 'furycutter') {
+    // Each use in a row doubles it (up to 4x): the next one is double the last.
+    const last = (source.volatiles['furycutter'] as { multiplier?: number } | undefined)?.multiplier
+    const multiplier = last ? Math.min(last * 2, 4) : 1
+    return Math.min(basePower * multiplier, 160)
+  }
+  if (moveId === 'rollout' || moveId === 'iceball') {
+    const rolling = source.volatiles[moveId] as { hitCount?: number; contactHitCount?: number } | undefined
+    let power = basePower
+    if (rolling?.hitCount) power *= 2 ** (rolling.contactHitCount ?? 0)
+    if (source.volatiles['defensecurl']) power *= 2
+    return power
+  }
+  return null
+}
+
+// Moves that hit a Dynamaxed Pokemon twice as hard. Showdown applies this (in the Dynamax
+// condition) but its descriptions don't say so - MOVE_DESCRIPTIONS below does.
+const DYNAMAX_BANE_MOVES = new Set(['behemothblade', 'behemothbash', 'dynamaxcannon'])
+
+// Descriptions to show in place of Showdown's (which leave something out).
+const MOVE_DESCRIPTIONS: Record<string, string> = {
+  behemothblade: 'Deals double damage to a Dynamaxed Pokémon.',
+  behemothbash: 'Deals double damage to a Dynamaxed Pokémon.',
+  dynamaxcannon: 'Deals double damage to a Dynamaxed Pokémon.'
+}
+
+/** A move's short description, with this game's corrections. */
+export function moveDescription(move: { id: string; shortDesc?: string; desc?: string }): string {
+  return MOVE_DESCRIPTIONS[move.id] ?? (move.shortDesc || move.desc || '')
+}
+
 /**
  * What a move would hit for right now, from the sim's own rules: the move's
  * power callback (Reversal, Heavy Slam, Gyro Ball, Return, Facade, ...) is asked
@@ -2213,6 +2337,16 @@ export function liveMovePower(battle: Battle, source: Pokemon, foes: Pokemon[], 
   if (typeof move.damage === 'number') return { ...NO_POWER, fixedDamage: move.damage }
   if (move.damage === 'level') return { ...NO_POWER, fixedDamage: source.level }
 
+  // Final Gambit's damage rule faints its user as it works the number out - asking it
+  // here would knock out the real Pokemon on the field. It hits for the user's HP.
+  if (base.id === 'finalgambit') return { ...NO_POWER, fixedDamage: source.hp > 0 ? source.hp : null, dynamic: true }
+  // These power rules move the real Pokemon's counters along as they work the power out
+  // (Fury Cutter's multiplier, Rollout's hit count) - so they're worked out here instead.
+  const ownPower = sideEffectFreePower(base.id, base.basePower, source)
+  if (ownPower !== null) {
+    return { ...NO_POWER, basePower: ownPower, dynamic: ownPower !== base.basePower }
+  }
+
   if (move.damageCallback) {
     // Super Fang, Nature's Madness, Counter and friends - a number only once there is one.
     let damage: number | null = null
@@ -2226,6 +2360,7 @@ export function liveMovePower(battle: Battle, source: Pokemon, foes: Pokemon[], 
   }
 
   move.hit = 1 // a multi-hit move's first hit (Triple Axel and Triple Kick scale with the hit number)
+  let dynamaxBonus = false
   const values = (foes.length > 0 ? foes : [null]).map((target) => {
     let power = move.basePower
     if (move.basePowerCallback) {
@@ -2236,6 +2371,10 @@ export function liveMovePower(battle: Battle, source: Pokemon, foes: Pokemon[], 
         // the rule needs something the preview can't supply - fall back to the printed power
       }
     }
+    if (power > 0 && target && DYNAMAX_BANE_MOVES.has(move.id) && target.volatiles['dynamax']) {
+      power *= 2
+      dynamaxBonus = true
+    }
     return power > 0 ? applyOwnPowerModifier(battle, move, source, target, power) : power
   })
   const lowest = Math.min(...values)
@@ -2245,7 +2384,8 @@ export function liveMovePower(battle: Battle, source: Pokemon, foes: Pokemon[], 
     basePower: lowest > 0 ? lowest : null,
     basePowerMax: highest > lowest ? highest : null,
     // Dynamic when the move's own rule decided it, i.e. it isn't simply the printed number.
-    dynamic: !!move.basePowerCallback || values.some((v) => v !== move.basePower)
+    dynamic: !!move.basePowerCallback || values.some((v) => v !== move.basePower),
+    dynamaxBonus
   }
 }
 
@@ -2378,7 +2518,7 @@ export function getMoveInfo(id: string): MoveInfo | null {
     basePower: move.basePower,
     accuracy: move.accuracy,
     pp: move.pp,
-    description: move.shortDesc || move.desc || '',
+    description: moveDescription(move),
     target: move.target,
     contact: !!move.flags?.contact,
     multihit: !!move.multihit,
