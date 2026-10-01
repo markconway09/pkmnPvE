@@ -198,6 +198,34 @@ export function deletePremadeTeam(teamId: string): PremadeTeamSummary[] {
   return listPremadeTeamsForTrainer(trainerId)
 }
 
+/** A copy of a team ("Name (copy)") for the same trainer, right after it. */
+export function duplicatePremadeTeam(teamId: string): PremadeTeamSummary[] {
+  const team = findTeam(teamId)
+  const state = getState()
+  state.splice(state.indexOf(team) + 1, 0, copyOf(team, team.trainerId, `${team.name} (copy)`))
+  persist()
+  return listPremadeTeamsForTrainer(team.trainerId)
+}
+
+/** Every team of one trainer copied over to another (for a duplicated trainer). */
+export function copyTeamsToTrainer(fromTrainerId: string, toTrainerId: string): void {
+  const state = getState()
+  for (const team of state.filter((t) => t.trainerId === fromTrainerId)) {
+    state.push(copyOf(team, toTrainerId, team.name))
+  }
+  persist()
+}
+
+function copyOf(team: StoredPremadeTeam, trainerId: string, name: string): StoredPremadeTeam {
+  return {
+    ...structuredClone(team),
+    id: randomUUID(),
+    trainerId,
+    name,
+    mons: team.mons.map((m) => ({ ...structuredClone(m), id: randomUUID() }))
+  }
+}
+
 export function deleteTeamsForTrainer(trainerId: string): void {
   state = getState().filter((t) => t.trainerId !== trainerId)
   persist()

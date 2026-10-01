@@ -10,6 +10,7 @@ import CaseOpening from './CaseOpening'
 import BagShopTabs from './BagShopTabs'
 import { formatMoney } from './money'
 import { errorMessage, pointOf, useFloatingNotes, type NotePoint } from './FloatingNotes'
+import ModalSpinner from './ModalSpinner'
 
 interface Props {
   onClose: () => void
@@ -236,10 +237,10 @@ function BagModal({ onClose, onChanged, onOpenShop }: Props): React.JSX.Element 
 
   return createPortal(
     <div className="modal-overlay" onMouseDown={onClose}>
-      <div className="modal-panel bag-modal" onMouseDown={(e) => e.stopPropagation()}>
+      <div className={`modal-panel bag-modal${!items && !error ? ' modal-panel-loading' : ''}`} onMouseDown={(e) => e.stopPropagation()}>
         <BagShopTabs current="bag" onSwitch={onOpenShop} />
         {error && <p className="editor-error">{error}</p>}
-        {!items && !error && <p>Loading...</p>}
+        {!items && !error && <ModalSpinner />}
         {items && items.length === 0 && <p className="box-empty-hint">Your bag is empty.</p>}
         {items && items.length > 0 && (
           <div className="bag-toolbar">

@@ -48,7 +48,8 @@ import type {
   SpeciesEditInfo,
   Trainer,
   WildDropEntry,
-  WildLocationId
+  WildLocationId,
+  CompanionSizeChoice
 } from '../shared/battle-types'
 
 const api = {
@@ -131,6 +132,10 @@ const api = {
   evolveMon: (id: string, targetSpecies: string): Promise<BoxState> => ipcRenderer.invoke('box:evolve', id, targetSpecies),
   levelUpMon: (id: string): Promise<BoxState> => ipcRenderer.invoke('box:levelUp', id),
   toggleFavorite: (id: string): Promise<BoxState> => ipcRenderer.invoke('box:toggleFavorite', id),
+  // The companion beside the team: a max-friendship Pokemon out of the box, and back again.
+  setCompanion: (id: string): Promise<BoxState> => ipcRenderer.invoke('box:setCompanion', id),
+  returnCompanion: (): Promise<BoxState> => ipcRenderer.invoke('box:returnCompanion'),
+  setCompanionSize: (size: CompanionSizeChoice): Promise<BoxState> => ipcRenderer.invoke('box:setCompanionSize', size),
   useShinyPatch: (id: string): Promise<BoxState> => ipcRenderer.invoke('box:useShinyPatch', id),
   changeForm: (id: string, form: string): Promise<BoxState> => ipcRenderer.invoke('box:changeForm', id, form),
   fuseMon: (id: string, partnerId: string): Promise<BoxState> => ipcRenderer.invoke('box:fuse', id, partnerId),
@@ -141,6 +146,9 @@ const api = {
   // The expanded box's "select to merge" (see mergeSelectedMons).
   mergeSelectedMons: (ids: string[]): Promise<{ box: BoxState; merged: number; results: { species: string; stars: number }[] }> =>
     ipcRenderer.invoke('box:mergeSelected', ids),
+  // A Random Pokemon's "Auto merge": straight into its best keeper (see autoMergeMon).
+  autoMergeMon: (monId: string): Promise<{ box: BoxState; species: string; stars: number }> =>
+    ipcRenderer.invoke('box:autoMerge', monId),
   listLoadouts: (): Promise<LoadoutView[]> => ipcRenderer.invoke('loadouts:list'),
   saveLoadout: (name: string): Promise<LoadoutView[]> => ipcRenderer.invoke('loadouts:save', name),
   updateLoadout: (id: string): Promise<LoadoutView[]> => ipcRenderer.invoke('loadouts:update', id),
@@ -152,9 +160,10 @@ const api = {
   useExpCandiesUntilCap: (itemId: string): Promise<{ used: number; results: ExpGainResult[]; allCapped: boolean }> =>
     ipcRenderer.invoke('bag:useExpCandiesUntilCap', itemId),
   getMoney: (): Promise<number> => ipcRenderer.invoke('money:get'),
-  sellMon: (id: string): Promise<{ sold: number; species: string; money: number; box: BoxState }> =>
+  // `found`: evolution items the Alchemist title turned up (their names).
+  sellMon: (id: string): Promise<{ sold: number; species: string; money: number; box: BoxState; found: string[] }> =>
     ipcRenderer.invoke('box:sell', id),
-  sellMons: (ids: string[]): Promise<{ sold: number; count: number; money: number; box: BoxState }> =>
+  sellMons: (ids: string[]): Promise<{ sold: number; count: number; money: number; box: BoxState; found: string[] }> =>
     ipcRenderer.invoke('box:sellMany', ids),
   getCoins: (): Promise<number> => ipcRenderer.invoke('coins:get'),
   getAchievements: (): Promise<AchievementsState> => ipcRenderer.invoke('achievements:get'),
@@ -245,6 +254,8 @@ const api = {
   updateTrainer: (id: string, input: Omit<Trainer, 'id'>): Promise<Trainer[]> =>
     ipcRenderer.invoke('trainers:update', id, input),
   deleteTrainer: (id: string): Promise<Trainer[]> => ipcRenderer.invoke('trainers:delete', id),
+  // A copy of a trainer and all its teams.
+  duplicateTrainer: (id: string): Promise<Trainer> => ipcRenderer.invoke('trainers:duplicate', id),
 
   listPremadeTeams: (): Promise<PremadeTeamSummary[]> => ipcRenderer.invoke('premadeTeams:list'),
   listPremadeTeamsForTrainer: (trainerId: string): Promise<PremadeTeamSummary[]> =>
@@ -254,6 +265,7 @@ const api = {
   renamePremadeTeam: (id: string, name: string): Promise<PremadeTeamSummary[]> =>
     ipcRenderer.invoke('premadeTeams:rename', id, name),
   deletePremadeTeam: (id: string): Promise<PremadeTeamSummary[]> => ipcRenderer.invoke('premadeTeams:delete', id),
+  duplicatePremadeTeam: (id: string): Promise<PremadeTeamSummary[]> => ipcRenderer.invoke('premadeTeams:duplicate', id),
   addSpeciesToTeam: (teamId: string, species: string): Promise<PremadeTeamSummary[]> =>
     ipcRenderer.invoke('premadeTeams:addSpecies', teamId, species),
   removeTeamMon: (teamId: string, monId: string): Promise<PremadeTeamSummary[]> =>

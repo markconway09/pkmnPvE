@@ -3,6 +3,9 @@ import { trainerSpriteUrl } from './trainerSprite'
 import { ballStateFor, pokeballStyle } from './pokeballIcon'
 import RewardsTooltipContent from './RewardsTooltipContent'
 import Tooltip from './Tooltip'
+import SpriteImage from './SpriteImage'
+import { toSpriteId } from '../../shared/battle-types'
+import type { CompanionSize } from '../../shared/battle-types'
 
 interface Props {
   name: string
@@ -17,6 +20,10 @@ interface Props {
   // The opponent's sprite shows what winning pays out when hovered. Undefined means
   // don't show it; null is a friendly match with nothing to win.
   rewards?: BattleRewardsView | null
+  // The player's companion, standing beside their sprite, at the size they picked.
+  companion?: { species: string; shiny: boolean; size: CompanionSize } | null
+  // No Poke Balls - the player's own team is on show beside the battle anyway.
+  hideBalls?: boolean
 }
 
 const TEAM_SIZE = 6
@@ -32,22 +39,51 @@ function ballTitle(slot: RosterSlotView | undefined): string | undefined {
   return slot.species
 }
 
-function TrainerHud({ name, title, spriteId, roster, align, size = 'small', rewards }: Props): React.JSX.Element {
+function TrainerHud({ name, title, spriteId, roster, align, size = 'small', rewards, companion, hideBalls }: Props): React.JSX.Element {
   const slots = Array.from({ length: TEAM_SIZE }, (_, i) => roster[i])
+  const sprite =
+    rewards !== undefined ? (
+      <Tooltip placement="below" content={<RewardsTooltipContent rewards={rewards} />}>
+        <img className="trainer-hud-sprite" src={trainerSpriteUrl(spriteId)} alt={name} />
+      </Tooltip>
+    ) : (
+      <img className="trainer-hud-sprite" src={trainerSpriteUrl(spriteId)} alt={name} />
+    )
+  const figure = companion ? (
+    // The trainer with their companion at their feet, just in front of them.
+    <div className="trainer-hud-figure">
+      {sprite}
+      <SpriteImage
+        style="2d-animated"
+        className={`trainer-hud-companion trainer-hud-companion-${companion.size.toLowerCase()}`}
+        spriteId={toSpriteId(companion.species)}
+        shiny={companion.shiny}
+        alt={companion.species}
+      />
+    </div>
+  ) : (
+    sprite
+  )
+  const nameRow = (
+    <div className="trainer-hud-name">
+      {name}
+      {title && <span className="trainer-hud-title">{title}</span>}
+    </div>
+  )
+  // The player (no Poke Balls): the name along the top, the sprites centred under it.
+  if (hideBalls) {
+    return (
+      <div className={`trainer-hud trainer-hud-${align} trainer-hud-${size} trainer-hud-stacked`}>
+        {nameRow}
+        {figure}
+      </div>
+    )
+  }
   return (
     <div className={`trainer-hud trainer-hud-${align} trainer-hud-${size}`}>
-      {rewards !== undefined ? (
-        <Tooltip placement="below" content={<RewardsTooltipContent rewards={rewards} />}>
-          <img className="trainer-hud-sprite" src={trainerSpriteUrl(spriteId)} alt={name} />
-        </Tooltip>
-      ) : (
-        <img className="trainer-hud-sprite" src={trainerSpriteUrl(spriteId)} alt={name} />
-      )}
+      {figure}
       <div className="trainer-hud-info">
-        <div className="trainer-hud-name">
-          {name}
-          {title && <span className="trainer-hud-title">{title}</span>}
-        </div>
+        {nameRow}
         <div className="trainer-hud-balls">
           {slots.map((slot, i) => (
             <span

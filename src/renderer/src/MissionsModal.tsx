@@ -6,6 +6,7 @@ import ItemSprite from './ItemSprite'
 import CoinIcon from './CoinIcon'
 import { formatMoney } from './money'
 import { errorMessage, pointOf, useFloatingNotes } from './FloatingNotes'
+import type { NotePoint } from './FloatingNotes'
 
 interface Props {
   state: MissionsState
@@ -64,11 +65,13 @@ function MissionsModal({ state, onChange, onClaimed, onClose }: Props): React.JS
     return () => clearInterval(timer)
   }, [])
 
-  async function act(e: React.MouseEvent, action: () => Promise<void>): Promise<void> {
+  // The note goes where the click was - worked out straight away, as the button is gone
+  // from the event once the action has been awaited.
+  async function act(e: React.MouseEvent, action: (at: NotePoint) => Promise<void>): Promise<void> {
     const at = pointOf(e)
     setBusy(true)
     try {
-      await action()
+      await action(at)
     } catch (err) {
       notes.show(errorMessage(err), at, 'bad')
     } finally {
@@ -77,19 +80,19 @@ function MissionsModal({ state, onChange, onClaimed, onClose }: Props): React.JS
   }
 
   const claim = (e: React.MouseEvent, slot: number): Promise<void> =>
-    act(e, async () => {
+    act(e, async (at) => {
       const result = await window.api.claimMission(slot)
       onChange(result.state)
       onClaimed(result.money)
-      notes.show(`Got ${result.rewardText}`, pointOf(e))
+      notes.show(`Got ${result.rewardText}`, at)
     })
 
   const claimBonus = (e: React.MouseEvent): Promise<void> =>
-    act(e, async () => {
+    act(e, async (at) => {
       const result = await window.api.claimMissionBonus()
       onChange(result.state)
       onClaimed(result.money)
-      notes.show(`Got ${result.rewardText}`, pointOf(e))
+      notes.show(`Got ${result.rewardText}`, at)
     })
 
   const reroll = (e: React.MouseEvent, slot: number): Promise<void> =>

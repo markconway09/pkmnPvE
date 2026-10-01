@@ -28,6 +28,12 @@ export type AchievementStat =
   | 'shayminOwned'
   | 'deoxysOwned'
   | 'zygardeOwned'
+  // Pokemon owned (the companion too) at max friendship.
+  | 'maxFriendship'
+  // Alcremie's creams in the Pokedex (all nine - see ALCREMIE_FORMS).
+  | 'alcremieForms'
+  // Minior's cores ever owned (all seven - see MINIOR_COLORS).
+  | 'miniorColors'
   | 'money'
   | 'evolutions'
   | 'pokemonSold'
@@ -376,6 +382,33 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     reward: { keyItems: ['meteorite'] }
   },
   {
+    id: 'bestfriend',
+    name: 'Best Friends',
+    description: "Max out a Pokémon's friendship - unlocks a companion slot beside your team",
+    category: 'Collection',
+    stat: 'maxFriendship',
+    goal: 1,
+    reward: { money: 5000 }
+  },
+  {
+    id: 'alcremie',
+    name: 'Sweet Tooth',
+    description: 'Register every Alcremie form in the Pokédex',
+    category: 'Collection',
+    stat: 'alcremieForms',
+    goal: 9,
+    reward: { keyItems: ['decorationbox'] }
+  },
+  {
+    id: 'minior',
+    name: 'Shooting Stars',
+    description: 'Collect every Minior core color',
+    category: 'Collection',
+    stat: 'miniorColors',
+    goal: 7,
+    reward: { money: 10000 }
+  },
+  {
     id: 'zygarde',
     name: 'Order Keeper',
     description: 'Own a Zygarde (any form)',
@@ -521,7 +554,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     category: 'Game Corner',
     stat: 'rouletteSpins',
     goal: 100,
-    reward: { coins: 100 }
+    reward: { coins: 100, title: 'Croupier' }
   },
   {
     id: 'luckynumber',

@@ -75,17 +75,27 @@ export function slotSymbolAt(reel: number, stop: number, row: number): SlotSymbo
   return strip[(stop + row - 1 + strip.length) % strip.length]
 }
 
-/** What each row pays with the reels stopped here (stops = each reel's middle symbol) for this bet. */
-export function slotWins(stops: number[], bet: number, payouts: Record<SlotSymbol, number> = SLOT_PAYOUTS): SlotLineWin[] {
+/**
+ * What each row pays with the reels stopped here (stops = each reel's middle symbol) for this
+ * bet - with this payout table and these cherry payouts (the Golden Touch title raises them).
+ * A payout that isn't whole is rounded down.
+ */
+export function slotWins(
+  stops: number[],
+  bet: number,
+  payouts: Record<SlotSymbol, number> = SLOT_PAYOUTS,
+  cherry: { one: number; two: number } = { one: CHERRY_ONE, two: CHERRY_TWO }
+): SlotLineWin[] {
+  const coins = (multiplier: number): number => Math.floor(multiplier * bet + 1e-9)
   const wins: SlotLineWin[] = []
   SLOT_LINES.forEach(({ rows, diagonal }, line) => {
     const symbols = rows.map((row, reel) => slotSymbolAt(reel, stops[reel], row))
     const [first] = symbols
     if (symbols[1] === first && symbols[2] === first) {
-      wins.push({ line, symbol: first, count: 3, payout: payouts[first] * bet })
+      wins.push({ line, symbol: first, count: 3, payout: coins(payouts[first]) })
     } else if (first === 'cherry' && !diagonal) {
       const two = symbols[1] === 'cherry'
-      wins.push({ line, symbol: 'cherry', count: two ? 2 : 1, payout: (two ? CHERRY_TWO : CHERRY_ONE) * bet })
+      wins.push({ line, symbol: 'cherry', count: two ? 2 : 1, payout: coins(two ? cherry.two : cherry.one) })
     }
   })
   return wins
@@ -93,11 +103,11 @@ export function slotWins(stops: number[], bet: number, payouts: Record<SlotSymbo
 
 // Game Corner coins: bought with Poke Dollars (never sold back), bet on the slots, and
 // traded for prizes.
-export const COIN_PRICE = 20
+export const COIN_PRICE = 10
 
 // The most either Game Corner game (slots or blackjack) takes on one bet.
 export const MAX_BET = 1000
-export const COIN_PACKS = [50, 250, 500, 2500]
+export const COIN_PACKS = [100, 500, 1000, 5000]
 
 export interface CoinPrize {
   itemId: string
@@ -105,12 +115,12 @@ export interface CoinPrize {
 }
 
 export const COIN_PRIZES: CoinPrize[] = [
-  { itemId: 'lockcapsule', coins: 100 },
-  { itemId: 'wishingpiece', coins: 2500 },
-  { itemId: 'randompokemon', coins: 500 },
-  { itemId: 'shinypatch', coins: 1000 },
-  { itemId: 'expcandyl', coins: 1000 },
-  { itemId: 'randomlegendary', coins: 10000 }
+  { itemId: 'lockcapsule', coins: 200 },
+  { itemId: 'wishingpiece', coins: 5000 },
+  { itemId: 'randompokemon', coins: 1000 },
+  { itemId: 'shinypatch', coins: 2000 },
+  { itemId: 'expcandyl', coins: 2000 },
+  { itemId: 'randomlegendary', coins: 20000 }
 ]
 
 // Coins and Poke Dollars after a Game Corner purchase.

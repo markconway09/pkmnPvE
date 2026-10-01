@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { BlackjackOutcome, BlackjackView } from '../../shared/blackjack'
-import BetSlider, { maxBet, placedBet, useGameCornerPerks, useSavedBet } from './BetSlider'
+import BetSlider, { maxBet, placedBet, useGameCornerPerks, useSavedBet, betStep } from './BetSlider'
 import GameCornerTabs, { type GameCornerGame } from './GameCornerTabs'
 import PlayingCard from './PlayingCard'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
@@ -11,6 +11,11 @@ interface Props {
   onClose: () => void
   onOpenCoinShop: () => void
   onSwitchGame: (game: GameCornerGame) => void
+}
+
+// A payout to 1 as odds: 1.5 is "3:2", 4 is "4:1".
+function oddsText(toOne: number): string {
+  return Number.isInteger(toOne) ? `${toOne}:1` : `${toOne * 2}:2`
 }
 
 const OUTCOME_TEXT: Record<BlackjackOutcome, string> = {
@@ -106,8 +111,10 @@ function BlackjackTable({ onClose, onOpenCoinShop, onSwitchGame }: Props): React
           <div className={`blackjack-result${outcomeTone ? ` blackjack-result-${outcomeTone}` : ''}`}>
             {table?.phase === 'done' && table.outcome
               ? table.outcome === 'blackjack'
-                ? `Blackjack! Paid ${perks.blackjackPayout === 3 ? '3:1' : '3:2'}`
-                : OUTCOME_TEXT[table.outcome]
+                ? `Blackjack! Paid ${oddsText(perks.blackjackPayout)}`
+                : table.outcome === 'win' && perks.blackjackWinPayout !== 1
+                  ? `You win! Paid ${oddsText(perks.blackjackWinPayout)}`
+                  : OUTCOME_TEXT[table.outcome]
               : playing
                 ? (
                   <>
@@ -154,7 +161,8 @@ function BlackjackTable({ onClose, onOpenCoinShop, onSwitchGame }: Props): React
             </>
           ) : (
             <>
-              <BetSlider bet={bet} max={maxBet(coins, perks.betCap)} disabled={busy || !coins} onChange={setBet} />
+              <BetSlider bet={bet} max={maxBet(coins, perks.betCap)}
+            step={betStep(perks.betCap)} disabled={busy || !coins} onChange={setBet} />
               <button
                 className="slots-spin"
                 disabled={busy || coins === null || coins < bet}
@@ -166,7 +174,9 @@ function BlackjackTable({ onClose, onOpenCoinShop, onSwitchGame }: Props): React
           )}
         </div>
         <p className="editor-hint slots-hint">
-          The dealer draws to 16 and stands on 17. Blackjack pays {perks.blackjackPayout === 3 ? <strong>3:1 (9+10)</strong> : '3:2'}, a win 1:1, a tie returns your bet.
+          The dealer draws to 16 and stands on 17. Blackjack pays{' '}
+          {perks.blackjackPayout !== 1.5 ? <strong>{oddsText(perks.blackjackPayout)} (9+10)</strong> : '3:2'}, a win{' '}
+          {perks.blackjackWinPayout !== 1 ? <strong>{oddsText(perks.blackjackWinPayout)} (9+10)</strong> : '1:1'}, a tie returns your bet.
         </p>
         {error && <p className="editor-error">{error}</p>}
         {coins !== null && coins < 1 && !playing && (

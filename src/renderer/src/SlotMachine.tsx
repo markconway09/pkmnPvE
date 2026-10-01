@@ -4,7 +4,7 @@ import type { SlotLineWin, SlotSpinResult, SlotSymbol } from '../../shared/slots
 import type { SlotRules } from '../../shared/slots'
 import { SLOT_LINES, SLOT_RULES } from '../../shared/slots'
 import ItemSprite from './ItemSprite'
-import BetSlider, { maxBet, placedBet, useGameCornerPerks, useSavedBet } from './BetSlider'
+import BetSlider, { maxBet, placedBet, useGameCornerPerks, useSavedBet, betStep } from './BetSlider'
 import GameCornerTabs, { type GameCornerGame } from './GameCornerTabs'
 import SpriteImage from './SpriteImage'
 import { toSpriteId } from '../../shared/battle-types'
@@ -233,7 +233,8 @@ function SlotMachine({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JS
         </div>
 
         <div className="slots-controls">
-          <BetSlider bet={bet} max={maxBet(coins, perks.betCap)} disabled={spinning || !coins} onChange={setBet} />
+          <BetSlider bet={bet} max={maxBet(coins, perks.betCap)}
+            step={betStep(perks.betCap)} disabled={spinning || !coins} onChange={setBet} />
           <button
             ref={spinButtonRef}
             className="slots-spin"

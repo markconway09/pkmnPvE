@@ -52,7 +52,14 @@ function CaseOpening({ itemName, result, onClose, onOpenAnother }: Props): React
   const [sellError, setSellError] = useState<string | null>(null)
   // Selling a shiny, or a red or gold Pokemon, takes a second click.
   const [confirmingSell, setConfirmingSell] = useState(false)
+  // What the Alchemist title turned up selling it.
+  const [found, setFound] = useState<string[]>([])
+  // A Pokemon won can be merged straight into its keeper instead (see autoMergeMon).
+  const [mergedInto, setMergedInto] = useState<{ species: string; stars: number } | null>(null)
   const canSell = !!result.sellPrice && (result.kind === 'item' ? !!result.itemId : !!result.monId)
+  const canMerge = result.kind === 'pokemon' && !!result.monId && !!result.mergeKeeper
+  // Sold or merged: it's gone from the box, so neither can happen again.
+  const settled = soldFor !== null || mergedInto !== null
   const sellNeedsConfirm =
     result.kind === 'pokemon' && (result.shiny || CONFIRM_SELL_TIERS.has(result.tier))
 
@@ -65,17 +72,33 @@ function CaseOpening({ itemName, result, onClose, onOpenAnother }: Props): React
     setSelling(true)
     setSellError(null)
     try {
-      const sold =
-        result.kind === 'item'
-          ? (await window.api.sellItem(result.itemId!)).sold
-          : (await window.api.sellMon(result.monId!)).sold
-      setSoldFor(sold)
+      if (result.kind === 'item') {
+        setSoldFor((await window.api.sellItem(result.itemId!)).sold)
+      } else {
+        const sale = await window.api.sellMon(result.monId!)
+        setFound(sale.found)
+        setSoldFor(sale.sold)
+      }
     } catch (e) {
       setSellError(e instanceof Error ? e.message : String(e))
     } finally {
       setSelling(false)
     }
   }
+  async function merge(): Promise<void> {
+    if (!canMerge || settled) return
+    setSelling(true)
+    setSellError(null)
+    try {
+      const merged = await window.api.autoMergeMon(result.monId!)
+      setMergedInto({ species: merged.species, stars: merged.stars })
+    } catch (e) {
+      setSellError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setSelling(false)
+    }
+  }
+
   // Lands somewhere inside the winning card, not dead centre every time.
   const [jitter] = useState(() => (Math.random() - 0.5) * (CARD_WIDTH * 0.7))
 
@@ -197,44 +220,62 @@ function CaseOpening({ itemName, result, onClose, onOpenAnother }: Props): React
                   ? `${TIER_LABELS[winner.tier]} · sold for ${formatMoney(soldFor)}`
                   : `${TIER_LABELS[winner.tier]} · it's in your bag`
                 : soldFor !== null
-                  ? `${TIER_LABELS[winner.tier]} · Lv ${result.level} · sold for ${formatMoney(soldFor)}`
-                  : `${TIER_LABELS[winner.tier]} · Lv ${result.level} · it's waiting in your box`}
+                  ? `${TIER_LABELS[winner.tier]} · Lv ${result.level} · sold for ${formatMoney(soldFor)}${found.length ? ` · found a ${found.join(', ')}` : ''}`
+                  : mergedInto
+                    ? `${TIER_LABELS[winner.tier]} · Lv ${result.level} · merged into your ${mergedInto.species}${mergedInto.stars > 0 ? ` - now ★${mergedInto.stars}` : ''}`
+                    : `${TIER_LABELS[winner.tier]} · Lv ${result.level} · it's waiting in your box`}
             </p>
             {sellError && <p className="editor-error">{sellError}</p>}
+            {/* Always the same four buttons in the same places - greyed out when they don't apply. */}
             <div className="case-result-actions">
-              {canSell && soldFor === null && (
-                <button
-                  className={confirmingSell ? 'confirm-button' : undefined}
-                  disabled={selling}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    void sell()
-                  }}
-                  onBlur={() => setConfirmingSell(false)}
-                >
-                  {confirmingSell
-                    ? `Sell ${result.shiny ? 'this shiny' : TIER_LABELS[winner.tier]} ${result.name} for ${formatMoney(result.sellPrice!)}? Click again`
-                    : `Sell (${formatMoney(result.sellPrice!)})`}
-                </button>
-              )}
-              {result.remaining > 0 && (
-                <button
-                  disabled={selling}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onOpenAnother(soldFor ?? undefined)
-                  }}
-                >
-                  Open another ({result.remaining} left)
-                </button>
-              )}
+              <button
+                className={confirmingSell ? 'confirm-button' : undefined}
+                disabled={selling || !canSell || settled}
+                title={!canSell ? "This can't be sold" : undefined}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void sell()
+                }}
+                onBlur={() => setConfirmingSell(false)}
+              >
+                {confirmingSell
+                  ? `Sell ${result.shiny ? 'this shiny' : TIER_LABELS[winner.tier]} ${result.name} for ${formatMoney(result.sellPrice!)}? Click again`
+                  : canSell
+                    ? `Sell (${formatMoney(result.sellPrice!)})`
+                    : 'Sell'}
+              </button>
+              <button
+                disabled={selling || !canMerge || settled}
+                title={
+                  canMerge
+                    ? `Merge it into your ${result.mergeKeeper!.species}${result.mergeKeeper!.stars > 0 ? ` (★${result.mergeKeeper!.stars})` : ''}${result.mergeKeeper!.uses.length ? ` - evolves on the way in, using ${result.mergeKeeper!.uses.join(', ')}` : ''}`
+                    : result.kind === 'pokemon'
+                      ? 'Nothing fully evolved in your box it can merge into yet'
+                      : 'Only a Pokémon can be merged'
+                }
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void merge()
+                }}
+              >
+                Auto merge
+              </button>
+              <button
+                disabled={selling || result.remaining <= 0}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpenAnother(soldFor ?? undefined)
+                }}
+              >
+                Open another ({result.remaining} left)
+              </button>
               <button
                 onClick={(e) => {
                   e.stopPropagation()
                   onClose(soldFor ?? undefined)
                 }}
               >
-                {soldFor !== null ? 'Done' : 'Nice!'}
+                {settled ? 'Done' : 'Nice!'}
               </button>
             </div>
           </div>

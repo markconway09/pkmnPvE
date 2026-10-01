@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import type { PokedexEntry } from '../../shared/battle-types'
 import { toSpriteId } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
+import ModalSpinner from './ModalSpinner'
 
 interface Props {
   onClose: () => void
@@ -34,7 +35,7 @@ function PokedexModal({ onClose }: Props): React.JSX.Element {
 
   return createPortal(
     <div className="modal-overlay" onMouseDown={onClose}>
-      <div className="modal-panel pokedex-modal" onMouseDown={(e) => e.stopPropagation()}>
+      <div className={`modal-panel pokedex-modal${entries ? '' : ' modal-panel-loading'}`} onMouseDown={(e) => e.stopPropagation()}>
         <div className="pokedex-header">
           <h2>Pokédex</h2>
           {entries && (
@@ -55,6 +56,7 @@ function PokedexModal({ onClose }: Props): React.JSX.Element {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        {!entries && <ModalSpinner />}
         <div className="pokedex-grid">
           {shown.map((e) => (
             <div

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { AutoSetOption, EditablePokemonSet, EditorOptions, SpeciesEditInfo, StatBlock, BoxPokemonView } from '../../shared/battle-types'
-import { MERGE_MAX_STARS, NON_HELD_ITEM_IDS, mergeStarsFor, mergeStatMultiplier, toSpriteId } from '../../shared/battle-types'
+import { MERGE_MAX_STARS, NON_HELD_ITEM_IDS, mergeBonusText, mergeStarsFor, mergeStatMultiplier, toSpriteId } from '../../shared/battle-types'
+import type { RarityTier } from '../../shared/battle-types'
 import { starRow } from './MergeModal'
 import type { NatureOptionEntry } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
@@ -9,6 +10,7 @@ import ItemSprite from './ItemSprite'
 import ShinyIcon from './ShinyIcon'
 import { itemIconStyle } from './itemIcon'
 import { TYPE_COLORS } from './moveAnimations'
+import ModalSpinner from './ModalSpinner'
 
 export type PokemonEditorSource = { kind: 'box'; monId: string } | { kind: 'premadeTeam'; teamId: string; monId: string }
 
@@ -52,21 +54,41 @@ interface Props {
   // Its form changes (Rotom Catalog, Prison Bottle...), listed the same way.
   formChanges?: BoxPokemonView['formChanges']
   onChangeForm?: (form: string) => void
-  // A box Pokemon's merge stars: the Stat column shows them (+10% each, in classic battles).
+  // A box Pokemon's merge stars: the Stat column shows them (+10% each in classic battles - less for red and gold).
   mergeStars?: number
   // And how many copies it's made of - its progress to the next star, under the portrait.
   mergeCopies?: number
+  // Its rarity - red and gold Pokemon get less from each star.
+  rarityTier?: RarityTier
+}
+
+// A sideways-scrolling strip (the evolutions and form changes): the mouse wheel scrolls it
+// sideways too, while there's more of it to see that way - otherwise the editor scrolls as usual.
+function wheelScrollsSideways(strip: HTMLDivElement | null): void {
+  if (!strip || strip.dataset.wheel) return
+  strip.dataset.wheel = '1'
+  strip.addEventListener(
+    'wheel',
+    (e) => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) || strip.scrollWidth <= strip.clientWidth) return
+      const atEnd = e.deltaY > 0 ? strip.scrollLeft + strip.clientWidth >= strip.scrollWidth - 1 : strip.scrollLeft <= 0
+      if (atEnd) return
+      e.preventDefault()
+      strip.scrollLeft += e.deltaY
+    },
+    { passive: false }
+  )
 }
 
 // A box Pokemon's stars and how far it is to the next one (stars at 2, 4, 8, 16, 32 copies).
-function MergeProgress({ copies }: { copies: number }): React.JSX.Element {
+function MergeProgress({ copies, tier }: { copies: number; tier: RarityTier | undefined }): React.JSX.Element {
   const stars = mergeStarsFor(copies)
   const maxed = stars >= MERGE_MAX_STARS
   const from = 2 ** stars
   const to = 2 ** (stars + 1)
   const percent = maxed ? 100 : ((copies - from) / (to - from)) * 100
   return (
-    <div className="editor-merge" title={stars > 0 ? `+${stars * 10}% to all stats in classic battles` : 'Merge duplicates in to earn stars'}>
+    <div className="editor-merge" title={stars > 0 ? `${mergeBonusText(stars, tier)} to all stats in classic battles` : 'Merge duplicates in to earn stars'}>
       <span className="merge-stars">{starRow(stars)}</span>
       <div className="editor-merge-bar">
         <div className="editor-merge-fill" style={{ width: `${percent}%` }} />
@@ -130,7 +152,7 @@ function finalStat(
 // rainbow), with white text shadowed so it reads on the light colours too.
 const STELLAR_BACKGROUND = 'linear-gradient(90deg, #e8453c, #f0a030, #f8d030, #58c060, #4890f0, #9b59d0)'
 
-function teraTypeStyle(type: string): React.CSSProperties {
+export function teraTypeStyle(type: string): React.CSSProperties {
   const color = TYPE_COLORS[type.toLowerCase()]
   return {
     background: color ?? (type === 'Stellar' ? STELLAR_BACKGROUND : undefined),
@@ -155,6 +177,7 @@ function PokemonEditor({
   formChanges,
   onChangeForm,
   mergeStars,
+  rarityTier,
   mergeCopies
 }: Props): React.JSX.Element {
   // Premade team rosters are admin/debug tooling, not the player's own
@@ -493,9 +516,9 @@ function PokemonEditor({
   return createPortal(
     <div className="modal-overlay" onMouseDown={onClose}>
       <div className="modal-row" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="modal-panel pokemon-editor pokemon-editor-main">
+        <div className={`modal-panel pokemon-editor pokemon-editor-main${!(options && set && speciesInfo) && !error ? ' modal-panel-loading' : ''}`}>
           <h2>Edit Pokemon</h2>
-          {!(options && set && speciesInfo) && !error && <p>Loading...</p>}
+          {!(options && set && speciesInfo) && !error && <ModalSpinner />}
           {options && set && speciesInfo && (
             <div className="pokemon-editor-layout" onFocus={handleFormFocus}>
               <div className="pokemon-editor-top">
@@ -529,7 +552,7 @@ function PokemonEditor({
                       )}
                     </span>
                   </div>
-                  {mergeCopies !== undefined && <MergeProgress copies={mergeCopies} />}
+                  {mergeCopies !== undefined && <MergeProgress copies={mergeCopies} tier={rarityTier} />}
                 </div>
 
                 <div className="pokemon-editor-details">
@@ -710,7 +733,7 @@ function PokemonEditor({
                 {onEvolve && evolutionPaths && evolutionPaths.length > 0 && (
                   <div className="editor-section">
                     <h3>Evolutions</h3>
-                    <div className="editor-evolutions">
+                    <div className="editor-evolutions" ref={wheelScrollsSideways}>
                       {evolutionPaths.map((evo) => (
                         <button
                           key={evo.species}
@@ -745,8 +768,20 @@ function PokemonEditor({
                 )}
                 {onChangeForm && formChanges && formChanges.forms.length > 0 && (
                   <div className="editor-section">
-                    <h3>Form changes</h3>
-                    <div className="editor-evolutions">
+                    {/* Many forms (Rotom, Alcremie): small tiles, the item named once in the heading. */}
+                    <h3>
+                      Form changes
+                      {formChanges.forms.length > 4 && (
+                        <span className="editor-form-item-heading">
+                          <ItemSprite spritenum={formChanges.spritenum} className="editor-form-item" />
+                          {formChanges.ready ? formChanges.itemName : `Needs the ${formChanges.itemName}`}
+                        </span>
+                      )}
+                    </h3>
+                    <div
+                      className={`editor-evolutions${formChanges.forms.length > 4 ? ' editor-evolutions-compact' : ''}`}
+                      ref={wheelScrollsSideways}
+                    >
                       {formChanges.forms.map((form) => (
                         <button
                           key={form}
@@ -767,13 +802,18 @@ function PokemonEditor({
                             shiny={set.shiny}
                             alt={form}
                           />
-                          <span className="editor-evolution-text">
-                            <span className="editor-evolution-name">{form}</span>
-                            <span className="editor-evolution-method">
-                              <ItemSprite spritenum={formChanges.spritenum} className="editor-form-item" />
-                              {formChanges.ready ? formChanges.itemName : `Needs the ${formChanges.itemName}`}
+                          {formChanges.forms.length > 4 ? (
+                            // Just the form's own part of the name: "Ruby Cream", "Wash" (plain Alcremie is Vanilla Cream).
+                            <span className="editor-evolution-name">{form.split('-').slice(1).join(' ') || (form === 'Alcremie' ? 'Vanilla Cream' : 'Normal')}</span>
+                          ) : (
+                            <span className="editor-evolution-text">
+                              <span className="editor-evolution-name">{form}</span>
+                              <span className="editor-evolution-method">
+                                <ItemSprite spritenum={formChanges.spritenum} className="editor-form-item" />
+                                {formChanges.ready ? formChanges.itemName : `Needs the ${formChanges.itemName}`}
+                              </span>
                             </span>
-                          </span>
+                          )}
                         </button>
                       ))}
                     </div>
@@ -835,6 +875,15 @@ function PokemonEditor({
                     <span className="editor-hint">
                       (EVs {evTotal}/{EV_TOTAL_CAP})
                     </span>
+                    {/* Its merge bonus, as a badge - the gold numbers beside each stat include it. */}
+                    {!!mergeStars && (
+                      <span
+                        className="merge-stat-badge"
+                        title={`Merged ★${mergeStars}: ${mergeBonusText(mergeStars, rarityTier)} to all stats in classic battles - shown in gold beside each stat`}
+                      >
+                        ★{mergeStars} {mergeBonusText(mergeStars, rarityTier)}
+                      </span>
+                    )}
                   </h3>
                   <label className="editor-field editor-nature-field">
                     <span>Nature</span>
@@ -847,12 +896,6 @@ function PokemonEditor({
                     </select>
                   </label>
                 </div>
-                {!!mergeStars && (
-                  <p className="editor-hint merge-editor-hint">
-                    <span className="merge-stars">{'★'.repeat(mergeStars)}</span> Merged: +{mergeStars * 10}% to all
-                    stats in classic battles - shown in gold beside each stat.
-                  </p>
-                )}
                 <div className="editor-ev-row editor-ev-header">
                   <span className="editor-ev-label" />
                   <span className="editor-ev-base">Base</span>
@@ -911,7 +954,7 @@ function PokemonEditor({
                           <span className="editor-ev-stat-merged" title={`With the ★${mergeStars} merge bonus`}>
                             {Math.floor(
                               finalStat(key, baseStats[key], set.level, set.ivs[key], set.evs[key], nature) *
-                                mergeStatMultiplier(mergeStars)
+                                mergeStatMultiplier(mergeStars, rarityTier)
                             )}
                           </span>
                         )}

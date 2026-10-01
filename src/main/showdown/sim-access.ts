@@ -33,6 +33,7 @@ import {
   ITEM_CHARM_ITEM_ID,
   FORM_CHANGES,
   ZYGARDE_CUBE_ITEM_ID,
+  DECORATION_BOX_ITEM_ID,
   PRISON_BOTTLE_ITEM_ID,
   REVEAL_GLASS_ITEM_ID,
   GRACIDEA_ITEM_ID,
@@ -347,6 +348,11 @@ export function speciesDexNum(speciesName: string): number {
   return Dex.species.get(speciesName).num || 0
 }
 
+/** A species' height in metres (the Pokedex's own). */
+export function speciesHeightM(speciesName: string): number {
+  return Dex.species.get(speciesName).heightm ?? 1
+}
+
 export function bstOf(speciesName: string): number {
   const cached = bstCache.get(speciesName)
   if (cached !== undefined) return cached
@@ -637,6 +643,29 @@ function isStarterLine(speciesId: string): boolean {
   return cachedStarterRoots.has(evolutionRootId(speciesId))
 }
 
+// A cosmetic form (Gastrodon-East, Sawsbuck-Winter, Florges-Blue) kept through
+// de-evolution when the earlier stage has the same one (Shellos-East, Deerling-Winter,
+// Floette-Blue) - the Dex points every form back to the plain earlier stage.
+function keepCosmeticForm(from: string, to: string): string {
+  if (from === to) return to
+  const original = Dex.species.get(from)
+  if (!original.isCosmeticForme || !original.forme) return to
+  const same = Dex.species.get(`${to}-${original.forme}`)
+  return same.exists ? same.name : to
+}
+
+// Lines whose forms random battle sets never roll (or only on a later stage): a wild one
+// gets a random form of its own - an Unown letter, a Burmy cloak, a Furfrou trim, a
+// Shellos sea, a Deerling season, a Flabébé flower.
+const RANDOM_COSMETIC_FORM_BASES = new Set(['Unown', 'Burmy', 'Furfrou', 'Shellos', 'Deerling', 'Flabébé', 'Floette'])
+
+function withRandomCosmeticForm(speciesName: string): string {
+  const species = Dex.species.get(speciesName)
+  if (species.forme || !RANDOM_COSMETIC_FORM_BASES.has(species.name) || !species.cosmeticFormes?.length) return speciesName
+  const forms = [species.name, ...species.cosmeticFormes]
+  return forms[Math.floor(Math.random() * forms.length)]
+}
+
 export function generateRandomWildMon(
   levelCap: number,
   location?: WildLocationConfig | null,
@@ -674,7 +703,7 @@ export function generateRandomWildMon(
       // Dropped outright rather than down-weighted: at a low cap a roll often has
       // only one or two candidates left, where a lower weight would change nothing.
       if (isStarterLine(dexSpecies.id) && Math.random() >= WILD_STARTER_CHANCE) continue
-      const finalSpecies = deevolveWild(mon.species, level)
+      const finalSpecies = keepCosmeticForm(mon.species, deevolveWild(mon.species, level))
       if (minLevelForSpecies(finalSpecies) > levelCap) continue
       if (bstOf(finalSpecies) > maxBST) continue
       if (allowedTypes || allowedEggGroups) {
@@ -694,7 +723,7 @@ export function generateRandomWildMon(
       // exactly WILD_SHINY_ODDS regardless of format. The generator leaves the
       // nature blank (and a de-evolved set is Hardy) - a wild Pokemon gets a
       // real random one instead, which a caught copy then keeps.
-      return { ...wild, shiny: rollWildShiny(), nature: randomNatureName() }
+      return { ...wild, species: withRandomCosmeticForm(wild.species), shiny: rollWildShiny(), nature: randomNatureName() }
     }
   }
   return null
@@ -930,6 +959,12 @@ const FORM_CHANGE_ITEMS: ItemOptionEntry[] = [
     name: 'Zygarde Cube',
     description: 'Right-click a Zygarde to change it between its 50% and 10% Formes.',
     spritenum: -25
+  },
+  {
+    id: DECORATION_BOX_ITEM_ID,
+    name: 'Decoration Box',
+    description: 'Right-click an Alcremie to change its cream to any of its nine forms.',
+    spritenum: -27
   }
 ]
 
@@ -1793,6 +1828,34 @@ const EVOLUTION_ITEM_OVERRIDES: Record<string, string[]> = {
   ]
 }
 
+// Milcery: each Sweet gives its own cream - and now and then (MILCERY_RARE_CREAM_CHANCE)
+// one of the two creams no Sweet gives instead.
+export const MILCERY_SWEET_FORMS: Record<string, string> = {
+  strawberrysweet: 'Alcremie-Ruby-Cream',
+  lovesweet: 'Alcremie-Ruby-Swirl',
+  berrysweet: 'Alcremie-Mint-Cream',
+  cloversweet: 'Alcremie-Matcha-Cream',
+  starsweet: 'Alcremie-Lemon-Cream',
+  flowersweet: 'Alcremie-Caramel-Swirl',
+  ribbonsweet: 'Alcremie'
+}
+const MILCERY_RARE_CREAMS = ['Alcremie-Salted-Cream', 'Alcremie-Rainbow-Swirl']
+const MILCERY_RARE_CREAM_CHANCE = 0.1
+
+/** The cream a Sweet evolution actually ends up with: its own, or (rarely) a rare one. */
+export function rollMilceryCream(target: string): string {
+  if (!Object.values(MILCERY_SWEET_FORMS).includes(target)) return target
+  return Math.random() < MILCERY_RARE_CREAM_CHANCE
+    ? MILCERY_RARE_CREAMS[Math.floor(Math.random() * MILCERY_RARE_CREAMS.length)]
+    : target
+}
+
+// Evolving into plain Alcremie: one option per Sweet, each into that Sweet's cream.
+function expandAlcremie(evoName: string): { species: string; items: string[] | null }[] | null {
+  if (evoName !== 'Alcremie') return null
+  return Object.entries(MILCERY_SWEET_FORMS).map(([sweet, form]) => ({ species: form, items: [sweet] }))
+}
+
 /**
  * Every evolution this set could reach, and what it takes: a plain level-up
  * evolution needs its usual evoLevel. A stone/hold-item evolution needs that
@@ -1837,7 +1900,8 @@ function isDexForm(s: ReturnType<typeof Dex.species.get>): boolean {
     !s.battleOnly &&
     !s.requiredItem &&
     !(s.requiredItems && s.requiredItems.length > 0) &&
-    !s.isCosmeticForme &&
+    // Alcremie's creams are cosmetic in the games' data, but each is collected here.
+    (!s.isCosmeticForme || s.baseSpecies === 'Alcremie') &&
     s.forme !== 'Gmax' &&
     !s.forme.includes('Totem') &&
     (!s.isNonstandard || s.isNonstandard === 'Past')
@@ -1853,6 +1917,73 @@ export function dexFormOf(speciesName: string): string {
   const from = typeof s.battleOnly === 'string' ? Dex.species.get(s.battleOnly) : null
   if (from && isDexForm(from)) return from.name
   return s.baseSpecies
+}
+
+/**
+ * A Pokemon's evolution line for merging, by Pokedex form: its own form, everything it
+ * evolved from (nearest first - Charizard: Charmeleon, Charmander), and the line's first
+ * stage. A regional line is its own (Alolan Ninetales from Alolan Vulpix), and a Mega counts
+ * as its base form.
+ */
+export function mergeLineOf(speciesName: string): { form: string; ancestors: string[]; root: string } {
+  const form = dexFormOf(speciesName)
+  const ancestors: string[] = []
+  let species = Dex.species.get(form)
+  while (species.exists && species.prevo && ancestors.length < 5) {
+    const prevo = dexFormOf(species.prevo)
+    ancestors.push(prevo)
+    species = Dex.species.get(prevo)
+  }
+  return { form, ancestors, root: ancestors[ancestors.length - 1] ?? form }
+}
+
+let cachedEvolutionItemIds: string[] | null = null
+
+/** A random evolution item the Shop sells (stones, trade items, Sweets...) - for Alchemist. */
+export function randomEvolutionItemId(): string | null {
+  if (!cachedEvolutionItemIds) {
+    const ids = new Set<string>()
+    for (const s of Dex.species.all()) {
+      if (!s.exists || s.num <= 0) continue
+      for (const id of evolutionItemsFor(s) ?? []) ids.add(id)
+    }
+    const sold = new Set(getShopCatalog().map((i) => i.id))
+    cachedEvolutionItemIds = [...ids].filter((id) => sold.has(id)).sort()
+  }
+  const pool = cachedEvolutionItemIds
+  return pool.length ? pool[Math.floor(Math.random() * pool.length)] : null
+}
+
+/** Fully evolved: nothing left to evolve into (a Mega counts as its base form). */
+export function isFullyEvolved(speciesName: string): boolean {
+  const species = Dex.species.get(dexFormOf(speciesName))
+  return !species.exists || species.evos.every((e) => {
+    const evo = Dex.species.get(e)
+    return !evo.exists || isBattleOnlyForme(evo)
+  })
+}
+
+/**
+ * The look a Pokemon has, when it's one of a species' cosmetic forms (Minior-Blue,
+ * Vivillon-Marine) or the plain look of a species that has them (Minior) - those aren't
+ * Pokedex forms, so they're collected on their own. Null for any other species.
+ */
+export function cosmeticLookOf(speciesName: string): string | null {
+  const species = Dex.species.get(speciesName)
+  if (!species.exists) return null
+  if (species.isCosmeticForme) return species.name
+  return species.cosmeticFormes?.length ? species.name : null
+}
+
+/**
+ * Whether this Pokemon can take that one in: the same form, or one it evolved from
+ * (Charizard takes a Charmander, Vaporeon an Eevee) - never its evolution, so a branching
+ * line's first stage can't take in its different evolutions (Eevee doesn't eat Jolteon).
+ */
+export function canMergeInto(keeper: string, fodder: string): boolean {
+  const lk = mergeLineOf(keeper)
+  const form = mergeLineOf(fodder).form
+  return lk.form === form || lk.ancestors.includes(form)
 }
 
 let cachedDexForms: Map<number, string[]> | null = null
@@ -1994,6 +2125,11 @@ export function evolutionOptionsFor(set: PokemonSet): EvolutionOption[] {
   for (const evoName of species.evos) {
     const evoSpecies = Dex.species.get(evoName)
     if (!evoSpecies.exists || isBattleOnlyForme(evoSpecies)) continue
+    const sweets = expandAlcremie(evoSpecies.name)
+    if (sweets) {
+      for (const sweet of sweets) options.push({ species: sweet.species, requiredItems: sweet.items })
+      continue
+    }
     const requiredItems = evolutionItemsFor(evoSpecies)
     if (requiredItems) {
       options.push({ species: evoSpecies.name, requiredItems })
@@ -2024,7 +2160,10 @@ export function evolutionPathsFor(set: PokemonSet): { species: string; method: s
     .get(set.species)
     .evos.map((name) => Dex.species.get(name))
     .filter((evo) => evo.exists && !isBattleOnlyForme(evo))
-    .map((evo) => {
+    // Alcremie: one path per Sweet, each to its own cream.
+    .flatMap((evo) => (expandAlcremie(evo.name) ?? [null]).map((sweet) => ({ evo, sweet })))
+    .map(({ evo, sweet }) => {
+      if (sweet) return { species: sweet.species, method: `Use a ${itemNames.get(sweet.items![0]) ?? sweet.items![0]}` }
       const requiredItems = evolutionItemsFor(evo)
       let method: string
       if (requiredItems) method = `Use a ${requiredItems.map((id) => itemNames.get(id) ?? id).join(' or ')}`

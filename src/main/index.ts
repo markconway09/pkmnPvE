@@ -15,7 +15,7 @@ import type {
   NextBossInfo,
   Trainer
 } from '../shared/battle-types'
-import type { ItemQuantity, WildLocationId } from '../shared/battle-types'
+import type { ItemQuantity, CompanionSizeChoice, WildLocationId } from '../shared/battle-types'
 import {
   WILD_LOCATIONS,
   WILD_RANDOM_DROP_CHANCE,
@@ -37,12 +37,16 @@ import {
   highestLevelOf,
   levelUpMon,
   toggleFavorite,
+  setCompanion,
+  returnCompanion,
+  setCompanionSize,
   useShinyPatch,
   changeForm,
   fuseMon,
   unfuseMon,
   mergeMons,
   mergeSelectedMons,
+  autoMergeMon,
   getTeamMergeStars,
   readSavedTeamStarsOf,
   readSavedTeamOf,
@@ -65,12 +69,14 @@ import {
   getEditorOptions,
   getSpeciesEditInfo
 } from './showdown/sim-access'
-import { addTrainer, deleteTrainer, listTrainers, updateTrainer } from './showdown/trainer-store'
+import { addTrainer, deleteTrainer, duplicateTrainer, listTrainers, updateTrainer } from './showdown/trainer-store'
 import {
   addPremadeTeam,
   addSpeciesToTeam,
   deletePremadeTeam,
   deleteTeamsForTrainer,
+  copyTeamsToTrainer,
+  duplicatePremadeTeam,
   getTeamMonSet,
   listPremadeTeams,
   listPremadeTeamsForTrainer,
@@ -82,7 +88,15 @@ import {
   setPremadeTeamDrop,
   updateTeamMon
 } from './showdown/premade-teams-store'
-import { getNextBoss, getProgression, resetProgression, setBossOrder, setLevelCap, lateItemsUnlocked } from './showdown/progression-store'
+import {
+  getNextBoss,
+  getProgression,
+  resetProgression,
+  removeFromBossOrder,
+  setBossOrder,
+  setLevelCap,
+  lateItemsUnlocked
+} from './showdown/progression-store'
 import { getMoney, resetMoney, setMoney } from './showdown/money-store'
 import { buyCoinPrize, buyCoins, getCoins, getSlotRules, setCoins, spinSlots } from './showdown/game-corner-store'
 import {
@@ -534,12 +548,16 @@ ipcMain.handle('box:addStarter', (_event, species: string) => addStarter(species
 ipcMain.handle('box:evolve', (_event, id: string, targetSpecies: string) => evolveMon(id, targetSpecies))
 ipcMain.handle('box:levelUp', (_event, id: string) => levelUpMon(id))
 ipcMain.handle('box:toggleFavorite', (_event, id: string) => toggleFavorite(id))
+ipcMain.handle('box:setCompanion', (_event, id: string) => setCompanion(id))
+ipcMain.handle('box:returnCompanion', () => returnCompanion())
+ipcMain.handle('box:setCompanionSize', (_event, size: CompanionSizeChoice) => setCompanionSize(size))
 ipcMain.handle('box:useShinyPatch', (_event, id: string) => useShinyPatch(id))
 ipcMain.handle('box:changeForm', (_event, id: string, form: string) => changeForm(id, form))
 ipcMain.handle('box:fuse', (_event, id: string, partnerId: string) => fuseMon(id, partnerId))
 ipcMain.handle('box:unfuse', (_event, id: string) => unfuseMon(id))
 ipcMain.handle('box:merge', (_event, keeperId: string, fodderIds: string[]) => mergeMons(keeperId, fodderIds))
 ipcMain.handle('box:mergeSelected', (_event, ids: string[]) => mergeSelectedMons(ids))
+ipcMain.handle('box:autoMerge', (_event, monId: string) => autoMergeMon(monId))
 
 ipcMain.handle('loadouts:list', () => listLoadouts())
 ipcMain.handle('loadouts:save', (_event, name: string) => saveLoadout(name))
@@ -615,7 +633,15 @@ ipcMain.handle('trainers:delete', (_event, id: string) => {
   requireAdmin()
   const result = deleteTrainer(id)
   deleteTeamsForTrainer(id)
+  removeFromBossOrder(id)
   return result
+})
+// A copy of the trainer with copies of all its teams (the copy isn't put in the boss order).
+ipcMain.handle('trainers:duplicate', (_event, id: string) => {
+  requireAdmin()
+  const copy = duplicateTrainer(id)
+  copyTeamsToTrainer(id, copy.id)
+  return copy
 })
 
 ipcMain.handle('premadeTeams:list', () => listPremadeTeams())
@@ -627,6 +653,10 @@ ipcMain.handle('premadeTeams:add', (_event, trainerId: string, name: string) => 
 ipcMain.handle('premadeTeams:rename', (_event, id: string, name: string) => {
   requireAdmin()
   return renamePremadeTeam(id, name)
+})
+ipcMain.handle('premadeTeams:duplicate', (_event, id: string) => {
+  requireAdmin()
+  return duplicatePremadeTeam(id)
 })
 ipcMain.handle('premadeTeams:delete', (_event, id: string) => {
   requireAdmin()

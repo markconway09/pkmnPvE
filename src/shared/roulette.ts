@@ -106,4 +106,6 @@ export interface RouletteSpin {
   coins: number
   // The last few pockets, newest first.
   history: number[]
+  // A losing spin the Croupier title gave every bet back on (totalReturned is then the bets).
+  refunded?: boolean
 }

@@ -103,7 +103,7 @@ function finish(current: Round, outcome: BlackjackOutcome): void {
     outcome === 'blackjack'
       ? current.bet + Math.floor(current.bet * getGameCornerPerks().blackjackPayout)
       : outcome === 'win'
-        ? current.bet * 2
+        ? current.bet + current.bet * getGameCornerPerks().blackjackWinPayout
         : outcome === 'push'
           ? current.bet
           : 0

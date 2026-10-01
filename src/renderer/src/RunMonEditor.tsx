@@ -6,6 +6,8 @@ import SpriteImage from './SpriteImage'
 import ItemSprite from './ItemSprite'
 import ShinyIcon from './ShinyIcon'
 import { TYPE_COLORS } from './moveAnimations'
+import ModalSpinner from './ModalSpinner'
+import { teraTypeStyle } from './PokemonEditor'
 
 interface Props {
   runMonId: string
@@ -26,6 +28,7 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved }: Props): React.JSX.Ele
   const [info, setInfo] = useState<RunMonEditInfo | null>(null)
   const [moves, setMoves] = useState<string[]>(['', '', '', ''])
   const [locked, setLocked] = useState<string[]>([])
+  const [teraType, setTeraType] = useState('')
   const [setId, setSetId] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -48,6 +51,7 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved }: Props): React.JSX.Ele
         setInfo(loaded)
         setMoves([0, 1, 2, 3].map((i) => loaded.moves[i] ?? ''))
         setLocked(loaded.lockedMoves)
+        setTeraType(loaded.teraType)
         setSetId(loaded.autoSets[0]?.id ?? '')
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
@@ -86,7 +90,8 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved }: Props): React.JSX.Ele
       onSaved(
         await window.api.updateRunMon(runMonId, {
           moves: chosen,
-          lockedMoves: locked.filter((m) => chosen.includes(m))
+          lockedMoves: locked.filter((m) => chosen.includes(m)),
+          teraType
         })
       )
       onClose()
@@ -100,8 +105,9 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved }: Props): React.JSX.Ele
   return createPortal(
     <div className="modal-overlay" onMouseDown={onClose}>
       <div className="modal-row" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="modal-panel pokemon-editor pokemon-editor-main run-mon-editor">
-          <h2>{info ? `${info.species} - moves` : 'Loading...'}</h2>
+        <div className={`modal-panel pokemon-editor pokemon-editor-main run-mon-editor${info ? '' : ' modal-panel-loading'}`}>
+          <h2>{info ? `${info.species} - moves` : 'Moves'}</h2>
+          {!info && <ModalSpinner />}
           {info && (
             <div
               className="pokemon-editor-layout"
@@ -157,6 +163,21 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved }: Props): React.JSX.Ele
                 </div>
 
                 <div className="pokemon-editor-details">
+                  <label className="editor-field run-editor-tera">
+                    <span>Tera Type</span>
+                    <select
+                      className="editor-tera-select"
+                      style={teraTypeStyle(teraType)}
+                      value={teraType}
+                      onChange={(e) => setTeraType(e.target.value)}
+                    >
+                      {info.teraTypes.map((t) => (
+                        <option key={t} value={t} style={teraTypeStyle(t)}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                   <div className="editor-section">
                     <h3>Smogon set</h3>
                     <div className="auto-set-row">

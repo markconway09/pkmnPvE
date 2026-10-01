@@ -7,7 +7,8 @@ import { onPlayerChange } from './player-session'
 
 // A player's lifetime tallies, shown on their trainer profile. Bosses aren't
 // counted here - the progression's own list of beaten bosses already says that.
-type StoredStats = Omit<PlayerStats, 'bossesDefeated'>
+// Nor are raids - the achievements already keep that count.
+type StoredStats = Omit<PlayerStats, 'bossesDefeated' | 'raidsWon'>
 
 const COUNTERS: (keyof StoredStats)[] = ['trainersDefeated', 'wildDefeated', 'wildCaught', 'bestFloor']
 

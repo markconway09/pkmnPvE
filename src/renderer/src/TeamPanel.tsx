@@ -125,14 +125,19 @@ interface Props {
   reservedSlots?: Set<number>
   // Parallel to team: each member's matchup against the foes out.
   matchups?: TeamMatchup[]
+  // No switching at all right now: the whole list greys out, with why (if there's a reason
+  // worth saying, like a trap) along the top.
+  locked?: boolean
+  lockedNote?: string
   onSwitch: (slot: number) => void
 }
 
-function TeamPanel({ team, activeFlags, selectable, disabled, reservedSlots, matchups, onSwitch }: Props): React.JSX.Element {
+function TeamPanel({ team, activeFlags, selectable, disabled, reservedSlots, matchups, locked, lockedNote, onSwitch }: Props): React.JSX.Element {
   // Doubles: two matchup chips a group (one per foe), so the cards go compact to keep them on one line.
   const doubles = !!matchups?.some((m) => m.offense.length > 1 || m.defense.length > 1)
   return (
-    <div className={`menu-panel team-panel${doubles ? ' team-panel-doubles' : ''}`}>
+    <div className={`menu-panel team-panel${doubles ? ' team-panel-doubles' : ''}${locked ? ' team-panel-locked' : ''}`}>
+      {lockedNote && <div className="team-panel-locked-note">{lockedNote}</div>}
       {team.map((mon, i) => (
         <TeamMember
           key={i}

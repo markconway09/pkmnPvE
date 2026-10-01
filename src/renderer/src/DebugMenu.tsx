@@ -7,7 +7,6 @@ interface Props {
   onClose: () => void
   onTrainers: () => void
   onRogueliteBosses: () => void
-  onProgression: () => void
   onAddRandom: () => void
   onWildDrops: () => void
   onShopPrices: () => void
@@ -28,7 +27,6 @@ function DebugMenu({
   onClose,
   onTrainers,
   onRogueliteBosses,
-  onProgression,
   onAddRandom,
   onWildDrops,
   onShopPrices,
@@ -78,7 +76,6 @@ function DebugMenu({
         <div className="debug-menu-options">
           <button onClick={onTrainers}>Edit Trainers</button>
           <button onClick={onRogueliteBosses}>Edit Roguelite Bosses</button>
-          <button onClick={onProgression}>Progression</button>
           <button onClick={onWildDrops}>Wild Item Drops</button>
           <button onClick={onShopPrices}>Shop Prices</button>
           <button disabled={addRandomBusy} onClick={onAddRandom}>

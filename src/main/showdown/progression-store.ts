@@ -96,6 +96,14 @@ export function setBossOrder(steps: Omit<BossStep, 'id'>[]): ProgressionState {
   return getProgression()
 }
 
+/** Takes a (deleted) trainer out of the boss order, if it's in it. */
+export function removeFromBossOrder(trainerId: string): void {
+  const order = getBossOrder()
+  if (!order.some((step) => step.trainerId === trainerId)) return
+  bossOrder = order.filter((step) => step.trainerId !== trainerId)
+  persistBossOrder()
+}
+
 export function setLevelCap(levelCap: number): ProgressionState {
   getProgress().levelCap = Math.max(1, Math.min(100, Math.round(levelCap)))
   persistProgress()

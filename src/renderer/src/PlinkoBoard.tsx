@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { PlinkoDrop, PlinkoRisk } from '../../shared/plinko'
 import { PLINKO_PAYOUTS, PLINKO_RISKS, PLINKO_RISK_LABELS, PLINKO_ROWS, PLINKO_SLOTS, plinkoSlotMultiplier } from '../../shared/plinko'
-import BetSlider, { maxBet, placedBet, useGameCornerPerks, useSavedBet } from './BetSlider'
+import BetSlider, { maxBet, placedBet, useGameCornerPerks, useSavedBet, betStep } from './BetSlider'
 import GameCornerTabs, { type GameCornerGame } from './GameCornerTabs'
 import CoinIcon from './CoinIcon'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
@@ -309,7 +309,8 @@ function PlinkoBoard({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JS
         </svg>
 
         <div className="slots-controls">
-          <BetSlider bet={bet} max={maxBet(coins, perks.betCap)} disabled={dropping || !coins} onChange={setBet} />
+          <BetSlider bet={bet} max={maxBet(coins, perks.betCap)}
+            step={betStep(perks.betCap)} disabled={dropping || !coins} onChange={setBet} />
           <button
             className="slots-spin"
             disabled={dropping || coins === null || coins < bet}

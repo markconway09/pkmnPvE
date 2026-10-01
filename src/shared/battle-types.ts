@@ -68,6 +68,30 @@ export const REVEAL_GLASS_ITEM_ID = 'revealglass'
 export const GRACIDEA_ITEM_ID = 'gracidea'
 export const METEORITE_ITEM_ID = 'meteorite'
 export const ZYGARDE_CUBE_ITEM_ID = 'zygardecube'
+export const DECORATION_BOX_ITEM_ID = 'decorationbox'
+
+// Alcremie's nine creams - each its own Pokedex form here. Vanilla Cream is plain Alcremie.
+export const ALCREMIE_FORMS = [
+  'Alcremie',
+  'Alcremie-Ruby-Cream',
+  'Alcremie-Matcha-Cream',
+  'Alcremie-Mint-Cream',
+  'Alcremie-Lemon-Cream',
+  'Alcremie-Salted-Cream',
+  'Alcremie-Ruby-Swirl',
+  'Alcremie-Caramel-Swirl',
+  'Alcremie-Rainbow-Swirl'
+]
+// Minior's seven cores (plain Minior is the red one) - all of them for an achievement.
+export const MINIOR_COLORS = [
+  'Minior',
+  'Minior-Orange',
+  'Minior-Yellow',
+  'Minior-Green',
+  'Minior-Blue',
+  'Minior-Indigo',
+  'Minior-Violet'
+]
 export const KEY_ITEM_IDS = new Set([
   ROTOM_CATALOG_ITEM_ID,
   EXP_CHARM_ITEM_ID,
@@ -83,7 +107,8 @@ export const KEY_ITEM_IDS = new Set([
   REVEAL_GLASS_ITEM_ID,
   GRACIDEA_ITEM_ID,
   METEORITE_ITEM_ID,
-  ZYGARDE_CUBE_ITEM_ID
+  ZYGARDE_CUBE_ITEM_ID,
+  DECORATION_BOX_ITEM_ID
 ])
 
 // The form-change key items: with one in the bag, a Pokemon in its group can be changed
@@ -100,7 +125,9 @@ export const FORM_CHANGES: { itemId: string; forms: string[] }[] = [
   { itemId: REVEAL_GLASS_ITEM_ID, forms: ['Enamorus', 'Enamorus-Therian'] },
   { itemId: GRACIDEA_ITEM_ID, forms: ['Shaymin', 'Shaymin-Sky'] },
   { itemId: METEORITE_ITEM_ID, forms: ['Deoxys', 'Deoxys-Attack', 'Deoxys-Defense', 'Deoxys-Speed'] },
-  { itemId: ZYGARDE_CUBE_ITEM_ID, forms: ['Zygarde', 'Zygarde-10%'] }
+  { itemId: ZYGARDE_CUBE_ITEM_ID, forms: ['Zygarde', 'Zygarde-10%'] },
+  // Only the cream changes - the same Pokemon otherwise (see changeForm).
+  { itemId: DECORATION_BOX_ITEM_ID, forms: ALCREMIE_FORMS }
 ]
 
 export interface FusionRule {
@@ -380,6 +407,8 @@ export interface EvolutionItemUse {
 
 export interface BoxPokemonView extends PokemonSummary {
   id: string
+  // At the top of the friendship scale - the only Pokemon that can be a companion.
+  maxFriendship?: boolean
   // Only present for the player's own persisted box/team Pokemon - premade
   // trainer team mons (also built from this type) have no exp progression
   // or evolution mechanic of their own.
@@ -437,7 +466,31 @@ export interface BoxPokemonView extends PokemonSummary {
 export interface BoxState {
   mons: BoxPokemonView[]
   team: (string | null)[]
+  // The companion beside the team (one of the box's own Pokemon - companionId), and whether
+  // the companion slot has been unlocked yet (see COMPANION_ACHIEVEMENT_ID).
+  companion?: BoxPokemonView | null
+  companionId?: string | null
+  companionUnlocked?: boolean
+  // The size it's drawn at, and what was picked - 'auto' goes by its height.
+  companionSize?: CompanionSize
+  companionSizeChoice?: CompanionSizeChoice
 }
+
+// How big the companion is drawn, on the menu and in battle.
+export type CompanionSize = 'S' | 'M' | 'L'
+export const COMPANION_SIZES: CompanionSize[] = ['S', 'M', 'L']
+export type CompanionSizeChoice = CompanionSize | 'auto'
+
+// Auto size by the species' real height: about a third of all Pokemon in each.
+export const COMPANION_AUTO_M_HEIGHT = 0.7
+export const COMPANION_AUTO_L_HEIGHT = 1.5
+
+export function autoCompanionSize(heightm: number): CompanionSize {
+  return heightm > COMPANION_AUTO_L_HEIGHT ? 'L' : heightm >= COMPANION_AUTO_M_HEIGHT ? 'M' : 'S'
+}
+
+// The achievement - maxing out a Pokemon's friendship - that unlocks the companion slot.
+export const COMPANION_ACHIEVEMENT_ID = 'bestfriend'
 
 // A named snapshot of a team lineup, saved from the box - see loadout-store.ts.
 // Loading one just calls setTeam with its ids (any that are no longer in the
@@ -670,6 +723,17 @@ export const RAID_STARS = 3
 // A raid boss's HP is this many times its own before Dynamaxing doubles it again, and it
 // attacks this many times a turn.
 export const RAID_HP_MULTIPLIER = 2
+// A raid boss's soft cap on one hit: the first RAID_SOFT_CAP_SHARE of its max HP is taken
+// in full, and only RAID_OVERFLOW_FACTOR of whatever goes past it - so a huge hit still
+// hurts, but can't burst it down.
+export const RAID_SOFT_CAP_SHARE = 0.25
+export const RAID_OVERFLOW_FACTOR = 0.5
+
+/** One hit's damage to a raid boss with this max HP, after the soft cap. */
+export function raidSoftCappedDamage(damage: number, maxHp: number): number {
+  const cap = Math.floor(maxHp * RAID_SOFT_CAP_SHARE)
+  return damage <= cap ? damage : cap + Math.floor((damage - cap) * RAID_OVERFLOW_FACTOR)
+}
 export const RAID_ATTACKS_PER_TURN = 2
 // What a raid's boss is: a Gigantamax Pokemon this often, otherwise a red Pokemon, or a
 // gold one (restricted legendary) this often.
@@ -774,10 +838,17 @@ export interface ItemOptionEntry extends DescribedOptionEntry {
 
 export interface ShopItemEntry extends ItemOptionEntry {
   price: number
+  // Each one's price when buying in bulk (the Tycoon title - see shopTotal), if lower.
+  bulkPrice?: number
   category: string
   // A key item: shown in the shop but never sold there - whether the player has it, and
   // the achievement that unlocks it.
   keyItem?: { owned: boolean; unlockedBy: string }
+}
+
+/** What buying this many of a Shop item costs - at its bulk price from TYCOON_BULK_MIN on. */
+export function shopTotal(item: { price: number; bulkPrice?: number }, count: number, bulkMin = 5): number {
+  return (count >= bulkMin && item.bulkPrice !== undefined ? item.bulkPrice : item.price) * count
 }
 
 /** A shop item as the admin price editor sees it: its current price and the default. */
@@ -928,6 +999,8 @@ export interface PlayerStats {
   // Pokemon is caught from the win screen, so every catch is also a knockout).
   wildDefeated: number
   wildCaught: number
+  // Max Raids won (every one a catch too - not counted as wild).
+  raidsWon: number
   // Roguelite: the furthest floor any run has reached (0 before the first run).
   bestFloor: number
 }
@@ -972,10 +1045,22 @@ export const POKEMON_SELL_PRICES: Record<RarityTier, number> = {
 // ---- Merging duplicates ----
 // Merging a duplicate into a Pokemon adds its copies to it: stars go up each time the
 // copies double (2 = 1 star, 4 = 2 stars ... 32 = 5 stars), and each star is +10% to all
-// its stats in classic battles and friendly matches (never in a Roguelite run).
+// its stats in classic battles and friendly matches (never in a Roguelite run) - less for
+// the strongest: +7.5% a star for a red Pokemon and +5% for a gold one.
 export const MERGE_MAX_STARS = 5
 export const MERGE_MAX_COPIES = 2 ** MERGE_MAX_STARS
 export const MERGE_STAT_BONUS_PER_STAR = 0.1
+export const MERGE_STAT_BONUS_BY_TIER: Partial<Record<RarityTier, number>> = { epic: 0.075, legendary: 0.05 }
+
+/** What one star adds to all its stats, for a Pokemon of this rarity. */
+export function mergeBonusPerStar(tier: RarityTier | undefined): number {
+  return (tier && MERGE_STAT_BONUS_BY_TIER[tier]) ?? MERGE_STAT_BONUS_PER_STAR
+}
+
+/** "+37.5%" - its whole bonus at this many stars. */
+export function mergeBonusText(stars: number, tier: RarityTier | undefined): string {
+  return `+${Math.round(stars * mergeBonusPerStar(tier) * 1000) / 10}%`
+}
 
 export function mergeStarsFor(copies: number | undefined): number {
   return Math.min(MERGE_MAX_STARS, Math.floor(Math.log2(Math.max(1, copies ?? 1))))
@@ -1015,8 +1100,8 @@ export function planMerge(keeperCopies: number, others: { id: string; copies: nu
   return plan
 }
 
-export function mergeStatMultiplier(stars: number): number {
-  return 1 + MERGE_STAT_BONUS_PER_STAR * stars
+export function mergeStatMultiplier(stars: number, tier: RarityTier | undefined): number {
+  return 1 + mergeBonusPerStar(tier) * stars
 }
 
 // A duplicate that could be merged into a Pokemon (see BoxPokemonView.mergeCandidates).
@@ -1030,6 +1115,10 @@ export interface MergeCandidateView {
   onTeam: boolean
   // Its held item goes back to the bag.
   item: string
+  // A pre-evolution evolves on its way in: the items that uses up (with how many of each
+  // the bag has), or why it can't yet ("Needs a Whipped Dream", "Level 36") - see mergeEvolutionFor.
+  evolveItems?: { itemId: string; name: string; spritenum: number | null; owned: number }[]
+  notReady?: string
 }
 
 // A shiny sells for this much more, whatever its rarity (on top of any title's bonus).
@@ -1067,6 +1156,9 @@ export interface OpenItemResult {
   sellPrice?: number | null
   // A Pokemon won: its id in the box, so it can be sold from the result (at sellPrice).
   monId?: string
+  // ...or merged straight into the box Pokemon it would go into (see autoMergeMon), if any -
+  // with the evolution items that would use up.
+  mergeKeeper?: { species: string; stars: number; uses: string[] } | null
   // An item won: its full shop price, shown by its name.
   price?: number
   // A Pokemon not in the Pokedex yet, or an item the bag didn't have - marked "New".
@@ -1170,6 +1262,8 @@ export interface BattleView {
   // What running away costs: 0 from a wild Pokemon, TRAINER_RUN_COST from an ordinary
   // trainer, null when it isn't allowed at all (a boss, a Roguelite trainer or boss).
   runCost: number | null
+  // Whether the player has the money to run (always, when it's free).
+  canAffordRun: boolean
   opponentRoster: RosterSlotView[]
   // A Roguelite run's battle: catching is free and fills the run's team, and there's
   // no money or items. Set with the Pokemon that fainted - they leave the run's team.
@@ -1215,12 +1309,16 @@ export interface RunMonEditInfo {
   autoSets: AutoSetOption[]
   moves: string[]
   lockedMoves: string[]
+  // Its Tera Type, and every one it could be.
+  teraType: string
+  teraTypes: string[]
 }
 
-// What the run's moves editor saves: moves (ids, up to 4) and the ones locked.
+// What the run's moves editor saves: moves (ids, up to 4), the ones locked, and its Tera Type.
 export interface RunMonEdit {
   moves: string[]
   lockedMoves: string[]
+  teraType?: string
 }
 
 // One of the four choices a New Ability / New Move floor offers.
@@ -1457,8 +1555,8 @@ export const RUN_GEM_ICON = './icons/run-gem.png'
 // Gems for beating a trainer and a boss.
 export const RUN_GEMS_PER_TRAINER = 1
 export const RUN_GEMS_PER_BOSS = 2
-// What each consumable costs in a boss floor's shop.
-export const RUN_CONSUMABLE_PRICE = 1
+// What each consumable costs in a boss floor's shop, in gems.
+export const RUN_CONSUMABLE_PRICES: Record<RunConsumableId, number> = { fullrestore: 3, revive: 5, abilitycapsule: 1 }
 // A boss floor's shop also sells one of each of these picks (Random Swap is free).
 export type RunShopTile = 'ability' | 'move' | 'item' | 'swap'
 export const RUN_SHOP_TILE_PRICES: Record<RunShopTile, number> = { ability: 1, move: 1, item: 1, swap: 0 }

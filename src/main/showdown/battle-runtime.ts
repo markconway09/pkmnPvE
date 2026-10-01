@@ -40,7 +40,7 @@ import {
 } from './volatile-badges'
 import type { Pokemon as SimPokemon } from 'pokemon-showdown/dist/sim/pokemon.js'
 import type { Battle as SimBattle } from 'pokemon-showdown/dist/sim/battle.js'
-import { RAID_ATTACKS_PER_TURN, RAID_HP_MULTIPLIER, mergeStatMultiplier } from '../../shared/battle-types'
+import { RAID_ATTACKS_PER_TURN, RAID_HP_MULTIPLIER, mergeStatMultiplier, raidSoftCappedDamage } from '../../shared/battle-types'
 import type { RaidView } from '../../shared/battle-types'
 import { RAID_PLACEHOLDER_NAME, raidPlaceholderSet } from './raid'
 import { RAID_LEADER_EXTRA_COPIES } from '../../shared/titles'
@@ -272,8 +272,10 @@ function computeItemEvent(line: string): AbilityEvent | null {
   }
   const from = parts.find((p) => p.startsWith('[from] item: '))
   if (!from) return null
+  // A healing item is the healed Pokemon's own - Shell Bell's [of] names the Pokemon it hit,
+  // not its holder. Otherwise [of] is the holder (Rocky Helmet hurting the attacker).
   const of = parts.find((p) => p.startsWith('[of] '))?.slice('[of] '.length)
-  return withItem(of ?? parts[1], from.slice('[from] item: '.length))
+  return withItem(cmd === '-heal' || !of ? parts[1] : of, from.slice('[from] item: '.length))
 }
 
 // A Pokemon Terastallizing or Mega Evolving on this line (Primal Reversion and Ultra
@@ -515,6 +517,14 @@ export class WildBattle {
       if (action) this.queue.prioritizeAction(action as never)
     }
     battle.onEvent('AfterMove', battle.format, onAfterMove as never)
+
+    // The soft cap: past a quarter of the boss's (Dynamaxed) max HP, a hit only does half
+    // as much more (see raidSoftCappedDamage). Moves only - not burns, weather or recoil.
+    const onDamage = function (this: SimBattle, damage: number, target: SimPokemon, _source: SimPokemon, effect: { effectType?: string }): number | void {
+      if (target !== boss || effect?.effectType !== 'Move') return
+      return raidSoftCappedDamage(damage, boss.maxhp)
+    }
+    battle.onEvent('Damage', battle.format, onDamage as never)
   }
 
   private raidCatch: RaidView['caught'] = null
@@ -544,7 +554,7 @@ export class WildBattle {
     for (const mon of side.pokemon) {
       const count = stars[side.team.indexOf(mon.set)] ?? 0
       if (!count) continue
-      const multiplier = mergeStatMultiplier(count)
+      const multiplier = mergeStatMultiplier(count, speciesRarityTier(mon.species.name))
       const ratio = mon.maxhp > 0 ? mon.hp / mon.maxhp : 1
       mon.m.mergeBoost = multiplier
       mon.baseMaxhp = Math.floor(mon.baseMaxhp * multiplier)
@@ -557,7 +567,7 @@ export class WildBattle {
   private withMergeStats(view: ActivePokemonView, side: 'p1' | 'p2'): ActivePokemonView {
     const count = view.rosterIndex !== undefined ? (this.mergeStars[side][view.rosterIndex] ?? 0) : 0
     if (!count) return view
-    const multiplier = mergeStatMultiplier(count)
+    const multiplier = mergeStatMultiplier(count, speciesRarityTier(view.species))
     const stats = { ...view.stats }
     for (const key of Object.keys(stats) as (keyof typeof stats)[]) stats[key] = Math.floor(stats[key] * multiplier)
     view.stats = stats
@@ -698,7 +708,8 @@ export class WildBattle {
               // boss - either way plus the level cap as a percentage on top.
               this.moneyGained = this.opponent.noPrizeMoney ? 0 : this.prizeMoney(levelCap)
               if (this.moneyGained > 0) addMoney(this.moneyGained)
-            } else {
+            } else if (!this.opponent?.raid) {
+              // A Max Raid isn't a wild battle - it has its own mission and achievements.
               countStat('wildDefeated')
             }
             if (this.opponent?.raid) this.catchRaidBoss(this.opponent.raid)
@@ -1017,6 +1028,21 @@ export class WildBattle {
   // encounter (no trainerId) that the player just won can be caught, and
   // only once per battle.
   // A beaten raid boss always joins the box: its stars as copies, and its Gigantamax form.
+  /**
+   * The player's request, with every trap they're under marked: a trap from an ability
+   * nobody has seen yet (Shadow Tag, Arena Trap, Magnet Pull) is left off it by the sim -
+   * hidden from a player who couldn't know - but here the switch list should just say so.
+   */
+  private requestWithTraps(): ChoiceRequest | null {
+    const request = this.human.latestRequest
+    if (!request || !('active' in request) || !request.active) return request
+    const active = this.battleStream.battle?.sides[0].active ?? []
+    return {
+      ...request,
+      active: request.active.map((slot, i) => (active[i]?.trapped && !slot.trapped ? { ...slot, trapped: true } : slot))
+    }
+  }
+
   private catchRaidBoss(raid: NonNullable<OpponentConfig['raid']>): void {
     const boss = this.p2team[0]
     // Raid Leader: a couple of extra copies on top of the boss's stars.
@@ -1024,7 +1050,7 @@ export class WildBattle {
     addCaughtMon(boss, { copies, gigantamax: raid.gigantamax })
     this.raidCatch = { species: boss.species, shiny: !!boss.shiny }
     this.caught = true
-    countStat('wildCaught')
+    // Not a wild catch (the catch missions and achievements) - raids count on their own.
     countAchievement('raidsWon')
     if (speciesRarityTier(boss.species) === 'legendary') countAchievement('goldRaidsWon')
     if (boss.shiny) countAchievement('shinyRaidCatches')
@@ -1501,7 +1527,7 @@ export class WildBattle {
       moveEvents: [...this.moveEvents],
       gimmickEvents: [...this.gimmickEvents],
       abilityEvents: [...this.abilityEvents],
-      request: this.ended ? null : this.human.latestRequest,
+      request: this.ended ? null : this.requestWithTraps(),
       ended: this.ended,
       winner: this.winner,
       expGains: this.expGains,
@@ -1516,6 +1542,7 @@ export class WildBattle {
       moveEffectiveness: this.moveEffectivenessView(),
       opponentTrainer,
       runCost: this.runCost(),
+      canAffordRun: getMoney() >= (this.runCost() ?? 0),
       opponentRoster: this.opponentRoster(),
       rewards: this.rewardsView(),
       runBattle: !!this.opponent?.run,

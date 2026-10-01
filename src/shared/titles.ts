@@ -27,32 +27,34 @@ export type Title =
   | 'Gigantamax Hunter'
   | 'Starlight'
   | 'Diligent'
+  | 'Croupier'
 
 // What each title does, for the title pickers.
 export const TITLE_PERKS: Record<Title, string> = {
-  Veteran: '+10% exp from battles',
-  'Ace Trainer': '+10% prize money from trainers and bosses',
-  'Badge Collector': '10% chance of a bonus Rare Candy after any battle won',
+  Veteran: 'Double exp from battles',
+  'Ace Trainer': '+50% prize money from trainers and bosses',
+  'Badge Collector': '50% chance of a bonus Rare Candy after any battle won',
   Champion: 'Running from trainers is free',
-  Collector: '10% chance a catch is free',
+  Collector: '25% chance a catch is free',
   Professor: "Pokemon you haven't registered turn up more often in the wild",
   'Shiny Hunter': 'Wild shiny odds 1 in 384 instead of 1 in 512 (not raid bosses)',
   'Legend Keeper': 'Random Legendary is likelier to give a box legendary',
-  Tycoon: '10% off everything in the Shop',
+  Tycoon: '25% off when buying 5 or more of an item at once in the Shop',
   Survivor: 'Roguelite runs start with a free item pick',
   Daredevil: 'Roguelite runs start with a free item, move and ability pick',
-  'Golden Touch': 'The slots jackpot pays ×60 instead of ×50',
-  'High Roller': 'Bet up to 2,000 coins in the Game Corner',
+  'Golden Touch': 'The slots jackpot pays ×75 instead of ×50, and every slots win 10% more',
+  'High Roller': 'Bet up to 10,000 coins in the Game Corner',
   'Edge Lord': "Plinko's edge slots pay double and the slots next to them 25% more, at every risk",
   Heartless: 'Pokemon sell for 15% more',
   Broker: 'Grey, blue and purple Pokemon sell for double',
-  '9+10': 'Blackjack pays 3:1 instead of 3:2',
+  '9+10': 'Blackjack pays 4:1 instead of 3:2, and a regular win 2:1 instead of 1:1',
   'Five-Star': 'Gold legendaries turn up twice as often as raid bosses',
-  Alchemist: '10% chance a merge adds a bonus copy',
+  Alchemist: '10% chance to find a random evolution item when selling a Pokémon',
   'Raid Leader': 'Raid bosses are caught with 2 extra copies',
   'Gigantamax Hunter': 'Raid bosses Gigantamax more often (65% instead of 50%)',
   Starlight: 'Raid bosses are 3× as likely to be shiny (5× with the Shiny Charm)',
-  Diligent: 'One extra daily mission reroll'
+  Diligent: 'One extra daily mission reroll',
+  Croupier: 'A losing roulette spin has a 10% chance to give every bet back'
 }
 
 /** A title's perk, for showing beside it ("" for a title without one). */
@@ -60,33 +62,43 @@ export function titlePerk(title: string): string {
   return TITLE_PERKS[title as Title] ?? ''
 }
 
-export const VETERAN_EXP_MULTIPLIER = 1.1
-export const ACE_TRAINER_MONEY_MULTIPLIER = 1.1
-export const BADGE_COLLECTOR_CANDY_CHANCE = 0.1
-export const COLLECTOR_FREE_CATCH_CHANCE = 0.1
+export const VETERAN_EXP_MULTIPLIER = 2
+export const ACE_TRAINER_MONEY_MULTIPLIER = 1.5
+export const BADGE_COLLECTOR_CANDY_CHANCE = 0.5
+export const COLLECTOR_FREE_CATCH_CHANCE = 0.25
 // How much likelier an unregistered species is in the wild (a weight on the pick).
 export const PROFESSOR_UNREGISTERED_WEIGHT = 2
 export const SHINY_HUNTER_ODDS = 384
 // With Legend Keeper, how often a Random Legendary is drawn from the box legendaries alone.
 export const LEGEND_KEEPER_RESTRICTED_CHANCE = 0.15
-export const TYCOON_SHOP_MULTIPLIER = 0.9
-export const GOLDEN_TOUCH_JACKPOT_BONUS = 10
-export const HIGH_ROLLER_BET_CAP = 2000
+// Tycoon: buying at least this many of one item at once takes this much off each.
+export const TYCOON_BULK_MIN = 5
+export const TYCOON_BULK_MULTIPLIER = 0.75
+export const GOLDEN_TOUCH_JACKPOT_BONUS = 25
+// ...and every payout (the jackpot included, after its bonus) 10% more.
+export const GOLDEN_TOUCH_PAYOUT_MULTIPLIER = 1.1
+export const HIGH_ROLLER_BET_CAP = 10000
 export const EDGE_LORD_EDGE_MULTIPLIER = 2
 // ...and the slots next to the edges pay 25% more.
 export const EDGE_LORD_NEAR_EDGE_MULTIPLIER = 1.25
 export const HEARTLESS_SELL_MULTIPLIER = 1.15
 // Broker: these rarity tiers (grey, blue, purple) sell for double.
 export const BROKER_DOUBLE_TIERS = new Set(['common', 'uncommon', 'rare'])
-// A natural blackjack's payout, to 1: 3:2 normally, 3:1 with 9+10.
+// A natural blackjack's payout, to 1: 3:2 normally, 4:1 with 9+10.
 export const BLACKJACK_PAYOUT = 1.5
-export const NINE_PLUS_TEN_BLACKJACK_PAYOUT = 3
+export const NINE_PLUS_TEN_BLACKJACK_PAYOUT = 4
+// An ordinary win, to 1: 1:1 normally, 2:1 with 9+10.
+export const BLACKJACK_WIN_PAYOUT = 1
+export const NINE_PLUS_TEN_WIN_PAYOUT = 2
 // Max Raid and merging perks.
 export const FIVE_STAR_RESTRICTED_CHANCE = 0.3
-export const ALCHEMIST_BONUS_COPY_CHANCE = 0.1
+// Alchemist: how often each Pokemon sold turns up a random evolution item.
+export const ALCHEMIST_ITEM_CHANCE = 0.1
 export const RAID_LEADER_EXTRA_COPIES = 2
 export const GIGANTAMAX_HUNTER_CHANCE = 0.65
 export const DILIGENT_EXTRA_REROLLS = 1
+// Croupier: how often a losing roulette spin gives every bet on it back.
+export const CROUPIER_REFUND_CHANCE = 0.1
 // Starlight's raid boss shiny multiplier - in place of the Shiny Charm's 3x, not on top of it.
 export const STARLIGHT_RAID_MULTIPLIER = 3
 export const STARLIGHT_RAID_CHARM_MULTIPLIER = 5
@@ -97,6 +109,7 @@ export interface GameCornerPerks {
   // Multiplies Plinko's two edge slots, and the two next to them.
   plinkoEdgeMultiplier: number
   plinkoNearEdgeMultiplier: number
-  // What a natural blackjack pays, to 1.
+  // What a natural blackjack pays, and an ordinary win, to 1.
   blackjackPayout: number
+  blackjackWinPayout: number
 }

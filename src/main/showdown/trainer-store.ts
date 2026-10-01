@@ -89,6 +89,19 @@ export function updateTrainer(id: string, input: Omit<Trainer, 'id'>): Trainer[]
   return listTrainers()
 }
 
+/** A copy of a trainer under a new id ("Name (copy)") - its teams are copied separately. */
+export function duplicateTrainer(id: string): Trainer {
+  const source = getState().find((t) => t.id === id)
+  if (!source) throw new Error(`Unknown trainer id: ${id}`)
+  // Not the importer's key: importing again would take the copy for the original.
+  const { id: _id, importKey: _importKey, ...rest } = source
+  const copy: Trainer = { ...structuredClone(rest), id: randomUUID(), name: `${source.name} (copy)` }
+  const state = getState()
+  state.splice(state.indexOf(source) + 1, 0, copy)
+  persist()
+  return copy
+}
+
 export function deleteTrainer(id: string): Trainer[] {
   state = getState().filter((t) => t.id !== id)
   persist()

@@ -20,6 +20,8 @@ import type {
   WildLocationId
 } from '../../shared/battle-types'
 import TeamRow from './TeamRow'
+import CompanionSlot, { COMPANION_SLOT_ID } from './CompanionSlot'
+import type { CompanionSizeChoice } from '../../shared/battle-types'
 import BoxGrid from './BoxGrid'
 import PokemonEditor from './PokemonEditor'
 import PokemonIconVisual from './PokemonIconVisual'
@@ -71,7 +73,6 @@ interface Props {
   onOptions: () => void
   onTrainers: () => void
   onRogueliteBosses: () => void
-  onProgression: () => void
   fightBusy: boolean
   fightError: string | null
   trainerSprite: string
@@ -100,13 +101,21 @@ const BOX_SORTS: { key: BoxSortKey; label: string }[] = [
   { key: 'stars', label: 'Stars' }
 ]
 
+// What the Alchemist title turned up selling, for the sale's note: " · found a Thunder Stone".
+function alchemistText(found: string[]): string {
+  if (found.length === 0) return ''
+  const counts = new Map<string, number>()
+  for (const name of found) counts.set(name, (counts.get(name) ?? 0) + 1)
+  return ` · found ${[...counts].map(([name, n]) => (n > 1 ? `${n}× ${name}` : `a ${name}`)).join(', ')}`
+}
+
 // The expanded box's filter chips: each one on narrows the box to Pokemon that pass it.
 type BoxFilterKey = 'favorite' | 'shiny' | 'stars' | 'duplicates'
 const BOX_FILTERS: { key: BoxFilterKey; icon: React.ReactNode; title: string; test: (m: BoxPokemonView) => boolean }[] = [
   { key: 'favorite', icon: '❤️', title: 'Favorites only', test: (m) => !!m.favorite },
   { key: 'shiny', icon: <ShinyIcon />, title: 'Shinies only', test: (m) => !!m.shiny },
   { key: 'stars', icon: '★', title: 'Merged (starred) only', test: (m) => (m.mergeStars ?? 0) > 0 },
-  { key: 'duplicates', icon: '⧉', title: 'Duplicates only - Pokémon with another of their species', test: (m) => (m.mergeCandidates?.length ?? 0) > 0 }
+  { key: 'duplicates', icon: '⧉', title: 'Duplicates only - Pokémon with another of their species (or a pre-evolution of theirs) to merge in', test: (m) => (m.mergeCandidates?.length ?? 0) > 0 }
 ]
 
 // Ascending order for a sort key (the caller flips it for descending).
@@ -152,7 +161,6 @@ function MainMenu({
   onOptions,
   onTrainers,
   onRogueliteBosses,
-  onProgression,
   fightBusy,
   fightError,
   trainerSprite,
@@ -359,7 +367,15 @@ function MainMenu({
   }
 
   // Unlocked achievements show up on the nav button's count as they happen.
-  useEffect(() => window.api.onAchievementsUnlocked(refreshAchievements), [])
+  // An unlock can open the companion slot (see COMPANION_ACHIEVEMENT_ID) - the box says so.
+  useEffect(
+    () =>
+      window.api.onAchievementsUnlocked(() => {
+        refreshAchievements()
+        refreshBox()
+      }),
+    []
+  )
 
   // Daily missions: the day's three, and whether their window is open.
   const [missions, setMissions] = useState<MissionsState | null>(null)
@@ -389,9 +405,10 @@ function MainMenu({
 
   useEffect(refreshAll, [])
 
-  // The Max Raid button counts Raid Crystals: bought in the Shop or the Coin Shop, or
-  // sold from the bag - so it's brought up to date once those are all closed again.
-  const itemWindowOpen = shopOpen || coinShopOpen || bagOpen || gameCorner !== null
+  // The Max Raid button counts Raid Crystals: bought in the Shop or the Coin Shop, sold
+  // from the bag, or won from an achievement or the daily missions - so it's brought up
+  // to date once those are all closed again (claims refresh it straight away too).
+  const itemWindowOpen = shopOpen || coinShopOpen || bagOpen || gameCorner !== null || missionsOpen || achievementsOpen
   useEffect(() => {
     if (!itemWindowOpen) refreshEligibility()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -471,7 +488,15 @@ function MainMenu({
   // Merging: pick every Pokemon on show that has another of its species in the box.
   function selectAllDuplicates(): void {
     setConfirmingBoxSell(false)
-    setBoxSelection(new Set(boxMons.filter((m) => canBulkMerge(m) && (m.mergeCandidates?.length ?? 0) > 0).map((m) => m.id)))
+    // Each fully evolved keeper with something to take in, and every one ready to go into it.
+    const ids = new Set<string>()
+    for (const m of boxMons) {
+      const ready = (m.mergeCandidates ?? []).filter((c) => !c.notReady)
+      if (!canBulkMerge(m) || ready.length === 0) continue
+      ids.add(m.id)
+      for (const c of ready) ids.add(c.id)
+    }
+    setBoxSelection(ids)
   }
 
   // Back to the battle buttons: the box's search, filters and selection are cleared.
@@ -540,7 +565,7 @@ function MainMenu({
       const result = await window.api.sellMons([...boxSelection])
       setBoxState(result.box)
       setMoney(result.money)
-      notes.show(`Sold ${result.count} Pokemon for ${formatMoney(result.sold)}`, at)
+      notes.show(`Sold ${result.count} Pokemon for ${formatMoney(result.sold)}${alchemistText(result.found)}`, at)
       stopBoxSelection()
     } catch (err) {
       notes.show(errorMessage(err), at, 'bad')
@@ -557,7 +582,7 @@ function MainMenu({
       const result = await window.api.sellMon(monId)
       setBoxState(result.box)
       setMoney(result.money)
-      notes.show(`Sold ${result.species} for ${formatMoney(result.sold)}`, at)
+      notes.show(`Sold ${result.species} for ${formatMoney(result.sold)}${alchemistText(result.found)}`, at)
     } catch (e) {
       notes.show(errorMessage(e), at, 'bad')
     } finally {
@@ -602,7 +627,8 @@ function MainMenu({
     setBusy(true)
     try {
       setBoxState(await window.api.changeForm(monId, form))
-      notes.show(`Changed into ${form} - it has a new set to match`, at)
+      // A cream change is only the look; any other form comes with a new set.
+      notes.show(form.startsWith('Alcremie') ? `Changed into ${form}` : `Changed into ${form} - it has a new set to match`, at)
     } catch (e) {
       notes.show(errorMessage(e), at, 'bad')
     } finally {
@@ -664,6 +690,39 @@ function MainMenu({
     void persistTeam(newTeam)
   }
 
+  // Dropped on the companion slot: only a Pokemon at max friendship can go there.
+  function handleCompanionDrop(draggedId: string): void {
+    const mon = monsById.get(draggedId)
+    const slot = document.querySelector('.companion-slot')?.getBoundingClientRect()
+    const at = slot ? { x: slot.left + slot.width / 2, y: slot.top } : { x: window.innerWidth / 4, y: window.innerHeight / 2 }
+    if (!mon) return
+    if (!mon.maxFriendship) {
+      notes.show(`Only a Pokémon at max friendship can be a companion`, at, 'bad')
+      return
+    }
+    window.api
+      .setCompanion(draggedId)
+      .then((box) => {
+        setBoxState(box)
+        notes.show(`${mon.species} is your companion now`, at)
+      })
+      .catch((e) => notes.show(errorMessage(e), at, 'bad'))
+  }
+
+  function setCompanionSize(size: CompanionSizeChoice): void {
+    window.api
+      .setCompanionSize(size)
+      .then(setBoxState)
+      .catch(() => {})
+  }
+
+  function returnCompanion(): void {
+    window.api
+      .returnCompanion()
+      .then(setBoxState)
+      .catch((e) => notes.show(errorMessage(e), { x: window.innerWidth / 4, y: window.innerHeight / 2 }, 'bad'))
+  }
+
   function handleDragStart(e: DragStartEvent): void {
     setActiveDragId(String(e.active.id))
   }
@@ -684,6 +743,8 @@ function MainMenu({
     if (overId.startsWith(RUN_SLOT_DROP_PREFIX)) return
     if (overId === RUN_STARTER_SLOT_ID) {
       setRunPickId(draggedId)
+    } else if (overId === COMPANION_SLOT_ID) {
+      handleCompanionDrop(draggedId)
     } else if (overId === 'box-drop-zone') {
       handleBoxDrop(draggedId)
     } else if (overId.startsWith('team-slot-')) {
@@ -746,7 +807,7 @@ function MainMenu({
         const target = e.target as HTMLElement
         if (
           target.closest(
-            'button, input, select, a, label, .menu-header, .team-slot, .box-toolbar-attached, .box-grid, .modal-overlay, .context-menu-overlay, .context-menu, .tooltip-portal'
+            'button, input, select, a, label, .menu-header, .team-slot, .companion-slot, .box-toolbar-attached, .box-grid, .modal-overlay, .context-menu-overlay, .context-menu, .tooltip-portal'
           )
         ) {
           return
@@ -1116,6 +1177,17 @@ function MainMenu({
         <>
         {/* The team in a panel like the box's, the loadouts a section of its toolbar. */}
         <div className="team-frame">
+          {/* The companion, on the team's left - once the Best Friends achievement opens the slot. */}
+          {boxState?.companionUnlocked && (
+            <CompanionSlot
+              companion={boxState.companion ?? null}
+              dragging={activeDragMon ?? null}
+              size={boxState.companionSize ?? 'S'}
+              sizeChoice={boxState.companionSizeChoice ?? 'auto'}
+              onSetSize={setCompanionSize}
+              onReturn={returnCompanion}
+            />
+          )}
           <div className="box-toolbar box-toolbar-attached box-toolbar-compact team-toolbar">
             <span className="box-toolbar-section box-toolbar-title team-toolbar-title">
               Team <span className="box-count">· {team.filter(Boolean).length}/{team.length}</span>
@@ -1330,6 +1402,7 @@ function MainMenu({
           favorite={!!monsById.get(editingMonId)?.favorite}
           mergeStars={monsById.get(editingMonId)?.mergeStars ?? 0}
           mergeCopies={monsById.get(editingMonId)?.copies}
+          rarityTier={monsById.get(editingMonId)?.rarityTier}
           onToggleFavorite={() => void toggleFavorite(editingMonId)}
           canUseRareCandy={!!monsById.get(editingMonId)?.canLevelUpWithCandy}
           evolutionPaths={monsById.get(editingMonId)?.evolutionPaths}
@@ -1361,7 +1434,6 @@ function MainMenu({
           onClose={() => setDebugOpen(false)}
           onTrainers={onTrainers}
           onRogueliteBosses={onRogueliteBosses}
-          onProgression={onProgression}
           onAddRandom={() => void addRandom()}
           onWildDrops={() => {
             setDebugOpen(false)
@@ -1533,6 +1605,8 @@ function MainMenu({
           onClaimed={(newMoney) => {
             setMoney(newMoney)
             refreshBox()
+            // A reward can be Raid Crystals - the Max Raid button counts them.
+            refreshEligibility()
           }}
           onClose={() => setAchievementsOpen(false)}
         />

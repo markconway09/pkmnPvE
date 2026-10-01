@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { MAX_BET } from '../../shared/slots'
-import { BLACKJACK_PAYOUT, type GameCornerPerks } from '../../shared/titles'
+import { BLACKJACK_PAYOUT, BLACKJACK_WIN_PAYOUT, type GameCornerPerks } from '../../shared/titles'
 import CoinIcon from './CoinIcon'
 
 interface Props {
@@ -9,6 +9,8 @@ interface Props {
   // The most that can be bet: every coin held, up to the bet cap (at least 1).
   max: number
   disabled: boolean
+  // How far each stop on the slider (and each − / +) moves the bet - see betStep.
+  step?: number
   onChange: (bet: number) => void
 }
 
@@ -21,7 +23,8 @@ export function useGameCornerPerks(): GameCornerPerks {
     betCap: MAX_BET,
     plinkoEdgeMultiplier: 1,
     plinkoNearEdgeMultiplier: 1,
-    blackjackPayout: BLACKJACK_PAYOUT
+    blackjackPayout: BLACKJACK_PAYOUT,
+    blackjackWinPayout: BLACKJACK_WIN_PAYOUT
   })
   useEffect(() => {
     window.api
@@ -60,6 +63,11 @@ export function useSavedBet(game: 'slots' | 'blackjack' | 'roulette' | 'plinko')
 }
 
 /** The most that can be bet holding this many coins: all of them, up to the bet cap. */
+/** The bet's step: 100 for a High Roller (whose cap is past the usual one), 10 otherwise. */
+export function betStep(cap: number): number {
+  return cap > MAX_BET ? 100 : 10
+}
+
 export function maxBet(coins: number | null, cap: number = MAX_BET): number {
   return Math.max(1, Math.min(cap, coins ?? 1))
 }
@@ -71,9 +79,10 @@ export function placedBet(bet: number, coins: number | null, cap: number = MAX_B
 
 /**
  * The Game Corner's bet control, shared by the slots and blackjack: − and + either side of
- * a slider that stops at 1, then every 10 up to what's held, and Max for the exact total.
+ * a slider that stops at 1, then every 10 (every 100 with High Roller) up to what's held, and Max
+ * for the exact total.
  */
-function BetSlider({ bet, max, disabled, onChange }: Props): React.JSX.Element {
+function BetSlider({ bet, max, disabled, step = 10, onChange }: Props): React.JSX.Element {
   // The bet as typed: kept apart from the bet itself while typing (so the box can be
   // cleared and retyped), and put back to the bet whenever that changes elsewhere.
   const [typed, setTyped] = useState(String(bet))
@@ -84,7 +93,7 @@ function BetSlider({ bet, max, disabled, onChange }: Props): React.JSX.Element {
     if (digits) onChange(Math.min(max, Math.max(1, Number(digits))))
   }
 
-  const steps = [1, ...Array.from({ length: Math.floor(max / 10) }, (_, i) => (i + 1) * 10)]
+  const steps = [1, ...Array.from({ length: Math.floor(max / step) }, (_, i) => (i + 1) * step)]
   const stepIndex = steps.reduce((best, step, i) => (step <= bet ? i : best), 0)
   // − and + move one stop down or up (from a Max bet between stops, down to the stop
   // below; + past the last stop, up to everything held).

@@ -33,7 +33,7 @@ import {
   runDifficultyInfo,
   runLockedConsumables,
   RUN_CONSUMABLES,
-  RUN_CONSUMABLE_PRICE,
+  RUN_CONSUMABLE_PRICES,
   RUN_GEMS_PER_BOSS,
   RUN_GEMS_PER_TRAINER,
   RUN_SHOP_TILE_PRICES,
@@ -43,6 +43,7 @@ import {
   buildPokemonSummary,
   evolveSet,
   getEditorOptions,
+  speciesStatsAndTypes,
   getItemSpritenum,
   levelUpMoveset,
   abilityInfo,
@@ -522,7 +523,8 @@ export function getRunView(): RunView | null {
     pickReason: current.pickOffer ? (current.pickOffer.reason ?? 'floor') : null,
     swapOffer: !!current.swapOffer,
     swapLevel: runBossLevel(current.bossesBeaten),
-    canRerollItems: !!current.itemOffer && (current.itemOfferReason ?? 'floor') === 'floor' && !current.itemRerolled,
+    // An item floor's offer, or the boss shop's New Item - like a floor's, it can be rerolled once.
+    canRerollItems: !!current.itemOffer && ['floor', 'shop'].includes(current.itemOfferReason ?? 'floor') && !current.itemRerolled,
     displacedItem: current.displacedItem
       ? {
           itemName: current.displacedItem.item,
@@ -757,10 +759,11 @@ export function takeItemNode(): RunView {
   return getRunView()!
 }
 
-/** An item floor's offer, rolled again - once per floor (not for a trainer's reward). */
+/** An item floor's offer (or the boss shop's New Item), rolled again - once per floor (not for a trainer's reward). */
 export function rerollRunItems(): RunView {
   const current = activeRun()
-  if (!current.itemOffer || current.itemOfferReason !== 'floor') throw new Error('Only an item floor can be rerolled')
+  const reason = current.itemOfferReason ?? 'floor'
+  if (!current.itemOffer || (reason !== 'floor' && reason !== 'shop')) throw new Error('Only an item floor or the shop New Item can be rerolled')
   if (current.itemRerolled) throw new Error('This floor has already been rerolled')
   current.itemOffer = rollItemOffer(current, ITEM_FLOOR_CHANCES)
   current.itemRerolled = true
@@ -924,7 +927,9 @@ export function getRunMonEditInfo(runMonId: string): RunMonEditInfo {
     learnable: runLearnable(mon.set.species),
     autoSets: listAutoSets(mon.set.species),
     moves: mon.set.moves.map((m) => toID(m)),
-    lockedMoves: [...(mon.lockedMoves ?? [])]
+    lockedMoves: [...(mon.lockedMoves ?? [])],
+    teraType: mon.set.teraType || speciesStatsAndTypes(mon.set.species, null).types[0],
+    teraTypes: getEditorOptions().types
   }
 }
 
@@ -945,6 +950,10 @@ export function updateRunMon(runMonId: string, input: RunMonEdit): RunView {
   if (unknown) throw new Error(`${mon.set.species} can't learn ${getMoveInfo(unknown)?.name ?? unknown}`)
   mon.set.moves = moves
   mon.lockedMoves = input.lockedMoves.map((m) => toID(m)).filter((m) => moves.includes(m))
+  if (input.teraType) {
+    if (!getEditorOptions().types.includes(input.teraType)) throw new Error(`${input.teraType} isn't a Tera Type`)
+    mon.set.teraType = input.teraType
+  }
   persist()
   return getRunView()!
 }
@@ -1320,7 +1329,7 @@ export function useRunFullRestore(runMonId: string): RunView {
   return getRunView()!
 }
 
-/** Revive: a Pokemon that fainted this run rejoins the team, at half HP and this floor's opponent level. */
+/** Revive: a Pokemon that fainted this run rejoins the team, at half HP and this floor's opponent level, its moves as they were. */
 export function useRunRevive(faintedId: string): RunView {
   const current = activeRun()
   if (current.team.length >= ROGUELITE_MAX_TEAM) throw new Error('Your run team is full')
@@ -1333,7 +1342,7 @@ export function useRunRevive(faintedId: string): RunView {
   mon.exp = totalExpForSpeciesLevel(mon.set.species, level)
   mon.hp = 0.5
   mon.status = null
-  refreshMonMoves(mon)
+  // It comes back with the moves it fainted with (not a fresh set for its new level).
   current.team.push(mon)
   persist()
   return getRunView()!
@@ -1373,7 +1382,7 @@ export function buyRunConsumable(id: RunConsumableId): RunView {
   const current = activeRun()
   requireShop(current)
   requireConsumableAllowed(current, id)
-  spendGems(current, RUN_CONSUMABLE_PRICE)
+  spendGems(current, RUN_CONSUMABLE_PRICES[id])
   current.consumables = { ...current.consumables, [id]: (current.consumables?.[id] ?? 0) + 1 }
   persist()
   return getRunView()!

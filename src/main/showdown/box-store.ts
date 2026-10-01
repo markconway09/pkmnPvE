@@ -8,6 +8,8 @@ import type {
   EvolutionItemUse,
   ExpGainResult,
   MergeCandidateView,
+  CompanionSize,
+  CompanionSizeChoice,
   PokedexEntry
 } from '../../shared/battle-types'
 import {
@@ -18,6 +20,12 @@ import {
   FRIENDSHIP_CHARM_MULTIPLIER,
   FUSIONS,
   MERGE_MAX_COPIES,
+  ALCREMIE_FORMS,
+  MINIOR_COLORS,
+  COMPANION_ACHIEVEMENT_ID,
+  DECORATION_BOX_ITEM_ID,
+  COMPANION_SIZES,
+  autoCompanionSize,
   MERGE_MAX_STARS,
   mergeStarsFor,
   planMerge,
@@ -33,10 +41,17 @@ import {
   buildPokemonSummary,
   dexBaseSpecies,
   dexFormOf,
+  canMergeInto,
+  isFullyEvolved,
+  randomEvolutionItemId,
+  cosmeticLookOf,
+  mergeLineOf,
   unretiredHeldItem,
   speciesRarityTier,
   speciesDexNum,
   bstOf,
+  speciesHeightM,
+  rollMilceryCream,
   nationalDexSpecies,
   nationalDexForms,
   evolutionOptionsFor,
@@ -56,13 +71,13 @@ import {
 } from './sim-access'
 import { expProgressForLevel, getExpInfo, levelForExp, totalExpForSpeciesLevel } from './exp'
 import { getProgression } from './progression-store'
-import { addItem, bagItemUse, hasItem, removeItem } from './bag-store'
+import { addItem, bagItemUse, getItemQuantity, hasItem, removeItem } from './bag-store'
 import { playerDirFor, playerPathFor } from './save-paths'
 import { onPlayerChange } from './player-session'
 import { addMoney } from './money-store'
-import { countAchievement, recordAchievementBest } from './achievement-progress'
+import { countAchievement, getAchievementProgress, recordAchievementBest } from './achievement-progress'
 import { hasTitle, monSellPrice } from './title-perks'
-import { ALCHEMIST_BONUS_COPY_CHANCE } from '../../shared/titles'
+import { ALCHEMIST_ITEM_CHANCE } from '../../shared/titles'
 import { buildAutoSet, listAutoSets } from './auto-sets'
 
 interface StoredMon {
@@ -86,6 +101,16 @@ interface StoredBox {
   // The same, form by form (see dexFormOf): Alolan Ninetales apart from Ninetales. A
   // save from before forms were tracked starts with its species as their base forms.
   registeredForms?: string[]
+  // Every cosmetic look ever owned (Minior's cores, Vivillon's patterns - see cosmeticLookOf),
+  // kept like the registered species.
+  registeredLooks?: string[]
+  // The companion beside the team: one of the box's own Pokemon, which stays in the box
+  // (and on the team) while it's the companion (see setCompanion).
+  companionId?: string | null
+  // Saved before that: the companion itself, taken out of the box (moved back on load).
+  companion?: StoredMon | null
+  // Unset: by its height (see autoCompanionSize).
+  companionSize?: CompanionSizeChoice
 }
 
 function emptyBox(): StoredBox {
@@ -99,6 +124,18 @@ function load(): StoredBox {
     const raw = readFileSync(path, 'utf8')
     const parsed = JSON.parse(raw) as StoredBox
     if (!Array.isArray(parsed.mons) || !Array.isArray(parsed.team)) return emptyBox()
+    // Saved before companions had that name: the same Pokemon and size under the old fields.
+    const legacy = parsed as StoredBox & { pet?: StoredMon | null; petSize?: CompanionSizeChoice }
+    if (legacy.pet && !parsed.companion) parsed.companion = legacy.pet
+    if (legacy.petSize && !parsed.companionSize) parsed.companionSize = legacy.petSize
+    delete legacy.pet
+    delete legacy.petSize
+    // A companion that was taken out of the box goes back in, still the companion.
+    if (parsed.companion) {
+      if (!parsed.mons.some((m) => m.id === parsed.companion!.id)) parsed.mons.push(parsed.companion)
+      parsed.companionId = parsed.companion.id
+      delete parsed.companion
+    }
     // Saves from before exp tracking existed have no `exp` field - treat
     // those Pokemon as freshly arrived at whatever level they're already at.
     for (const mon of parsed.mons) {
@@ -149,16 +186,31 @@ function persist(): void {
 // Adds everything currently in the box to the registered species. Run on every
 // save - which covers catches, gifts, starters and evolutions alike - and on first
 // load, so boxes from before this was tracked count what they already hold.
+// Every Pokemon the player has (the companion is one of the box's own).
+function ownedMons(): StoredMon[] {
+  return getState().mons
+}
+
+// The companion, if it's still in the box (it's gone once sold).
+function companionMon(): StoredMon | null {
+  const { companionId, mons } = getState()
+  return (companionId && mons.find((m) => m.id === companionId)) || null
+}
+
 function registerOwnedSpecies(): void {
   const box = getState()
   const registered = new Set(box.registered ?? [])
   const forms = new Set(box.registeredForms ?? box.registered ?? [])
-  for (const mon of box.mons) {
+  const looks = new Set(box.registeredLooks ?? [])
+  for (const mon of ownedMons()) {
     registered.add(dexBaseSpecies(mon.set.species))
     forms.add(dexFormOf(mon.set.species))
+    const look = cosmeticLookOf(mon.set.species)
+    if (look) looks.add(look)
   }
   box.registered = [...registered].sort()
   box.registeredForms = [...forms].sort()
+  box.registeredLooks = [...looks].sort()
 }
 
 /**
@@ -191,32 +243,89 @@ export function getPokedex(): PokedexEntry[] {
   ])
 }
 
-// The box's Pokemon by Pokedex form (see dexFormOf: Alolan Vulpix apart from Vulpix, but a
-// Mega or a plated Arceus with its base), for who can merge with whom. A fused
-// one can take in a duplicate but can't be merged away (its partner would go with it).
+// The box's Pokemon by evolution line (see mergeLineOf: Alolan Vulpix's line apart from
+// Vulpix's, a Mega or a plated Arceus with its base), for who can merge into whom - the
+// same form, or a pre-evolution into its evolution (Charmander into Charizard, Eevee into
+// Vaporeon - never the other way, see canMergeInto). A fused one can take in a duplicate
+// but can't be merged away (its partner would go with it).
 function mergeGroups(mons: StoredMon[]): Map<string, StoredMon[]> {
   const groups = new Map<string, StoredMon[]>()
   for (const mon of mons) {
-    const key = dexFormOf(mon.set.species)
+    const key = mergeLineOf(mon.set.species).root
     groups.set(key, [...(groups.get(key) ?? []), mon])
   }
   return groups
 }
 
 function mergeCandidatesFor(mon: StoredMon, groups: Map<string, StoredMon[]>): MergeCandidateView[] {
+  // Only a fully evolved Pokemon takes merges.
+  if (!isFullyEvolved(mon.set.species)) return []
   const team = new Set(getState().team)
-  return (groups.get(dexFormOf(mon.set.species)) ?? [])
-    .filter((other) => other.id !== mon.id && !other.fusedWith)
-    .map((other) => ({
-      id: other.id,
-      species: other.set.species,
-      level: other.set.level,
-      shiny: !!other.set.shiny,
-      favorite: !!other.favorite,
-      copies: other.copies ?? 1,
-      onTeam: team.has(other.id),
-      item: other.set.item ?? ''
-    }))
+  return (groups.get(mergeLineOf(mon.set.species).root) ?? [])
+    .filter((other) => other.id !== mon.id && !other.fusedWith && canMergeInto(mon.set.species, other.set.species))
+    .map((other) => {
+      const evolution = mergeEvolutionFor(other.set, mon.set.species, new Map())
+      const used = new Map<string, number>()
+      for (const id of evolution.items) used.set(id, (used.get(id) ?? 0) + 1)
+      return {
+        id: other.id,
+        species: other.set.species,
+        level: other.set.level,
+        shiny: !!other.set.shiny,
+        favorite: !!other.favorite,
+        copies: other.copies ?? 1,
+        onTeam: team.has(other.id),
+        item: other.set.item ?? '',
+        evolveItems: [...used.keys()].map((id) => ({
+          itemId: id,
+          name: itemName(id),
+          spritenum: getItemSpritenumById(id),
+          owned: getItemQuantity(id)
+        })),
+        notReady: evolution.ready ? undefined : evolution.reason
+      }
+    })
+}
+
+/**
+ * What merging this Pokemon into a keeper of that species takes: the same form goes in as it
+ * is; a pre-evolution evolves on its way in, every step to the keeper's species possible
+ * right now - its level, its friendship, and an evolution item for each step that needs one
+ * (Swirlix into Slurpuff takes a Whipped Dream; Charmander into Charizard, two level steps,
+ * only the level for both). `stock` holds what's left of each item after the others being
+ * merged with it (it's taken from as items are counted in).
+ */
+function mergeEvolutionFor(
+  set: PokemonSet,
+  keeperSpecies: string,
+  stock: Map<string, number>
+): { ready: boolean; items: string[]; reason?: string } {
+  const line = mergeLineOf(keeperSpecies)
+  const from = dexFormOf(set.species)
+  if (from === line.form) return { ready: true, items: [] }
+  const index = line.ancestors.indexOf(from)
+  if (index < 0) return { ready: false, items: [], reason: `It isn't in ${keeperSpecies}'s line` }
+  const steps = [...line.ancestors.slice(0, index).reverse(), line.form]
+  const reserved = new Map<string, number>()
+  const left = (id: string): number => (stock.get(id) ?? getItemQuantity(id)) - (reserved.get(id) ?? 0)
+  let current: PokemonSet = { ...set }
+  const items: string[] = []
+  for (const step of steps) {
+    const option = evolutionOptionsFor(current).find((o) => dexFormOf(o.species) === step)
+    if (!option) {
+      const path = evolutionPathsFor(current).find((p) => dexFormOf(p.species) === step)
+      return { ready: false, items: [], reason: path ? `${current.species}: ${path.method}` : `${current.species} can't evolve into ${step}` }
+    }
+    if (option.requiredItems) {
+      const item = option.requiredItems.find((id) => left(id) > 0)
+      if (!item) return { ready: false, items: [], reason: `Needs a ${itemName(option.requiredItems[0])}` }
+      reserved.set(item, (reserved.get(item) ?? 0) + 1)
+      items.push(item)
+    }
+    current = evolveSet(current, option.species)
+  }
+  for (const [id, n] of reserved) stock.set(id, (stock.get(id) ?? getItemQuantity(id)) - n)
+  return { ready: true, items }
 }
 
 function toView(mon: StoredMon, arrival: number, groups?: Map<string, StoredMon[]>): BoxPokemonView {
@@ -263,6 +372,7 @@ function toView(mon: StoredMon, arrival: number, groups?: Map<string, StoredMon[
     unfuse: fusion.unfuse,
     itemSpritenum,
     favorite: !!mon.favorite,
+    maxFriendship: atMaxFriendship(mon),
     copies: mon.copies ?? 1,
     mergeStars: mergeStarsFor(mon.copies),
     gigantamax: !!mon.set.gigantamax,
@@ -297,34 +407,100 @@ export function boxAchievementStats(): {
   restricted: number
   dexSpecies: number
   dexForms: number
+  maxFriendship: number
+  alcremieForms: number
+  miniorColors: number
 } {
   const box = getState()
-  if (!box.registeredForms || !box.registered) registerOwnedSpecies()
-  const tiers = box.mons.map((m) => speciesRarityTier(m.set.species))
+  if (!box.registeredForms || !box.registered || !box.registeredLooks) registerOwnedSpecies()
+  const mons = ownedMons()
+  const tiers = mons.map((m) => speciesRarityTier(m.set.species))
   const species = box.registered!.length
   return {
-    rotom: box.mons.filter((m) => baseSpeciesOf(m.set.species) === 'Rotom').length,
-    necrozma: box.mons.filter((m) => baseSpeciesOf(m.set.species) === 'Necrozma').length,
-    kyurem: box.mons.filter((m) => baseSpeciesOf(m.set.species) === 'Kyurem').length,
-    calyrex: box.mons.filter((m) => baseSpeciesOf(m.set.species) === 'Calyrex').length,
-    hoopa: box.mons.filter((m) => baseSpeciesOf(m.set.species) === 'Hoopa').length,
-    forces: box.mons.filter((m) => FORCES_OF_NATURE.has(baseSpeciesOf(m.set.species))).length,
-    shaymin: box.mons.filter((m) => baseSpeciesOf(m.set.species) === 'Shaymin').length,
-    deoxys: box.mons.filter((m) => baseSpeciesOf(m.set.species) === 'Deoxys').length,
-    zygarde: box.mons.filter((m) => baseSpeciesOf(m.set.species) === 'Zygarde').length,
-    shiny: box.mons.filter((m) => m.set.shiny).length,
-    gmaxSpecies: new Set(box.mons.filter((m) => m.set.gigantamax).map((m) => dexFormOf(m.set.species))).size,
+    rotom: mons.filter((m) => baseSpeciesOf(m.set.species) === 'Rotom').length,
+    necrozma: mons.filter((m) => baseSpeciesOf(m.set.species) === 'Necrozma').length,
+    kyurem: mons.filter((m) => baseSpeciesOf(m.set.species) === 'Kyurem').length,
+    calyrex: mons.filter((m) => baseSpeciesOf(m.set.species) === 'Calyrex').length,
+    hoopa: mons.filter((m) => baseSpeciesOf(m.set.species) === 'Hoopa').length,
+    forces: mons.filter((m) => FORCES_OF_NATURE.has(baseSpeciesOf(m.set.species))).length,
+    shaymin: mons.filter((m) => baseSpeciesOf(m.set.species) === 'Shaymin').length,
+    deoxys: mons.filter((m) => baseSpeciesOf(m.set.species) === 'Deoxys').length,
+    zygarde: mons.filter((m) => baseSpeciesOf(m.set.species) === 'Zygarde').length,
+    shiny: mons.filter((m) => m.set.shiny).length,
+    gmaxSpecies: new Set(mons.filter((m) => m.set.gigantamax).map((m) => dexFormOf(m.set.species))).size,
     legendaryClass: tiers.filter((t) => t === 'epic' || t === 'legendary').length,
     restricted: tiers.filter((t) => t === 'legendary').length,
     dexSpecies: species,
     // Every registered form past each species' own entry.
-    dexForms: Math.max(0, box.registeredForms!.length - species)
+    dexForms: Math.max(0, box.registeredForms!.length - species),
+    maxFriendship: mons.filter(atMaxFriendship).length,
+    alcremieForms: box.registeredForms!.filter((f) => ALCREMIE_FORMS.includes(f)).length,
+    miniorColors: (box.registeredLooks ?? []).filter((f) => MINIOR_COLORS.includes(f)).length
   }
+}
+
+// A set with no happiness recorded predates friendship being tracked and counts as maxed.
+function atMaxFriendship(mon: StoredMon): boolean {
+  return (mon.set.happiness ?? MAX_HAPPINESS) >= MAX_HAPPINESS
+}
+
+function companionUnlocked(): boolean {
+  return getAchievementProgress().unlocked.includes(COMPANION_ACHIEVEMENT_ID)
+}
+
+/**
+ * Makes a Pokemon at max friendship the companion, shown in the slot beside the team. It
+ * stays in the box - and on the team, if it's there - to be used as ever.
+ */
+export function setCompanion(id: string): BoxState {
+  if (!companionUnlocked()) throw new Error('The companion slot unlocks with the Best Friends achievement')
+  const box = getState()
+  const mon = box.mons.find((m) => m.id === id)
+  if (!mon) throw new Error(`Unknown Pokemon id: ${id}`)
+  if (!atMaxFriendship(mon)) throw new Error(`Only a Pokémon at max friendship can be a companion - ${mon.set.species} isn't there yet`)
+  box.companionId = mon.id
+  // A new companion starts at the size its height gives it.
+  box.companionSize = undefined
+  persist()
+  return getBoxState()
+}
+
+/** How big the companion is drawn: S, M or L, or 'auto' - by its height. */
+export function setCompanionSize(size: CompanionSizeChoice): BoxState {
+  if (size !== 'auto' && !COMPANION_SIZES.includes(size)) throw new Error('Pick a size: Auto, S, M or L')
+  getState().companionSize = size === 'auto' ? undefined : size
+  persist()
+  return getBoxState()
+}
+
+function companionSizeNow(): CompanionSize {
+  const { companionSize } = getState()
+  if (companionSize && companionSize !== 'auto') return companionSize
+  const companion = companionMon()
+  return companion ? autoCompanionSize(speciesHeightM(companion.set.species)) : 'S'
+}
+
+/** No companion any more (the Pokemon itself was in the box all along). */
+export function returnCompanion(): BoxState {
+  const box = getState()
+  if (!box.companionId) throw new Error('There is no companion')
+  box.companionId = null
+  persist()
+  return getBoxState()
 }
 
 export function getBoxState(): BoxState {
   const groups = mergeGroups(getState().mons)
-  return { mons: getState().mons.map((mon, i) => toView(mon, i, groups)), team: [...getState().team] }
+  const companion = companionMon()
+  return {
+    mons: getState().mons.map((mon, i) => toView(mon, i, groups)),
+    team: [...getState().team],
+    companion: companion ? toView(companion, -1, groups) : null,
+    companionId: companion?.id ?? null,
+    companionUnlocked: companionUnlocked(),
+    companionSize: companionSizeNow(),
+    companionSizeChoice: getState().companionSize ?? 'auto'
+  }
 }
 
 export function addRandomMon(): BoxState {
@@ -365,7 +541,22 @@ export function lastAddedMonId(): string | null {
  * Sells a Pokemon from the box (off the team too) for its rarity's price (see
  * POKEMON_SELL_PRICES). The last Pokemon can't be sold - there'd be nobody left to battle.
  */
-export function sellMon(id: string): { sold: number; species: string; money: number; box: BoxState } {
+// Alchemist: each Pokemon sold has a chance to turn up a random evolution item - into the
+// bag; their names (one per item found).
+function alchemistFinds(count: number): string[] {
+  if (!hasTitle('Alchemist')) return []
+  const found: string[] = []
+  for (let i = 0; i < count; i++) {
+    if (Math.random() >= ALCHEMIST_ITEM_CHANCE) continue
+    const itemId = randomEvolutionItemId()
+    if (!itemId) continue
+    addItem(itemId, 1)
+    found.push(itemName(itemId))
+  }
+  return found
+}
+
+export function sellMon(id: string): { sold: number; species: string; money: number; box: BoxState; found: string[] } {
   const box = getState()
   const index = box.mons.findIndex((m) => m.id === id)
   if (index === -1) throw new Error(`Unknown Pokemon id: ${id}`)
@@ -378,14 +569,15 @@ export function sellMon(id: string): { sold: number; species: string; money: num
   persist()
   countAchievement('pokemonSold')
   if (mon.set.shiny) countAchievement('shinySold')
-  return { sold, species: mon.set.species, money, box: getBoxState() }
+  const found = alchemistFinds(1)
+  return { sold, species: mon.set.species, money, box: getBoxState(), found }
 }
 
 /**
  * Sells several Pokemon at once (the expanded box's multi-select) - all or nothing: every
  * one is checked first, and at least one Pokemon always stays behind.
  */
-export function sellMons(ids: string[]): { sold: number; count: number; money: number; box: BoxState } {
+export function sellMons(ids: string[]): { sold: number; count: number; money: number; box: BoxState; found: string[] } {
   const box = getState()
   const wanted = new Set(ids)
   const selling = box.mons.filter((m) => wanted.has(m.id))
@@ -400,7 +592,8 @@ export function sellMons(ids: string[]): { sold: number; count: number; money: n
   persist()
   countAchievement('pokemonSold', selling.length)
   countAchievement('shinySold', selling.filter((m) => m.set.shiny).length)
-  return { sold, count: selling.length, money, box: getBoxState() }
+  const found = alchemistFinds(selling.length)
+  return { sold, count: selling.length, money, box: getBoxState(), found }
 }
 
 export function setTeam(team: (string | null)[]): BoxState {
@@ -489,9 +682,21 @@ function mergeInto(keeperId: string, fodderIds: string[]): number {
   if (fodder.length !== wanted.size) throw new Error('One of those Pokemon is no longer in the box')
   // Only the same form: an alternate form (Alolan, Therian, a Rotom appliance) is its own species here.
   const species = dexFormOf(keeper.set.species)
-  if (fodder.some((m) => dexFormOf(m.set.species) !== species)) throw new Error(`Only another ${species} can be merged in`)
+  if (fodder.some((m) => !canMergeInto(keeper.set.species, m.set.species))) {
+    throw new Error(`Only another ${species}, or one of its pre-evolutions, can be merged in`)
+  }
   if (fodder.some((m) => m.fusedWith)) throw new Error('Unfuse it first - its partner would be merged away with it')
   if ((keeper.copies ?? 1) >= MERGE_MAX_COPIES) throw new Error(`${keeper.set.species} is already at ${MERGE_MAX_STARS} stars`)
+  if (!isFullyEvolved(keeper.set.species)) throw new Error(`${keeper.set.species} has to be fully evolved to take merges`)
+  // A pre-evolution evolves on its way in - everything it needs for that, with the bag's
+  // items shared out among them in turn.
+  const stock = new Map<string, number>()
+  const evolveItems = new Map<string, string[]>()
+  for (const m of fodder) {
+    const evolution = mergeEvolutionFor(m.set, keeper.set.species, stock)
+    if (!evolution.ready) throw new Error(`${m.set.species} can't merge in yet - ${evolution.reason}`)
+    evolveItems.set(m.id, evolution.items)
+  }
   const plan = planMerge(
     keeper.copies ?? 1,
     fodder.map((m) => ({ id: m.id, copies: m.copies ?? 1 }))
@@ -505,11 +710,15 @@ function mergeInto(keeperId: string, fodderIds: string[]): number {
     partial.copies = plan.partial.left
   }
   for (const mon of fodder.filter((m) => whole.has(m.id))) {
+    // The evolution items it used on its way in (not counted as an evolution).
+    for (const itemId of evolveItems.get(mon.id) ?? []) removeItem(itemId, 1)
     if (mon.set.item) addItem(toID(mon.set.item), 1)
     if (mon.set.shiny) keeper.set.shiny = true
     if (mon.set.gigantamax) keeper.set.gigantamax = true
-    // A favorite merged in keeps its heart - on the one it went into.
+    // A favorite merged in keeps its heart - on the one it went into - and the companion
+    // stays the companion as the one it went into.
     if (mon.favorite) keeper.favorite = true
+    if (box.companionId === mon.id) box.companionId = keeper.id
     keeper.set.happiness = Math.max(keeper.set.happiness ?? 0, mon.set.happiness ?? 0)
     // A higher-level one brings its level up with it, exp and all.
     if (mon.set.level > keeper.set.level || (mon.set.level === keeper.set.level && mon.exp > keeper.exp)) {
@@ -517,8 +726,6 @@ function mergeInto(keeperId: string, fodderIds: string[]): number {
       keeper.exp = mon.exp
     }
   }
-  // Alchemist: now and then a merge gives a bonus copy (never past the top).
-  if (hasTitle('Alchemist') && copies < MERGE_MAX_COPIES && Math.random() < ALCHEMIST_BONUS_COPY_CHANCE) copies += 1
   keeper.copies = copies
   box.mons = box.mons.filter((m) => !whole.has(m.id))
   box.team = box.team.map((slot) => (slot && whole.has(slot) ? null : slot))
@@ -531,8 +738,8 @@ function mergeInto(keeperId: string, fodderIds: string[]): number {
 }
 
 /**
- * The expanded box's "select to merge": the picked Pokemon, species (form) by species,
- * each merged into the best of them - the most copies, then the highest level, then a
+ * The expanded box's "select to merge": the picked Pokemon, evolution line by line,
+ * each merged into the best of them - the most evolved, then the most copies, then the highest level, then a
  * shiny, then a favorite. Past the 32-copy top the rest stays in the box (see planMerge),
  * one already at the top is left out, and a Pokemon with no other of its species picked
  * is left alone.
@@ -543,29 +750,82 @@ export function mergeSelectedMons(ids: string[]): { box: BoxState; merged: numbe
   const picked = box.mons.filter((m) => wanted.has(m.id) && !m.fusedWith && (m.copies ?? 1) < MERGE_MAX_COPIES)
   const groups = new Map<string, StoredMon[]>()
   for (const mon of picked) {
-    const key = dexFormOf(mon.set.species)
+    const key = mergeLineOf(mon.set.species).root
     groups.set(key, [...(groups.get(key) ?? []), mon])
   }
   const results: { species: string; stars: number }[] = []
   let merged = 0
   for (const group of groups.values()) {
     if (group.length < 2) continue
+    // The keeper is fully evolved (only that takes merges) - the most copies first...
     const ranked = [...group].sort(
       (a, b) =>
+        Number(isFullyEvolved(b.set.species)) - Number(isFullyEvolved(a.set.species)) ||
         (b.copies ?? 1) - (a.copies ?? 1) ||
         b.set.level - a.set.level ||
         Number(!!b.set.shiny) - Number(!!a.set.shiny) ||
         Number(!!b.favorite) - Number(!!a.favorite)
     )
     const [keeper, ...rest] = ranked
+    if (!isFullyEvolved(keeper.set.species)) continue
+    // Only its own form and the pre-evolutions that can evolve into it now (the bag's items
+    // shared out in turn) - a sibling branch (Jolteon beside a Vaporeon keeper), or one
+    // not ready, is left for another time.
+    const stock = new Map<string, number>()
+    const fodder = rest.filter(
+      (m) => canMergeInto(keeper.set.species, m.set.species) && mergeEvolutionFor(m.set, keeper.set.species, stock).ready
+    )
+    if (fodder.length === 0) continue
     merged += mergeInto(
       keeper.id,
-      rest.map((m) => m.id)
+      fodder.map((m) => m.id)
     )
     results.push({ species: keeper.set.species, stars: mergeStarsFor(keeper.copies) })
   }
   if (merged === 0) throw new Error('Pick at least two of the same Pokemon to merge')
   return { box: getBoxState(), merged, results }
+}
+
+// The box Pokemon this one would best merge into: one that can take it in (its own form or
+// an evolution of it - see canMergeInto) and isn't at the top yet - the most copies first,
+// then the most evolved, the highest level, a shiny, a favorite.
+function bestMergeKeeperFor(monId: string): StoredMon | null {
+  const box = getState()
+  const mon = box.mons.find((m) => m.id === monId)
+  if (!mon || mon.fusedWith) return null
+  const keepers = box.mons.filter(
+    (k) =>
+      k.id !== monId &&
+      (k.copies ?? 1) < MERGE_MAX_COPIES &&
+      isFullyEvolved(k.set.species) &&
+      canMergeInto(k.set.species, mon.set.species) &&
+      mergeEvolutionFor(mon.set, k.set.species, new Map()).ready
+  )
+  keepers.sort(
+    (a, b) =>
+      (b.copies ?? 1) - (a.copies ?? 1) ||
+      b.set.level - a.set.level ||
+      Number(!!b.set.shiny) - Number(!!a.set.shiny) ||
+      Number(!!b.favorite) - Number(!!a.favorite)
+  )
+  return keepers[0] ?? null
+}
+
+/** Which box Pokemon a Pokemon would auto-merge into, and its stars now (null: none). */
+export function mergeKeeperPreview(monId: string): { species: string; stars: number; uses: string[] } | null {
+  const keeper = bestMergeKeeperFor(monId)
+  const mon = getState().mons.find((m) => m.id === monId)
+  if (!keeper || !mon) return null
+  const uses = mergeEvolutionFor(mon.set, keeper.set.species, new Map()).items.map(itemName)
+  return { species: keeper.set.species, stars: mergeStarsFor(keeper.copies), uses }
+}
+
+/** Merges a Pokemon straight into its best keeper (a Random Pokemon's "Auto merge"). */
+export function autoMergeMon(monId: string): { box: BoxState; species: string; stars: number } {
+  const keeper = bestMergeKeeperFor(monId)
+  if (!keeper) throw new Error('There is nothing in the box for it to merge into')
+  mergeInto(keeper.id, [monId])
+  return { box: getBoxState(), species: keeper.set.species, stars: mergeStarsFor(keeper.copies) }
 }
 
 /** Each team member's merge stars, in the same order as getTeamPokemonSets. */
@@ -752,7 +1012,8 @@ export function evolveMon(id: string, targetSpecies: string): BoxState {
       throw new Error(`You don't have the item needed for this evolution`)
     }
   }
-  mon.set = evolveSet(mon.set, targetSpecies)
+  // A Sweet's cream - or, now and then, a rare one (see rollMilceryCream).
+  mon.set = evolveSet(mon.set, rollMilceryCream(targetSpecies))
   persist()
   countAchievement('evolutions')
   return getBoxState()
@@ -863,7 +1124,8 @@ export function changeForm(id: string, form: string): BoxState {
   const change = formChangeFor(mon.set.species)
   if (!change || !change.forms.includes(form)) throw new Error(`${mon.set.species} can't change into ${form}`)
   if (!hasItem(change.itemId)) throw new Error(`You don't have the ${itemName(change.itemId)}`)
-  mon.set = withSmogonSet(mon.set, form)
+  // Alcremie's creams are the same Pokemon otherwise: it keeps its whole set.
+  mon.set = change.itemId === DECORATION_BOX_ITEM_ID ? { ...mon.set, species: form } : withSmogonSet(mon.set, form)
   persist()
   return getBoxState()
 }

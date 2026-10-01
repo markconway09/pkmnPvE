@@ -15,14 +15,16 @@ import {
   sellPriceFor
 } from './sim-access'
 import { lateItemsUnlocked } from './progression-store'
-import { shopPrice } from './title-perks'
+import { bulkShopPrice, shopPrice } from './title-perks'
+import { shopTotal } from '../../shared/battle-types'
+import { TYCOON_BULK_MIN } from '../../shared/titles'
 
 // What this player can actually buy right now - the late-game items stay out
 // until they're unlocked. The admin price editor still sees everything. Prices are what
 // this player pays (the Tycoon title's discount), unless asked for the Shop's own.
 function buyableCatalog(discounted = true): ShopItemEntry[] {
   const catalog = lateItemsUnlocked() ? getShopCatalog() : getShopCatalog().filter((i) => !isLateGameItem(i.id))
-  return discounted ? catalog.map((item) => ({ ...item, price: shopPrice(item.price) })) : catalog
+  return discounted ? catalog.map((item) => ({ ...item, price: shopPrice(item.price), bulkPrice: bulkShopPrice(item.price) })) : catalog
 }
 
 /**
@@ -122,7 +124,8 @@ export function buyItem(itemId: string, quantity: number): PurchaseResult {
   if (qty <= 0) return { success: false, money: getMoney() }
   const item = buyableCatalog().find((i) => i.id === itemId)
   if (!item) return { success: false, money: getMoney() }
-  if (!spendMoney(item.price * qty)) return { success: false, money: getMoney() }
+  // Tycoon: from TYCOON_BULK_MIN at once, each one at its bulk price.
+  if (!spendMoney(shopTotal(item, qty, TYCOON_BULK_MIN))) return { success: false, money: getMoney() }
   addItem(itemId, qty)
   return { success: true, money: getMoney() }
 }

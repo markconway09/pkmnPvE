@@ -4,6 +4,7 @@ import { FOSSIL_RESTORE_COST } from '../../shared/battle-types'
 import type { BagItemView, GalarFossilPartner, RestoreFossilResult } from '../../shared/battle-types'
 import ItemSprite from './ItemSprite'
 import { formatMoney } from './money'
+import ModalSpinner from './ModalSpinner'
 
 interface Props {
   fossil: BagItemView
@@ -52,7 +53,7 @@ function GalarFossilPrompt({ fossil, money, onClose, onRestored }: Props): React
           Pokemon comes back.
         </p>
 
-        {!partners && !error && <p>Loading...</p>}
+        {!partners && !error && <ModalSpinner />}
         {partners && (
           <div className="galar-partner-list">
             {partners.map((p) => (

@@ -97,11 +97,13 @@ function BattleResultModal({
   const canAfford = (money ?? 0) >= pokeballPrice
   const catchDisabled = runBattle ? busy || caught : busy || caught || pokeballs === null || (!hasPokeballs && !canAfford)
   const catchLabel = caught
-    ? freeCatch
+    ? runBattle
+      ? 'Added to team!'
+      : freeCatch
       ? 'Caught! (free - Catching Charm)'
       : 'Caught!'
     : runBattle
-      ? 'Catch it for your run'
+      ? 'Add to team'
       : hasPokeballs
       ? `Catch (${pokeballs} Poke Ball${pokeballs === 1 ? '' : 's'})`
       : `Buy Poke Ball (${formatMoney(pokeballPrice)})`

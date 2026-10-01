@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import type { ShopPriceEntry } from '../../shared/battle-types'
 import ItemSprite from './ItemSprite'
 import { formatMoney } from './money'
+import ModalSpinner from './ModalSpinner'
 
 interface Props {
   onClose: () => void
@@ -65,7 +66,7 @@ function ShopPricesModal({ onClose }: Props): React.JSX.Element {
 
   return createPortal(
     <div className="modal-overlay" onMouseDown={onClose}>
-      <div className="modal-panel shop-modal shop-prices-modal" onMouseDown={(e) => e.stopPropagation()}>
+      <div className={`modal-panel shop-modal shop-prices-modal${!catalog && !error ? ' modal-panel-loading' : ''}`} onMouseDown={(e) => e.stopPropagation()}>
         <div className="shop-header">
           <h2>Shop Prices</h2>
           <span className="box-empty-hint">{changedCount} changed</span>
@@ -79,7 +80,7 @@ function ShopPricesModal({ onClose }: Props): React.JSX.Element {
           onChange={(e) => setQuery(e.target.value)}
         />
         {error && <p className="editor-error">{error}</p>}
-        {!catalog && !error && <p>Loading...</p>}
+        {!catalog && !error && <ModalSpinner />}
         {catalog && filtered.length === 0 && <p className="box-empty-hint">No items match your search.</p>}
         {groups.map(([category, items]) => (
           <div key={category}>

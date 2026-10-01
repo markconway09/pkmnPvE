@@ -13,7 +13,7 @@ import {
   speciesRarityTier
 } from './sim-access'
 import { addItem, getItemQuantity, removeItem } from './bag-store'
-import { addCaughtMon, hasRegisteredSpecies, lastAddedMonId } from './box-store'
+import { addCaughtMon, hasRegisteredSpecies, lastAddedMonId, mergeKeeperPreview } from './box-store'
 import { restoredLevel } from './fossil-store'
 import { listShop } from './shop-store'
 
@@ -72,7 +72,9 @@ export function openBagItem(itemId: string): OpenItemResult {
     isNew,
     // It can be sold straight from the result, for its rarity's price (with a title's bonus).
     monId,
-    sellPrice: monSellPrice(winner.tier, shiny)
+    sellPrice: monSellPrice(winner.tier, shiny),
+    // ...or merged into the box Pokemon it would go into, if there is one.
+    mergeKeeper: monId ? mergeKeeperPreview(monId) : null
   }
 }
 

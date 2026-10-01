@@ -7,6 +7,8 @@ import BagShopTabs from './BagShopTabs'
 import { formatMoney } from './money'
 import { errorMessage, pointOf, useFloatingNotes, type NotePoint } from './FloatingNotes'
 import ContextMenuPanel from './ContextMenuPanel'
+import ModalSpinner from './ModalSpinner'
+import { shopTotal } from '../../shared/battle-types'
 
 // How many at a time the item menu offers to buy.
 const BUY_AMOUNTS = [1, 5, 10]
@@ -60,7 +62,7 @@ function ShopModal({ onClose, onMoneyChange, onOpenBag }: Props): React.JSX.Elem
       setMoney(result.money)
       onMoneyChange(result.money)
       if (!result.success) notes.show('Not enough money for that', at, 'bad')
-      else notes.show(`Bought ${count > 1 ? `${count}× ` : ''}${item.name} for ${formatMoney(item.price * count)}`, at)
+      else notes.show(`Bought ${count > 1 ? `${count}× ` : ''}${item.name} for ${formatMoney(shopTotal(item, count))}`, at)
     } catch (e) {
       notes.show(errorMessage(e), at, 'bad')
     } finally {
@@ -73,10 +75,10 @@ function ShopModal({ onClose, onMoneyChange, onOpenBag }: Props): React.JSX.Elem
 
   return createPortal(
     <div className="modal-overlay" onMouseDown={onClose}>
-      <div className="modal-panel shop-modal" onMouseDown={(e) => e.stopPropagation()}>
+      <div className={`modal-panel shop-modal${!catalog && !error ? ' modal-panel-loading' : ''}`} onMouseDown={(e) => e.stopPropagation()}>
         <BagShopTabs current="shop" onSwitch={onOpenBag} />
         {error && <p className="editor-error">{error}</p>}
-        {!catalog && !error && <p>Loading...</p>}
+        {!catalog && !error && <ModalSpinner />}
         {catalog && (
           <div className="bag-toolbar">
             <SearchBar value={query} onChange={setQuery} placeholder="Search the shop..." autoFocus />
@@ -141,14 +143,16 @@ function ShopModal({ onClose, onMoneyChange, onOpenBag }: Props): React.JSX.Elem
                 <button
                   key={count}
                   className="context-menu-item"
-                  disabled={busyId !== null || (money !== null && money < menu.item.price * count)}
+                  disabled={busyId !== null || (money !== null && money < shopTotal(menu.item, count))}
                   onClick={() => {
                     const { item } = menu
                     setMenu(null)
                     void buy(item, count, menu.at)
                   }}
                 >
-                  Buy {count > 1 ? `${count} ` : ''}for {formatMoney(menu.item.price * count)}
+                  Buy {count > 1 ? `${count} ` : ''}for {formatMoney(shopTotal(menu.item, count))}
+                  {/* Tycoon's bulk discount, from 5 at once. */}
+                  {menu.item.bulkPrice !== undefined && count >= 5 && <span className="shop-bulk-tag"> -25%</span>}
                 </button>
               ))}
             </ContextMenuPanel>

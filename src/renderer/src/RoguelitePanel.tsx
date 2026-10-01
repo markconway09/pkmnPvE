@@ -20,7 +20,7 @@ import {
   ROGUELITE_MAX_TEAM,
   ROGUELITE_START_LEVEL,
   RUN_CONSUMABLES,
-  RUN_CONSUMABLE_PRICE,
+  RUN_CONSUMABLE_PRICES,
   RUN_DIFFICULTIES,
   RUN_GEM_ICON,
   RUN_SHOP_TILE_PRICES,
@@ -100,7 +100,7 @@ interface Props {
 const statusLabel = (status: string): string => (status === 'tox' ? 'PSN' : status.toUpperCase())
 
 const NODE_INFO: Record<RunNodeKind, { label: string; hint: string }> = {
-  wild: { label: 'Wild Pokémon', hint: 'Beat it and you can catch it for your run' },
+  wild: { label: 'Wild Pokémon', hint: 'Beat it and you can add it to your team' },
   trainer: { label: 'Trainer', hint: 'A trainer battle, sized for this floor - win it for a held item and extra exp' },
   item: { label: 'Item', hint: 'Pick a held item for one of your Pokémon' },
   heal: { label: 'Pokémon Center', hint: 'Your whole team back to full HP, no status' },
@@ -831,12 +831,12 @@ function RoguelitePanel({
                 >
                   <button
                     className="run-item-button run-shop-button"
-                    disabled={busy || itemBusy || locked || run.consumables.gems < RUN_CONSUMABLE_PRICE}
+                    disabled={busy || itemBusy || locked || run.consumables.gems < RUN_CONSUMABLE_PRICES[c.id]}
                     onClick={() => void runItemAction(() => window.api.buyRunConsumable(c.id))}
                   >
                     <img className="run-consumable-icon" src={c.icon} alt="" />
                     <span>{c.name}</span>
-                    {gemPrice(RUN_CONSUMABLE_PRICE)}
+                    {gemPrice(RUN_CONSUMABLE_PRICES[c.id])}
                   </button>
                 </Tooltip>
               )
@@ -1006,11 +1006,7 @@ function RoguelitePanel({
             Cancel
           </button>
         </p>
-      ) : (
-        <p className="box-empty-hint">
-          Drag to reorder (the first one leads). Click to edit its moves, evolve it, or move its item.
-        </p>
-      )}
+      ) : null}
 
       {editingMonId && (
         <RunMonEditor

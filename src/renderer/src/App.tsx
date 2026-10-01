@@ -10,7 +10,8 @@ import type {
   GimmickEvent,
   MoveEvent,
   SessionInfo,
-  WildLocationId
+  WildLocationId,
+  CompanionSize
 } from '../../shared/battle-types'
 import { toSpriteId } from '../../shared/battle-types'
 import BattleSprite from './BattleSprite'
@@ -25,7 +26,6 @@ import Options from './Options'
 import MainMenu from './MainMenu'
 import TrainerList from './TrainerList'
 import PremadeTeamsList from './PremadeTeamsList'
-import ProgressionEditor from './ProgressionEditor'
 import { loadSpriteStyle, saveSpriteStyle, spriteUrl, type SpriteStyle } from './spriteStyle'
 import {
   effectivenessClass,
@@ -37,7 +37,7 @@ import {
 import { loadLegacyTrainerSprite } from './trainerSprite'
 import Login from './Login'
 
-type Screen = 'menu' | 'battle' | 'trainers' | 'rogueliteBosses' | 'premadeTeams' | 'progression'
+type Screen = 'menu' | 'battle' | 'trainers' | 'rogueliteBosses' | 'premadeTeams'
 
 const REVEAL_DELAY_MS = 350
 const EMPTY_FIELD: FieldSnapshot = { p1: [], p2: [], effects: [] }
@@ -252,13 +252,22 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
     return () => window.removeEventListener('keydown', onKey)
   }, [screen])
   const inBattle = view !== null
+  // The player's companion, beside their sprite in battle. Both are read again every time the
+  // battle screen opens (the last battle's view lingers on after it, so inBattle alone
+  // wouldn't notice a new one) - a companion or size changed since then shows up.
+  const [playerCompanion, setPlayerCompanion] = useState<{ species: string; shiny: boolean; size: CompanionSize } | null>(null)
+  const onBattleScreen = screen === 'battle'
   useEffect(() => {
-    if (!inBattle) return
+    if (!inBattle || !onBattleScreen) return
     window.api
       .getAchievements()
       .then((state) => setPlayerTitle(state.title))
       .catch(() => setPlayerTitle(null))
-  }, [inBattle])
+    window.api
+      .listBox()
+      .then((box) => setPlayerCompanion(box.companion ? { species: box.companion.species, shiny: box.companion.shiny, size: box.companionSize ?? 'S' } : null))
+      .catch(() => setPlayerCompanion(null))
+  }, [inBattle, onBattleScreen])
   const logRef = useRef<HTMLDivElement>(null)
   const battleFieldRef = useRef<HTMLDivElement>(null)
   // Set when a revealed log line uses a move the animation spike knows about -
@@ -753,10 +762,6 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
     return <PremadeTeamsList onBack={() => setScreen(premadeTeamsBack)} />
   }
 
-  if (screen === 'progression') {
-    return <ProgressionEditor onBack={() => setScreen('menu')} />
-  }
-
   if (screen === 'menu') {
     return (
       <>
@@ -784,7 +789,6 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
           onOptions={() => setOptionsOpen(true)}
           onTrainers={() => setScreen('trainers')}
           onRogueliteBosses={() => setScreen('rogueliteBosses')}
-          onProgression={() => setScreen('progression')}
           fightBusy={busy}
           fightError={error}
           trainerSprite={trainerSprite}
@@ -807,19 +811,29 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
   const activeRequest = view?.request && 'active' in view.request ? view.request.active : undefined
   const forceSwitchRequest = view?.request && 'forceSwitch' in view.request ? view.request.forceSwitch : undefined
   const switchTarget = currentSwitchTarget()
+  // The Pokemon picking its move right now can't switch out (Mean Look, Shadow Tag...).
+  const switchTrapped = (() => {
+    const request = view?.request
+    return !!(request && 'active' in request && request.active?.[activeSelectSlot]?.trapped)
+  })()
 
   return (
     <div className="screen battle-screen">
       <div className="switch-column">
-        {switchTarget && (
+        {/* Always on show: greyed out whenever there's no switching - trapped, between
+            turns, or once the battle's over. */}
+        {view && displayedTeam.length > 0 && (
           <TeamPanel
             team={displayedTeam}
             activeFlags={displayedActiveFlags}
-            selectable
-            disabled={switchTarget.disabled}
+            selectable={!!switchTarget}
+            disabled={!switchTarget || switchTarget.disabled}
+            locked={!switchTarget}
+            lockedNote={switchTrapped && !view.ended ? "Trapped - can't switch out" : undefined}
             matchups={teamMatchupChips()}
-            reservedSlots={reservedSwitchSlots(switchTarget.slotIndex)}
+            reservedSlots={switchTarget ? reservedSwitchSlots(switchTarget.slotIndex) : undefined}
             onSwitch={(slot) => {
+              if (!switchTarget) return
               if (switchTarget.forced) setPendingChoice(switchTarget.slotIndex, `switch ${slot}`)
               else commitActiveSlotChoice(switchTarget.slotIndex, `switch ${slot}`)
             }}
@@ -834,6 +848,8 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
               name="You"
               title={playerTitle}
               spriteId={trainerSprite}
+              companion={playerCompanion}
+              hideBalls
               roster={displayedTeam.map((m) => ({ species: m.species, fainted: m.fainted, status: m.status }))}
               align="left"
               size="large"
@@ -985,7 +1001,13 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
                       {(canGoBack || canRun) && (
                         <button
                           className={`run-cancel-button ${confirmingRun && canRun ? 'confirm-button' : ''}`}
-                          disabled={busy}
+                          // Running from a trainer costs money - greyed out without enough of it.
+                          disabled={busy || (!canGoBack && view?.canAffordRun === false)}
+                          title={
+                            !canGoBack && view?.canAffordRun === false
+                              ? `Not enough money to run (₽${(runCost ?? 0).toLocaleString('en-US')})`
+                              : undefined
+                          }
                           onClick={() => {
                             if (canGoBack) {
                               goBackActiveSlot()

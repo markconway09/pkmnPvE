@@ -1,5 +1,5 @@
 import type { BoxPokemonView } from '../../shared/battle-types'
-import { MERGE_MAX_STARS, toSpriteId } from '../../shared/battle-types'
+import { MERGE_MAX_STARS, mergeBonusText, toSpriteId } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
 import ItemSprite from './ItemSprite'
 import ShinyIcon from './ShinyIcon'
@@ -33,7 +33,7 @@ function PokemonIconVisual({ mon }: Props): React.JSX.Element {
         </span>
       )}
       {!!mon.mergeStars && (
-        <span className="box-icon-stars" title={`Merged ★${mon.mergeStars}: +${mon.mergeStars * 10}% to all stats in classic battles`}>
+        <span className="box-icon-stars" title={`Merged ★${mon.mergeStars}: ${mergeBonusText(mon.mergeStars, mon.rarityTier)} to all stats in classic battles`}>
           {'★'.repeat(mon.mergeStars)}
         </span>
       )}

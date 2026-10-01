@@ -9,7 +9,9 @@ import {
   HEARTLESS_SELL_MULTIPLIER,
   HIGH_ROLLER_BET_CAP,
   NINE_PLUS_TEN_BLACKJACK_PAYOUT,
-  TYCOON_SHOP_MULTIPLIER
+  NINE_PLUS_TEN_WIN_PAYOUT,
+  BLACKJACK_WIN_PAYOUT,
+  TYCOON_BULK_MULTIPLIER
 } from '../../shared/titles'
 import { MAX_BET } from '../../shared/slots'
 import { getAchievementProgress } from './achievement-progress'
@@ -44,9 +46,14 @@ function rarityPrice(tier: RarityTier): number {
   return base
 }
 
-/** A Shop price, with Tycoon's discount. */
+/** A Shop price for one (Tycoon's discount is only for buying in bulk - see bulkShopPrice). */
 export function shopPrice(price: number): number {
-  return hasTitle('Tycoon') ? Math.max(1, Math.round(price * TYCOON_SHOP_MULTIPLIER)) : price
+  return price
+}
+
+/** Each one's price when buying TYCOON_BULK_MIN or more at once - lower with Tycoon, else none. */
+export function bulkShopPrice(price: number): number | undefined {
+  return hasTitle('Tycoon') ? Math.max(1, Math.round(price * TYCOON_BULK_MULTIPLIER)) : undefined
 }
 
 /** The most one Game Corner bet can be. */
@@ -59,6 +66,7 @@ export function getGameCornerPerks(): GameCornerPerks {
     betCap: betCap(),
     plinkoEdgeMultiplier: hasTitle('Edge Lord') ? EDGE_LORD_EDGE_MULTIPLIER : 1,
     plinkoNearEdgeMultiplier: hasTitle('Edge Lord') ? EDGE_LORD_NEAR_EDGE_MULTIPLIER : 1,
-    blackjackPayout: hasTitle('9+10') ? NINE_PLUS_TEN_BLACKJACK_PAYOUT : BLACKJACK_PAYOUT
+    blackjackPayout: hasTitle('9+10') ? NINE_PLUS_TEN_BLACKJACK_PAYOUT : BLACKJACK_PAYOUT,
+    blackjackWinPayout: hasTitle('9+10') ? NINE_PLUS_TEN_WIN_PAYOUT : BLACKJACK_WIN_PAYOUT
   }
 }

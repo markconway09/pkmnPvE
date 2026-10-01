@@ -1,6 +1,7 @@
 import type { LeagueMilestone, TrainerProfile } from '../../shared/battle-types'
 import { getProgression } from './progression-store'
 import { getStats } from './stats-store'
+import { getAchievementProgress } from './achievement-progress'
 import { listTrainers } from './trainer-store'
 
 // The road to the Pokemon League, one notch each: Kanto's eight gyms in badge
@@ -28,7 +29,11 @@ export function getTrainerProfile(): TrainerProfile {
   const beaten = new Set(bossesDefeated)
   const byKey = new Map(listTrainers().map((t) => [t.importKey, t]))
   return {
-    stats: { ...getStats(), bossesDefeated: bossesDefeated.length },
+    stats: {
+      ...getStats(),
+      bossesDefeated: bossesDefeated.length,
+      raidsWon: getAchievementProgress().counters.raidsWon ?? 0
+    },
     league: LEAGUE.map(({ importKey, label, group }) => {
       const trainer = byKey.get(importKey)
       return {

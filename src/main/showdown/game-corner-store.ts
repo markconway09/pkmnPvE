@@ -1,8 +1,8 @@
 import { randomInt } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
 import type { CoinBalance, SlotRules, SlotSpinResult, SlotSymbol } from '../../shared/slots'
-import { COIN_PACKS, COIN_PRICE, COIN_PRIZES, SLOT_PAYOUTS, SLOT_REELS, SLOT_RULES, slotWins } from '../../shared/slots'
-import { GOLDEN_TOUCH_JACKPOT_BONUS } from '../../shared/titles'
+import { CHERRY_ONE, CHERRY_TWO, COIN_PACKS, COIN_PRICE, COIN_PRIZES, SLOT_PAYOUTS, SLOT_REELS, SLOT_RULES, slotWins } from '../../shared/slots'
+import { GOLDEN_TOUCH_JACKPOT_BONUS, GOLDEN_TOUCH_PAYOUT_MULTIPLIER } from '../../shared/titles'
 import { betCap, hasTitle } from './title-perks'
 import { getMoney, spendMoney } from './money-store'
 import { addItem } from './bag-store'
@@ -93,7 +93,7 @@ export function spinSlots(bet: number): SlotSpinResult {
   if (bet > betCap()) throw new Error(`Bet at most ${betCap()} coins`)
   if (getCoins() < bet) throw new Error('Not enough coins - buy some at the Coin Shop')
   const stops = SLOT_REELS.map((strip) => randomInt(strip.length))
-  const wins = slotWins(stops, bet, slotPayouts())
+  const wins = slotWins(stops, bet, slotPayouts(), slotCherryPayouts())
   const payout = wins.reduce((sum, w) => sum + w.payout, 0)
   getState().coins += payout - bet
   persist()
@@ -103,14 +103,26 @@ export function spinSlots(bet: number): SlotSpinResult {
   return { stops, wins, payout, coins: getCoins() }
 }
 
-// What three of each symbol pays - the jackpot a little more with the Golden Touch title.
+// The Golden Touch title: every payout 10% more (on top of its bigger jackpot).
+const goldenTouch = (multiplier: number): number =>
+  hasTitle('Golden Touch') ? Math.round(multiplier * GOLDEN_TOUCH_PAYOUT_MULTIPLIER * 100) / 100 : multiplier
+
+// What three of each symbol pays - the jackpot more with the Golden Touch title, and every
+// one of them 10% more on top.
 function slotPayouts(): Record<SlotSymbol, number> {
   const bonus = hasTitle('Golden Touch') ? GOLDEN_TOUCH_JACKPOT_BONUS : 0
-  return { ...SLOT_PAYOUTS, gholdengo: SLOT_PAYOUTS.gholdengo + bonus }
+  const base: Record<SlotSymbol, number> = { ...SLOT_PAYOUTS, gholdengo: SLOT_PAYOUTS.gholdengo + bonus }
+  return Object.fromEntries(Object.entries(base).map(([symbol, x]) => [symbol, goldenTouch(x)])) as Record<SlotSymbol, number>
+}
+
+// What one and two cherries pay - also 10% more with Golden Touch.
+function slotCherryPayouts(): { one: number; two: number } {
+  return { one: goldenTouch(CHERRY_ONE), two: goldenTouch(CHERRY_TWO) }
 }
 
 /** The machine's rules for this time it's opened - with three freshly picked Pokemon. */
 export function getSlotRules(): SlotRules {
   const [high, mid, low] = randomSlotPokemon()
-  return { ...SLOT_RULES, payouts: slotPayouts(), pokemon: { high, mid, low } }
+  const cherry = slotCherryPayouts()
+  return { ...SLOT_RULES, payouts: slotPayouts(), cherryOne: cherry.one, cherryTwo: cherry.two, pokemon: { high, mid, low } }
 }

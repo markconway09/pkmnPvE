@@ -10,7 +10,7 @@ import {
   betOdds,
   pocketColor
 } from '../../shared/roulette'
-import BetSlider, { maxBet, placedBet, useGameCornerPerks, useSavedBet } from './BetSlider'
+import BetSlider, { maxBet, placedBet, useGameCornerPerks, useSavedBet, betStep } from './BetSlider'
 import GameCornerTabs, { type GameCornerGame } from './GameCornerTabs'
 import CoinIcon from './CoinIcon'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
@@ -213,7 +213,8 @@ function RouletteTable({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.
         const net = outcome.totalReturned - outcome.totalBet
         const rect = boardRef.current?.getBoundingClientRect()
         const at = rect ? { x: rect.left + rect.width / 2, y: rect.top } : { x: window.innerWidth / 2, y: 200 }
-        if (net > 0) notes.show(`+${net.toLocaleString('en-US')} coins`, at)
+        if (outcome.refunded) notes.show('Refunded by the Croupier!', at)
+        else if (net > 0) notes.show(`+${net.toLocaleString('en-US')} coins`, at)
         else if (net < 0) notes.show(`${net.toLocaleString('en-US')} coins`, at, 'bad')
         else notes.show('Broke even', at)
       }, SPIN_MS)
@@ -277,7 +278,9 @@ function RouletteTable({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.
             </div>
             {result && !spinning && (
               <div className="roulette-result-detail">
-                {result.totalReturned > 0
+                {result.refunded
+                  ? `No winning bets - but the Croupier gave all ${result.totalBet.toLocaleString('en-US')} back`
+                  : result.totalReturned > 0
                   ? `${result.bets
                       .filter((b) => b.returned > 0)
                       .map((b) => betLabel(b.key))
@@ -326,7 +329,8 @@ function RouletteTable({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.
         </div>
 
         <div className="slots-controls">
-          <BetSlider bet={chip} max={maxBet(coins, perks.betCap)} disabled={spinning || !coins} onChange={setChip} />
+          <BetSlider bet={chip} max={maxBet(coins, perks.betCap)}
+            step={betStep(perks.betCap)} disabled={spinning || !coins} onChange={setChip} />
         </div>
         <div className="slots-controls roulette-actions">
           <button disabled={spinning || placed.length === 0} onClick={undo}>
