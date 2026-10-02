@@ -37,10 +37,14 @@ import {
   PRISON_BOTTLE_ITEM_ID,
   REVEAL_GLASS_ITEM_ID,
   GRACIDEA_ITEM_ID,
-  METEORITE_ITEM_ID
+  METEORITE_ITEM_ID,
+  QUICK_SELL_KEPT_BERRY_IDS,
+  SELL_ONLY_ITEM_IDS,
+  WILD_LOCATIONS
 } from '../../shared/battle-types'
 import type {
   AutoSetResult,
+  PokedexHint,
   RarityTier,
   EditablePokemonSet,
   EditorOptions,
@@ -77,6 +81,16 @@ const { BattleStream, getPlayerStreams, Teams, Dex, toID } =
 const { BattlePlayer } = require('pokemon-showdown/dist/sim/battle-stream.js') as typeof import(
   'pokemon-showdown/dist/sim/battle-stream.js'
 )
+
+// Meltan becomes Melmetal with candies in the real games, so the Dex lists no
+// evolution for it. Here it evolves at max friendship instead. Patched into the raw
+// data before any species is looked up (looked-up species are frozen and cached).
+{
+  const pokedex = Dex.data.Pokedex as unknown as Record<string, Record<string, unknown>>
+  pokedex.meltan = { ...pokedex.meltan, evos: ['Melmetal'] }
+  pokedex.melmetal = { ...pokedex.melmetal, prevo: 'Meltan', evoType: 'levelFriendship' }
+  ;(Dex.species as unknown as { speciesCache: Map<string, unknown> }).speciesCache.clear()
+}
 
 // Teams/Dex aren't re-exported directly: their method signatures reference
 // pokemon-showdown internal types (e.g. Teams' ExportOptions) that aren't
@@ -178,9 +192,33 @@ export function buildPokemonSummary(species: string, set: PokemonSet | null): Po
   }
 }
 
+/** Whether a species has a Gigantamax form (Charizard, Urshifu-Rapid-Strike...). */
+export function hasGmaxForm(speciesName: string): boolean {
+  const species = Dex.species.get(speciesName)
+  return species.exists && (!!species.canGigantamax || Dex.species.get(`${species.name}-Gmax`).exists)
+}
+
+/**
+ * Whether the editor offers the cosmetic Gigantamax look: only a Pokemon caught Gigantamax
+ * in a Max Raid, while it's a species with that form.
+ */
+export function canUseGmaxLook(set: PokemonSet | null | undefined, species = set?.species ?? ''): boolean {
+  return !!set?.gigantamax && hasGmaxForm(species)
+}
+
+/**
+ * The cosmetic Gigantamax look (the editor's toggle): only a sprite swap, kept on the set
+ * itself so it follows the Pokemon into battle.
+ */
+export function gmaxLookOf(set: PokemonSet | null | undefined, species = set?.species ?? ''): boolean {
+  return !!(set as { gmaxLook?: boolean } | null | undefined)?.gmaxLook && canUseGmaxLook(set, species)
+}
+
 export function toEditableSet(set: PokemonSet): EditablePokemonSet {
   const { types } = speciesStatsAndTypes(set.species, null)
   return {
+    gmaxLook: gmaxLookOf(set),
+    canGmax: canUseGmaxLook(set),
     name: set.name,
     species: set.species,
     item: set.item,
@@ -216,6 +254,7 @@ export function applyEditableSet(existing: PokemonSet, input: EditablePokemonSet
   const species = input.species.trim() || existing.species
   return {
     ...existing,
+    ...{ gmaxLook: !!input.gmaxLook && canUseGmaxLook(existing, species) },
     name: input.name.trim() || species,
     species,
     item: input.item,
@@ -694,6 +733,8 @@ export function generateRandomWildMon(
     for (const mon of generated) {
       const dexSpecies = Dex.species.get(mon.species)
       if (dexSpecies.tags.some((tag) => LEGENDARY_TAGS.has(tag))) continue
+      // Paradox Pokemon only turn up in the Lab (see generateLabWildMon).
+      if (isParadoxSpecies(dexSpecies)) continue
       if (isBattleOnlyForme(dexSpecies)) continue
       // De-evolve first, then check whether what's left still makes sense at
       // this level cap - checking the raw generated species (always its most
@@ -740,6 +781,10 @@ const LAB_TABLE: { chance: number; pool: keyof LabPools | 'starters' }[] = [
 ]
 // Paradox Pokemon from the DLC that this Showdown version doesn't tag as Paradox.
 const UNTAGGED_PARADOX_IDS = new Set(['gougingfire', 'ragingbolt', 'ironboulder', 'ironcrown'])
+
+function isParadoxSpecies(species: ReturnType<typeof Dex.species.get>): boolean {
+  return species.tags.includes('Paradox') || UNTAGGED_PARADOX_IDS.has(species.id)
+}
 
 interface LabPools {
   paradox: string[]
@@ -888,7 +933,7 @@ const SHINY_PATCH_ITEM: ItemOptionEntry = {
   description: 'Right-click a Pokemon in your box or team and use it to make that Pokemon shiny.',
   spritenum: -8
 }
-const SHINY_PATCH_PRICE = 10000
+const SHINY_PATCH_PRICE = 25000
 
 // A key item (see KEY_ITEM_IDS) - never sold. -11 maps to its own image (see ItemSprite).
 // More key items. -12 and -13 map to their own images (see ItemSprite).
@@ -1263,11 +1308,11 @@ function getEvolutionOnlyItemIds(): Set<string> {
 /**
  * Items kept out of the shop until the boss flagged `unlocksLateItems` is
  * beaten (see lateItemsUnlocked in progression-store.ts): the Exp. Candies, the
- * evolution items, and the Raid Crystal (Max Raids open up at the same time). Drops are
+ * evolution items, the Shiny Patch, and the Raid Crystal (Max Raids open up at the same time). Drops are
  * never affected.
  */
 export function isLateGameItem(itemId: string): boolean {
-  return itemId in EXP_CANDY_EXP || itemId === WISHING_PIECE_ITEM_ID || getEvolutionOnlyItemIds().has(itemId)
+  return itemId in EXP_CANDY_EXP || itemId === WISHING_PIECE_ITEM_ID || itemId === SHINY_PATCH_ITEM_ID || getEvolutionOnlyItemIds().has(itemId)
 }
 
 let cachedWildDropPool: ItemOptionEntry[] | null = null
@@ -1381,6 +1426,11 @@ export function pokeballPrice(): number {
  * everything it sells - including the items it isn't showing yet (see
  * isLateGameItem), so a dropped evolution item can always be sold.
  */
+/** What the Shop charges for an item, or null if the Shop doesn't sell it. */
+export function shopPriceFor(itemId: string): number | null {
+  return getShopCatalog().find((i) => i.id === itemId)?.price ?? null
+}
+
 export function sellPriceFor(itemId: string): number | null {
   // Random Pokemon / Random Legendary can't be sold back - too easy to lose one by accident.
   if (OPENABLE_ITEM_IDS.has(itemId)) return null
@@ -1713,14 +1763,10 @@ export function pickRandomUnevolvedAnySpecies(): string {
  * a red one (legendary-class) - now and then a gold one (a restricted legendary). Fully
  * evolved only.
  */
-// Pokemon that do evolve, though the Dex lists no evolution for them: Meltan becomes
-// Melmetal with candies, not a level or an item.
-const NOT_FULLY_EVOLVED_IDS = new Set(['meltan'])
-
-export function pickRaidSpecies(
-  chances: { gigantamax: number; restricted: number } = { gigantamax: RAID_GIGANTAMAX_CHANCE, restricted: RAID_RESTRICTED_CHANCE }
-): { species: string; gigantamax: boolean } {
-  const pool = Dex.species
+// Fully evolved, ordinary-form species from current games (or Past) - what a raid
+// boss is drawn from.
+function raidSpeciesPool(): ReturnType<typeof Dex.species.get>[] {
+  return Dex.species
     .all()
     .filter(
       (s) =>
@@ -1729,9 +1775,25 @@ export function pickRaidSpecies(
         (!s.isNonstandard || s.isNonstandard === 'Past') &&
         !isBattleOnlyForme(s) &&
         isPlainSpecies(s) &&
-        s.evos.length === 0 &&
-        !NOT_FULLY_EVOLVED_IDS.has(s.id)
+        s.evos.length === 0
     )
+}
+
+/**
+ * Every Pokemon a Max Raid can bring (see pickRaidSpecies), in Pokedex order: the ones
+ * that can Gigantamax (and raid as such), the other legendaries, the restricted ones.
+ */
+export function raidBossCandidates(): { species: string; num: number; gigantamax: boolean }[] {
+  return raidSpeciesPool()
+    .filter((s) => !!s.canGigantamax || isLegendaryClass(s) || isGoldSpecies(s))
+    .map((s) => ({ species: s.name, num: s.num, gigantamax: !!s.canGigantamax }))
+    .sort((a, b) => a.num - b.num || a.species.localeCompare(b.species))
+}
+
+export function pickRaidSpecies(
+  chances: { gigantamax: number; restricted: number } = { gigantamax: RAID_GIGANTAMAX_CHANCE, restricted: RAID_RESTRICTED_CHANCE }
+): { species: string; gigantamax: boolean } {
+  const pool = raidSpeciesPool()
   const restricted = isGoldSpecies
   if (Math.random() < chances.gigantamax) {
     const gmax = pool.filter((s) => !!s.canGigantamax)
@@ -1783,6 +1845,27 @@ export function randomSlotPokemon(): [string, string, string] {
   const second = species.filter((s) => stage(s) === 2 && s.id !== 'gholdengo')
   const third = species.filter((s) => stage(s) === 3)
   return [pickFrom(third), pickFrom(second), pickFrom(first)]
+}
+
+/**
+ * The Coin Shop's Pokemon of the day: an ultra beast, a paradox Pokemon, a mythical or a
+ * gold legendary (Mewtwo, Kyogre, Koraidon...) - fully evolved only, so never Cosmog or
+ * Poipole. Not the ordinary (red) sub-legendaries.
+ */
+export function pickDailyShopSpecies(): string {
+  const pool = Dex.species
+    .all()
+    .filter(
+      (s) =>
+        s.exists &&
+        s.num > 0 &&
+        (!s.isNonstandard || s.isNonstandard === 'Past') &&
+        !isBattleOnlyForme(s) &&
+        isPlainSpecies(s) &&
+        s.evos.length === 0 &&
+        (isGoldSpecies(s) || isParadoxSpecies(s) || s.tags.includes('Mythical') || s.tags.includes('Ultra Beast'))
+    )
+  return pickFrom(pool)
 }
 
 /** An unevolved legendary, mythical, ultra beast or paradox Pokemon. */
@@ -2012,15 +2095,81 @@ export function nationalDexSpecies(): { num: number; species: string }[] {
   return cachedNationalDex
 }
 
+// Every species a wild roll can bring up: each stage of every line the random sets
+// cover, and of every extra line (see wildExtraSpecies), as ids.
+let cachedWildLineIds: Set<string> | null = null
+
+function wildLineIds(): Set<string> {
+  if (!cachedWildLineIds) {
+    const randomSets = require('pokemon-showdown/dist/data/random-battles/gen9/sets.json') as Record<string, unknown>
+    const ids = new Set<string>()
+    for (const id of [...Object.keys(randomSets), ...wildExtraSpecies().map(toID)]) {
+      let species = Dex.species.get(id)
+      while (species.exists && !ids.has(species.id)) {
+        ids.add(species.id)
+        if (!species.prevo) break
+        species = Dex.species.get(species.prevo)
+      }
+    }
+    cachedWildLineIds = ids
+  }
+  return cachedWildLineIds
+}
+
 /**
- * What the bag's Quick sell picks an item up as: a berry, or one of the type-changing
- * items only one Pokemon can use (a Memory for Silvally, a Plate for Arceus, a Drive for
- * Genesect) - with that Pokemon, since those are kept while one is owned.
+ * Where to look for a Pokedex entry, as short hints: the wild locations whose type or
+ * egg-group filters let it through (the same ones generateRandomWildMon uses), the Lab,
+ * Max Raids, fossil restoring - or, when none of those has it, evolving or a form change.
  */
-export function quickSellKind(itemId: string): { kind: 'berry' } | { kind: 'forPokemon'; species: string } | null {
+export function pokedexLocationHints(speciesName: string): PokedexHint[] {
+  const species = Dex.species.get(speciesName)
+  if (!species.exists) return []
+  if (isFossilLine(species.id)) return [{ icon: '🦴', label: 'Restore a fossil' }]
+  const hints: PokedexHint[] = []
+  const legendary = isLegendaryClass(species)
+  const starter = isStarterLine(species.id)
+  const pools = labPools()
+  const inLab =
+    REGIONAL_STARTER_SPECIES.includes(species.name) ||
+    [...pools.paradox, ...pools.ultraBeasts, ...pools.mythicals].includes(species.name)
+  if (inLab) hints.push({ icon: '🧪', label: 'Lab' })
+  if (!legendary && !isBattleOnlyForme(species) && wildLineIds().has(species.id)) {
+    const root = evolutionRootId(species.id)
+    for (const location of WILD_LOCATIONS) {
+      if (!location.types) continue
+      const isException = location.exceptionBaseSpecies.some((s) => toID(s) === root)
+      const typeMatch = species.types.some((t) => location.types!.includes(t))
+      const eggGroupMatch = species.eggGroups.some((g) => location.eggGroups?.includes(g))
+      if (isException || typeMatch || eggGroupMatch) {
+        hints.push({ icon: location.icon, label: starter ? `${location.label} (rare)` : location.label })
+      }
+    }
+  }
+  if (legendary && species.evos.length === 0 && isPlainSpecies(species)) {
+    hints.push({ icon: '⭐', label: 'Max Raids' })
+  }
+  const formChange = formChangeFor(species.name)
+  if (formChange && species.forme) hints.push({ icon: '🔄', label: `Form change from ${species.baseSpecies}` })
+  if (hints.length === 0 && species.prevo) hints.push({ icon: '⤴️', label: `Evolve ${Dex.species.get(species.prevo).name}` })
+  if (hints.length === 0 && !species.prevo && isPlainSpecies(species)) {
+    hints.push(legendary ? { icon: '🎁', label: 'Random Legendary' } : { icon: '🎁', label: 'Random Pokémon' })
+  }
+  return hints
+}
+
+/**
+ * What the bag's Quick sell picks an item up as: a sell-only item (Bottle Caps...), a
+ * berry (but not the ones worth holding - see QUICK_SELL_KEPT_BERRY_IDS), or one of the
+ * type-changing items only one Pokemon can use (a Memory for Silvally, a Plate for Arceus,
+ * a Drive for Genesect) - with that Pokemon, since those are kept while one is owned.
+ */
+export function quickSellKind(
+  itemId: string
+): { kind: 'sellOnly' } | { kind: 'berry' } | { kind: 'forPokemon'; species: string } | null {
+  if (SELL_ONLY_ITEM_IDS.has(itemId)) return { kind: 'sellOnly' }
   const item = Dex.items.get(itemId)
   if (!item.exists) return null
-  if (item.isBerry) return { kind: 'berry' }
+  if (item.isBerry) return QUICK_SELL_KEPT_BERRY_IDS.has(item.id) ? null : { kind: 'berry' }
   if (item.onMemory) return { kind: 'forPokemon', species: 'Silvally' }
   // The type Z-Crystals carry onPlate too - only the real Plates count.
   if (item.onPlate && !item.zMove) return { kind: 'forPokemon', species: 'Arceus' }

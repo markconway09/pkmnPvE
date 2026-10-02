@@ -55,6 +55,24 @@ export type AchievementStat =
   | 'runsWon'
   | 'hardRunsWon'
   | 'earlyRunLosses'
+  // Draft mode: drafts ended (any result, abandoned too), battles won, the most wins in
+  // one draft, 7-0 drafts, 7-win drafts per format (and how many formats have one), and
+  // battles won without a Pokemon fainting.
+  | 'draftsFinished'
+  | 'draftBattlesWon'
+  | 'draftBestWins'
+  | 'perfectDrafts'
+  | 'perfectSinglesDrafts'
+  | 'perfectDoublesDrafts'
+  | 'draftFormatsPerfected'
+  | 'flawlessDraftWins'
+  // Packs offered with a legendary-rarity card in them, the most legendary-rarity
+  // Pokemon picked in one draft, and 7-win singles drafts in the top (Ubers + OU) and
+  // bottom (ZU) tiers.
+  | 'luckyPacks'
+  | 'draftBestLegendaries'
+  | 'ubersPerfectDrafts'
+  | 'zuPerfectDrafts'
   // Game Corner.
   | 'slotSpins'
   | 'jackpots'
@@ -66,12 +84,13 @@ export type AchievementStat =
   | 'plinkoDrops'
   | 'plinkoEdges'
 
-export type AchievementCategory = 'Battle' | 'Collection' | 'Merges & Raids' | 'Roguelite' | 'Game Corner' | 'Secret'
+export type AchievementCategory = 'Battle' | 'Collection' | 'Merges & Raids' | 'Roguelite' | 'Draft' | 'Game Corner' | 'Secret'
 export const ACHIEVEMENT_CATEGORIES: AchievementCategory[] = [
   'Battle',
   'Collection',
   'Merges & Raids',
   'Roguelite',
+  'Draft',
   'Game Corner',
   'Secret'
 ]
@@ -490,6 +509,98 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     stat: 'hardRunsWon',
     goal: 1,
     reward: { items: [item('shinypatch')], title: 'Daredevil' }
+  },
+
+  // Draft
+  {
+    id: 'draft1',
+    name: 'First Pick',
+    description: 'Finish a draft',
+    category: 'Draft',
+    stat: 'draftsFinished',
+    goal: 1,
+    reward: { items: [item('rarecandy', 3)] }
+  },
+  {
+    id: 'draftbest4',
+    name: 'Halfway There',
+    description: 'Reach 4 wins in a single draft',
+    category: 'Draft',
+    stat: 'draftBestWins',
+    goal: 4,
+    reward: { items: [item('expcandyl', 2)] }
+  },
+  {
+    id: 'draftwins25',
+    name: 'Gauntlet Runner',
+    description: 'Win 25 draft battles',
+    category: 'Draft',
+    stat: 'draftBattlesWon',
+    goal: 25,
+    reward: { items: [item('randompokemon')] }
+  },
+  {
+    id: 'draftflawless',
+    name: 'Flawless',
+    description: 'Win a draft battle without any of your Pokémon fainting',
+    category: 'Draft',
+    stat: 'flawlessDraftWins',
+    goal: 1,
+    reward: { items: [item('rarecandy', 5)] }
+  },
+  {
+    id: 'draftperfect',
+    name: 'Perfect Draft',
+    description: 'Finish a draft 7-0',
+    category: 'Draft',
+    stat: 'perfectDrafts',
+    goal: 1,
+    reward: { items: [item('randomlegendary')], title: 'Grand Drafter' }
+  },
+  {
+    id: 'draftformats',
+    name: 'Two Formats',
+    description: 'Win 7 battles in a singles draft and in a doubles draft',
+    category: 'Draft',
+    stat: 'draftFormatsPerfected',
+    goal: 2,
+    reward: { items: [item('randomlegendary')] }
+  },
+  {
+    id: 'draftluckypack',
+    name: 'Lucky Pack',
+    description: 'Open a draft pack with a legendary-rarity card in it',
+    category: 'Draft',
+    stat: 'luckyPacks',
+    goal: 1,
+    reward: { items: [item('randompokemon')] }
+  },
+  {
+    id: 'draftgoldenhand',
+    name: 'Golden Hand',
+    description: 'Draft 3 legendary-rarity Pokémon in one draft',
+    category: 'Draft',
+    stat: 'draftBestLegendaries',
+    goal: 3,
+    reward: { items: [item('randomlegendary')] }
+  },
+  {
+    id: 'draftubers',
+    name: 'Ubers Champion',
+    description: 'Win 7 battles in a singles draft with Ubers and OU',
+    category: 'Draft',
+    stat: 'ubersPerfectDrafts',
+    goal: 1,
+    reward: { items: [item('wishingpiece')] }
+  },
+  {
+    id: 'draftunderdog',
+    name: 'Underdog',
+    description: 'Win 7 battles in a singles draft with ZU',
+    category: 'Draft',
+    stat: 'zuPerfectDrafts',
+    goal: 1,
+    reward: { items: [item('shinypatch')] }
   },
 
   // Game Corner

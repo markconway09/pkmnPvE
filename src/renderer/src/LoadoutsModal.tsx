@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { RarityGlow } from './RarityCard'
 import { createPortal } from 'react-dom'
 import type { BoxPokemonView, BoxState, LoadoutView } from '../../shared/battle-types'
 import { toSpriteId } from '../../shared/battle-types'
@@ -21,10 +22,14 @@ function TeamPreview({ team, monsById }: { team: (string | null)[]; monsById: Ma
         return (
           <div
             key={i}
-            className={`loadout-preview-slot${mon ? ` loadout-preview-filled rarity-${mon.rarityTier ?? 'common'}` : ''}`}
+            className={`loadout-preview-slot${mon ? ` loadout-preview-filled rarity-card rarity-tier-${mon.rarityTier ?? 'common'}` : ''}`}
             title={mon ? `${mon.species} · Lv ${mon.level}` : id ? 'No longer in your box' : 'Empty'}
           >
-            {mon && <SpriteImage style="2d-static" spriteId={toSpriteId(mon.species)} shiny={mon.shiny} alt={mon.species} />}
+            {mon && (
+              <RarityGlow size={null} className="loadout-preview-glow">
+                <SpriteImage style="3d-static" spriteId={toSpriteId(mon.species)} shiny={mon.shiny} alt={mon.species} />
+              </RarityGlow>
+            )}
           </div>
         )
       })}

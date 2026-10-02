@@ -7,14 +7,12 @@ interface Props {
   onClose: () => void
   onTrainers: () => void
   onRogueliteBosses: () => void
-  onAddRandom: () => void
+  // Opens the Add Pokémon window.
+  onAddPokemon: () => void
   onWildDrops: () => void
   onShopPrices: () => void
   // The money and coins were set - the menu bar's money needs refreshing.
   onWalletChanged: (money: number) => void
-  onResetBossProgress: () => void
-  onResetStats: () => void
-  addRandomBusy: boolean
 }
 
 // Typed digits only (commas and spaces ignored), as a whole number - or null while it's empty.
@@ -27,16 +25,11 @@ function DebugMenu({
   onClose,
   onTrainers,
   onRogueliteBosses,
-  onAddRandom,
+  onAddPokemon,
   onWildDrops,
   onShopPrices,
-  onWalletChanged,
-  onResetBossProgress,
-  onResetStats,
-  addRandomBusy
+  onWalletChanged
 }: Props): React.JSX.Element {
-  // Only one button needing a second click can be armed at a time.
-  const [confirming, setConfirming] = useState<'boss' | 'stats' | null>(null)
   // The wallet as typed - filled in with the current amounts when the menu opens.
   const [moneyText, setMoneyText] = useState('')
   const [coinsText, setCoinsText] = useState('')
@@ -78,9 +71,7 @@ function DebugMenu({
           <button onClick={onRogueliteBosses}>Edit Roguelite Bosses</button>
           <button onClick={onWildDrops}>Wild Item Drops</button>
           <button onClick={onShopPrices}>Shop Prices</button>
-          <button disabled={addRandomBusy} onClick={onAddRandom}>
-            Add Random Pokemon (temporary)
-          </button>
+          <button onClick={onAddPokemon}>Add Pokémon…</button>
           <form
             className="debug-wallet"
             onSubmit={(e) => {
@@ -115,32 +106,6 @@ function DebugMenu({
             <button type="submit">Set</button>
           </form>
           {walletNote && <p className={walletNote.bad ? 'editor-error' : 'debug-wallet-saved'}>{walletNote.text}</p>}
-          {confirming === 'boss' ? (
-            <button
-              className="debug-reset-confirm"
-              onClick={() => {
-                onResetBossProgress()
-                setConfirming(null)
-              }}
-            >
-              Click again to confirm boss reset
-            </button>
-          ) : (
-            <button onClick={() => setConfirming('boss')}>Reset Boss Progression</button>
-          )}
-          {confirming === 'stats' ? (
-            <button
-              className="debug-reset-confirm"
-              onClick={() => {
-                onResetStats()
-                setConfirming(null)
-              }}
-            >
-              Click again to confirm reset
-            </button>
-          ) : (
-            <button onClick={() => setConfirming('stats')}>Reset Stats</button>
-          )}
         </div>
         <div className="editor-actions">
           <button onClick={onClose}>Close</button>

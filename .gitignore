@@ -12,3 +12,4 @@ save/session.json
 # Local build secrets (the Google Drive OAuth client) - compiled into the build, never committed.
 .env.local
 .env.*.local
+CLAUDE.md

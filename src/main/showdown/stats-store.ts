@@ -1,7 +1,8 @@
 import type { MissionStat } from '../../shared/missions'
 import { recordMission } from './mission-store'
 import { readFileSync, writeFileSync } from 'node:fs'
-import type { PlayerStats } from '../../shared/battle-types'
+import type { PlayerStats, RunDifficulty } from '../../shared/battle-types'
+import { RUN_DIFFICULTIES } from '../../shared/battle-types'
 import { playerPathFor } from './save-paths'
 import { onPlayerChange } from './player-session'
 
@@ -10,10 +11,10 @@ import { onPlayerChange } from './player-session'
 // Nor are raids - the achievements already keep that count.
 type StoredStats = Omit<PlayerStats, 'bossesDefeated' | 'raidsWon'>
 
-const COUNTERS: (keyof StoredStats)[] = ['trainersDefeated', 'wildDefeated', 'wildCaught', 'bestFloor']
+const COUNTERS = ['trainersDefeated', 'wildDefeated', 'wildCaught', 'bestFloor'] as const
 
 function emptyStats(): StoredStats {
-  return { trainersDefeated: 0, wildDefeated: 0, wildCaught: 0, bestFloor: 0 }
+  return { trainersDefeated: 0, wildDefeated: 0, wildCaught: 0, bestFloor: 0, bestFloorDifficulty: null }
 }
 
 function load(): StoredStats {
@@ -23,6 +24,7 @@ function load(): StoredStats {
     const parsed = JSON.parse(readFileSync(path, 'utf8')) as Partial<StoredStats>
     const stats = emptyStats()
     for (const key of COUNTERS) if (typeof parsed[key] === 'number') stats[key] = parsed[key]
+    if (RUN_DIFFICULTIES.some((d) => d.id === parsed.bestFloorDifficulty)) stats.bestFloorDifficulty = parsed.bestFloorDifficulty!
     return stats
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code
@@ -51,10 +53,15 @@ export function getStats(): StoredStats {
   return { ...getState() }
 }
 
-/** Roguelite: keeps the furthest floor a run has reached. */
-export function recordBestFloor(floor: number): void {
-  if (floor <= getState().bestFloor) return
-  getState().bestFloor = floor
+/** Roguelite: keeps the furthest floor a run has reached, and on which difficulty -
+ *  reaching the same floor on a harder difficulty takes the record over. */
+export function recordBestFloor(floor: number, difficulty: RunDifficulty): void {
+  const stats = getState()
+  const rank = (d: RunDifficulty | null): number => RUN_DIFFICULTIES.findIndex((info) => info.id === d)
+  if (floor < stats.bestFloor) return
+  if (floor === stats.bestFloor && rank(difficulty) <= rank(stats.bestFloorDifficulty)) return
+  stats.bestFloor = floor
+  stats.bestFloorDifficulty = difficulty
   persist()
 }
 
@@ -65,7 +72,7 @@ const MISSION_STATS: Partial<Record<keyof StoredStats, MissionStat>> = {
   wildCaught: 'catches'
 }
 
-export function countStat(key: Exclude<keyof StoredStats, 'bestFloor'>): void {
+export function countStat(key: Exclude<keyof StoredStats, 'bestFloor' | 'bestFloorDifficulty'>): void {
   getState()[key] += 1
   persist()
   const mission = MISSION_STATS[key]

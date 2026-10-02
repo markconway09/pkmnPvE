@@ -1,4 +1,6 @@
 import { createPortal } from 'react-dom'
+import { RarityGlow } from './RarityCard'
+import FitName from './FitName'
 import type { BoxState } from '../../shared/battle-types'
 import { toSpriteId } from '../../shared/battle-types'
 import { spriteUrl } from './spriteStyle'
@@ -24,17 +26,20 @@ function StarterPicker({ onClose, onChosen }: Props): React.JSX.Element {
           {STARTER_SPECIES.map((species) => (
             <button
               key={species}
-              className="starter-option"
+              // Starters are all unevolved, low-BST Pokemon: the grey (common) tier.
+              className="starter-option rarity-card rarity-tier-common"
               title={species}
               onClick={() => void choose(species)}
             >
-              <img
-                className="starter-img"
-                src={spriteUrl('2d-static', 'front', toSpriteId(species))}
-                alt={species}
-                draggable={false}
-              />
-              <span className="starter-name">{species}</span>
+              <RarityGlow size={48}>
+                <img
+                  className="starter-img"
+                  src={spriteUrl('2d-static', 'front', toSpriteId(species))}
+                  alt={species}
+                  draggable={false}
+                />
+              </RarityGlow>
+              <FitName className="starter-name" text={species} />
             </button>
           ))}
           <button className="starter-option" title="Random Unevolved" onClick={() => void choose('random')}>

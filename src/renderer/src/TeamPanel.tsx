@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { RarityGlow } from './RarityCard'
+import FitName from './FitName'
 import type { ActivePokemonView } from '../../shared/battle-types'
 import { toSpriteId } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
@@ -36,7 +38,13 @@ const STATUS_LABELS: Record<string, string> = {
 function TeamMember({ mon, isActive, disabled, onClick, matchup }: TeamMemberProps): React.JSX.Element {
   const spriteId = toSpriteId(mon.species)
   const hpClass = mon.hpPercent > 50 ? 'hp-high' : mon.hpPercent > 20 ? 'hp-mid' : 'hp-low'
-  const classes = ['team-member', isActive && 'team-member-active', mon.fainted && 'team-member-fainted']
+  const classes = [
+    'team-member',
+    'rarity-card',
+    `rarity-tier-${mon.rarityTier ?? 'common'}`,
+    isActive && 'team-member-active',
+    mon.fainted && 'team-member-fainted'
+  ]
     .filter(Boolean)
     .join(' ')
 
@@ -58,16 +66,18 @@ function TeamMember({ mon, isActive, disabled, onClick, matchup }: TeamMemberPro
     <Tooltip className="team-member-slot" placement="right" content={<PokemonTooltipContent pokemon={mon} />}>
       <button className={classes} disabled={disabled} onClick={onClick}>
         <div className="team-member-top">
-          <SpriteImage
-            style="2d-static"
-            className="team-member-icon"
-            spriteId={spriteId}
-            shiny={mon.shiny}
-            alt={mon.species}
-          />
+          <RarityGlow size={65}>
+            <SpriteImage
+              style="3d-static"
+              className="team-member-icon"
+              spriteId={spriteId}
+              shiny={mon.shiny}
+              alt={mon.species}
+            />
+          </RarityGlow>
           <div className="team-member-info">
             <div className="team-member-name-row">
-              <span className="team-member-name">{mon.species}</span>
+              <FitName className="team-member-name" text={mon.species} />
               {mon.status && (
                 <span className={`status-badge status-${mon.status}`}>{STATUS_LABELS[mon.status] ?? mon.status.toUpperCase()}</span>
               )}
@@ -129,10 +139,12 @@ interface Props {
   // worth saying, like a trap) along the top.
   locked?: boolean
   lockedNote?: string
+  // Revival Blessing: only the fainted can be picked, to bring one back.
+  reviveMode?: boolean
   onSwitch: (slot: number) => void
 }
 
-function TeamPanel({ team, activeFlags, selectable, disabled, reservedSlots, matchups, locked, lockedNote, onSwitch }: Props): React.JSX.Element {
+function TeamPanel({ team, activeFlags, selectable, disabled, reservedSlots, matchups, locked, lockedNote, reviveMode, onSwitch }: Props): React.JSX.Element {
   // Doubles: two matchup chips a group (one per foe), so the cards go compact to keep them on one line.
   const doubles = !!matchups?.some((m) => m.offense.length > 1 || m.defense.length > 1)
   return (
@@ -143,7 +155,7 @@ function TeamPanel({ team, activeFlags, selectable, disabled, reservedSlots, mat
           key={i}
           mon={mon}
           isActive={!!activeFlags[i]}
-          disabled={disabled || !selectable || mon.fainted || !!activeFlags[i] || !!reservedSlots?.has(i + 1)}
+          disabled={disabled || !selectable || mon.fainted !== !!reviveMode || !!activeFlags[i] || !!reservedSlots?.has(i + 1)}
           onClick={() => onSwitch(i + 1)}
           matchup={matchups?.[i]}
         />

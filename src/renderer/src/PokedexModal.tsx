@@ -1,9 +1,20 @@
 import { useEffect, useState } from 'react'
+import { RarityGlow } from './RarityCard'
+import FitName from './FitName'
 import { createPortal } from 'react-dom'
 import type { PokedexEntry } from '../../shared/battle-types'
 import { toSpriteId } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
 import ModalSpinner from './ModalSpinner'
+import SearchBar from './SearchBar'
+
+// The hint icons, spelled out for the header's legend.
+const LEGEND = [
+  '🗻 Cave · ⛰️ Mountain · 🌲 Forest · 🏙️ City',
+  '🏭 Industry · 🪦 Graveyard · 🌊 Ocean (Wild Battle locations)',
+  '🧪 Lab · ⭐ Max Raids · 🦴 Restore a fossil',
+  '🔄 Form change · ⤴️ Evolve · 🎁 Random Pokémon / Legendary'
+].join('\n')
 
 interface Props {
   onClose: () => void
@@ -12,6 +23,7 @@ interface Props {
 // The trainer profile's Pokedex: every species in National Dex order, each followed by
 // its alternate forms (Alolan, Hisuian, Rotom-Wash...) - the ones the player has
 // registered (had in their box, in that form) with their sprite, the rest as a "?".
+// Each shows small icons for where to look for it, spelled out on hover.
 function PokedexModal({ onClose }: Props): React.JSX.Element {
   const [entries, setEntries] = useState<PokedexEntry[] | null>(null)
   const [search, setSearch] = useState('')
@@ -32,6 +44,8 @@ function PokedexModal({ onClose }: Props): React.JSX.Element {
   const shown = (entries ?? []).filter(
     (e) => !query || e.species.toLowerCase().includes(query) || (/^\d+$/.test(query) && e.num === Number(query))
   )
+  // Each Dex number's own species name, for its forms' cells.
+  const baseNames = new Map((entries ?? []).filter((e) => !e.form).map((e) => [e.num, e.species]))
 
   return createPortal(
     <div className="modal-overlay" onMouseDown={onClose}>
@@ -47,31 +61,49 @@ function PokedexModal({ onClose }: Props): React.JSX.Element {
               </span>
             </span>
           )}
-          <input
-            className="box-search pokedex-search"
-            type="search"
-            placeholder="Search name or number…"
-            value={search}
-            autoFocus
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          {/* How much of the Dex is registered, as a bar. */}
+          {entries && species.length > 0 && (
+            <span className="pokedex-progress" aria-hidden="true">
+              <span style={{ width: `${(registeredCount / species.length) * 100}%` }} />
+            </span>
+          )}
+          <span className="pokedex-legend" title={LEGEND}>
+            Where to find?
+          </span>
+          <SearchBar className="pokedex-search" placeholder="Search name or number…" value={search} onChange={setSearch} autoFocus />
         </div>
         {!entries && <ModalSpinner />}
         <div className="pokedex-grid">
-          {shown.map((e) => (
+          {shown.map((e) => {
+            // An alternate form shows its species' name, and the form itself in a tag on
+            // the corner ("Rotom" tagged "Wash") - the full name on hover.
+            const base = e.form ? baseNames.get(e.num) : undefined
+            const formName = base && e.species.startsWith(`${base}-`) ? e.species.slice(base.length + 1) : null
+            return (
             <div
               key={e.species}
-              className={`pokedex-cell${e.registered ? '' : ' pokedex-cell-unknown'}${e.form ? ' pokedex-cell-form' : ''}`}
-              title={e.form ? `#${e.num} ${e.species}` : undefined}
+              className={`pokedex-cell rarity-card rarity-tier-${e.registered ? e.rarityTier : 'common'}${e.registered ? '' : ' pokedex-cell-unknown'}${e.form ? ' pokedex-cell-form' : ''}`}
+              title={`#${e.num} ${e.species}${e.hints.length ? `\nFound: ${e.hints.map((h) => h.label).join(', ')}` : ''}`}
             >
+              {formName && <span className="pokedex-form-tag">{formName}</span>}
               {e.registered ? (
-                <SpriteImage style="2d-static" className="pokedex-sprite" spriteId={toSpriteId(e.species)} alt={e.species} />
+                <RarityGlow size={56}>
+                  <SpriteImage style="3d-static" className="pokedex-sprite" spriteId={toSpriteId(e.species)} alt={e.species} />
+                </RarityGlow>
               ) : (
                 <span className="pokedex-unknown">?</span>
               )}
-              <span className="pokedex-name">{e.species}</span>
+              <FitName className="pokedex-name" text={formName ? base! : e.species} />
+              {e.hints.length > 0 && (
+                <span className="pokedex-hints">
+                  {e.hints.map((h) => (
+                    <span key={h.label}>{h.icon}</span>
+                  ))}
+                </span>
+              )}
             </div>
-          ))}
+            )
+          })}
           {entries && shown.length === 0 && <p className="box-empty-hint">No Pokémon match that search.</p>}
         </div>
         <div className="editor-actions">

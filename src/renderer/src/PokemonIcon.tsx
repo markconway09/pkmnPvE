@@ -3,6 +3,7 @@ import type { BoxPokemonView } from '../../shared/battle-types'
 import PokemonTooltipContent from './PokemonTooltipContent'
 import PokemonIconVisual from './PokemonIconVisual'
 import Tooltip from './Tooltip'
+import RarityCard from './RarityCard'
 
 interface Props {
   mon: BoxPokemonView
@@ -37,9 +38,11 @@ function PokemonIcon({
       placement="above"
       content={<PokemonTooltipContent pokemon={mon} />}
     >
-      <div
-        ref={setNodeRef}
-        className={`box-icon-draggable ${isDragging ? 'box-icon-dragging' : ''}${mon.rarityTier ? ` rarity-${mon.rarityTier}` : ''}${selected ? ' box-icon-selected' : ''}${unselectable ? ' box-icon-unselectable' : ''}`}
+      {/* A RarityCard in its rarity colour (grey, blue, purple, red, gold). */}
+      <RarityCard
+        cardRef={setNodeRef}
+        tier={mon.rarityTier ?? 'common'}
+        className={`box-icon-draggable ${isDragging ? 'box-icon-dragging' : ''}${selected ? ' box-icon-selected' : ''}${unselectable ? ' box-icon-unselectable' : ''}`}
         // Right-click for the menu; double-click to edit it.
         onDoubleClick={() => onEdit?.(mon.id)}
         onContextMenu={onContextMenu ? (e) => onContextMenu(e, mon) : undefined}
@@ -61,7 +64,7 @@ function PokemonIcon({
           </button>
         )}
         <PokemonIconVisual mon={mon} />
-      </div>
+      </RarityCard>
     </Tooltip>
   )
 }

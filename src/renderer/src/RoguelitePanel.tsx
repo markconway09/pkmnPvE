@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import FitName from './FitName'
+import { createPortal } from 'react-dom'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import type {
   BoxPokemonView,
@@ -14,22 +16,26 @@ import type {
 } from '../../shared/battle-types'
 import {
   POKEMON_GENERATIONS,
-  ROGUELITE_BOSS_COUNT,
+  runBossCount,
   ROGUELITE_BOSS_EVERY,
-  ROGUELITE_FINAL_FLOOR,
+  runFinalFloor,
   ROGUELITE_MAX_TEAM,
   ROGUELITE_START_LEVEL,
   RUN_CONSUMABLES,
   RUN_CONSUMABLE_PRICES,
+  RUN_RARE_CANDY_ICON,
+  RUN_RARE_CANDY_PRICE,
   RUN_DIFFICULTIES,
   RUN_GEM_ICON,
   RUN_SHOP_TILE_PRICES,
   WILD_LOCATIONS,
   rogueliteBossClassAt,
   rogueliteBossLabelAt,
-  runDifficultyInfo
+  runDifficultyInfo,
+  toSpriteId
 } from '../../shared/battle-types'
 import PokemonIconVisual from './PokemonIconVisual'
+import SpriteImage from './SpriteImage'
 import PokemonTooltipContent from './PokemonTooltipContent'
 import Tooltip from './Tooltip'
 import ItemSprite from './ItemSprite'
@@ -42,12 +48,17 @@ import { LOCATION_BUTTON_BACKDROP, backdropUrl, locationIconUrl } from './battle
 
 // The whole run as a bar: a notch per floor, a bigger one for each boss (coloured by
 // Gym Leader / Elite Four / Champion), filled up to the floor the run is on.
-function RunProgressBar({ floor }: { floor: number }): React.JSX.Element {
-  const done = Math.min(1, (floor - 1) / (ROGUELITE_FINAL_FLOOR - 1))
+function RunProgressBar({ floor, difficulty }: { floor: number; difficulty: RunDifficulty }): React.JSX.Element {
+  const finalFloor = runFinalFloor(difficulty)
+  const done = Math.min(1, (floor - 1) / (finalFloor - 1))
   return (
-    <div className="run-progress" title={`Floor ${floor} of ${ROGUELITE_FINAL_FLOOR}`}>
+    <div className="run-progress" title={`Floor ${floor} of ${finalFloor}`}>
       <div className="run-progress-fill" style={{ width: `${done * 100}%` }} />
-      {Array.from({ length: ROGUELITE_FINAL_FLOOR }, (_, i) => {
+      {/* A little flag over the floor the run is on. */}
+      <span className="run-progress-marker" style={{ left: `${done * 100}%` }}>
+        {floor}
+      </span>
+      {Array.from({ length: finalFloor }, (_, i) => {
         const n = i + 1
         const boss = n % ROGUELITE_BOSS_EVERY === 0
         const bossIndex = n / ROGUELITE_BOSS_EVERY - 1
@@ -55,9 +66,9 @@ function RunProgressBar({ floor }: { floor: number }): React.JSX.Element {
         return (
           <span
             key={n}
-            className={`run-notch run-notch-${state}${boss ? ` run-notch-boss run-notch-${rogueliteBossClassAt(bossIndex)}` : ''}`}
-            style={{ left: `${(i / (ROGUELITE_FINAL_FLOOR - 1)) * 100}%` }}
-            title={boss ? `Floor ${n}: ${rogueliteBossLabelAt(bossIndex)}` : `Floor ${n}`}
+            className={`run-notch run-notch-${state}${boss ? ` run-notch-boss run-notch-${rogueliteBossClassAt(bossIndex, difficulty)}` : ''}`}
+            style={{ left: `${(i / (finalFloor - 1)) * 100}%` }}
+            title={boss ? `Floor ${n}: ${rogueliteBossLabelAt(bossIndex, difficulty)}` : `Floor ${n}`}
           />
         )
       })}
@@ -77,7 +88,8 @@ interface Props {
   // The box/team Pokemon dragged onto the starter slot (before a run starts).
   picked: BoxPokemonView | undefined
   busy: boolean
-  bestFloor: number | null
+  // The furthest floor any run reached, and on which difficulty (null if unrecorded).
+  bestFloor: { floor: number; difficulty: RunDifficulty | null } | null
   onStart: (difficulty: RunDifficulty, generation: number | null) => void
   // A floor option, by its place in run.choices.
   onChoose: (index: number) => void
@@ -99,15 +111,24 @@ interface Props {
 // Badly poisoned reads as PSN, the same as the battle screen shows it.
 const statusLabel = (status: string): string => (status === 'tox' ? 'PSN' : status.toUpperCase())
 
-const NODE_INFO: Record<RunNodeKind, { label: string; hint: string }> = {
-  wild: { label: 'Wild Pokémon', hint: 'Beat it and you can add it to your team' },
-  trainer: { label: 'Trainer', hint: 'A trainer battle, sized for this floor - win it for a held item and extra exp' },
-  item: { label: 'Item', hint: 'Pick a held item for one of your Pokémon' },
-  heal: { label: 'Pokémon Center', hint: 'Your whole team back to full HP, no status' },
-  boss: { label: 'Boss', hint: 'A boss battle - win it to heal up and move on' },
-  ability: { label: 'New Ability', hint: 'Pick one of four strong abilities for one of your Pokémon' },
-  move: { label: 'New Move', hint: 'Pick one of four signature moves to teach one of your Pokémon' },
-  swap: { label: 'Random Swap', hint: 'Swap one Pokémon - or your whole team - for completely random ones at the next boss’s level' }
+// Each floor kind's name, its tooltip, and the one-liner under it on its tile.
+const NODE_INFO: Record<RunNodeKind, { label: string; hint: string; short: string }> = {
+  wild: { label: 'Wild Pokémon', hint: 'Beat it and you can add it to your team', short: 'Catch a new member' },
+  trainer: {
+    label: 'Trainer',
+    hint: 'A trainer battle, sized for this floor - win it for a held item and extra exp',
+    short: 'Item, exp & gems'
+  },
+  item: { label: 'Item', hint: 'Pick a held item for one of your Pokémon', short: 'Pick a held item' },
+  heal: { label: 'Pokémon Center', hint: 'Your whole team back to full HP, no status', short: 'Full team heal' },
+  boss: { label: 'Boss', hint: 'A boss battle - win it to heal up and move on', short: 'Boss battle' },
+  ability: { label: 'New Ability', hint: 'Pick one of four strong abilities for one of your Pokémon', short: 'Pick an ability' },
+  move: { label: 'New Move', hint: 'Pick one of four signature moves to teach one of your Pokémon', short: 'Teach a move' },
+  swap: {
+    label: 'Random Swap',
+    hint: 'Swap one Pokémon - or your whole team - for completely random ones at the next boss’s level',
+    short: 'Roll the dice'
+  }
 }
 
 // Where a wild option is - its location's entry, or none for an older run's "anywhere".
@@ -249,7 +270,13 @@ function starterPreview(mon: BoxPokemonView): BoxPokemonView {
 
 function StarterSlot({ picked }: { picked: BoxPokemonView | undefined }): React.JSX.Element {
   const { setNodeRef, isOver } = useDroppable({ id: RUN_STARTER_SLOT_ID })
-  const classes = ['team-slot', 'run-starter-slot', picked && 'team-slot-filled', isOver && 'team-slot-over']
+  const classes = [
+    'team-slot',
+    'run-starter-slot',
+    picked && 'team-slot-filled',
+    picked && `rarity-card rarity-tier-${picked.rarityTier ?? 'common'}`,
+    isOver && 'team-slot-over'
+  ]
     .filter(Boolean)
     .join(' ')
   const preview = picked ? starterPreview(picked) : null
@@ -276,9 +303,11 @@ interface RunMonCardProps {
   // Double-click: edit it.
   onEdit?: () => void
   selectable?: boolean
+  // Its held item is the one being moved.
+  moving?: boolean
 }
 
-function RunMonCard({ mon, index, onClick, onContextMenu, onEdit, selectable }: RunMonCardProps): React.JSX.Element {
+function RunMonCard({ mon, index, onClick, onContextMenu, onEdit, selectable, moving }: RunMonCardProps): React.JSX.Element {
   const hpClass = mon.hpPercent > 50 ? 'hp-high' : mon.hpPercent > 20 ? 'hp-mid' : 'hp-low'
   // Drag it onto another card to move it there - the first one leads every battle.
   const drag = useDraggable({ id: `${RUN_MON_DRAG_PREFIX}${mon.id}` })
@@ -295,10 +324,15 @@ function RunMonCard({ mon, index, onClick, onContextMenu, onEdit, selectable }: 
         }}
         {...drag.attributes}
         {...drag.listeners}
-        style={transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 5 } : undefined}
-        className={`team-slot team-slot-filled run-mon-card${mon.rarityTier ? ` rarity-${mon.rarityTier}` : ''}${selectable ? ' run-mon-card-selectable' : ''}${
+        style={
+          {
+            '--i': index,
+            ...(transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 5 } : {})
+          } as React.CSSProperties
+        }
+        className={`team-slot team-slot-filled run-mon-card rarity-card rarity-tier-${mon.rarityTier ?? 'common'}${selectable ? ' run-mon-card-selectable' : ''}${
           drop.isOver && !drag.isDragging ? ' team-slot-over' : ''
-        }${drag.isDragging ? ' run-mon-card-dragging' : ''}`}
+        }${drag.isDragging ? ' run-mon-card-dragging' : ''}${mon.hpPercent <= 0 ? ' run-mon-card-fainted' : ''}${moving ? ' run-mon-card-moving' : ''}`}
         // Not disabled even when there's nothing to click for - a disabled button gets no
         // right-clicks, and the context menu needs them. A left click only picks it as a
         // target when something is being given (a drag that ends where it began doesn't
@@ -317,11 +351,14 @@ function RunMonCard({ mon, index, onClick, onContextMenu, onEdit, selectable }: 
             <PokemonIconVisual mon={{ ...mon, expPercent: undefined }} />
           </div>
         </div>
+        {/* The first one leads every battle. */}
+        {index === 0 && <span className="run-mon-lead">Lead</span>}
         <div className="run-mon-hp">
           <div className={`hp-bar-fill ${hpClass}`} style={{ width: `${mon.hpPercent}%` }} />
         </div>
         <div className="run-mon-meta">
           <span>Lv {mon.level}</span>
+          <span className={`run-mon-hp-text ${hpClass}`}>{Math.round(mon.hpPercent)}%</span>
           {mon.status && (
             <span className={`status-badge status-${mon.status}`}>{statusLabel(mon.status)}</span>
           )}
@@ -389,8 +426,88 @@ function RoguelitePanel({
   // member (the capsule then its ability), Revive a pick from the fainted.
   const [using, setUsing] = useState<RunConsumableId | null>(null)
   const [capsuleMon, setCapsuleMon] = useState<RunMonView | null>(null)
+  // A Revive with a full team: the fainted Pokemon picked, waiting for who leaves.
+  const [reviving, setReviving] = useState<RunMonView | null>(null)
+  // Buying Rare Candies in a boss shop: each click on a team member buys and uses one.
+  const [candyMode, setCandyMode] = useState(false)
   const [itemBusy, setItemBusy] = useState(false)
   const [itemError, setItemError] = useState<string | null>(null)
+
+  // Gems just won pop up as "+N" over the gem counter for a moment.
+  const gems = run?.status === 'active' ? run.consumables.gems : null
+  const lastGems = useRef<number | null>(null)
+  const [gemPop, setGemPop] = useState<{ amount: number; key: number } | null>(null)
+  useEffect(() => {
+    const before = lastGems.current
+    lastGems.current = gems
+    if (gems === null || before === null || gems <= before) return
+    setGemPop({ amount: gems - before, key: Date.now() })
+    const timer = window.setTimeout(() => setGemPop(null), 1600)
+    return () => window.clearTimeout(timer)
+  }, [gems])
+
+  // Keys 1-9 pick the floor's options in order, and Escape backs out of whatever's being
+  // picked (an item, a consumable, a move target...) - only while nothing else is open.
+  const canPickFloor =
+    !!run &&
+    run.status === 'active' &&
+    !run.swapOffer &&
+    !run.pickOffer &&
+    !run.itemOffer &&
+    !run.displacedItem &&
+    !busy &&
+    !editingMonId &&
+    !menu
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      const target = e.target as HTMLElement | null
+      if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return
+      if (e.ctrlKey || e.altKey || e.metaKey) return
+      if (e.key === 'Escape') {
+        setUsing(null)
+        setCapsuleMon(null)
+        setReviving(null)
+        setCandyMode(false)
+        setMovingFrom(null)
+        setChosenItem(null)
+        setLearner(null)
+        setChosenPick(null)
+        setSwapMode(null)
+        return
+      }
+      if (!canPickFloor || !run) return
+      const n = Number(e.key)
+      if (Number.isInteger(n) && n >= 1 && n <= run.choices.length) {
+        e.preventDefault()
+        onChoose(n - 1)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [canPickFloor, run, onChoose])
+
+  // On the setup screen: left/right step through the difficulties, Enter starts the run.
+  useEffect(() => {
+    if (!settingUp) return
+    const onKey = (e: KeyboardEvent): void => {
+      const target = e.target as HTMLElement | null
+      if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target.tagName))) {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+        if (target.tagName !== 'BUTTON') return
+      }
+      const ids = RUN_DIFFICULTIES.map((d) => d.id)
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault()
+        const step = e.key === 'ArrowLeft' ? -1 : 1
+        setDifficulty((current) => ids[Math.min(ids.length - 1, Math.max(0, ids.indexOf(current) + step))])
+      } else if (e.key === 'Enter' && picked && !busy) {
+        e.preventDefault()
+        onStart(difficulty, generation)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [settingUp, picked, busy, difficulty, generation, onStart])
 
   // Using a consumable or buying in the shop - the run as it stands afterwards.
   async function runItemAction(action: () => Promise<RunView>): Promise<void> {
@@ -400,6 +517,7 @@ function RoguelitePanel({
       onRunUpdated(await action())
       setUsing(null)
       setCapsuleMon(null)
+      setReviving(null)
     } catch (e) {
       setItemError(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']*': (?:Error: )?/, '') : String(e))
     } finally {
@@ -422,81 +540,129 @@ function RoguelitePanel({
   }
 
   if (!run || run.status !== 'active') {
+    const info = runDifficultyInfo(difficulty)
     return (
-      <div className="run-panel">
+      <div className="run-panel run-setup">
+        {/* The last run in one line: how it ended, then its rewards as icons (names on hover). */}
         {run && (
           <div className={`run-result ${run.status === 'won' ? 'run-result-won' : 'run-result-lost'}`}>
-            <p>
-              {run.status === 'won'
-                ? `Run complete! ${run.starterSpecies}'s run beat all ${ROGUELITE_BOSS_COUNT} bosses on ${runDifficultyInfo(run.difficulty).label}.`
-                : `Run over - ${run.starterSpecies}'s run fell on floor ${run.floor} (${run.bossesBeaten} boss${run.bossesBeaten === 1 ? '' : 'es'} beaten, ${runDifficultyInfo(run.difficulty).label}).`}
-            </p>
+            <span className="run-result-title">{run.status === 'won' ? '🏆 Won' : 'Run over'}</span>
+            <span className="run-result-summary">
+              {run.starterSpecies} · {runDifficultyInfo(run.difficulty).label} ·{' '}
+              {run.status === 'won' ? `all ${runBossCount(run.difficulty)} bosses` : `floor ${run.floor}, ${run.bossesBeaten}/${runBossCount(run.difficulty)} bosses`}
+            </span>
             {run.rewards.length > 0 ? (
-              <div className="run-reward-list">
-                <span>Rewards sent to your bag:</span>
-                {run.rewards.map((line) => (
-                  <span key={line.label} className="run-reward-line">
-                    {line.spritenum !== null && <ItemSprite spritenum={line.spritenum} />}
-                    {/* One string, so the count can't drift next to the following reward's icon. */}
-                    {line.itemId ? `${line.quantity}× ${line.label}` : line.label}
+              <span className="run-reward-list" title="Sent to your bag">
+                {run.rewards.map((line, i) => (
+                  <span
+                    key={line.label}
+                    className="run-reward-line"
+                    style={{ '--i': i } as React.CSSProperties}
+                    title={line.itemId ? `${line.quantity}× ${line.label}` : line.label}
+                  >
+                    {line.spritenum !== null ? (
+                      <>
+                        <ItemSprite spritenum={line.spritenum} />
+                        {line.itemId && line.quantity > 1 ? `×${line.quantity}` : ''}
+                      </>
+                    ) : (
+                      line.label
+                    )}
                   </span>
                 ))}
-              </div>
+              </span>
             ) : (
-              <p className="box-empty-hint">No bosses beaten - no rewards this time.</p>
+              <span className="run-result-none">No rewards</span>
             )}
           </div>
         )}
-        <p className="box-empty-hint">
-          Drag a Pokémon from your team or box onto the slot. The run uses a Lv {ROGUELITE_START_LEVEL} copy of it
-          (no held item, with a fresh moveset) - the original stays exactly as it is.
-          {bestFloor ? ` Best floor so far: ${bestFloor}.` : ''}
-        </p>
-        <div className="run-starter-row">
-          <StarterSlot picked={picked} />
-          <div className="run-settings">
-            <div className="run-difficulty-row">
-              {RUN_DIFFICULTIES.map((d) => (
-                <button
-                  key={d.id}
-                  className={`run-difficulty-button run-difficulty-${d.id}${difficulty === d.id ? ' run-difficulty-selected' : ''}`}
-                  onClick={() => setDifficulty(d.id)}
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
-            <p className="run-difficulty-text">
-              <strong>{runDifficultyInfo(difficulty).rules}</strong>
-              <br />
-              Rewards at the end of the run, for each boss beaten:
-            </p>
-            <RunRewardChips reward={runDifficultyInfo(difficulty).reward} />
-            <label className="run-generation-row">
-              <span>Bosses from</span>
-              <select
-                value={generation ?? ''}
-                onChange={(e) => setGeneration(e.target.value ? Number(e.target.value) : null)}
+        <div className={`run-setup-card run-hud-${difficulty}`}>
+          <div className="run-starter-row">
+            {/* The starter on its pedestal, its name, and the start button under it. */}
+            <div className="run-starter-column">
+              <span className="run-hud-label">Starter</span>
+              <div
+                className={`run-starter-pedestal${picked ? ' run-starter-pedestal-filled' : ''}`}
+                title={`The run uses a Lv ${ROGUELITE_START_LEVEL} copy (no held item, fresh moveset) - the original stays as it is.`}
               >
-                <option value="">Any generation</option>
-                {POKEMON_GENERATIONS.map((g) => {
-                  const complete = completeGenerations.includes(g)
-                  return (
-                    <option key={g} value={g} disabled={!complete}>
-                      Generation {g}
-                      {complete ? '' : ' (Coming soon)'}
-                    </option>
-                  )
-                })}
-              </select>
-            </label>
+                <StarterSlot picked={picked} />
+              </div>
+              <span className="run-starter-name">{picked ? `${picked.species} · Lv ${ROGUELITE_START_LEVEL}` : 'Drag a Pokémon here'}</span>
+              <button
+                className={`run-start-button${picked ? ' run-start-ready' : ''}`}
+                disabled={busy || !picked}
+                title="Enter starts the run, ← → change the difficulty"
+                onClick={() => onStart(difficulty, generation)}
+              >
+                {picked ? `Start ${info.label}` : 'Pick a starter'}
+              </button>
+            </div>
+            <div className="run-settings">
+              <div className="run-setup-header">
+                <span className="run-hud-label">Difficulty</span>
+                {bestFloor ? (
+                  <span className={`run-setup-best${bestFloor.difficulty ? ` run-difficulty-${bestFloor.difficulty}` : ''}`}>
+                    Best floor: {bestFloor.floor}
+                    {bestFloor.difficulty ? ` · ${runDifficultyInfo(bestFloor.difficulty).label}` : ''}
+                  </span>
+                ) : null}
+              </div>
+              <div className="run-difficulty-row">
+                {RUN_DIFFICULTIES.map((d, i) => (
+                  <button
+                    key={d.id}
+                    className={`run-difficulty-button run-difficulty-${d.id}${difficulty === d.id ? ' run-difficulty-selected' : ''}`}
+                    style={{ '--i': i } as React.CSSProperties}
+                    title={`${d.gymLeaders} Gym Leaders and ${d.eliteFour} Elite Four before the Champion`}
+                    onClick={() => setDifficulty(d.id)}
+                  >
+                    <span className="run-difficulty-name">{d.label}</span>
+                    {/* One pip per step up in difficulty. */}
+                    <span className="run-difficulty-pips">
+                      {RUN_DIFFICULTIES.map((_, p) => (
+                        <span key={p} className={p <= i ? 'run-pip-on' : ''} />
+                      ))}
+                    </span>
+                    <span className="run-difficulty-sub">{runFinalFloor(d.id)} floors</span>
+                  </button>
+                ))}
+              </div>
+              {/* Always the same height (scrolling if a difficulty says more), so switching
+                  never moves the box below. Keyed on the difficulty to fade in again. */}
+              <div className="run-difficulty-details" key={difficulty}>
+                <p className="run-difficulty-text">{info.rules}</p>
+                <span className="run-hud-label">Rewards for each boss beaten</span>
+                <RunRewardChips reward={info.reward} />
+              </div>
+              {/* Where the bosses come from: any generation, or one with a full set of bosses. */}
+              <div className="run-generation-row">
+                <span className="run-hud-label">Bosses from</span>
+                <div className="run-generation-chips">
+                  <button
+                    className={`run-generation-chip run-generation-any${generation === null ? ' run-generation-chosen' : ''}`}
+                    onClick={() => setGeneration(null)}
+                  >
+                    Any
+                  </button>
+                  {POKEMON_GENERATIONS.map((g) => {
+                    const complete = completeGenerations.includes(g)
+                    return (
+                      <button
+                        key={g}
+                        className={`run-generation-chip${generation === g ? ' run-generation-chosen' : ''}`}
+                        disabled={!complete}
+                        title={complete ? `Generation ${g} bosses only` : `Generation ${g} - coming soon`}
+                        onClick={() => setGeneration(g)}
+                      >
+                        {g}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-        {picked && (
-          <button className="run-start-button" disabled={busy} onClick={() => onStart(difficulty, generation)}>
-            Start Run
-          </button>
-        )}
       </div>
     )
   }
@@ -508,6 +674,11 @@ function RoguelitePanel({
   // What clicking a team member does right now, if anything.
   const pickTarget = (mon: RunMonView): (() => void) | null => {
     if (busy || swapBusy || itemBusy) return null
+    if (candyMode && run.consumables.bossShop) {
+      return mon.level < 100 && run.consumables.gems >= RUN_RARE_CANDY_PRICE
+        ? () => void runItemAction(() => window.api.buyRunRareCandy(mon.id))
+        : null
+    }
     if (using === 'fullrestore') {
       return mon.hpPercent < 100 || mon.status ? () => void runItemAction(() => window.api.useRunFullRestore(mon.id)) : null
     }
@@ -532,7 +703,9 @@ function RoguelitePanel({
       if (mon.moveList.some((m) => m.id === chosenPick)) return null
       return () => setLearner(mon)
     }
-    if (movingFrom && mon.id !== movingFrom.id) {
+    // Moving an item: clicking the Pokemon it comes from again calls it off.
+    if (movingFrom && mon.id === movingFrom.id) return () => setMovingFrom(null)
+    if (movingFrom) {
       return () => {
         onMoveItem(movingFrom.id, mon.id)
         setMovingFrom(null)
@@ -549,37 +722,73 @@ function RoguelitePanel({
       <button
         key={index}
         className={`big-battle-button run-node-button run-node-${choice.kind}${location?.id === 'lab' ? ' run-node-lab' : ''}${location ? ' run-node-located' : ''}`}
-        style={location ? { backgroundImage: `url(${backdropUrl(LOCATION_BUTTON_BACKDROP[location.id])})` } : undefined}
+        style={
+          {
+            '--i': index,
+            ...(location ? { backgroundImage: `url(${backdropUrl(LOCATION_BUTTON_BACKDROP[location.id])})` } : {})
+          } as React.CSSProperties
+        }
         disabled={busy}
         title={NODE_INFO[choice.kind].hint}
         onClick={() => onChoose(index)}
       >
+        {/* The number key that picks it. */}
+        <span className="run-node-key">{index + 1}</span>
         <NodeIcon choice={choice} />
-        <span>{location ? location.label : choice.kind === 'boss' ? run.nextBossLabel : NODE_INFO[choice.kind].label}</span>
-        {location && <span className="run-node-sub">Wild Pokémon</span>}
+        <span className="run-node-label">
+          {location ? location.label : choice.kind === 'boss' ? run.nextBossLabel : NODE_INFO[choice.kind].label}
+        </span>
+        <span className="run-node-sub">{location ? 'Wild Pokémon' : NODE_INFO[choice.kind].short}</span>
       </button>
     )
   }
   return (
     <div className="run-panel">
-      <div className="run-status-row">
-        <span>
-          Floor <strong>{run.floor}</strong>/{ROGUELITE_FINAL_FLOOR}
-        </span>
-        <span>
-          Bosses <strong>{run.bossesBeaten}</strong>/{ROGUELITE_BOSS_COUNT}
-        </span>
-        <span>Next: {run.nextBossLabel}</span>
+      {/* The run's HUD: where it is, what's next and what it has to spend. */}
+      <div className={`run-hud run-hud-${run.difficulty}`}>
+        <div className="run-hud-floor">
+          <span className="run-hud-label">Floor</span>
+          <span className="run-hud-big" key={run.floor}>
+            {run.floor}
+            <small>/{runFinalFloor(run.difficulty)}</small>
+          </span>
+        </div>
+        <div className="run-hud-stats">
+          <span className="run-hud-stat">
+            <span className="run-hud-label">Bosses</span>
+            <strong>
+              {run.bossesBeaten}/{runBossCount(run.difficulty)}
+            </strong>
+          </span>
+          <span className="run-hud-stat">
+            <span className="run-hud-label">Next boss</span>
+            <strong>{run.nextBossLabel}</strong>
+          </span>
+          <span className="run-hud-stat">
+            <span className="run-hud-label">Opponents</span>
+            <strong>Lv {run.opponentLevel}</strong>
+          </span>
+          <span className="run-hud-stat">
+            <span className="run-hud-label">Level cap</span>
+            <strong>Lv {run.levelCap}</strong>
+          </span>
+        </div>
         <span className={`run-difficulty-tag run-difficulty-${run.difficulty}`}>
           {runDifficultyInfo(run.difficulty).label}
           {run.generation ? ` · Gen ${run.generation}` : ''}
         </span>
-        <span className="run-gems" title="Gems: 1 per trainer, 2 per boss - spend them in the shop on boss floors">
+        <span
+          className="run-gems run-hud-gems"
+          title={`Gems: 1 per trainer, 2 per boss${run.difficulty === 'easy' ? ' (+1 each on Easy)' : ''} - spend them in the shop on boss floors`}
+        >
           <GemIcon />
-          <strong>{run.consumables.gems}</strong>
+          <strong key={run.consumables.gems}>{run.consumables.gems}</strong>
+          {gemPop && (
+            <span key={gemPop.key} className="run-gem-pop">
+              +{gemPop.amount}
+            </span>
+          )}
         </span>
-        <span>Opponents Lv {run.opponentLevel}</span>
-        <span>Level Cap: {run.levelCap}</span>
         <button
           className={`run-forfeit-button${confirmingForfeit ? ' confirm-button' : ''}`}
           disabled={busy}
@@ -595,7 +804,7 @@ function RoguelitePanel({
           {confirmingForfeit ? 'Give up the run? Click again' : 'Forfeit'}
         </button>
       </div>
-      <RunProgressBar floor={run.floor} />
+      <RunProgressBar floor={run.floor} difficulty={run.difficulty} />
 
       {run.swapOffer ? (
         <div className="run-item-offer">
@@ -841,22 +1050,50 @@ function RoguelitePanel({
                 </Tooltip>
               )
             })}
+            <Tooltip
+              placement="below"
+              content={
+                <div className="tooltip-panel">
+                  <div className="tooltip-title">Rare Candy</div>
+                  <div className="tooltip-desc">
+                    Used right away: pick a Pokémon to raise by one level - it can go past the level cap.
+                  </div>
+                </div>
+              }
+            >
+              <button
+                className={`run-item-button run-shop-button${candyMode ? ' run-shop-button-chosen' : ''}`}
+                disabled={busy || itemBusy || (!candyMode && run.consumables.gems < RUN_RARE_CANDY_PRICE)}
+                onClick={() => {
+                  setItemError(null)
+                  setUsing(null)
+                  setCandyMode((on) => !on)
+                }}
+              >
+                <img className="run-consumable-icon" src={RUN_RARE_CANDY_ICON} alt="" />
+                <span>Rare Candy</span>
+                {gemPrice(RUN_RARE_CANDY_PRICE)}
+              </button>
+            </Tooltip>
           </div>
-          <div className="run-choice-grid">{run.choices.map(choiceTile)}</div>
+          <div className="run-choice-grid" key={run.floor}>
+            {run.choices.map(choiceTile)}
+          </div>
           <div className="run-choice-grid run-boss-shop-tiles">
-            {SHOP_TILES.map((tile) => {
+            {SHOP_TILES.map((tile, i) => {
               const used = shop.usedTiles.includes(tile)
               const price = RUN_SHOP_TILE_PRICES[tile]
               return (
                 <button
                   key={tile}
-                  className={`big-battle-button run-node-button run-node-${tile}`}
+                  className={`big-battle-button run-node-button run-node-${tile}${used ? ' run-node-bought' : ''}`}
+                  style={{ '--i': i + run.choices.length } as React.CSSProperties}
                   disabled={busy || itemBusy || used || run.consumables.gems < price}
                   title={used ? 'Already bought on this floor' : NODE_INFO[tile].hint}
                   onClick={() => void runItemAction(() => window.api.buyRunShopTile(tile))}
                 >
                   <NodeIcon choice={{ kind: tile }} />
-                  <span>{SHOP_TILE_LABELS[tile]}</span>
+                  <span className="run-node-label">{SHOP_TILE_LABELS[tile]}</span>
                   {used ? <span className="run-node-sub">Bought</span> : gemPrice(price)}
                 </button>
               )
@@ -864,11 +1101,21 @@ function RoguelitePanel({
           </div>
         </div>
       ) : (
-        <div className="run-choice-grid">{run.choices.map(choiceTile)}</div>
+        <div className="run-floor-pick">
+          <p className="run-floor-title">
+            {run.choices.length === 1 && run.choices[0].kind === 'boss' ? 'A boss blocks the way' : 'Choose your path'}
+          </p>
+          {/* Keyed on the floor, so the tiles deal themselves in again each new floor. */}
+          <div className="run-choice-grid" key={run.floor}>
+            {run.choices.map(choiceTile)}
+          </div>
+        </div>
       )}
 
-      <h2 className="options-heading run-team-heading">Run Team</h2>
-      <div className="team-row">
+      <h2 className="options-heading run-team-heading">
+        Run Team <span className="run-team-count">{run.team.length}/{ROGUELITE_MAX_TEAM}</span>
+      </h2>
+      <div className="team-row run-team-row">
         {run.team.map((mon, index) => {
           const target = pickTarget(mon)
           return (
@@ -877,6 +1124,7 @@ function RoguelitePanel({
               mon={mon}
               index={index}
               selectable={!!target}
+              moving={movingFrom?.id === mon.id}
               onContextMenu={(e) => {
                 e.preventDefault()
                 if (!busy) setMenu({ mon, x: e.clientX, y: e.clientY })
@@ -890,6 +1138,7 @@ function RoguelitePanel({
         })}
       </div>
       <div className="run-consumables">
+        <span className="run-hud-label run-consumables-label">Bag</span>
         {RUN_CONSUMABLES.map((c) => {
           const count = run.consumables.counts[c.id]
           const locked = run.consumables.locked.includes(c.id)
@@ -912,6 +1161,8 @@ function RoguelitePanel({
                 onClick={() => {
                   setItemError(null)
                   setCapsuleMon(null)
+                  setReviving(null)
+                  setCandyMode(false)
                   setUsing(using === c.id ? null : c.id)
                 }}
               >
@@ -924,33 +1175,94 @@ function RoguelitePanel({
       </div>
       {itemError && <p className="editor-error">{itemError}</p>}
 
-      {using === 'revive' && (
-        <div className="run-item-offer">
-          <p className="box-empty-hint">
-            {run.consumables.fainted.length === 0
-              ? 'Nobody has fainted this run.'
-              : run.team.length >= ROGUELITE_MAX_TEAM
-                ? 'Your team is full - a revived Pokémon needs a free spot.'
-                : `Pick who to revive - they come back at half HP, at Lv ${run.consumables.reviveLevel}.`}
-          </p>
-          <div className="run-item-row">
-            {run.consumables.fainted.map((mon) => (
-              <button
-                key={mon.id}
-                className="run-item-button"
-                disabled={busy || itemBusy || run.team.length >= ROGUELITE_MAX_TEAM}
-                onClick={() => void runItemAction(() => window.api.useRunRevive(mon.id))}
-              >
-                {mon.species}
-                <span className="run-shop-price">Lv {mon.level}</span>
-              </button>
-            ))}
-            <button className="run-item-button run-item-skip" onClick={() => setUsing(null)}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
+      {using === 'revive' &&
+        createPortal(
+          // A Revive: pick who comes back, then - with a full team - who leaves to make room.
+          <div
+            className="modal-overlay run-revive-overlay"
+            onMouseDown={() => {
+              setUsing(null)
+              setReviving(null)
+            }}
+          >
+            <div className="modal-panel run-revive-modal" onMouseDown={(e) => e.stopPropagation()}>
+              <div className="run-revive-header">
+                <img className="run-revive-icon" src={RUN_CONSUMABLES.find((c) => c.id === 'revive')?.icon} alt="" />
+                <div>
+                  <h2>{reviving ? `Make room for ${reviving.species}` : 'Revive'}</h2>
+                  <p className="run-revive-sub">
+                    {run.consumables.fainted.length === 0
+                      ? 'Nobody has fainted this run.'
+                      : reviving
+                        ? 'Your team is full - pick who leaves. They join the fainted, and can be revived later.'
+                        : `Comes back at half HP, at Lv ${run.consumables.reviveLevel}.${
+                            run.team.length >= ROGUELITE_MAX_TEAM ? ' Your team is full, so someone will leave to make room.' : ''
+                          }`}
+                  </p>
+                </div>
+              </div>
+              {/* Keyed on the step, so the cards deal in again when it changes. */}
+              <div className="run-revive-grid" key={reviving ? 'leave' : 'pick'}>
+                {(reviving ? run.team : run.consumables.fainted).map((mon, i) => (
+                  <button
+                    key={mon.id}
+                    className={`run-revive-card rarity-card rarity-tier-${mon.rarityTier ?? 'common'}${reviving ? ' run-revive-card-leave' : ''}`}
+                    style={{ '--i': i } as React.CSSProperties}
+                    disabled={busy || itemBusy}
+                    onClick={() => {
+                      if (reviving) void runItemAction(() => window.api.useRunRevive(reviving.id, mon.id))
+                      else if (run.team.length >= ROGUELITE_MAX_TEAM) setReviving(mon)
+                      else void runItemAction(() => window.api.useRunRevive(mon.id))
+                    }}
+                  >
+                    {/* The sprite with its held item tucked in the corner, then name and ability. */}
+                    <div className="run-revive-sprite rarity-glow" title={mon.item || undefined}>
+                      <SpriteImage
+                        style="3d-static"
+                        className="run-revive-img"
+                        spriteId={toSpriteId(mon.species)}
+                        shiny={mon.shiny}
+                        gmax={mon.gmaxLook}
+                        alt={mon.species}
+                        draggable={false}
+                      />
+                      {mon.itemSpritenum != null && <ItemSprite spritenum={mon.itemSpritenum} className="run-revive-item" />}
+                    </div>
+                    <FitName className="run-revive-name" text={mon.species} />
+                    <span className="run-revive-ability">{mon.ability}</span>
+                    <span className="run-revive-level">
+                      {reviving ? (
+                        `Lv ${mon.level}`
+                      ) : (
+                        <>
+                          Lv {mon.level} → <strong>{run.consumables.reviveLevel}</strong>
+                        </>
+                      )}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {itemError && <p className="editor-error">{itemError}</p>}
+              <div className="editor-actions run-revive-actions">
+                {reviving && (
+                  <button className="run-item-button run-item-skip" onClick={() => setReviving(null)}>
+                    Back
+                  </button>
+                )}
+                <button
+                  className="run-item-button run-item-skip"
+                  onClick={() => {
+                    setUsing(null)
+                    setReviving(null)
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
 
       {using === 'abilitycapsule' && capsuleMon && (
         <div className="run-item-offer">
@@ -990,24 +1302,6 @@ function RoguelitePanel({
         </div>
       )}
 
-      {using === 'fullrestore' || (using === 'abilitycapsule' && !capsuleMon) ? (
-        <p className="box-empty-hint">
-          {using === 'fullrestore'
-            ? 'Click the Pokémon to fully heal.'
-            : 'Click the Pokémon to use the Ability Capsule on.'}{' '}
-          <button className="run-forfeit-button" onClick={() => setUsing(null)}>
-            Cancel
-          </button>
-        </p>
-      ) : movingFrom ? (
-        <p className="box-empty-hint">
-          Click the Pokémon to give {movingFrom.species}&apos;s {movingFrom.item} to - if it holds something, they swap.{' '}
-          <button className="run-forfeit-button" onClick={() => setMovingFrom(null)}>
-            Cancel
-          </button>
-        </p>
-      ) : null}
-
       {editingMonId && (
         <RunMonEditor
           runMonId={editingMonId}
@@ -1025,6 +1319,7 @@ function RoguelitePanel({
           evolutions={menu.mon.eligibleEvolutions ?? []}
           registeredEvolutions={menu.mon.registeredEvolutions}
           heldItem={menu.mon.item || null}
+          heldItemSpritenum={menu.mon.itemSpritenum ?? null}
           onMoveItem={() => {
             setMenu(null)
             setMovingFrom(menu.mon)

@@ -1,4 +1,5 @@
 import type { ChoiceRequest } from 'pokemon-showdown/dist/sim/side.js'
+import type { DraftBattleResult } from './draft'
 
 // Not a real Dex item - stands in for "a trade partner" for evolutions that
 // need a trade but no specific item (this project has no trading). See
@@ -348,9 +349,13 @@ export interface VolatileBadge {
 }
 
 export interface ActivePokemonView extends PokemonSummary {
+  // Its rarity colour (see speciesRarityTier), for its card on the team panel.
+  rarityTier?: RarityTier
   // Dynamaxed right now (a Max Raid's boss), and in its Gigantamax form.
   dynamaxed?: boolean
   gigantamax?: boolean
+  // The player's cosmetic Gigantamax look: just its Gigantamax sprite, not Dynamaxed.
+  gmaxLook?: boolean
   // Where it is in its side's roster (the order the team was built in) - tells two of
   // the same species apart.
   rosterIndex?: number
@@ -409,6 +414,8 @@ export interface BoxPokemonView extends PokemonSummary {
   id: string
   // At the top of the friendship scale - the only Pokemon that can be a companion.
   maxFriendship?: boolean
+  // In the companion slot - it can take merges, but can't be merged into anything.
+  companion?: boolean
   // Only present for the player's own persisted box/team Pokemon - premade
   // trainer team mons (also built from this type) have no exp progression
   // or evolution mechanic of their own.
@@ -423,6 +430,8 @@ export interface BoxPokemonView extends PokemonSummary {
   canLevelUpWithCandy?: boolean
   // Not shiny yet, and there's a Shiny Patch in the bag to make it so.
   canUseShinyPatch?: boolean
+  // How many Shiny Patches the bag holds, shown beside that menu option.
+  shinyPatches?: number
   // Every Pokemon it can evolve into, ready or not, with what it takes and whether it's
   // already in the Pokedex (the edit window lists them all).
   evolutionPaths?: { species: string; method: string; ready: boolean; registered: boolean }[]
@@ -446,6 +455,8 @@ export interface BoxPokemonView extends PokemonSummary {
   favorite?: boolean
   // Caught Gigantamax (from a Max Raid): it takes its Gigantamax form when it Dynamaxes.
   gigantamax?: boolean
+  // Shown with its Gigantamax sprite (the editor's cosmetic toggle).
+  gmaxLook?: boolean
   // How many copies have been merged into it (1 = none), and the stars that makes.
   copies?: number
   mergeStars?: number
@@ -476,16 +487,21 @@ export interface BoxState {
   companionSizeChoice?: CompanionSizeChoice
 }
 
-// How big the companion is drawn, on the menu and in battle.
-export type CompanionSize = 'S' | 'M' | 'L'
-export const COMPANION_SIZES: CompanionSize[] = ['S', 'M', 'L']
+// How big the companion is drawn, on the menu and in battle. XL looks like L on the menu,
+// but in battle it's twice that - spilling past the trainer box, which cuts it off.
+export type CompanionSize = 'S' | 'M' | 'L' | 'XL'
+export const COMPANION_SIZES: CompanionSize[] = ['S', 'M', 'L', 'XL']
 export type CompanionSizeChoice = CompanionSize | 'auto'
 
 // Auto size by the species' real height: about a third of all Pokemon in each.
 export const COMPANION_AUTO_M_HEIGHT = 0.7
 export const COMPANION_AUTO_L_HEIGHT = 1.5
+// Only the very biggest - Wailord, Steelix and most of the box legendaries - are XL, and so
+// is any Gigantamax Pokemon showing its Gigantamax look.
+export const COMPANION_AUTO_XL_HEIGHT = 3.5
 
-export function autoCompanionSize(heightm: number): CompanionSize {
+export function autoCompanionSize(heightm: number, gmaxLook = false): CompanionSize {
+  if (gmaxLook || heightm >= COMPANION_AUTO_XL_HEIGHT) return 'XL'
   return heightm > COMPANION_AUTO_L_HEIGHT ? 'L' : heightm >= COMPANION_AUTO_M_HEIGHT ? 'M' : 'S'
 }
 
@@ -570,6 +586,30 @@ export interface BattleRewardsView {
   randomDropChance: number
 }
 
+// Items that do nothing in this game, only worth selling: Bottle Caps (there's no Hyper
+// Training), Rare Bone and Pretty Feather. The bag's Quick sell always picks them up.
+export const SELL_ONLY_ITEM_IDS = new Set(['bottlecap', 'goldbottlecap', 'rarebone', 'prettyfeather'])
+
+// The berries worth holding, which the bag's Quick sell leaves alone (they can still be
+// sold by hand): Sitrus and Lum, and the competitive pinch berries.
+export const QUICK_SELL_KEPT_BERRY_IDS = new Set([
+  'sitrusberry',
+  'lumberry',
+  'liechiberry',
+  'ganlonberry',
+  'salacberry',
+  'petayaberry',
+  'apicotberry',
+  'lansatberry',
+  'starfberry',
+  'micleberry',
+  'custapberry',
+  'keeberry',
+  'marangaberry',
+  'jabocaberry',
+  'rowapberry'
+])
+
 // A trainer can hand out up to this many different items after a win; each is
 // rolled on its own chance.
 export const MAX_TRAINER_DROPS = 3
@@ -590,18 +630,31 @@ export const ROGUELITE_BOSS_CLASSES: { id: RogueliteBossClass; label: string }[]
 ]
 
 /** The class of a run's n-th boss (0 = the first): Gym Leaders, the Elite Four, then the Champion. */
-export function rogueliteBossClassAt(bossIndex: number): RogueliteBossClass {
-  if (bossIndex < ROGUELITE_GYM_LEADERS) return 'gymLeader'
-  if (bossIndex < ROGUELITE_GYM_LEADERS + ROGUELITE_ELITE_FOUR) return 'eliteFour'
+export function rogueliteBossClassAt(bossIndex: number, difficulty?: RunDifficulty): RogueliteBossClass {
+  const { gymLeaders, eliteFour } = runDifficultyInfo(difficulty)
+  if (bossIndex < gymLeaders) return 'gymLeader'
+  if (bossIndex < gymLeaders + eliteFour) return 'eliteFour'
   return 'champion'
 }
 
 /** "Gym Leader 3/8", "Elite Four 2/4", "Champion" - the n-th boss (0 = the first). */
-export function rogueliteBossLabelAt(bossIndex: number): string {
-  const bossClass = rogueliteBossClassAt(bossIndex)
-  if (bossClass === 'gymLeader') return `Gym Leader ${bossIndex + 1}/${ROGUELITE_GYM_LEADERS}`
-  if (bossClass === 'eliteFour') return `Elite Four ${bossIndex - ROGUELITE_GYM_LEADERS + 1}/${ROGUELITE_ELITE_FOUR}`
+export function rogueliteBossLabelAt(bossIndex: number, difficulty?: RunDifficulty): string {
+  const { gymLeaders, eliteFour } = runDifficultyInfo(difficulty)
+  const bossClass = rogueliteBossClassAt(bossIndex, difficulty)
+  if (bossClass === 'gymLeader') return `Gym Leader ${bossIndex + 1}/${gymLeaders}`
+  if (bossClass === 'eliteFour') return `Elite Four ${bossIndex - gymLeaders + 1}/${eliteFour}`
   return 'Champion'
+}
+
+/** How many bosses a run on this difficulty has, the Champion last. */
+export function runBossCount(difficulty?: RunDifficulty): number {
+  const { gymLeaders, eliteFour } = runDifficultyInfo(difficulty)
+  return gymLeaders + eliteFour + 1
+}
+
+/** A run's last floor on this difficulty - the Champion's. */
+export function runFinalFloor(difficulty?: RunDifficulty): number {
+  return ROGUELITE_BOSS_EVERY * runBossCount(difficulty)
 }
 
 export interface Trainer {
@@ -716,6 +769,16 @@ export interface BattleEligibility {
 }
 
 // ---- Max Raids ----
+// One Pokemon a Max Raid can bring, for the Max Raid page's carousel: in its Gigantamax
+// form when it raids as one, and only named if it's registered in the player's Pokedex.
+export interface RaidBossPreview {
+  species: string
+  num: number
+  gigantamax: boolean
+  registered: boolean
+  rarityTier: RarityTier
+}
+
 // A Raid Crystal starts one: a doubles battle, the player's two against one boss that's
 // Dynamaxed (Gigantamax when it can) for the whole fight, at the level cap and with 3
 // merge stars. Winning catches it, stars and all.
@@ -770,6 +833,10 @@ export interface EditablePokemonSet {
   // always this many levels under it - and `level` is just what that works out to
   // right now. Null (or absent) means `level` is fixed.
   capOffset?: number | null
+  // Cosmetic only: shown with its Gigantamax sprite everywhere (same size, no glow) -
+  // only offered when its species has a Gigantamax form (canGmax, read-only).
+  gmaxLook?: boolean
+  canGmax?: boolean
 }
 
 // Options → Check for updates (see src/main/updater.ts).
@@ -841,9 +908,12 @@ export interface ShopItemEntry extends ItemOptionEntry {
   // Each one's price when buying in bulk (the Tycoon title - see shopTotal), if lower.
   bulkPrice?: number
   category: string
-  // A key item: shown in the shop but never sold there - whether the player has it, and
-  // the achievement that unlocks it.
-  keyItem?: { owned: boolean; unlockedBy: string }
+}
+
+/** A key item, for the Key Items tab: never sold - whether the player has it, and the achievement that unlocks it. */
+export interface KeyItemView extends ItemOptionEntry {
+  owned: boolean
+  unlockedBy: string
 }
 
 /** What buying this many of a Shop item costs - at its bulk price from TYCOON_BULK_MIN on. */
@@ -987,6 +1057,8 @@ export interface BagItemView {
   restoresTo: string | null
   // An Exp. Candy: how much exp using it gives each Pokemon on the team.
   teamExp: number | null
+  // Its card's colour (see bagItemRarity).
+  rarityTier: RarityTier
 }
 
 // ---- Trainer profile
@@ -1003,6 +1075,9 @@ export interface PlayerStats {
   raidsWon: number
   // Roguelite: the furthest floor any run has reached (0 before the first run).
   bestFloor: number
+  // The difficulty that floor was reached on (null before the first run, or for a best
+  // set before difficulties were recorded).
+  bestFloorDifficulty: RunDifficulty | null
 }
 
 // One notch on the profile's league progress bar.
@@ -1022,6 +1097,16 @@ export interface PokedexEntry {
   registered: boolean
   // An alternate form (Alolan, Hisuian, Rotom-Wash...) listed after its species.
   form: boolean
+  // Where to look for it (see pokedexLocationHints).
+  hints: PokedexHint[]
+  // Its rarity colour (see speciesRarityTier), for its cell.
+  rarityTier: RarityTier
+}
+
+// One place a Pokemon can be found: a wild location, the Lab, Max Raids...
+export interface PokedexHint {
+  icon: string
+  label: string
 }
 
 export interface TrainerProfile {
@@ -1271,6 +1356,8 @@ export interface BattleView {
   runFainted: string[]
   // Won a run's trainer or boss battle: an item reward waits on the run menu.
   runItemReward: boolean
+  // A Draft mode battle, once it has ended: the draft's record after it.
+  draftResult?: DraftBattleResult | null
   // Against a boss (Classic or Roguelite) - it's fought in the gym.
   bossBattle?: boolean
   // A Max Raid (see RaidView) - null for any other battle.
@@ -1283,7 +1370,11 @@ export interface BattleView {
 // ---- Roguelite mode ----
 
 // A run's floors: every ROGUELITE_BOSS_EVERY-th one is a boss - 8 Gym Leaders, then
-// the Elite Four, then the Champion on the final floor, whose defeat wins the run.
+// the Elite Four, then the Champion on the final floor, whose defeat wins the run. Those
+// are the full run's (Hard and Extreme); Easy and Normal have fewer (see runBossCount),
+// ending sooner on the same climb - each boss as strong as it is at that place in a full
+// run, so their Champion is met below the top level cap. The level curve is always the
+// full run's (ROGUELITE_BOSS_COUNT).
 export const ROGUELITE_BOSS_EVERY = 5
 export const ROGUELITE_GYM_LEADERS = 8
 export const ROGUELITE_ELITE_FOUR = 4
@@ -1312,6 +1403,9 @@ export interface RunMonEditInfo {
   // Its Tera Type, and every one it could be.
   teraType: string
   teraTypes: string[]
+  // What its ability and held item do, for their tooltips ('' when unknown or none).
+  abilityDescription: string
+  itemDescription: string
 }
 
 // What the run's moves editor saves: moves (ids, up to 4), the ones locked, and its Tera Type.
@@ -1365,25 +1459,30 @@ export interface RunDifficultyInfo {
   fullBossTeams: boolean
   // No Pokémon Center floors and no heal after beating a boss.
   noHealing: boolean
+  // How many Gym Leaders and Elite Four members come before the Champion.
+  gymLeaders: number
+  eliteFour: number
 }
 
 export const RUN_DIFFICULTIES: RunDifficultyInfo[] = [
   {
     id: 'easy',
     label: 'Easy',
-    rules: 'Trainers and bosses use the Normal AI, and you start with a Full Restore.',
+    rules: 'A short run: 4 Gym Leaders and 2 Elite Four before the Champion. Trainers and bosses use the Normal AI, you start with a Full Restore, and trainer and boss wins pay 1 extra gem.',
     rewardText: 'Per boss: Exp. Candy S and ₽1,000. Beating the Champion: a Random Pokémon.',
     reward: { money: 1000, expCandy: 'expcandys', randomPokemon: ['champion'] },
     aiOverride: 'normal',
     wildAi: 'easy',
     extraOpponentMons: 0,
     fullBossTeams: false,
-    noHealing: false
+    noHealing: false,
+    gymLeaders: 4,
+    eliteFour: 2
   },
   {
     id: 'normal',
     label: 'Normal',
-    rules: 'No changes.',
+    rules: 'A shorter run: 6 Gym Leaders and 3 Elite Four before the Champion.',
     rewardText: 'Per boss: Exp. Candy M and ₽5,000. Each Elite Four member and the Champion: a Random Pokémon and a Raid Crystal.',
     reward: {
       money: 5000,
@@ -1395,7 +1494,9 @@ export const RUN_DIFFICULTIES: RunDifficultyInfo[] = [
     wildAi: 'easy',
     extraOpponentMons: 0,
     fullBossTeams: false,
-    noHealing: false
+    noHealing: false,
+    gymLeaders: 6,
+    eliteFour: 3
   },
   {
     id: 'hard',
@@ -1413,7 +1514,9 @@ export const RUN_DIFFICULTIES: RunDifficultyInfo[] = [
     wildAi: 'normal',
     extraOpponentMons: 1,
     fullBossTeams: false,
-    noHealing: false
+    noHealing: false,
+    gymLeaders: ROGUELITE_GYM_LEADERS,
+    eliteFour: ROGUELITE_ELITE_FOUR
   },
   {
     id: 'extreme',
@@ -1425,7 +1528,9 @@ export const RUN_DIFFICULTIES: RunDifficultyInfo[] = [
     wildAi: 'hard',
     extraOpponentMons: 1,
     fullBossTeams: true,
-    noHealing: true
+    noHealing: true,
+    gymLeaders: ROGUELITE_GYM_LEADERS,
+    eliteFour: ROGUELITE_ELITE_FOUR
   }
 ]
 
@@ -1461,6 +1566,8 @@ export interface RunMonView extends BoxPokemonView {
   moveList: { id: string; name: string; locked: boolean }[]
   // Its ability came from a New Ability floor (and stays through evolution).
   abilityLocked: boolean
+  // What resetting that pick would give it back (null with no pick to reset).
+  abilityResetTo: string | null
   // The abilities an Ability Capsule can give it: its species' normal and hidden ones.
   abilityChoices: { id: string; name: string; description: string }[]
 }
@@ -1557,6 +1664,10 @@ export const RUN_GEMS_PER_TRAINER = 1
 export const RUN_GEMS_PER_BOSS = 2
 // What each consumable costs in a boss floor's shop, in gems.
 export const RUN_CONSUMABLE_PRICES: Record<RunConsumableId, number> = { fullrestore: 3, revive: 5, abilitycapsule: 1 }
+// A boss floor's shop's Rare Candy: used on the spot on a team member - one level up,
+// past the run's level cap if need be (up to 100). Never kept.
+export const RUN_RARE_CANDY_PRICE = 1
+export const RUN_RARE_CANDY_ICON = './sprites/misc/rarecandy.png'
 // A boss floor's shop also sells one of each of these picks (Random Swap is free).
 export type RunShopTile = 'ability' | 'move' | 'item' | 'swap'
 export const RUN_SHOP_TILE_PRICES: Record<RunShopTile, number> = { ability: 1, move: 1, item: 1, swap: 0 }

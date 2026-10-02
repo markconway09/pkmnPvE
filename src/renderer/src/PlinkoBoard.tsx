@@ -1,18 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { GameCornerLoading } from './GameCornerTabs'
 import type { PlinkoDrop, PlinkoRisk } from '../../shared/plinko'
 import { PLINKO_PAYOUTS, PLINKO_RISKS, PLINKO_RISK_LABELS, PLINKO_ROWS, PLINKO_SLOTS, plinkoSlotMultiplier } from '../../shared/plinko'
 import BetSlider, { maxBet, placedBet, useGameCornerPerks, useSavedBet, betStep } from './BetSlider'
-import GameCornerTabs, { type GameCornerGame } from './GameCornerTabs'
-import CoinIcon from './CoinIcon'
+import type { GameCornerGameProps } from './GameCornerTabs'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
 import { playClunk, playTick } from './ticks'
-
-interface Props {
-  onClose: () => void
-  onOpenCoinShop: () => void
-  onSwitchGame: (game: GameCornerGame) => void
-}
 
 // The board's geometry, in SVG units: the gap between pegs, and between rows.
 const GAP = 34
@@ -57,7 +50,7 @@ function slotTone(multiplier: number): string {
  * where it lands decides what it pays. Every bounce is decided by the main process when
  * the ball is dropped (see plinko-store); the ball here just follows that path down.
  */
-function PlinkoBoard({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JSX.Element {
+function PlinkoBoard({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCornerGameProps): React.JSX.Element {
   const [coins, setCoins] = useState<number | null>(null)
   const [betWanted, setBet] = useSavedBet('plinko')
   const perks = useGameCornerPerks()
@@ -91,6 +84,14 @@ function PlinkoBoard({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JS
       .catch((e) => setError(errorMessage(e)))
     return () => void audio.current?.close()
   }, [])
+
+  // The Game Corner window shows the coins, and locks its tabs while balls are dropping.
+  useEffect(() => {
+    onCoinsChange(coins)
+  }, [coins])
+  useEffect(() => {
+    onBusyChange(dropping)
+  }, [dropping])
 
   function chooseRisk(next: PlinkoRisk): void {
     setRisk(next)
@@ -238,125 +239,112 @@ function PlinkoBoard({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JS
   // The edge slots (and the ones next to them) pay more with the Edge Lord title.
   const payouts = PLINKO_PAYOUTS[risk].map((_, slot) => plinkoSlotMultiplier(risk, slot, perks))
 
-  return createPortal(
-    <div className="modal-overlay" onMouseDown={onClose}>
-      <div className="modal-panel plinko-modal" onMouseDown={(e) => e.stopPropagation()}>
-        <GameCornerTabs current="plinko" disabled={dropping} onSwitch={onSwitchGame} />
-        <div className="slots-header">
-          <h2>Plinko</h2>
-          <span className="slots-coins">
-            <CoinIcon /> {coins === null ? '…' : coins.toLocaleString('en-US')} coins
-          </span>
-        </div>
+  if (coins === null && !error) return <GameCornerLoading />
 
-        <div className="plinko-risk" title="Higher risk: bigger edge slots, smaller middle ones - the same payback over time">
-          Risk
-          {PLINKO_RISKS.map((r) => (
-            <button
-              key={r}
-              className={`plinko-risk-option${risk === r ? ' plinko-risk-active' : ''}`}
-              disabled={inFlight || dropping}
-              onClick={() => chooseRisk(r)}
-            >
-              {PLINKO_RISK_LABELS[r]}
-            </button>
-          ))}
-        </div>
-
-        <svg ref={boardRef} className="plinko-board" viewBox={`0 0 ${WIDTH} ${HEIGHT}`}>
-          {Array.from({ length: PLINKO_ROWS }, (_, row) =>
-            Array.from({ length: row + 3 }, (_, k) => (
-              <circle
-                key={`${row}-${k}`}
-                cx={ballX(row, k - 1)}
-                cy={TOP + row * ROW_HEIGHT}
-                r={PEG_RADIUS}
-                className="plinko-peg"
-              />
-            ))
-          )}
-          {payouts.map((multiplier, slot) => {
-            const x = ballX(PLINKO_ROWS, slot)
-            return (
-              <g key={slot} className={lit?.slot === slot ? 'plinko-slot-lit' : undefined}>
-                <rect
-                  key={lit?.slot === slot ? lit.id : 'slot'}
-                  x={x - GAP / 2 + 2}
-                  y={SLOT_TOP}
-                  width={GAP - 4}
-                  height={24}
-                  rx={5}
-                  className={`plinko-slot ${slotTone(multiplier)}`}
-                />
-                <text x={x} y={SLOT_TOP + 16} className="plinko-slot-text">
-                  ×{multiplier}
-                </text>
-              </g>
-            )
-          })}
-          {balls.map((ball) => {
-            const [x, y] = position(ball)
-            return (
-              <g key={ball.id} transform={`translate(${x} ${y})`}>
-                {/* A Poke Ball. */}
-                <circle r={BALL_RADIUS} className="plinko-ball-bottom" />
-                <path d={`M${-BALL_RADIUS},0 A${BALL_RADIUS},${BALL_RADIUS} 0 0 1 ${BALL_RADIUS},0 Z`} className="plinko-ball-top" />
-                <line x1={-BALL_RADIUS} y1={0} x2={BALL_RADIUS} y2={0} className="plinko-ball-band" />
-                <circle r={2.6} className="plinko-ball-button" />
-              </g>
-            )
-          })}
-        </svg>
-
-        <div className="slots-controls">
-          <BetSlider bet={bet} max={maxBet(coins, perks.betCap)}
-            step={betStep(perks.betCap)} disabled={dropping || !coins} onChange={setBet} />
+  return (
+    <div className="game-corner-game plinko-game">
+      <div className="plinko-risk" title="Higher risk: bigger edge slots, smaller middle ones - the same payback over time">
+        Risk
+        {PLINKO_RISKS.map((r) => (
           <button
-            className="slots-spin"
-            disabled={dropping || coins === null || coins < bet}
-            title="Hold to keep dropping"
-            onPointerDown={(e) => {
-              if (e.button === 0) void holdDrop()
-            }}
-            // The keyboard (Enter / Space) still drops one.
-            onClick={(e) => {
-              if (e.detail === 0) void drop(1)
-            }}
+            key={r}
+            className={`plinko-risk-option${risk === r ? ' plinko-risk-active' : ''}`}
+            disabled={inFlight || dropping}
+            onClick={() => chooseRisk(r)}
           >
-            Drop
+            {PLINKO_RISK_LABELS[r]}
           </button>
-          <button
-            disabled={dropping || coins === null || coins < bet}
-            title={`Drops ${MULTI_COUNT} balls one after another, each bet on its own`}
-            onClick={() => void drop(MULTI_COUNT)}
-          >
-            ×{MULTI_COUNT}
-          </button>
-        </div>
-        <p className="editor-hint slots-hint">
-          The ball bounces left or right at every peg - most land near the middle, a few reach the edges. Each slot pays
-          its multiplier times your bet.
-        </p>
-        {error && <p className="editor-error">{error}</p>}
-        {coins !== null && coins < 1 && !dropping && (
-          <p className="editor-hint">
-            You&apos;re out of coins.{' '}
-            <button className="link-button" onClick={onOpenCoinShop}>
-              Buy some at the Coin Shop
-            </button>
-          </p>
-        )}
-
-        <div className="editor-actions">
-          <button className="coin-shop-button" onClick={onOpenCoinShop} disabled={dropping}>
-            <CoinIcon /> Coin Shop
-          </button>
-          <button onClick={onClose}>Close</button>
-        </div>
-        {notes.layer}
+        ))}
       </div>
-    </div>,
-    document.body
+
+      <svg ref={boardRef} className="plinko-board" viewBox={`0 0 ${WIDTH} ${HEIGHT}`}>
+        {Array.from({ length: PLINKO_ROWS }, (_, row) =>
+          Array.from({ length: row + 3 }, (_, k) => (
+            <circle
+              key={`${row}-${k}`}
+              cx={ballX(row, k - 1)}
+              cy={TOP + row * ROW_HEIGHT}
+              r={PEG_RADIUS}
+              className="plinko-peg"
+            />
+          ))
+        )}
+        {payouts.map((multiplier, slot) => {
+          const x = ballX(PLINKO_ROWS, slot)
+          return (
+            <g key={slot} className={lit?.slot === slot ? 'plinko-slot-lit' : undefined}>
+              <rect
+                key={lit?.slot === slot ? lit.id : 'slot'}
+                x={x - GAP / 2 + 2}
+                y={SLOT_TOP}
+                width={GAP - 4}
+                height={24}
+                rx={5}
+                className={`plinko-slot ${slotTone(multiplier)}`}
+              />
+              <text x={x} y={SLOT_TOP + 16} className="plinko-slot-text">
+                ×{multiplier}
+              </text>
+            </g>
+          )
+        })}
+        {balls.map((ball) => {
+          const [x, y] = position(ball)
+          return (
+            <g key={ball.id} transform={`translate(${x} ${y})`}>
+              {/* A Poke Ball. */}
+              <circle r={BALL_RADIUS} className="plinko-ball-bottom" />
+              <path d={`M${-BALL_RADIUS},0 A${BALL_RADIUS},${BALL_RADIUS} 0 0 1 ${BALL_RADIUS},0 Z`} className="plinko-ball-top" />
+              <line x1={-BALL_RADIUS} y1={0} x2={BALL_RADIUS} y2={0} className="plinko-ball-band" />
+              <circle r={2.6} className="plinko-ball-button" />
+            </g>
+          )
+        })}
+      </svg>
+
+      <div className="slots-controls">
+        <BetSlider bet={bet} max={maxBet(coins, perks.betCap)}
+          step={betStep(perks.betCap)} disabled={dropping || !coins} onChange={setBet}
+          info={
+            <>
+              The ball bounces left or right at every peg - most land near the middle, a few reach the edges. Each slot pays
+              its multiplier times your bet.
+            </>
+          }
+        />
+        <button
+          className="slots-spin"
+          disabled={dropping || coins === null || coins < bet}
+          title="Hold to keep dropping"
+          onPointerDown={(e) => {
+            if (e.button === 0) void holdDrop()
+          }}
+          // The keyboard (Enter / Space) still drops one.
+          onClick={(e) => {
+            if (e.detail === 0) void drop(1)
+          }}
+        >
+          Drop
+        </button>
+        <button
+          disabled={dropping || coins === null || coins < bet}
+          title={`Drops ${MULTI_COUNT} balls one after another, each bet on its own`}
+          onClick={() => void drop(MULTI_COUNT)}
+        >
+          ×{MULTI_COUNT}
+        </button>
+      </div>
+      {error && <p className="editor-error">{error}</p>}
+      {coins !== null && coins < 1 && !dropping && (
+        <p className="editor-hint">
+          You&apos;re out of coins.{' '}
+          <button className="link-button" onClick={onOpenCoinShop}>
+            Buy some at the Coin Shop
+          </button>
+        </p>
+      )}
+      {notes.layer}
+    </div>
   )
 }
 

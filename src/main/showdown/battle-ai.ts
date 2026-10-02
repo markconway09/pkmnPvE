@@ -38,6 +38,10 @@ interface OpponentInfo {
   magnetRise?: boolean
   // Smack Down / Thousand Arrows pulled it to the ground.
   smackedDown?: boolean
+  // Foresight / Odor Sleuth: Normal and Fighting moves now hit it through a Ghost type.
+  foresight?: boolean
+  // Miracle Eye: Psychic moves now hit it through a Dark type.
+  miracleEye?: boolean
   level: number
   // Its Speed stage (-6 to +6), as the battle has shown it.
   speBoost: number
@@ -374,6 +378,8 @@ export class AIPlayer extends BattlePlayer {
     else if (cmd === '-start' && effect === 'Magnet Rise') opponent.magnetRise = true
     else if (cmd === '-end' && effect === 'Magnet Rise') opponent.magnetRise = false
     else if (cmd === '-start' && effect === 'Smack Down') opponent.smackedDown = true
+    else if (cmd === '-start' && (effect === 'Foresight' || effect === 'Odor Sleuth')) opponent.foresight = true
+    else if (cmd === '-start' && effect === 'Miracle Eye') opponent.miracleEye = true
 
     if (cmd === 'replace' || cmd === 'detailschange' || cmd === '-formechange') {
       opponent.species = parts[2].split(',')[0].trim()
@@ -408,6 +414,15 @@ export class AIPlayer extends BattlePlayer {
   // is a coarse heuristic to begin with).
   private primaryOpponent(): OpponentInfo | null {
     return this.opponents.find((o) => o && !o.fainted) ?? null
+  }
+
+  // A foe's types as a move of this type meets them: once Foresight / Odor Sleuth has
+  // landed its Ghost type no longer stops Normal and Fighting moves, and after Miracle
+  // Eye its Dark type no longer stops Psychic ones.
+  private typesFacing(foe: OpponentInfo, moveType: string): string[] {
+    if (foe.foresight && (moveType === 'Normal' || moveType === 'Fighting')) return foe.types.filter((t) => t !== 'Ghost')
+    if (foe.miracleEye && moveType === 'Psychic') return foe.types.filter((t) => t !== 'Dark')
+    return foe.types
   }
 
   private aliveOpponents(): OpponentInfo[] {
@@ -553,9 +568,12 @@ export class AIPlayer extends BattlePlayer {
 
     if (request.forceSwitch) {
       const chosen = new Set<number>()
-      const choices = request.forceSwitch.map((mustSwitch) => {
+      const choices = request.forceSwitch.map((mustSwitch, i) => {
         if (!mustSwitch) return 'pass'
-        const slot = this.pickSwitchIn(request.side.pokemon, chosen)
+        // Revival Blessing: bring back the first fainted team member instead of switching.
+        const slot = request.side.pokemon[i]?.reviving
+          ? this.pickRevive(request.side.pokemon, chosen)
+          : this.pickSwitchIn(request.side.pokemon, chosen)
         if (slot === null) return 'pass'
         chosen.add(slot)
         return `switch ${slot + 1}`
@@ -624,6 +642,11 @@ export class AIPlayer extends BattlePlayer {
       chosenTargetLoc ?? this.pickTargetLoc(moveReq?.target ?? 'normal', numActive, mySlotIndex, moveReq?.id ?? '', own)
     const targetSuffix = targetLoc !== 0 ? ` ${targetLoc}` : ''
     return `move ${slot}${targetSuffix}${this.gimmickSuffix(active, slot, moveReq?.id ?? '', ownTypes)}`
+  }
+
+  private pickRevive(pokemon: PokemonSwitchRequestData[], exclude: Set<number>): number | null {
+    const index = pokemon.findIndex((p, i) => !p.active && p.condition.endsWith('fnt') && !exclude.has(i))
+    return index < 0 ? null : index
   }
 
   private pickSwitchIn(pokemon: PokemonSwitchRequestData[], exclude: Set<number>): number | null {
@@ -901,7 +924,10 @@ export class AIPlayer extends BattlePlayer {
     // A move that would certainly do nothing to any foe out is never worth a turn
     // (skipped when the field changed its type - the check below covers that case).
     const foes = this.aliveOpponents()
-    if (!typeChanged && foes.length > 0 && foes.every((foe) => moveDoesNothing(moveId, own, this.foeParty(foe, this.moldBreaker)))) {
+    if (!typeChanged && foes.length > 0 && foes.every((foe) =>
+        moveDoesNothing(moveId, own, { ...this.foeParty(foe, this.moldBreaker), types: this.typesFacing(foe, moveType) })
+      )
+    ) {
       return 0
     }
     // What the move actually hits for right now (Last Respects, Eruption, Low Kick,
@@ -931,13 +957,20 @@ export class AIPlayer extends BattlePlayer {
 
     const opponent = target
     if (info.category === 'Status') {
+      // Foresight / Odor Sleuth / Miracle Eye only do anything against a Ghost (Dark)
+      // type that isn't already identified - repeating them just wastes turns.
+      if (moveId === 'foresight' || moveId === 'odorsleuth') {
+        if (!opponent || opponent.foresight || !opponent.types.includes('Ghost')) return 0
+      } else if (moveId === 'miracleeye') {
+        if (!opponent || opponent.miracleEye || !opponent.types.includes('Dark')) return 0
+      }
       // Worth less if the terrain might keep the status off (a foe that may or may not be grounded).
       const maybeBlocked =
         !!opponent && !!combat.inflicts && this.foeShields(opponent, this.moldBreaker).statuses.possible.includes(combat.inflicts)
       return maybeBlocked ? 17 : 35
     }
 
-    const typeMultiplier = opponent ? getTypeEffectivenessMultiplier(moveType, opponent.types) : 1
+    const typeMultiplier = opponent ? getTypeEffectivenessMultiplier(moveType, this.typesFacing(opponent, moveType)) : 1
     let multiplier = typeMultiplier
     if (opponent && !combat.selfTargeted) {
       const shields = this.foeShields(opponent, this.moldBreaker)

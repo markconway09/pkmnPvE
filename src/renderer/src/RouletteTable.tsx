@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { GameCornerLoading } from './GameCornerTabs'
 import type { RouletteBetKey, RouletteSpin } from '../../shared/roulette'
 import {
   BET_LABELS,
@@ -11,16 +11,10 @@ import {
   pocketColor
 } from '../../shared/roulette'
 import BetSlider, { maxBet, placedBet, useGameCornerPerks, useSavedBet, betStep } from './BetSlider'
-import GameCornerTabs, { type GameCornerGame } from './GameCornerTabs'
+import type { GameCornerGameProps } from './GameCornerTabs'
 import CoinIcon from './CoinIcon'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
 import { playClunk, playTick } from './ticks'
-
-interface Props {
-  onClose: () => void
-  onOpenCoinShop: () => void
-  onSwitchGame: (game: GameCornerGame) => void
-}
 
 const SPIN_MS = 4200
 const SEGMENT = 360 / WHEEL_ORDER.length
@@ -74,7 +68,7 @@ const BOARD_KEYS: RouletteBetKey[] = [
  * roulette-store); the wheel just turns to where the ball already landed. The bets stay on
  * the board for the next spin.
  */
-function RouletteTable({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JSX.Element {
+function RouletteTable({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCornerGameProps): React.JSX.Element {
   const [coins, setCoins] = useState<number | null>(null)
   const [history, setHistory] = useState<number[]>([])
   const [chipWanted, setChip] = useSavedBet('roulette')
@@ -101,6 +95,14 @@ function RouletteTable({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.
     const pending = timers.current
     return () => pending.forEach((t) => clearTimeout(t))
   }, [])
+
+  // The Game Corner window shows the coins, and locks its tabs while the wheel turns.
+  useEffect(() => {
+    onCoinsChange(coins)
+  }, [coins])
+  useEffect(() => {
+    onBusyChange(spinning)
+  }, [spinning])
 
   const chip = placedBet(chipWanted, coins, perks.betCap)
   const total = Object.values(bets).reduce((sum, n) => sum + n, 0)
@@ -223,158 +225,143 @@ function RouletteTable({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.
 
   const winningKeys = result ? new Set(result.bets.filter((b) => b.returned > 0).map((b) => b.key)) : null
 
-  return createPortal(
-    <div className="modal-overlay" onMouseDown={() => !spinning && onClose()}>
-      <div className="modal-panel roulette-modal" onMouseDown={(e) => e.stopPropagation()}>
-        <GameCornerTabs current="roulette" disabled={spinning} onSwitch={onSwitchGame} />
-        <div className="slots-header">
-          <h2>Roulette</h2>
-          <span className="slots-coins">
-            <CoinIcon /> {coins === null ? '…' : coins.toLocaleString('en-US')} coins
-          </span>
-        </div>
+  if (coins === null && !error) return <GameCornerLoading />
 
-        <div className="roulette-top">
-          <div className="roulette-wheel-wrap">
-            <svg className="roulette-wheel" viewBox="-130 -130 260 260">
-              <g
-                style={{
-                  transform: `rotate(${rotation}deg)`,
-                  transition: spinning ? `transform ${SPIN_MS}ms cubic-bezier(0.12, 0.8, 0.2, 1)` : 'none'
-                }}
-              >
-                <circle r={OUTER + 5} className="roulette-rim" />
-                {WHEEL_ORDER.map((n, i) => {
-                  const [tx, ty] = polar((OUTER + INNER) / 2, i * SEGMENT)
-                  return (
-                    <g key={n}>
-                      <path d={wedgePath(i * SEGMENT)} className={`roulette-pocket roulette-pocket-${pocketColor(n)}`} />
-                      <text
-                        x={tx}
-                        y={ty}
-                        className="roulette-pocket-number"
-                        transform={`rotate(${i * SEGMENT} ${tx} ${ty})`}
-                      >
-                        {n}
-                      </text>
-                    </g>
-                  )
-                })}
-                {/* A Poke Ball in the middle of the wheel. */}
-                <circle r={INNER - 4} className="roulette-hub" />
-                <path d={`M${-(INNER - 20)},0 A${INNER - 20},${INNER - 20} 0 0 1 ${INNER - 20},0 Z`} className="roulette-ball-top" />
-                <path d={`M${-(INNER - 20)},0 A${INNER - 20},${INNER - 20} 0 0 0 ${INNER - 20},0 Z`} className="roulette-ball-bottom" />
-                <line x1={-(INNER - 20)} y1={0} x2={INNER - 20} y2={0} className="roulette-ball-band" />
-                <circle r={13} className="roulette-ball-button" />
-              </g>
-              {/* The marker, and the ball resting under it once the wheel stops. */}
-              <path d={`M-8,${-OUTER - 6} L8,${-OUTER - 6} L0,${-OUTER + 8} Z`} className="roulette-marker" />
-              {!spinning && result && <circle cx={0} cy={-(INNER + 7)} r={6} className="roulette-ball" />}
-            </svg>
+  return (
+    <div className="game-corner-game roulette-game">
+      <div className="roulette-top">
+        <div className="roulette-wheel-wrap">
+          <svg className="roulette-wheel" viewBox="-130 -130 260 260">
+            <g
+              style={{
+                transform: `rotate(${rotation}deg)`,
+                transition: spinning ? `transform ${SPIN_MS}ms cubic-bezier(0.12, 0.8, 0.2, 1)` : 'none'
+              }}
+            >
+              <circle r={OUTER + 5} className="roulette-rim" />
+              {WHEEL_ORDER.map((n, i) => {
+                const [tx, ty] = polar((OUTER + INNER) / 2, i * SEGMENT)
+                return (
+                  <g key={n}>
+                    <path d={wedgePath(i * SEGMENT)} className={`roulette-pocket roulette-pocket-${pocketColor(n)}`} />
+                    <text
+                      x={tx}
+                      y={ty}
+                      className="roulette-pocket-number"
+                      transform={`rotate(${i * SEGMENT} ${tx} ${ty})`}
+                    >
+                      {n}
+                    </text>
+                  </g>
+                )
+              })}
+              {/* A Poke Ball in the middle of the wheel. */}
+              <circle r={INNER - 4} className="roulette-hub" />
+              <path d={`M${-(INNER - 20)},0 A${INNER - 20},${INNER - 20} 0 0 1 ${INNER - 20},0 Z`} className="roulette-ball-top" />
+              <path d={`M${-(INNER - 20)},0 A${INNER - 20},${INNER - 20} 0 0 0 ${INNER - 20},0 Z`} className="roulette-ball-bottom" />
+              <line x1={-(INNER - 20)} y1={0} x2={INNER - 20} y2={0} className="roulette-ball-band" />
+              <circle r={13} className="roulette-ball-button" />
+            </g>
+            {/* The marker, and the ball resting under it once the wheel stops. */}
+            <path d={`M-8,${-OUTER - 6} L8,${-OUTER - 6} L0,${-OUTER + 8} Z`} className="roulette-marker" />
+            {!spinning && result && <circle cx={0} cy={-(INNER + 7)} r={6} className="roulette-ball" />}
+          </svg>
+        </div>
+        <div className="roulette-side">
+          <div className={`roulette-result${result ? ` roulette-result-${pocketColor(result.pocket)}` : ''}`}>
+            {spinning ? 'Spinning…' : result ? `${result.pocket} ${pocketColor(result.pocket)}` : 'Place your bets'}
           </div>
-          <div className="roulette-side">
-            <div className={`roulette-result${result ? ` roulette-result-${pocketColor(result.pocket)}` : ''}`}>
-              {spinning ? 'Spinning…' : result ? `${result.pocket} ${pocketColor(result.pocket)}` : 'Place your bets'}
+          {result && !spinning && (
+            <div className="roulette-result-detail">
+              {result.refunded
+                ? `No winning bets - but the Croupier gave all ${result.totalBet.toLocaleString('en-US')} back`
+                : result.totalReturned > 0
+                ? `${result.bets
+                    .filter((b) => b.returned > 0)
+                    .map((b) => betLabel(b.key))
+                    .join(', ')} paid ${result.totalReturned.toLocaleString('en-US')} · ${
+                    result.totalReturned >= result.totalBet ? '+' : ''
+                  }${(result.totalReturned - result.totalBet).toLocaleString('en-US')} overall`
+                : 'No winning bets'}
             </div>
-            {result && !spinning && (
-              <div className="roulette-result-detail">
-                {result.refunded
-                  ? `No winning bets - but the Croupier gave all ${result.totalBet.toLocaleString('en-US')} back`
-                  : result.totalReturned > 0
-                  ? `${result.bets
-                      .filter((b) => b.returned > 0)
-                      .map((b) => betLabel(b.key))
-                      .join(', ')} paid ${result.totalReturned.toLocaleString('en-US')} · ${
-                      result.totalReturned >= result.totalBet ? '+' : ''
-                    }${(result.totalReturned - result.totalBet).toLocaleString('en-US')} overall`
-                  : 'No winning bets'}
-              </div>
-            )}
-            <div className="roulette-history" title="The last spins, newest first">
-              {history.map((n, i) => (
-                <span key={i} className={`roulette-history-pocket roulette-pocket-bg-${pocketColor(n)}`}>
-                  {n}
-                </span>
-              ))}
-            </div>
-            <div className="roulette-total">
-              On the board: <CoinIcon /> {total.toLocaleString('en-US')}
-            </div>
+          )}
+          <div className="roulette-history" title="The last spins, newest first">
+            {history.map((n, i) => (
+              <span key={i} className={`roulette-history-pocket roulette-pocket-bg-${pocketColor(n)}`}>
+                {n}
+              </span>
+            ))}
+          </div>
+          <div className="roulette-total">
+            On the board: <CoinIcon /> {total.toLocaleString('en-US')}
           </div>
         </div>
-
-        <div className="roulette-board" ref={boardRef}>
-          {BOARD_KEYS.map((key) => {
-            const [column, row, span] = boardPlace(key)
-            const n = key.startsWith('n:') ? Number(key.slice(2)) : null
-            const color = n !== null ? pocketColor(n) : key === 'red' ? 'red' : key === 'black' ? 'black' : null
-            const won = winningKeys?.has(key)
-            const landed = result && n === result.pocket && !spinning
-            return (
-              <button
-                key={key}
-                type="button"
-                className={`roulette-cell${color ? ` roulette-cell-${color}` : ''}${won ? ' roulette-cell-won' : ''}${landed ? ' roulette-cell-landed' : ''}`}
-                style={{ gridColumn: `${column} / span ${span}`, gridRow: key === 'n:0' ? '1 / span 3' : row }}
-                title={`${betLabel(key)} - pays ${betOdds(key)} to 1`}
-                disabled={spinning}
-                onClick={(e) => place(key, e)}
-                onContextMenu={(e) => takeBack(key, e)}
-              >
-                {n !== null ? n : BET_LABELS[key]}
-                {bets[key] && <span className="roulette-chip">{bets[key].toLocaleString('en-US')}</span>}
-              </button>
-            )
-          })}
-        </div>
-
-        <div className="slots-controls">
-          <BetSlider bet={chip} max={maxBet(coins, perks.betCap)}
-            step={betStep(perks.betCap)} disabled={spinning || !coins} onChange={setChip} />
-        </div>
-        <div className="slots-controls roulette-actions">
-          <button disabled={spinning || placed.length === 0} onClick={undo}>
-            Undo
-          </button>
-          <button disabled={spinning || total === 0} onClick={clear}>
-            Clear
-          </button>
-          <button
-            className="slots-spin"
-            disabled={spinning || total === 0 || coins === null || coins < total}
-            onClick={() => void spin()}
-          >
-            Spin
-          </button>
-        </div>
-        <p className="editor-hint slots-hint">
-          Click the board to place a chip (the bet above), right-click to take a bet back. A number pays 35 to 1, a
-          dozen or column 2 to 1, the rest 1 to 1 - and the zero beats every outside bet. Each spot takes up to{' '}
-          {perks.betCap.toLocaleString('en-US')} coins, the whole board up to{' '}
-          {(perks.betCap * ROULETTE_MAX_FULL_BETS).toLocaleString('en-US')}.
-        </p>
-        {error && <p className="editor-error">{error}</p>}
-        {coins !== null && coins < 1 && !spinning && (
-          <p className="editor-hint">
-            You&apos;re out of coins.{' '}
-            <button className="link-button" onClick={onOpenCoinShop}>
-              Buy some at the Coin Shop
-            </button>
-          </p>
-        )}
-
-        <div className="editor-actions">
-          <button className="coin-shop-button" onClick={onOpenCoinShop} disabled={spinning}>
-            <CoinIcon /> Coin Shop
-          </button>
-          <button onClick={onClose} disabled={spinning}>
-            Close
-          </button>
-        </div>
-        {notes.layer}
       </div>
-    </div>,
-    document.body
+
+      <div className="roulette-board" ref={boardRef}>
+        {BOARD_KEYS.map((key) => {
+          const [column, row, span] = boardPlace(key)
+          const n = key.startsWith('n:') ? Number(key.slice(2)) : null
+          const color = n !== null ? pocketColor(n) : key === 'red' ? 'red' : key === 'black' ? 'black' : null
+          const won = winningKeys?.has(key)
+          const landed = result && n === result.pocket && !spinning
+          return (
+            <button
+              key={key}
+              type="button"
+              className={`roulette-cell${color ? ` roulette-cell-${color}` : ''}${won ? ' roulette-cell-won' : ''}${landed ? ' roulette-cell-landed' : ''}`}
+              style={{ gridColumn: `${column} / span ${span}`, gridRow: key === 'n:0' ? '1 / span 3' : row }}
+              title={`${betLabel(key)} - pays ${betOdds(key)} to 1`}
+              disabled={spinning}
+              onClick={(e) => place(key, e)}
+              onContextMenu={(e) => takeBack(key, e)}
+            >
+              {n !== null ? n : BET_LABELS[key]}
+              {bets[key] && <span className="roulette-chip">{bets[key].toLocaleString('en-US')}</span>}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="slots-controls">
+        <BetSlider bet={chip} max={maxBet(coins, perks.betCap)}
+          step={betStep(perks.betCap)} disabled={spinning || !coins} onChange={setChip}
+          info={
+            <>
+              Click the board to place a chip (the bet on the slider), right-click to take a bet back. A number pays 35 to 1, a
+              dozen or column 2 to 1, the rest 1 to 1 - and the zero beats every outside bet. Each spot takes up to{' '}
+              {perks.betCap.toLocaleString('en-US')} coins, the whole board up to{' '}
+              {(perks.betCap * ROULETTE_MAX_FULL_BETS).toLocaleString('en-US')}.
+            </>
+          }
+        />
+      </div>
+      <div className="slots-controls roulette-actions">
+        <button disabled={spinning || placed.length === 0} onClick={undo}>
+          Undo
+        </button>
+        <button disabled={spinning || total === 0} onClick={clear}>
+          Clear
+        </button>
+        <button
+          className="slots-spin"
+          disabled={spinning || total === 0 || coins === null || coins < total}
+          onClick={() => void spin()}
+        >
+          Spin
+        </button>
+      </div>
+      {error && <p className="editor-error">{error}</p>}
+      {coins !== null && coins < 1 && !spinning && (
+        <p className="editor-hint">
+          You&apos;re out of coins.{' '}
+          <button className="link-button" onClick={onOpenCoinShop}>
+            Buy some at the Coin Shop
+          </button>
+        </p>
+      )}
+      {notes.layer}
+    </div>
   )
 }
 

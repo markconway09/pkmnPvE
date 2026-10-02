@@ -10,7 +10,8 @@ import type {
   MergeCandidateView,
   CompanionSize,
   CompanionSizeChoice,
-  PokedexEntry
+  PokedexEntry,
+  RaidBossPreview
 } from '../../shared/battle-types'
 import {
   EXP_CANDY_EXP,
@@ -54,6 +55,8 @@ import {
   rollMilceryCream,
   nationalDexSpecies,
   nationalDexForms,
+  pokedexLocationHints,
+  raidBossCandidates,
   evolutionOptionsFor,
   evolutionPathsFor,
   evolveSet,
@@ -61,6 +64,7 @@ import {
   formChangeFor,
   getItemSpritenumById,
   heldItemForme,
+  gmaxLookOf,
   generateRandomSingle,
   getEditorOptions,
   getItemSpritenum,
@@ -232,14 +236,40 @@ export function ownsSpecies(baseSpecies: string): boolean {
  * The trainer profile's Pokedex: every species in National Dex order, each followed by
  * its alternate forms, marked if that exact form has been registered.
  */
+/** The Max Raid page's carousel: every possible raid boss, and whether it's registered. */
+export function getRaidBossPreviews(): RaidBossPreview[] {
+  const box = getState()
+  if (!box.registeredForms) registerOwnedSpecies()
+  const registered = new Set(box.registeredForms)
+  return raidBossCandidates().map((c) => ({
+    ...c,
+    registered: registered.has(c.species),
+    rarityTier: speciesRarityTier(c.species)
+  }))
+}
+
 export function getPokedex(): PokedexEntry[] {
   const box = getState()
   if (!box.registeredForms) registerOwnedSpecies()
   const registered = new Set(box.registeredForms)
   const forms = nationalDexForms()
   return nationalDexSpecies().flatMap(({ num, species }) => [
-    { num, species, registered: registered.has(species), form: false },
-    ...(forms.get(num) ?? []).map((form) => ({ num, species: form, registered: registered.has(form), form: true }))
+    {
+      num,
+      species,
+      registered: registered.has(species),
+      form: false,
+      hints: pokedexLocationHints(species),
+      rarityTier: speciesRarityTier(species)
+    },
+    ...(forms.get(num) ?? []).map((form) => ({
+      num,
+      species: form,
+      registered: registered.has(form),
+      form: true,
+      hints: pokedexLocationHints(form),
+      rarityTier: speciesRarityTier(form)
+    }))
   ])
 }
 
@@ -260,7 +290,8 @@ function mergeGroups(mons: StoredMon[]): Map<string, StoredMon[]> {
 function mergeCandidatesFor(mon: StoredMon, groups: Map<string, StoredMon[]>): MergeCandidateView[] {
   // Only a fully evolved Pokemon takes merges.
   if (!isFullyEvolved(mon.set.species)) return []
-  const team = new Set(getState().team)
+  const { team: teamSlots, companionId } = getState()
+  const team = new Set(teamSlots)
   return (groups.get(mergeLineOf(mon.set.species).root) ?? [])
     .filter((other) => other.id !== mon.id && !other.fusedWith && canMergeInto(mon.set.species, other.set.species))
     .map((other) => {
@@ -282,7 +313,13 @@ function mergeCandidatesFor(mon: StoredMon, groups: Map<string, StoredMon[]>): M
           spritenum: getItemSpritenumById(id),
           owned: getItemQuantity(id)
         })),
-        notReady: evolution.ready ? undefined : evolution.reason
+        // The companion stays itself - it can't be merged away while it's in the slot.
+        notReady:
+          other.id === companionId
+            ? "It's your companion - take it out of the companion slot first"
+            : evolution.ready
+              ? undefined
+              : evolution.reason
       }
     })
 }
@@ -367,15 +404,18 @@ function toView(mon: StoredMon, arrival: number, groups?: Map<string, StoredMon[
     })),
     canLevelUpWithCandy,
     canUseShinyPatch,
+    shinyPatches: canUseShinyPatch ? getItemQuantity(SHINY_PATCH_ITEM_ID) : undefined,
     formChanges,
     fusions: fusion.fusions,
     unfuse: fusion.unfuse,
     itemSpritenum,
     favorite: !!mon.favorite,
     maxFriendship: atMaxFriendship(mon),
+    companion: getState().companionId === mon.id || undefined,
     copies: mon.copies ?? 1,
     mergeStars: mergeStarsFor(mon.copies),
     gigantamax: !!mon.set.gigantamax,
+    gmaxLook: gmaxLookOf(mon.set) || undefined,
     mergeCandidates: groups ? mergeCandidatesFor(mon, groups) : undefined,
     rarityTier: speciesRarityTier(mon.set.species),
     sellPrice: monSellPrice(speciesRarityTier(mon.set.species), !!mon.set.shiny, mon.copies),
@@ -449,15 +489,15 @@ function companionUnlocked(): boolean {
 }
 
 /**
- * Makes a Pokemon at max friendship the companion, shown in the slot beside the team. It
- * stays in the box - and on the team, if it's there - to be used as ever.
+ * Makes any Pokemon the companion, shown in the slot beside the team. It stays in the box -
+ * and on the team, if it's there - to be used as ever, and grows closer battling at your side
+ * (see awardFriendshipToTeam).
  */
 export function setCompanion(id: string): BoxState {
   if (!companionUnlocked()) throw new Error('The companion slot unlocks with the Best Friends achievement')
   const box = getState()
   const mon = box.mons.find((m) => m.id === id)
   if (!mon) throw new Error(`Unknown Pokemon id: ${id}`)
-  if (!atMaxFriendship(mon)) throw new Error(`Only a Pokémon at max friendship can be a companion - ${mon.set.species} isn't there yet`)
   box.companionId = mon.id
   // A new companion starts at the size its height gives it.
   box.companionSize = undefined
@@ -465,9 +505,9 @@ export function setCompanion(id: string): BoxState {
   return getBoxState()
 }
 
-/** How big the companion is drawn: S, M or L, or 'auto' - by its height. */
+/** How big the companion is drawn: S, M, L or XL, or 'auto' - by its height. */
 export function setCompanionSize(size: CompanionSizeChoice): BoxState {
-  if (size !== 'auto' && !COMPANION_SIZES.includes(size)) throw new Error('Pick a size: Auto, S, M or L')
+  if (size !== 'auto' && !COMPANION_SIZES.includes(size)) throw new Error('Pick a size: Auto, S, M, L or XL')
   getState().companionSize = size === 'auto' ? undefined : size
   persist()
   return getBoxState()
@@ -477,7 +517,7 @@ function companionSizeNow(): CompanionSize {
   const { companionSize } = getState()
   if (companionSize && companionSize !== 'auto') return companionSize
   const companion = companionMon()
-  return companion ? autoCompanionSize(speciesHeightM(companion.set.species)) : 'S'
+  return companion ? autoCompanionSize(speciesHeightM(companion.set.species), gmaxLookOf(companion.set)) : 'S'
 }
 
 /** No companion any more (the Pokemon itself was in the box all along). */
@@ -505,6 +545,16 @@ export function getBoxState(): BoxState {
 
 export function addRandomMon(): BoxState {
   const set = generateRandomSingle('gen9randombattle')
+  const exp = totalExpForSpeciesLevel(set.species, set.level)
+  getState().mons.push({ id: randomUUID(), set, exp })
+  persist()
+  return getBoxState()
+}
+
+// Debug: a Pokemon of the admin's choosing, straight into the box - a basic set of that
+// species at the level asked (1-100), shiny if asked.
+export function addMonOfSpecies(species: string, level: number, shiny: boolean): BoxState {
+  const set = { ...buildBasicSet(species, Math.max(1, Math.min(100, Math.round(level) || 1))), happiness: 0, shiny }
   const exp = totalExpForSpeciesLevel(set.species, set.level)
   getState().mons.push({ id: randomUUID(), set, exp })
   persist()
@@ -686,6 +736,9 @@ function mergeInto(keeperId: string, fodderIds: string[]): number {
     throw new Error(`Only another ${species}, or one of its pre-evolutions, can be merged in`)
   }
   if (fodder.some((m) => m.fusedWith)) throw new Error('Unfuse it first - its partner would be merged away with it')
+  if (fodder.some((m) => m.id === box.companionId)) {
+    throw new Error("Your companion can't be merged into anything - take it out of the companion slot first")
+  }
   if ((keeper.copies ?? 1) >= MERGE_MAX_COPIES) throw new Error(`${keeper.set.species} is already at ${MERGE_MAX_STARS} stars`)
   if (!isFullyEvolved(keeper.set.species)) throw new Error(`${keeper.set.species} has to be fully evolved to take merges`)
   // A pre-evolution evolves on its way in - everything it needs for that, with the bag's
@@ -715,10 +768,8 @@ function mergeInto(keeperId: string, fodderIds: string[]): number {
     if (mon.set.item) addItem(toID(mon.set.item), 1)
     if (mon.set.shiny) keeper.set.shiny = true
     if (mon.set.gigantamax) keeper.set.gigantamax = true
-    // A favorite merged in keeps its heart - on the one it went into - and the companion
-    // stays the companion as the one it went into.
+    // A favorite merged in keeps its heart - on the one it went into.
     if (mon.favorite) keeper.favorite = true
-    if (box.companionId === mon.id) box.companionId = keeper.id
     keeper.set.happiness = Math.max(keeper.set.happiness ?? 0, mon.set.happiness ?? 0)
     // A higher-level one brings its level up with it, exp and all.
     if (mon.set.level > keeper.set.level || (mon.set.level === keeper.set.level && mon.exp > keeper.exp)) {
@@ -758,9 +809,11 @@ export function mergeSelectedMons(ids: string[]): { box: BoxState; merged: numbe
   for (const group of groups.values()) {
     if (group.length < 2) continue
     // The keeper is fully evolved (only that takes merges) - the most copies first...
+    // (the companion before the rest, as it can't go into another)...
     const ranked = [...group].sort(
       (a, b) =>
         Number(isFullyEvolved(b.set.species)) - Number(isFullyEvolved(a.set.species)) ||
+        Number(b.id === box.companionId) - Number(a.id === box.companionId) ||
         (b.copies ?? 1) - (a.copies ?? 1) ||
         b.set.level - a.set.level ||
         Number(!!b.set.shiny) - Number(!!a.set.shiny) ||
@@ -773,7 +826,10 @@ export function mergeSelectedMons(ids: string[]): { box: BoxState; merged: numbe
     // not ready, is left for another time.
     const stock = new Map<string, number>()
     const fodder = rest.filter(
-      (m) => canMergeInto(keeper.set.species, m.set.species) && mergeEvolutionFor(m.set, keeper.set.species, stock).ready
+      (m) =>
+        m.id !== box.companionId &&
+        canMergeInto(keeper.set.species, m.set.species) &&
+        mergeEvolutionFor(m.set, keeper.set.species, stock).ready
     )
     if (fodder.length === 0) continue
     merged += mergeInto(
@@ -983,13 +1039,14 @@ export function useExpCandiesUntilCap(itemId: string): { used: number; results: 
 
 // Every Pokemon on the team - the same ones awardExpToTeam pays out to - grows
 // closer to its trainer after a battle won, whether or not it had exp to
-// gain. Capped at MAX_HAPPINESS. Deliberately not part of ExpGainResult: it's
+// gain, and so does the companion, as if it were on the team - twice over when
+// it's on the team as well. Capped at MAX_HAPPINESS. Deliberately not part of ExpGainResult: it's
 // never shown on the battle result screen.
 export function awardFriendshipToTeam(baseAmount = FRIENDSHIP_PER_BATTLE): void {
   // The Friendship Charm: twice as much.
   const amount = hasItem(FRIENDSHIP_CHARM_ITEM_ID) ? baseAmount * FRIENDSHIP_CHARM_MULTIPLIER : baseAmount
   const byId = new Map(getState().mons.map((m) => [m.id, m]))
-  for (const id of getState().team) {
+  for (const id of [...getState().team, getState().companionId]) {
     const mon = id ? byId.get(id) : undefined
     if (!mon) continue
     // A set with no happiness recorded predates friendship being tracked and

@@ -30,6 +30,8 @@ import {
   WISHING_PIECE_ITEM_ID,
   rogueliteBossClassAt,
   rogueliteBossLabelAt,
+  runBossCount,
+  runFinalFloor,
   runDifficultyInfo,
   runLockedConsumables,
   RUN_CONSUMABLES,
@@ -37,6 +39,8 @@ import {
   RUN_GEMS_PER_BOSS,
   RUN_GEMS_PER_TRAINER,
   RUN_SHOP_TILE_PRICES,
+  RUN_RARE_CANDY_PRICE,
+  SELL_ONLY_ITEM_IDS,
   WILD_LOCATIONS
 } from '../../shared/battle-types'
 import {
@@ -95,6 +99,8 @@ interface RunMon {
   lockedMoves?: string[]
   // An ability given on a New Ability floor: kept through evolution.
   lockedAbility?: string
+  // The ability it had before that - what resetting the New Ability pick goes back to.
+  originalAbility?: string
 }
 
 interface StoredRun {
@@ -152,12 +158,15 @@ export function runLevelCap(bossesBeaten: number): number {
 }
 
 // How strong this floor's opponents are (Lv 4 on the first floor, just under the Lv 5 starter). Each stretch between bosses is a climb of its
-// own: the floor after a boss starts at that boss's level, and the next ones rise
-// quickly (front-loaded) to a level under the next boss. A boss fights at the level
+// own: the floor after a boss starts a couple of levels under that boss, and the next
+// ones rise quickly (front-loaded) to a few levels under the next boss. A boss fights at the level
 // cap its stretch had (the Champion at 100) - as strong as your team can be.
 const FIRST_OPPONENT_LEVEL = 4
 // Under 1 makes the first floors of a stretch climb faster than the last.
 const STRETCH_CURVE = 0.8
+// How far under the last boss a stretch starts, and under the next boss it tops out.
+const STRETCH_START_BELOW_BOSS = 2
+const STRETCH_END_BELOW_BOSS = 3
 
 /** The n-th boss's level (0 = the first). */
 export function runBossLevel(bossIndex: number): number {
@@ -170,8 +179,8 @@ export function runOpponentLevel(floor: number): number {
   const place = f - bossIndex * ROGUELITE_BOSS_EVERY
   const bossLevel = runBossLevel(bossIndex)
   if (place === ROGUELITE_BOSS_EVERY) return bossLevel
-  const start = bossIndex === 0 ? FIRST_OPPONENT_LEVEL : runBossLevel(bossIndex - 1)
-  const end = bossLevel - 1
+  const end = bossLevel - STRETCH_END_BELOW_BOSS
+  const start = Math.min(end, bossIndex === 0 ? FIRST_OPPONENT_LEVEL : runBossLevel(bossIndex - 1) - STRETCH_START_BELOW_BOSS)
   const t = (place - 1) / (ROGUELITE_BOSS_EVERY - 2)
   return Math.round(start + (end - start) * Math.pow(t, STRETCH_CURVE))
 }
@@ -241,8 +250,6 @@ const STAPLE_ITEMS = new Set([
   'fairyfeather'
 ])
 const STAPLE_WEIGHT = 3
-// Held items that do nothing in a battle.
-const NOT_FOR_BATTLE = new Set(['rarebone', 'prettyfeather', 'bottlecap', 'goldbottlecap'])
 
 let cachedItemPool: string[] | null = null
 
@@ -263,7 +270,7 @@ function runItemPool(): string[] {
       ...new Set([
         ...STAPLE_ITEMS,
         ...getDefaultShopCatalog()
-          .filter((item) => item.category === 'Items' && !signature.has(item.id) && !NOT_FOR_BATTLE.has(item.id))
+          .filter((item) => item.category === 'Items' && !signature.has(item.id) && !SELL_ONLY_ITEM_IDS.has(item.id))
           .map((item) => item.id)
       ])
     ]
@@ -383,15 +390,15 @@ function isBossFloor(floor: number): boolean {
 // Pokemon (the weight is shared out between the locations), then trainers, and rarely
 // an item or a rest. A rest is only rolled once someone could use it.
 const FLOOR_OPTIONS = 5
-// Random Swap is as rare as an item floor - its share came out of Wild's, so nothing
-// else got rarer.
+// Item, New Ability and New Move floors are equally likely. Random Swap's share came
+// out of Wild's, so nothing else got rarer.
 const CHOICE_WEIGHTS: Record<'wild' | 'trainer' | 'item' | 'heal' | 'ability' | 'move' | 'swap', number> = {
   wild: 38,
   trainer: 25,
-  item: 4,
+  item: 8,
   heal: 9,
-  ability: 10,
-  move: 10,
+  ability: 8,
+  move: 8,
   swap: 4
 }
 
@@ -468,6 +475,7 @@ function toView(mon: RunMon): RunMonView {
       return { id, name: getMoveInfo(id)?.name ?? move, locked: locked.has(id) }
     }),
     abilityLocked: !!mon.lockedAbility,
+    abilityResetTo: mon.lockedAbility ? resetAbilityFor(mon) : null,
     abilityChoices: speciesAbilityChoices(mon.set.species),
     id: mon.id,
     exp: mon.exp,
@@ -514,7 +522,7 @@ export function getRunView(): RunView | null {
     bossesBeaten: current.bossesBeaten,
     levelCap: runLevelCap(current.bossesBeaten),
     opponentLevel: runOpponentLevel(current.floor),
-    nextBossLabel: rogueliteBossLabelAt(current.bossesBeaten),
+    nextBossLabel: rogueliteBossLabelAt(current.bossesBeaten, current.difficulty),
     team: current.team.map(toView),
     choices: current.status === 'active' ? current.choices : [],
     itemOffer: current.itemOffer ? itemOfferView(current.itemOffer) : null,
@@ -641,7 +649,7 @@ function endRun(current: StoredRun, status: 'lost' | 'won'): void {
   current.choices = []
   current.itemOffer = null
   current.rewards = payRunRewards(current)
-  recordBestFloor(current.floor)
+  recordBestFloor(current.floor, runDifficultyInfo(current.difficulty).id)
   persist()
   if (status === 'won') {
     countAchievement('runsWon')
@@ -661,7 +669,7 @@ function payRunRewards(current: StoredRun): RunRewardLine[] {
     counts.set(itemId, (counts.get(itemId) ?? 0) + 1)
   }
   const appliesTo = (who: typeof reward.randomPokemon, bossIndex: number): boolean =>
-    who === 'all' || (!!who && who.includes(rogueliteBossClassAt(bossIndex)))
+    who === 'all' || (!!who && who.includes(rogueliteBossClassAt(bossIndex, current.difficulty)))
   let money = 0
   for (let i = 0; i < current.bossesBeaten; i++) {
     money += reward.money
@@ -929,7 +937,11 @@ export function getRunMonEditInfo(runMonId: string): RunMonEditInfo {
     moves: mon.set.moves.map((m) => toID(m)),
     lockedMoves: [...(mon.lockedMoves ?? [])],
     teraType: mon.set.teraType || speciesStatsAndTypes(mon.set.species, null).types[0],
-    teraTypes: getEditorOptions().types
+    teraTypes: getEditorOptions().types,
+    abilityDescription: abilityInfo(toID(mon.set.ability))?.description ?? '',
+    itemDescription: mon.set.item
+      ? (getEditorOptions().items.find((i) => i.id === toID(mon.set.item))?.description ?? '')
+      : ''
   }
 }
 
@@ -989,6 +1001,7 @@ export function takeSwapNode(): RunView {
 function inheritFromReplaced(newcomer: RunMon, replaced: RunMon): RunMon {
   newcomer.set.item = replaced.set.item
   if (replaced.lockedAbility) {
+    newcomer.originalAbility = newcomer.set.ability
     newcomer.set.ability = replaced.lockedAbility
     newcomer.lockedAbility = replaced.lockedAbility
   }
@@ -1085,9 +1098,31 @@ export function giveRunAbility(abilityId: string, runMonId: string): RunView {
   }
   const mon = runMon(current, runMonId)
   const name = abilityInfo(abilityId)?.name ?? abilityId
+  // The first pick remembers what it came with - a second pick doesn't overwrite that.
+  if (!mon.lockedAbility) mon.originalAbility = mon.set.ability
   mon.set.ability = name
   mon.lockedAbility = name
   return finishPick(current)
+}
+
+// What a New Ability pick resets to: the ability it came with, if its species (it may
+// have evolved since) can still have it - otherwise its species' main ability.
+function resetAbilityFor(mon: RunMon): string {
+  const choices = speciesAbilityChoices(mon.set.species)
+  const original = mon.originalAbility ? choices.find((a) => a.id === toID(mon.originalAbility!)) : undefined
+  return (original ?? choices[0])?.name ?? mon.set.ability
+}
+
+/** Undoes a New Ability pick: back to the ability it came with (free, from the editor). */
+export function resetRunAbility(runMonId: string): RunView {
+  const current = activeRun()
+  const mon = runMon(current, runMonId)
+  if (!mon.lockedAbility) throw new Error(`${mon.set.species} has no New Ability pick to reset`)
+  mon.set.ability = resetAbilityFor(mon)
+  mon.lockedAbility = undefined
+  mon.originalAbility = undefined
+  persist()
+  return getRunView()!
 }
 
 /**
@@ -1219,7 +1254,11 @@ export function finishRunBattleWon(
     ? levelTeamTo(current, runBossLevel(current.bossesBeaten))
     : levelUpTeam(current, kind === 'trainer' ? LEVELS_PER_TRAINER_WIN : LEVELS_PER_WILD_WIN)
   if (wasBoss) current.bossesBeaten += 1
-  if (kind === 'trainer' || wasBoss) current.gems = (current.gems ?? 0) + (wasBoss ? RUN_GEMS_PER_BOSS : RUN_GEMS_PER_TRAINER)
+  // Easy pays one extra gem per trainer and boss win.
+  if (kind === 'trainer' || wasBoss) {
+    const easyBonus = runDifficultyInfo(current.difficulty).id === 'easy' ? 1 : 0
+    current.gems = (current.gems ?? 0) + (wasBoss ? RUN_GEMS_PER_BOSS : RUN_GEMS_PER_TRAINER) + easyBonus
+  }
   if (wasBoss && !runDifficultyInfo(current.difficulty).noHealing) {
     // A beaten boss patches the team up for the next stretch.
     for (const mon of current.team) {
@@ -1227,7 +1266,8 @@ export function finishRunBattleWon(
       mon.status = null
     }
   }
-  if (current.bossesBeaten >= ROGUELITE_BOSS_COUNT || current.floor >= ROGUELITE_FINAL_FLOOR) {
+  // The Champion beaten: the run's won (Easy and Normal have fewer bosses - see runBossCount).
+  if (current.bossesBeaten >= runBossCount(current.difficulty) || current.floor >= runFinalFloor(current.difficulty)) {
     endRun(current, 'won')
     return { expGains, fainted, itemReward: false }
   }
@@ -1329,10 +1369,17 @@ export function useRunFullRestore(runMonId: string): RunView {
   return getRunView()!
 }
 
-/** Revive: a Pokemon that fainted this run rejoins the team, at half HP and this floor's opponent level, its moves as they were. */
-export function useRunRevive(faintedId: string): RunView {
+/**
+ * Revive: a Pokemon that fainted this run rejoins the team, at half HP and this floor's
+ * opponent level, its moves as they were. With a full team it takes the place of the team
+ * member picked to leave (`replaceId`) - who goes to the fainted, to be revived later.
+ */
+export function useRunRevive(faintedId: string, replaceId?: string): RunView {
   const current = activeRun()
-  if (current.team.length >= ROGUELITE_MAX_TEAM) throw new Error('Your run team is full')
+  const full = current.team.length >= ROGUELITE_MAX_TEAM
+  if (full && !replaceId) throw new Error('Your run team is full - pick who leaves to make room')
+  const replaceAt = full ? current.team.findIndex((m) => m.id === replaceId) : -1
+  if (full && replaceAt === -1) throw new Error("That Pokemon isn't on your run team")
   const index = (current.fainted ?? []).findIndex((m) => m.id === faintedId)
   if (index === -1) throw new Error("That Pokemon hasn't fainted this run")
   spendConsumable(current, 'revive')
@@ -1343,7 +1390,13 @@ export function useRunRevive(faintedId: string): RunView {
   mon.hp = 0.5
   mon.status = null
   // It comes back with the moves it fainted with (not a fresh set for its new level).
-  current.team.push(mon)
+  if (replaceAt >= 0) {
+    // The one making room joins the fainted, newest first - item, moves and all.
+    const [left] = current.team.splice(replaceAt, 1, mon)
+    current.fainted = [{ ...left, hp: 0, status: null }, ...current.fainted!]
+  } else {
+    current.team.push(mon)
+  }
   persist()
   return getRunView()!
 }
@@ -1359,6 +1412,7 @@ export function useRunAbilityCapsule(runMonId: string, abilityId: string): RunVi
   // It replaces a New Ability pick too - that one no longer carries through evolution.
   mon.set.ability = choice.name
   mon.lockedAbility = undefined
+  mon.originalAbility = undefined
   persist()
   return getRunView()!
 }
@@ -1384,6 +1438,23 @@ export function buyRunConsumable(id: RunConsumableId): RunView {
   requireConsumableAllowed(current, id)
   spendGems(current, RUN_CONSUMABLE_PRICES[id])
   current.consumables = { ...current.consumables, [id]: (current.consumables?.[id] ?? 0) + 1 }
+  persist()
+  return getRunView()!
+}
+
+/**
+ * Buys a Rare Candy in a boss floor's shop and uses it right away: the team member goes
+ * up a level, even past the run's level cap (up to 100). Later level-ups never take it
+ * back down - they only raise the ones under the cap.
+ */
+export function buyRunRareCandy(runMonId: string): RunView {
+  const current = activeRun()
+  requireShop(current)
+  const mon = runMon(current, runMonId)
+  if (mon.set.level >= 100) throw new Error(`${mon.set.species} is already level 100`)
+  spendGems(current, RUN_RARE_CANDY_PRICE)
+  mon.set.level += 1
+  mon.exp = totalExpForSpeciesLevel(mon.set.species, mon.set.level)
   persist()
   return getRunView()!
 }

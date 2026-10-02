@@ -109,6 +109,44 @@ export const COIN_PRICE = 10
 export const MAX_BET = 1000
 export const COIN_PACKS = [100, 500, 1000, 5000]
 
+// The Coin Shop's daily offer: a big pack at a discount, bought once a day - it comes back
+// the next day (local midnight).
+export const DAILY_COIN_OFFER = { coins: 2500, price: 15000 }
+
+// The Coin Shop's Pokemon of the day: an ultra beast, paradox, mythical or gold legendary,
+// bought once a day and arriving already at this many merge stars (4 copies). It costs
+// two and a half times its 2-star sell price in coins (each coin being worth COIN_PRICE) -
+// a gold one 50,000 coins, a red one 10,000 - so it can never be bought and sold back at a
+// profit, and costs about what four of it would.
+export const DAILY_MON_STARS = 2
+export const DAILY_MON_MARKUP = 2.5
+
+export interface DailyCoinMon {
+  species: string
+  // Its rarity colour: 'legendary' (gold) or 'epic' (red).
+  tier: 'legendary' | 'epic'
+  coins: number
+  stars: number
+  bought: boolean
+}
+
+export interface DailyCoinMonPurchase extends CoinBalance {
+  species: string
+  shiny: boolean
+}
+
+export interface DailyCoinOffer {
+  coins: number
+  price: number
+  // What the same coins cost as a normal pack.
+  fullPrice: number
+  // Bought already today.
+  bought: boolean
+}
+
+// The most of one prize traded at once.
+export const MAX_PRIZE_BULK = 99
+
 export interface CoinPrize {
   itemId: string
   coins: number
@@ -118,7 +156,7 @@ export const COIN_PRIZES: CoinPrize[] = [
   { itemId: 'lockcapsule', coins: 200 },
   { itemId: 'wishingpiece', coins: 5000 },
   { itemId: 'randompokemon', coins: 1000 },
-  { itemId: 'shinypatch', coins: 2000 },
+  { itemId: 'shinypatch', coins: 5000 },
   { itemId: 'expcandyl', coins: 2000 },
   { itemId: 'randomlegendary', coins: 20000 }
 ]

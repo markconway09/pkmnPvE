@@ -4,6 +4,7 @@ import { ballStateFor, pokeballStyle } from './pokeballIcon'
 import RewardsTooltipContent from './RewardsTooltipContent'
 import Tooltip from './Tooltip'
 import SpriteImage from './SpriteImage'
+import { loadSpriteStyle } from './spriteStyle'
 import { toSpriteId } from '../../shared/battle-types'
 import type { CompanionSize } from '../../shared/battle-types'
 
@@ -21,7 +22,7 @@ interface Props {
   // don't show it; null is a friendly match with nothing to win.
   rewards?: BattleRewardsView | null
   // The player's companion, standing beside their sprite, at the size they picked.
-  companion?: { species: string; shiny: boolean; size: CompanionSize } | null
+  companion?: { species: string; shiny: boolean; gmaxLook?: boolean; size: CompanionSize } | null
   // No Poke Balls - the player's own team is on show beside the battle anyway.
   hideBalls?: boolean
 }
@@ -54,10 +55,11 @@ function TrainerHud({ name, title, spriteId, roster, align, size = 'small', rewa
     <div className="trainer-hud-figure">
       {sprite}
       <SpriteImage
-        style="2d-animated"
+        style={loadSpriteStyle()}
         className={`trainer-hud-companion trainer-hud-companion-${companion.size.toLowerCase()}`}
         spriteId={toSpriteId(companion.species)}
         shiny={companion.shiny}
+        gmax={companion.gmaxLook}
         alt={companion.species}
       />
     </div>

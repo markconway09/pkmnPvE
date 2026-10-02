@@ -19,48 +19,48 @@ import type {
   RunView,
   WildLocationId
 } from '../../shared/battle-types'
-import TeamRow from './TeamRow'
+import TeamDock from './TeamDock'
 import CompanionSlot, { COMPANION_SLOT_ID } from './CompanionSlot'
-import type { CompanionSizeChoice } from '../../shared/battle-types'
+import type { CompanionSizeChoice, RunDifficulty } from '../../shared/battle-types'
 import BoxGrid from './BoxGrid'
 import PokemonEditor from './PokemonEditor'
 import PokemonIconVisual from './PokemonIconVisual'
 import DebugMenu from './DebugMenu'
+import DebugAddMon from './DebugAddMon'
 import PlayerTrainerModal from './PlayerTrainerModal'
 import PokedexModal from './PokedexModal'
 import ChallengeModal from './ChallengeModal'
 import StarterPicker from './StarterPicker'
 import PokemonContextMenu from './PokemonContextMenu'
 import MergeModal from './MergeModal'
-import MissionsModal from './MissionsModal'
+import RewardsModal, { type RewardsTab } from './RewardsModal'
 import type { MissionsState } from '../../shared/missions'
-import BagModal from './BagModal'
-import ShopModal from './ShopModal'
+import BagShopModal from './BagShopModal'
+import type { BagShopTab } from './BagShopTabs'
 import WildDropsModal from './WildDropsModal'
 import ShopPricesModal from './ShopPricesModal'
 import LoadoutsModal from './LoadoutsModal'
 import BossRematchModal from './BossRematchModal'
 import RunMovesChoice from './RunMovesChoice'
 import RoguelitePanel, { RUN_MON_DRAG_PREFIX, RUN_SLOT_DROP_PREFIX, RUN_STARTER_SLOT_ID } from './RoguelitePanel'
-import { loadMenuMode, saveMenuMode, type MenuMode } from './menuMode'
+import DraftPanel from './DraftPanel'
+import { loadMenuPage, saveMenuPage, type MenuPage } from './menuMode'
+import MenuRail from './MenuRail'
+import HomeHub from './HomeHub'
+import RaidPage from './RaidPage'
 import { trainerSpriteUrl } from './trainerSprite'
-import SlotMachine from './SlotMachine'
-import BlackjackTable from './BlackjackTable'
-import type { GameCornerGame } from './GameCornerTabs'
+import type { GameCornerTab } from './GameCornerTabs'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
-import CoinShopModal from './CoinShopModal'
-import RouletteTable from './RouletteTable'
-import PlinkoBoard from './PlinkoBoard'
-import ItemSprite from './ItemSprite'
+import GameCornerModal from './GameCornerModal'
 import SearchBar from './SearchBar'
-import AchievementsModal from './AchievementsModal'
 import type { AchievementsState } from '../../shared/achievements'
 import { LOCATION_BUTTON_BACKDROP, backdropUrl, locationIconUrl } from './battleScenery'
 import { formatMoney } from './money'
 import ShinyIcon from './ShinyIcon'
 
 interface Props {
-  onFight: () => void
+  // A wild battle - in that location, or the one last picked.
+  onFight: (location?: WildLocationId) => void
   wildLocation: WildLocationId
   onChangeWildLocation: (location: WildLocationId) => void
   wildLevelCap: number
@@ -88,8 +88,6 @@ const EMPTY_TEAM: (string | null)[] = [null, null, null, null, null, null]
 // Below this a wild encounter's level range gets thin enough to barely mean
 // anything - the slider simply doesn't go lower.
 const WILD_LEVEL_CAP_MIN = 15
-// The Poke Ball on the Showdown item sheet - the Classic mode's icon.
-const POKE_BALL_SPRITENUM = 345
 
 // The orders the expanded box can be sorted in.
 type BoxSortKey = 'arrival' | 'name' | 'bst' | 'dex' | 'stars'
@@ -141,7 +139,37 @@ function matchesBoxSearch(mon: BoxPokemonView, search: string): boolean {
 }
 
 // Each mode's colour, for the pulse when switching to it (the toggle's own colours).
-const MODE_COLORS: Record<MenuMode, string> = { classic: '#6bb0ff', roguelite: '#b48cff' }
+const MODE_COLORS: Record<MenuPage, string> = {
+  home: '#9fb3c8',
+  classic: '#6bb0ff',
+  box: '#5fd4b0',
+  roguelite: '#b48cff',
+  draft: '#ffb74d',
+  raid: '#e9628c',
+  corner: '#ffd76b'
+}
+
+// Each page's name over it, beside its sidebar icon.
+const PAGE_TITLES: Record<MenuPage, string> = {
+  home: 'Home',
+  classic: 'Classic',
+  box: 'Box',
+  roguelite: 'Roguelite',
+  draft: 'Draft',
+  raid: 'Max Raid',
+  corner: 'Game Corner'
+}
+
+// The number keys open the pages, in the sidebar's order (Home is 0).
+const PAGE_KEYS: Record<string, MenuPage> = {
+  '0': 'home',
+  '1': 'classic',
+  '2': 'box',
+  '3': 'roguelite',
+  '4': 'draft',
+  '5': 'raid',
+  '6': 'corner'
+}
 
 // Players who've asked their system for less motion get the switch without the effects.
 function reducedMotion(): boolean {
@@ -171,13 +199,16 @@ function MainMenu({
   onRunBattle
 }: Props): React.JSX.Element {
   const [boxState, setBoxState] = useState<BoxState | null>(null)
-  // Classic or Roguelite menu - remembered per player. Switching never touches a run.
-  const [mode, setMode] = useState<MenuMode>(() => loadMenuMode(username))
-  // Switching modes: the colour pulse spreading from the toggle (see toggleMode), and the
-  // menu content fading in behind it.
-  const [modePulse, setModePulse] = useState<{ x: number; y: number; radius: number; mode: MenuMode; seq: number } | null>(
+  // The menu's open page - Home, a mode or the Game Corner - picked from the sidebar.
+  // Switching never touches a run. The modes' own pages go by `mode`.
+  const [mode, setMode] = useState<MenuPage>(() => loadMenuPage(username))
+  // Switching pages: the colour pulse spreading from the sidebar button (see goTo), and
+  // the page fading in behind it.
+  const [modePulse, setModePulse] = useState<{ x: number; y: number; radius: number; mode: MenuPage; seq: number } | null>(
     null
   )
+  // Mid-spin / mid-hand in the Game Corner: the sidebar stays put until it's over.
+  const [cornerBusy, setCornerBusy] = useState(false)
   const sectionRef = useRef<HTMLDivElement>(null)
   const shownMode = useRef(mode)
   useEffect(() => {
@@ -197,7 +228,7 @@ function MainMenu({
   const [runPickId, setRunPickId] = useState<string | null>(null)
   const [runBusy, setRunBusy] = useState(false)
   const [runError, setRunError] = useState<string | null>(null)
-  const [bestFloor, setBestFloor] = useState<number | null>(null)
+  const [bestFloor, setBestFloor] = useState<{ floor: number; difficulty: RunDifficulty | null } | null>(null)
   // Keep moves or take new ones - asked when a run starts and when a run Pokemon evolves.
   const [movesChoice, setMovesChoice] = useState<{
     title: string
@@ -206,6 +237,8 @@ function MainMenu({
   } | null>(null)
   // A run in progress takes the whole menu: the regular team and box are hidden.
   const runInProgress = mode === 'roguelite' && run?.status === 'active'
+  // Draft mode never uses the box, so it always has the whole menu too.
+  const fullPanel = runInProgress || mode === 'draft'
   const [levelCap, setLevelCap] = useState<number | null>(null)
   const [eligibility, setEligibility] = useState<BattleEligibility | null>(null)
   const [busy, setBusy] = useState(false)
@@ -215,11 +248,13 @@ function MainMenu({
   const [editorVersion, setEditorVersion] = useState(0)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [debugOpen, setDebugOpen] = useState(false)
+  const [debugAddOpen, setDebugAddOpen] = useState(false)
   const [wildDropsOpen, setWildDropsOpen] = useState(false)
   const [shopPricesOpen, setShopPricesOpen] = useState(false)
   const [loadoutsOpen, setLoadoutsOpen] = useState(false)
-  // Folds the battle buttons away so the box gets the rest of the window.
-  const [boxExpanded, setBoxExpanded] = useState(false)
+  // The Box page: Classic's team and box with the battle buttons folded away, so the
+  // box gets the rest of the window.
+  const boxExpanded = mode === 'box'
   // Picking Pokemon in the expanded box to sell at once (null: not picking).
   const [boxSelection, setBoxSelection] = useState<Set<string> | null>(null)
   // The expanded box's filter chips, and whether its Select menu is open.
@@ -242,27 +277,35 @@ function MainMenu({
   const [pokedexOpen, setPokedexOpen] = useState(false)
   const [challengeOpen, setChallengeOpen] = useState(false)
   const [starterOpen, setStarterOpen] = useState(false)
-  const [bagOpen, setBagOpen] = useState(false)
-  const [shopOpen, setShopOpen] = useState(false)
-  // The Game Corner: the slot machine, and the Coin Shop its coins come from.
-  // The Game Corner game open (null: none), and the last one played - the button and the
-  // Coin Shop both go back to it.
-  const [gameCorner, setGameCorner] = useState<GameCornerGame | null>(null)
-  const [lastGame, setLastGame] = useState<GameCornerGame>('slots')
-  const [coinShopOpen, setCoinShopOpen] = useState(false)
-  const openGame = (game: GameCornerGame): void => {
-    setLastGame(game)
-    setGameCorner(game)
-  }
-  const toCoinShop = (): void => {
-    setGameCorner(null)
-    setCoinShopOpen(true)
-  }
+  // The Bag | Shop window, open on one of its tabs.
+  const [bagShopTab, setBagShopTab] = useState<BagShopTab | null>(null)
+  // The Game Corner page's tab (one of its games or the Coin Shop) - it reopens on the
+  // one played last.
+  const gameCornerOpen = mode === 'corner'
+  const [gameCornerTab, setGameCornerTab] = useState<GameCornerTab>('slots')
   const [money, setMoney] = useState<number | null>(null)
   const [achievements, setAchievements] = useState<AchievementsState | null>(null)
-  const [achievementsOpen, setAchievementsOpen] = useState(false)
+  // The Daily Missions | Achievements window, open on one of its tabs.
+  const [rewardsTab, setRewardsTab] = useState<RewardsTab | null>(null)
   // The player card's menu (profile, options, debug), placed under the card.
   const [playerMenu, setPlayerMenu] = useState<{ right: number; top: number } | null>(null)
+  // The player menu opens on hover and closes a moment after the pointer leaves both the
+  // card and the menu - the delay lets it cross the gap between them.
+  const playerMenuCloseTimer = useRef<number | null>(null)
+  const cancelPlayerMenuClose = (): void => {
+    if (playerMenuCloseTimer.current !== null) window.clearTimeout(playerMenuCloseTimer.current)
+    playerMenuCloseTimer.current = null
+  }
+  const schedulePlayerMenuClose = (): void => {
+    cancelPlayerMenuClose()
+    playerMenuCloseTimer.current = window.setTimeout(() => setPlayerMenu(null), 200)
+  }
+  const openPlayerMenu = (card: HTMLElement): void => {
+    cancelPlayerMenuClose()
+    const rect = card.getBoundingClientRect()
+    setPlayerMenu((open) => open ?? { right: window.innerWidth - rect.right, top: rect.bottom + 4 })
+  }
+  useEffect(() => cancelPlayerMenuClose, [])
   // Notes that float up from the box (a Pokemon sold, or why it couldn't be).
   const notes = useFloatingNotes()
   const unclaimedAchievements = achievements?.achievements.filter((a) => a.unlocked && !a.claimed).length ?? 0
@@ -305,7 +348,11 @@ function MainMenu({
       .catch(() => setRun(null))
     window.api
       .getTrainerProfile()
-      .then((profile) => setBestFloor(profile.stats.bestFloor))
+      .then((profile) =>
+        setBestFloor(
+          profile.stats.bestFloor ? { floor: profile.stats.bestFloor, difficulty: profile.stats.bestFloorDifficulty } : null
+        )
+      )
       .catch(() => setBestFloor(null))
   }
 
@@ -336,20 +383,34 @@ function MainMenu({
     })
   }
 
-  function toggleMode(e: React.MouseEvent<HTMLButtonElement>): void {
-    const next: MenuMode = mode === 'classic' ? 'roguelite' : 'classic'
-    setMode(next)
-    saveMenuMode(username, next)
-    if (reducedMotion()) return
-    // A ring of the new mode's colour spreads from the button over the whole window...
-    const rect = e.currentTarget.getBoundingClientRect()
+  // Opens a page of the menu, from a sidebar button, a Home card or a number key.
+  function goTo(next: MenuPage, from: HTMLElement | null): void {
+    if (next === mode || cornerBusy) return
+    const open = (): void => {
+      if (mode === 'box') collapseBox()
+      setMode(next)
+      saveMenuPage(username, next)
+    }
+    // Under 100 coins there's little to play with - the Game Corner opens on the Coin Shop.
+    if (next === 'corner') {
+      window.api
+        .getCoins()
+        .then((coins) => {
+          if (coins < 100) setGameCornerTab('shop')
+        })
+        .catch(() => {})
+        .finally(open)
+    } else open()
+    if (reducedMotion() || !from) return
+    // A ring of the new page's colour spreads from the button over the whole window...
+    const rect = from.getBoundingClientRect()
     const x = rect.left + rect.width / 2
     const y = rect.top + rect.height / 2
     const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y))
     setModePulse((prev) => ({ x, y, radius, mode: next, seq: (prev?.seq ?? 0) + 1 }))
     // ...while the button itself flares up in it.
     const color = MODE_COLORS[next]
-    e.currentTarget.animate(
+    from.animate(
       [
         { boxShadow: `0 0 0 0 ${color}` },
         { boxShadow: `0 0 22px 6px ${color}`, offset: 0.3 },
@@ -358,6 +419,22 @@ function MainMenu({
       { duration: 700, easing: 'ease-out' }
     )
   }
+
+  // The number keys open the pages - not while typing, or with a window open over the menu.
+  const goToRef = useRef(goTo)
+  goToRef.current = goTo
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      const next = PAGE_KEYS[e.key]
+      if (!next || e.ctrlKey || e.altKey || e.metaKey || e.repeat) return
+      const target = e.target as HTMLElement | null
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return
+      if (document.querySelector('.modal-overlay, .context-menu-overlay')) return
+      goToRef.current(next, document.querySelector<HTMLElement>(`.menu-rail-${next}`))
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   function refreshAchievements(): void {
     window.api
@@ -377,9 +454,8 @@ function MainMenu({
     []
   )
 
-  // Daily missions: the day's three, and whether their window is open.
+  // Daily missions: the day's three.
   const [missions, setMissions] = useState<MissionsState | null>(null)
-  const [missionsOpen, setMissionsOpen] = useState(false)
   function refreshMissions(): void {
     window.api
       .getMissions()
@@ -392,6 +468,15 @@ function MainMenu({
     ? missions.missions.filter((m) => m.progress >= m.goal && !m.claimed).length +
       (missions.bonusReady && !missions.bonusClaimed ? 1 : 0)
     : 0
+
+  // The Daily Missions | Achievements window - on the missions tab when only mission
+  // rewards are waiting.
+  function openRewards(): void {
+    // A new day's missions, if the date has turned while the menu was open.
+    refreshMissions()
+    refreshAchievements()
+    setRewardsTab(claimableMissions > 0 && unclaimedAchievements === 0 ? 'missions' : 'achievements')
+  }
 
   function refreshAll(): void {
     refreshAchievements()
@@ -408,39 +493,16 @@ function MainMenu({
   // The Max Raid button counts Raid Crystals: bought in the Shop or the Coin Shop, sold
   // from the bag, or won from an achievement or the daily missions - so it's brought up
   // to date once those are all closed again (claims refresh it straight away too).
-  const itemWindowOpen = shopOpen || coinShopOpen || bagOpen || gameCorner !== null || missionsOpen || achievementsOpen
+  const [draftRefreshKey, setDraftRefreshKey] = useState(0)
+  const itemWindowOpen = bagShopTab !== null || gameCornerOpen || rewardsTab !== null
   useEffect(() => {
-    if (!itemWindowOpen) refreshEligibility()
+    if (!itemWindowOpen) {
+      refreshEligibility()
+      // The Draft panel shows the coins owned, which the Game Corner and Coin Shop change.
+      setDraftRefreshKey((k) => k + 1)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemWindowOpen])
-
-  async function addRandom(): Promise<void> {
-    setBusy(true)
-    try {
-      setBoxState(await window.api.addRandomBoxMon())
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function resetStats(): Promise<void> {
-    setBusy(true)
-    try {
-      const result = await window.api.resetStats()
-      setBoxState(result.box)
-      setLevelCap(result.progression.levelCap)
-      setMoney(result.money)
-      refreshEligibility()
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function resetBossProgression(): Promise<void> {
-    const progression = await window.api.resetProgression()
-    setLevelCap(progression.levelCap)
-    refreshEligibility()
-  }
 
   function handleContextMenu(e: React.MouseEvent, mon: BoxPokemonView): void {
     e.preventDefault()
@@ -492,21 +554,21 @@ function MainMenu({
     const ids = new Set<string>()
     for (const m of boxMons) {
       const ready = (m.mergeCandidates ?? []).filter((c) => !c.notReady)
-      if (!canBulkMerge(m) || ready.length === 0) continue
+      // The companion is left out - picking it would only ever make it the keeper.
+      if (!canBulkMerge(m) || m.companion || ready.length === 0) continue
       ids.add(m.id)
       for (const c of ready) ids.add(c.id)
     }
     setBoxSelection(ids)
   }
 
-  // Back to the battle buttons: the box's search, filters and selection are cleared.
+  // Leaving the Box page: its search, filters and selection are cleared.
   function collapseBox(): void {
     setBoxSearch('')
     setBoxFilters(new Set())
     setSelectMenuOpen(false)
     setSortMenuOpen(false)
     stopBoxSelection()
-    setBoxExpanded(false)
   }
 
   function startBoxSelection(mode: 'sell' | 'merge'): void {
@@ -690,16 +752,12 @@ function MainMenu({
     void persistTeam(newTeam)
   }
 
-  // Dropped on the companion slot: only a Pokemon at max friendship can go there.
+  // Dropped on the companion slot: any Pokemon can go there.
   function handleCompanionDrop(draggedId: string): void {
     const mon = monsById.get(draggedId)
     const slot = document.querySelector('.companion-slot')?.getBoundingClientRect()
     const at = slot ? { x: slot.left + slot.width / 2, y: slot.top } : { x: window.innerWidth / 4, y: window.innerHeight / 2 }
     if (!mon) return
-    if (!mon.maxFriendship) {
-      notes.show(`Only a Pokémon at max friendship can be a companion`, at, 'bad')
-      return
-    }
     window.api
       .setCompanion(draggedId)
       .then((box) => {
@@ -788,7 +846,12 @@ function MainMenu({
   } else bossHint = `Ready: ${nextBoss.trainerName}`
   // Every boss beaten: Boss Battle becomes the rematch menu.
   const allBossesDefeated = !!eligibility?.allBossesDefeated
-  if (allBossesDefeated) bossHint = 'Every boss is beaten - pick one to fight again'
+  if (allBossesDefeated) bossHint = 'Fight any boss again'
+
+  // The wild level tile fills what's left of the wild grid's last row (four to a row,
+  // "Anywhere" taking two) - or a whole row of its own when the tiles fill theirs.
+  const wildTileCells = WILD_LOCATIONS.filter((loc) => !loc.requiresAllBosses || allBossesDefeated).length + 1
+  const wildLevelSpan = (4 - (wildTileCells % 4)) % 4 || 4
 
   // The Lab closes again if boss progress is reset - back to All.
   const selectedLocation = WILD_LOCATIONS.find((l) => l.id === wildLocation)
@@ -796,24 +859,68 @@ function MainMenu({
     if (eligibility && selectedLocation?.requiresAllBosses && !eligibility.allBossesDefeated) onChangeWildLocation('all')
   }, [eligibility, selectedLocation, onChangeWildLocation])
 
+  // The dock hidden down to its tab - remembered in this browser's storage (losing it
+  // just means the dock shows).
+  const [dockCollapsed, setDockCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('pkmnpve.dockCollapsed') === '1'
+    } catch {
+      return false
+    }
+  })
+  function collapseDock(collapsed: boolean): void {
+    setDockCollapsed(collapsed)
+    try {
+      localStorage.setItem('pkmnpve.dockCollapsed', collapsed ? '1' : '0')
+    } catch {
+      // Not remembered - it only decides whether the dock opens hidden.
+    }
+  }
+  // The team dock shows on Home, Classic, the Box and Max Raid pages and while setting up
+  // a Roguelite run (drag a team member onto the starter slot); it stays loaded elsewhere.
+  const dockShown =
+    mode === 'home' || mode === 'classic' || mode === 'box' || mode === 'raid' || (mode === 'roguelite' && !runInProgress)
+  // The dock itself, and the picture that follows the pointer while a Pokemon is dragged.
+  const teamDock = (
+    <TeamDock
+      team={team}
+      monsById={monsById}
+      companion={
+        // The companion, off the dock's left - once the Best Friends achievement opens the slot.
+        boxState?.companionUnlocked && (
+          <CompanionSlot
+            companion={boxState.companion ?? null}
+            dragging={activeDragMon ?? null}
+            size={boxState.companionSize ?? 'S'}
+            sizeChoice={boxState.companionSizeChoice ?? 'auto'}
+            onSetSize={setCompanionSize}
+            onReturn={returnCompanion}
+          />
+        )
+      }
+      onEdit={(id) => openEditor(id, false)}
+      onContextMenu={handleContextMenu}
+      onApplied={setBoxState}
+      onManage={() => setLoadoutsOpen(true)}
+      manageOpen={loadoutsOpen}
+      leadCount={mode === 'raid' ? 2 : 0}
+      collapsed={dockCollapsed}
+      onCollapsedChange={collapseDock}
+    />
+  )
+  const dragOverlay = (
+    <DragOverlay dropAnimation={{ duration: 200, easing: 'ease' }}>
+      {activeDragMon && (
+        <div className="box-icon-draggable box-icon-overlay">
+          <PokemonIconVisual mon={activeDragMon} />
+        </div>
+      )}
+    </DragOverlay>
+  )
+
   return (
     <div
-      className="screen"
-      // The expanded box collapses again from a click on the menu's background - not on
-      // anything in it (the header, a team card, the box, or a pop-up) - the empty space
-      // around the team counts - and not mid-selection.
-      onClick={(e) => {
-        if (!boxExpanded || boxSelection) return
-        const target = e.target as HTMLElement
-        if (
-          target.closest(
-            'button, input, select, a, label, .menu-header, .team-slot, .companion-slot, .box-toolbar-attached, .box-grid, .modal-overlay, .context-menu-overlay, .context-menu, .tooltip-portal'
-          )
-        ) {
-          return
-        }
-        collapseBox()
-      }}
+      className="screen menu-shell"
     >
       {modePulse &&
         createPortal(
@@ -830,106 +937,40 @@ function MainMenu({
           />,
           document.body
         )}
+      <MenuRail
+        page={mode}
+        locked={cornerBusy}
+        onGo={goTo}
+        runFloor={run?.status === 'active' ? run.floor : null}
+        raidCrystals={eligibility?.raidsUnlocked ? eligibility.wishingPieces : null}
+        rewardsWaiting={claimableMissions + unclaimedAchievements}
+        onBag={() => setBagShopTab('bag')}
+        onShop={() => setBagShopTab('shop')}
+        onPokedex={() => setPokedexOpen(true)}
+        onRewards={openRewards}
+        onOptions={onOptions}
+      />
+      <div className="menu-content">
+      {/* The open page's name on the left, the player card on the right. */}
       <div className="menu-header">
-        <div className="menu-header-left">
-          <h1>pkmnPvE</h1>
-          {/* Both modes side by side - the lit one is where you are. */}
-          <div className="mode-switch" title="Switch between the classic game and Roguelite runs">
-            <button
-              className={`mode-switch-option mode-switch-classic${mode === 'classic' ? ' mode-switch-active' : ''}`}
-              onClick={(e) => mode !== 'classic' && toggleMode(e)}
-            >
-              <ItemSprite spritenum={POKE_BALL_SPRITENUM} className="mode-switch-icon" />
-              Classic
-            </button>
-            <button
-              className={`mode-switch-option mode-switch-roguelite${mode === 'roguelite' ? ' mode-switch-active' : ''}`}
-              onClick={(e) => mode !== 'roguelite' && toggleMode(e)}
-            >
-              <img className="mode-switch-icon" src="./icons/nav/roguelite.png" alt="" />
-              Roguelite
-            </button>
-          </div>
-        </div>
+        <h1 className={`menu-page-title menu-page-title-${mode}`}>{PAGE_TITLES[mode]}</h1>
         <div className="menu-nav">
-          {/* A run has no bag or shop of its own - these are the classic game's. */}
-          <div className="nav-actions">
-            <button className="nav-icon-button" title="Bag" disabled={mode === 'roguelite'} onClick={() => setBagOpen(true)}>
-              <img className="nav-icon" src="./icons/nav/bag.png" alt="Bag" />
-            </button>
-            <button className="nav-icon-button" title="Shop" disabled={mode === 'roguelite'} onClick={() => setShopOpen(true)}>
-              <img className="nav-icon nav-icon-smooth" src="./icons/nav/shop.svg" alt="Shop" />
-            </button>
-            {/* Open in either mode - its coins are the player's own, not a run's. The Coin
-                Shop opens from inside the Game Corner's games. */}
-            <button
-              className="nav-icon-button"
-              title="Game Corner: slots, blackjack, roulette and Plinko"
-              onClick={() => openGame(lastGame)}
-            >
-              <img className="nav-icon" src="./icons/nav/gamecorner.png" alt="Game Corner" />
-            </button>
-            <button
-              className="nav-icon-button"
-              title="Daily Missions"
-              onClick={() => {
-                // A new day's missions, if the date has turned while the menu was open.
-                refreshMissions()
-                setMissionsOpen(true)
-              }}
-            >
-              <img className="nav-icon" src="./icons/nav/missions.png" alt="Daily Missions" />
-              {claimableMissions > 0 && <span className="nav-achievements-badge">{claimableMissions}</span>}
-            </button>
-            <button
-              className="nav-icon-button"
-              title="Achievements"
-              onClick={() => {
-                refreshAchievements()
-                setAchievementsOpen(true)
-              }}
-            >
-              <img className="nav-icon" src="./icons/nav/achievements.png" alt="Achievements" />
-              {unclaimedAchievements > 0 && <span className="nav-achievements-badge">{unclaimedAchievements}</span>}
-            </button>
-          </div>
-          {/* The player: their trainer, name, title and money - opens a menu with the rarer things. */}
+          {/* The player: their trainer, name, title and money. A click anywhere on it opens
+              the Trainer Card; hovering it opens a menu with the rarer things. */}
           <button
             className={`nav-player-card${playerMenu ? ' nav-player-card-open' : ''}`}
-            title={`${username}'s menu`}
-            onClick={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect()
-              setPlayerMenu(playerMenu ? null : { right: window.innerWidth - rect.right, top: rect.bottom + 4 })
+            title="Trainer Card"
+            onMouseEnter={(e) => openPlayerMenu(e.currentTarget)}
+            onMouseLeave={schedulePlayerMenuClose}
+            onClick={() => {
+              setPlayerMenu(null)
+              setPlayerTrainerOpen(true)
             }}
           >
-            {/* The trainer itself goes straight to the Trainer Card; the rest of the card opens the menu. */}
-            <img
-              className="nav-trainer-sprite"
-              src={trainerSpriteUrl(trainerSprite)}
-              alt=""
-              title="Trainer Card"
-              onClick={(e) => {
-                e.stopPropagation()
-                setPlayerMenu(null)
-                setPlayerTrainerOpen(true)
-              }}
-            />
+            <img className="nav-trainer-sprite" src={trainerSpriteUrl(trainerSprite)} alt="" />
             <span className="nav-player-text">
               <span className="nav-player-name">{username}</span>
-              {/* The title too goes to the Trainer Card, where it's picked. */}
-              {achievements?.title && (
-                <span
-                  className="nav-player-title"
-                  title="Trainer Card"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setPlayerMenu(null)
-                    setPlayerTrainerOpen(true)
-                  }}
-                >
-                  {achievements.title}
-                </span>
-              )}
+              {achievements?.title && <span className="nav-player-title">{achievements.title}</span>}
             </span>
             {money !== null && <span className="nav-player-money">{formatMoney(money)}</span>}
             <span className="nav-player-caret">▾</span>
@@ -938,11 +979,14 @@ function MainMenu({
       </div>
       {playerMenu &&
         createPortal(
-          <div className="context-menu-overlay" onMouseDown={() => setPlayerMenu(null)}>
+          // A hover menu: the overlay lets the pointer through, so the card under it still
+          // knows when it's hovered.
+          <div className="context-menu-overlay nav-player-menu-overlay">
             <div
               className="context-menu nav-player-menu"
               style={{ right: playerMenu.right, top: playerMenu.top }}
-              onMouseDown={(e) => e.stopPropagation()}
+              onMouseEnter={cancelPlayerMenuClose}
+              onMouseLeave={schedulePlayerMenuClose}
             >
               {[
                 {
@@ -951,27 +995,18 @@ function MainMenu({
                   action: () => setPlayerTrainerOpen(true)
                 },
                 {
-                  label: 'Pokédex',
-                  icon: <img className="nav-menu-icon" src="./icons/nav/pokedex.png" alt="" />,
-                  action: () => setPokedexOpen(true)
-                },
-                {
                   label: 'Challenge a player',
                   icon: <img className="nav-menu-icon" src="./icons/nav/challenge.png" alt="" />,
                   action: () => setChallengeOpen(true)
                 },
-                {
-                  label: 'Options',
-                  icon: <img className="nav-menu-icon" src="./icons/nav/options.png" alt="" />,
-                  action: onOptions
-                },
                 ...(isAdmin
                   ? [{ label: 'Debug', icon: <span className="nav-menu-icon">🛠</span>, action: () => setDebugOpen(true) }]
                   : [])
-              ].map(({ label, icon, action }) => (
+              ].map(({ label, icon, action }, i) => (
                 <button
                   key={label}
                   className="context-menu-item nav-menu-item"
+                  style={{ '--i': i } as React.CSSProperties}
                   onClick={() => {
                     setPlayerMenu(null)
                     action()
@@ -991,13 +1026,56 @@ function MainMenu({
       {mode === 'roguelite' && runError && <p style={{ color: '#ff6b6b' }}>{runError}</p>}
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <div ref={sectionRef} className={`menu-page menu-page-${mode}`}>
+      {mode === 'home' ? (
+        <HomeHub
+          levelCap={levelCap}
+          eligibility={eligibility}
+          bossHint={bossHint}
+          run={run}
+          bestFloor={bestFloor}
+          missions={missions}
+          fightBusy={fightBusy}
+          onGo={goTo}
+          onOpenMissions={() => {
+            refreshMissions()
+            setRewardsTab('missions')
+          }}
+        />
+      ) : mode === 'raid' ? (
+        <RaidPage
+          eligibility={eligibility}
+          teamSize={team.filter(Boolean).length}
+          levelCap={levelCap}
+          fightBusy={fightBusy}
+          onStart={onRaidFight}
+          onOpenShop={() => setBagShopTab('shop')}
+          onOpenCoinShop={() => {
+            setGameCornerTab('shop')
+            goTo('corner', document.querySelector<HTMLElement>('.menu-rail-corner'))
+          }}
+        />
+      ) : mode === 'corner' ? (
+        <GameCornerModal
+          inline
+          initialTab={gameCornerTab}
+          onTabChange={setGameCornerTab}
+          onClose={() => {}}
+          onBusyChange={setCornerBusy}
+          onMoneyChange={setMoney}
+        />
+      ) : (
+      <>
       <div
-        ref={sectionRef}
-        className={`battle-section${boxExpanded && !runInProgress ? ' battle-section-collapsed' : ''}${
-          runInProgress ? ' battle-section-run' : ''
+        className={`battle-section${boxExpanded && !fullPanel ? ' battle-section-collapsed' : ''}${
+          fullPanel ? ' battle-section-run' : ''
         }`}
       >
-        {mode === 'roguelite' ? (
+        {mode === 'draft' ? (
+          <div className="battle-section-inner">
+            <DraftPanel busy={fightBusy} onBattle={(view) => onRunBattle(view)} refreshKey={draftRefreshKey} />
+          </div>
+        ) : mode === 'roguelite' ? (
           <div className="battle-section-inner">
             <RoguelitePanel
               run={run}
@@ -1086,125 +1164,179 @@ function MainMenu({
           </div>
         ) : (
         <div className="battle-section-inner">
-          {levelCap !== null && <p className="level-cap-display">Level Cap: {levelCap}</p>}
+          {/* One framed card like the Roguelite and Draft setups, in Classic's blue. */}
+          <div className="run-panel classic-panel">
+          <div className="classic-card">
+          <div className="run-setup-header">
+            <span className="run-hud-label">Battle</span>
+            {levelCap !== null && <span className="classic-level-cap">Level Cap {levelCap}</span>}
+          </div>
 
-          <div className="big-battle-row">
-            <button className="big-battle-button" disabled={fightBusy || teamEmpty} onClick={onFight}>
-              <img className="big-battle-icon" src="./icons/tall-grass.png" alt="" />
-              <span>Wild Battle</span>
-            </button>
+          {/* Wild Pokemon: every area is its own battle button - click one to find a wild
+              Pokemon there straight away (it's remembered as the last area fought in). */}
+          <div className="classic-section-head">
+            <img className="classic-section-icon" src="./icons/tall-grass.png" alt="" />
+            <span className="run-hud-label">Wild battle</span>
+            <span className="classic-section-sub">Pick an area to search</span>
+          </div>
+          <div className="classic-wild-grid">
+            {WILD_LOCATIONS.filter((loc) => !loc.requiresAllBosses || allBossesDefeated).map((loc) => (
+              <button
+                key={loc.id}
+                className={`classic-wild-tile classic-wild-${loc.id}${wildLocation === loc.id ? ' classic-wild-tile-last' : ''}`}
+                disabled={fightBusy || teamEmpty}
+                title={wildLocation === loc.id ? `${loc.label} - where you last searched` : `Find a wild Pokémon: ${loc.label}`}
+                style={{ backgroundImage: `url(${backdropUrl(LOCATION_BUTTON_BACKDROP[loc.id])})` }}
+                onClick={() => onFight(loc.id)}
+              >
+                <span className="classic-wild-go">Battle ▸</span>
+                <span className="classic-wild-label">
+                  <img className="classic-wild-icon" src={locationIconUrl(loc.id)} alt="" />
+                  {loc.id === 'all' ? 'Anywhere' : loc.label}
+                </span>
+              </button>
+            ))}
+            {/* The wild level, in the room left on the last row: the level big, - / + either
+                side (or the mouse wheel over it), quick picks, and a bar along the bottom
+                to drag. Wild Pokemon come at up to this level. */}
+            <div
+              className="classic-level-tile"
+              style={{ gridColumn: `span ${wildLevelSpan}` }}
+              title="Wild Pokémon come at up to this level - scroll over it to change it"
+              onWheel={(e) =>
+                onChangeWildLevelCap(
+                  Math.min(levelCapMax, Math.max(WILD_LEVEL_CAP_MIN, effectiveWildLevelCap + (e.deltaY < 0 ? 1 : -1)))
+                )
+              }
+            >
+              <div className="classic-level-main">
+                <button
+                  className="classic-level-step"
+                  aria-label="One level lower"
+                  disabled={effectiveWildLevelCap <= WILD_LEVEL_CAP_MIN}
+                  onClick={() => onChangeWildLevelCap(effectiveWildLevelCap - 1)}
+                >
+                  −
+                </button>
+                <span className="classic-level-value">
+                  <span className="classic-level-label">Wild level</span>
+                  <strong>Lv {effectiveWildLevelCap}</strong>
+                </span>
+                <button
+                  className="classic-level-step"
+                  aria-label="One level higher"
+                  disabled={effectiveWildLevelCap >= levelCapMax}
+                  onClick={() => onChangeWildLevelCap(effectiveWildLevelCap + 1)}
+                >
+                  +
+                </button>
+                <span className="classic-level-picks">
+                  {[
+                    { label: 'Min', level: WILD_LEVEL_CAP_MIN },
+                    { label: 'Half', level: Math.round((WILD_LEVEL_CAP_MIN + levelCapMax) / 2) },
+                    { label: 'Max', level: levelCapMax }
+                  ].map((p) => (
+                    <button
+                      key={p.label}
+                      className={`classic-level-pick${effectiveWildLevelCap === p.level ? ' classic-level-pick-on' : ''}`}
+                      title={`Lv ${p.level}`}
+                      onClick={() => onChangeWildLevelCap(p.level)}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </span>
+              </div>
+              <input
+                type="range"
+                className="classic-level-bar"
+                aria-label="Wild level"
+                min={WILD_LEVEL_CAP_MIN}
+                max={levelCapMax}
+                value={effectiveWildLevelCap}
+                style={
+                  {
+                    '--fill': `${levelCapMax > WILD_LEVEL_CAP_MIN ? ((effectiveWildLevelCap - WILD_LEVEL_CAP_MIN) / (levelCapMax - WILD_LEVEL_CAP_MIN)) * 100 : 100}%`
+                  } as React.CSSProperties
+                }
+                onChange={(e) => onChangeWildLevelCap(Number(e.target.value))}
+              />
+            </div>
+          </div>
+
+          {/* Trainers: the next trainer, and the next boss (or a rematch once all are beaten). */}
+          <div className="classic-section-head">
+            <img className="classic-section-icon" src="./icons/nav/classic.png" alt="" />
+            <span className="run-hud-label">Trainer battles</span>
+          </div>
+          <div className="classic-trainer-row">
             <button
-              className="big-battle-button"
+              className={`classic-trainer-tile${eligibility?.rocketEvent ? ' classic-trainer-rocket' : ''}`}
               disabled={fightBusy || teamEmpty || !eligibility?.hasTrainer}
               onClick={onTrainerFight}
             >
               <img
-                className="big-battle-icon"
-                src={trainerSpriteUrl(eligibility?.rocketEvent ? 'rocketgrunt' : 'youngster')}
+                className="classic-trainer-sprite"
+                src={trainerSpriteUrl(eligibility?.rocketEvent ? 'rocketgrunt' : 'acetrainer')}
                 alt=""
               />
-              <span>Trainer Battle</span>
+              <span className="classic-trainer-text">
+                <span className="classic-trainer-title">{eligibility?.rocketEvent ? 'Team Rocket!' : 'Trainer Battle'}</span>
+                <span className="classic-trainer-sub">
+                  {eligibility?.rocketEvent ? 'A grunt blocks the way' : 'Take on the next trainer'}
+                </span>
+              </span>
+              <span className="classic-wild-go">Battle ▸</span>
             </button>
             <button
-              className="big-battle-button"
+              className="classic-trainer-tile classic-boss-tile"
               disabled={fightBusy || teamEmpty || !(eligibility?.hasBoss || allBossesDefeated)}
               title={bossHint}
               onClick={allBossesDefeated ? () => setRematchOpen(true) : onBossFight}
             >
-              <img
-                className="big-battle-icon"
-                src={trainerSpriteUrl(nextBoss?.spriteId || 'giovanni')}
-                alt=""
-              />
-              <span>{allBossesDefeated ? 'Boss Rematch' : 'Boss Battle'}</span>
-            </button>
-            <button
-              className={`big-battle-button raid-battle-button${eligibility && !eligibility.raidsUnlocked ? ' raid-battle-locked' : ''}`}
-              disabled={fightBusy || teamEmpty || !eligibility?.raidsUnlocked || !eligibility?.wishingPieces}
-              title={
-                eligibility && !eligibility.raidsUnlocked
-                  ? `Max Raids open up once you beat ${eligibility.raidUnlockBoss ?? 'the right boss'}`
-                  : eligibility?.wishingPieces
-                  ? `A doubles battle against a Dynamaxed ★3 boss - win to catch it. Uses a Raid Crystal (you have ${eligibility.wishingPieces}).`
-                  : 'Needs a Raid Crystal - the Shop and the Game Corner sell them'
-              }
-              onClick={onRaidFight}
-            >
-              <img className="big-battle-icon raid-battle-icon" src="./sprites/misc/raidcrystal.png" alt="" />
-              <span>{eligibility && !eligibility.raidsUnlocked ? '🔒 Max Raid' : 'Max Raid'}</span>
-              {eligibility?.raidsUnlocked && <span className="raid-battle-count">×{eligibility.wishingPieces}</span>}
+              <img className="classic-trainer-sprite" src={trainerSpriteUrl(nextBoss?.spriteId || 'giovanni')} alt="" />
+              <span className="classic-trainer-text">
+                <span className="classic-trainer-title">{allBossesDefeated ? 'Boss Rematch' : 'Boss Battle'}</span>
+                <span className="classic-trainer-sub">{bossHint}</span>
+              </span>
+              <span className="classic-wild-go">{allBossesDefeated ? 'Pick ▸' : 'Battle ▸'}</span>
             </button>
           </div>
-          {nextBoss && <p className="box-empty-hint battle-row-hint">{bossHint}</p>}
-
-          <div className="wild-location-row">
-            {WILD_LOCATIONS.filter((loc) => !loc.requiresAllBosses || allBossesDefeated).map((loc) => (
-              <button
-                key={loc.id}
-                className={`wild-location-button${wildLocation === loc.id ? ' wild-location-button-active' : ''}`}
-                title={loc.label}
-                style={{ backgroundImage: `url(${backdropUrl(LOCATION_BUTTON_BACKDROP[loc.id])})` }}
-                onClick={() => onChangeWildLocation(loc.id)}
-              >
-                <img className="wild-location-icon" src={locationIconUrl(loc.id)} alt="" />
-                <span>{loc.label}</span>
-              </button>
-            ))}
           </div>
-
-          <div className="wild-levelcap-row">
-            <input
-              type="range"
-              className="wild-levelcap-slider"
-              min={WILD_LEVEL_CAP_MIN}
-              max={levelCapMax}
-              value={effectiveWildLevelCap}
-              onChange={(e) => onChangeWildLevelCap(Number(e.target.value))}
-            />
-            <span className="wild-levelcap-value">Wild Level Cap: {effectiveWildLevelCap}</span>
           </div>
         </div>
         )}
       </div>
 
-      {boxEmpty && !runInProgress && (
+      {boxEmpty && !fullPanel && (
         <button className="choose-starter-button" onClick={() => setStarterOpen(true)}>
           Choose Starter
         </button>
       )}
 
-        {!runInProgress && (
+        {!fullPanel && (
         <>
-        {/* The team in a panel like the box's, the loadouts a section of its toolbar. */}
-        <div className="team-frame">
-          {/* The companion, on the team's left - once the Best Friends achievement opens the slot. */}
-          {boxState?.companionUnlocked && (
-            <CompanionSlot
-              companion={boxState.companion ?? null}
-              dragging={activeDragMon ?? null}
-              size={boxState.companionSize ?? 'S'}
-              sizeChoice={boxState.companionSizeChoice ?? 'auto'}
-              onSetSize={setCompanionSize}
-              onReturn={returnCompanion}
-            />
-          )}
-          <div className="box-toolbar box-toolbar-attached box-toolbar-compact team-toolbar">
-            <span className="box-toolbar-section box-toolbar-title team-toolbar-title">
-              Team <span className="box-count">· {team.filter(Boolean).length}/{team.length}</span>
-            </span>
-            <span className="team-toolbar-spacer" />
-            <div className="box-toolbar-section">
-              <button className="team-loadouts-button" title="Save this team, or switch to a saved one" onClick={() => setLoadoutsOpen(true)}>
-                Loadouts
-              </button>
-            </div>
+        {mode === 'box' && boxState && (
+          <div className="box-summary">
+            {[
+              { label: 'Pokémon', value: boxState.mons.length },
+              { label: 'Shiny', value: boxState.mons.filter((m) => m.shiny).length },
+              { label: 'Merged ★', value: boxState.mons.filter((m) => (m.mergeStars ?? 0) > 0).length },
+              { label: 'Favorites', value: boxState.mons.filter((m) => m.favorite).length },
+              { label: 'Can merge', value: boxState.mons.filter((m) => (m.mergeCandidates?.length ?? 0) > 0).length }
+            ].map((s) => (
+              <span key={s.label} className="box-summary-stat">
+                <strong>{s.value.toLocaleString('en-US')}</strong>
+                {s.label}
+              </span>
+            ))}
           </div>
-          <div className="team-box-panel">
-            <TeamRow team={team} monsById={monsById} onEdit={(id) => openEditor(id, false)} onContextMenu={handleContextMenu} />
-          </div>
-        </div>
+        )}
 
-        {/* The box's toolbar - or, while picking Pokemon to sell or merge, the selection bar in its place. */}
+        {/* The box, on the Box page only: its toolbar - or, while picking Pokemon to sell or
+            merge, the selection bar in its place - and the box itself. */}
+        {mode === 'box' && (
+        <>
         {boxSelection ? (
           <div className="box-toolbar box-toolbar-attached box-selection-bar">
             <button className="box-selection-cancel" disabled={busy} title="Stop selecting" onClick={stopBoxSelection}>
@@ -1257,17 +1389,12 @@ function MainMenu({
         ) : (
           <>
             {
-              // One panel on top of the box, each option a section of it - a little shorter
-              // while the box is collapsed. The title expands and collapses the box (a click
-              // on the menu's background collapses it too).
-              <div className={`box-toolbar box-toolbar-attached${boxExpanded ? '' : ' box-toolbar-compact'}`}>
-                <button
-                  className="box-toolbar-section box-toolbar-title"
-                  title={boxExpanded ? 'Show the battle buttons again' : 'Hide the battle buttons for a bigger box'}
-                  onClick={() => (boxExpanded ? collapseBox() : setBoxExpanded(true))}
-                >
+              // One panel on top of the box, each option a section of it.
+              <div className="box-toolbar box-toolbar-attached">
+                {/* How many Pokemon are on show - the search and filters narrow it. */}
+                <span className="box-toolbar-section box-toolbar-title box-toolbar-count-label">
                   Box <span className="box-count">· {boxMons.length}</span>
-                </button>
+                </span>
                 <div className="box-toolbar-section box-toolbar-search">
                   <SearchBar
                     key={boxExpanded ? 'expanded' : 'collapsed'}
@@ -1275,7 +1402,7 @@ function MainMenu({
                     value={boxSearch}
                     onChange={setBoxSearch}
                     placeholder="Search name, type, move, ability, item…"
-                    autoFocus={boxExpanded}
+                    autoFocus={false}
                   />
                 </div>
                 <div className="box-toolbar-section box-filters">
@@ -1379,15 +1506,21 @@ function MainMenu({
         />
         </>
         )}
+        </>
+        )}
 
-        <DragOverlay dropAnimation={{ duration: 200, easing: 'ease' }}>
-          {activeDragMon && (
-            <div className="box-icon-draggable box-icon-overlay">
-              <PokemonIconVisual mon={activeDragMon} />
-            </div>
-          )}
-        </DragOverlay>
+      </>
+      )}
+      </div>
+      {/* The team dock: one, always loaded, floating over the bottom of every page that
+          uses the team - it slides away where the team isn't used (Draft, the Game Corner,
+          a run in progress) and back again, never reloading. */}
+      <div className={`team-dock-holder${dockShown ? '' : ' team-dock-holder-hidden'}`} aria-hidden={!dockShown}>
+        {teamDock}
+      </div>
+      {dragOverlay}
       </DndContext>
+      </div>
 
       {editingMonId && (
         <PokemonEditor
@@ -1434,7 +1567,10 @@ function MainMenu({
           onClose={() => setDebugOpen(false)}
           onTrainers={onTrainers}
           onRogueliteBosses={onRogueliteBosses}
-          onAddRandom={() => void addRandom()}
+          onAddPokemon={() => {
+            setDebugOpen(false)
+            setDebugAddOpen(true)
+          }}
           onWildDrops={() => {
             setDebugOpen(false)
             setWildDropsOpen(true)
@@ -1444,11 +1580,10 @@ function MainMenu({
             setShopPricesOpen(true)
           }}
           onWalletChanged={setMoney}
-          onResetBossProgress={() => void resetBossProgression()}
-          onResetStats={() => void resetStats()}
-          addRandomBusy={busy}
         />
       )}
+
+      {debugAddOpen && <DebugAddMon onAdded={setBoxState} onClose={() => setDebugAddOpen(false)} />}
 
       {wildDropsOpen && <WildDropsModal onClose={() => setWildDropsOpen(false)} />}
       {shopPricesOpen && <ShopPricesModal onClose={() => setShopPricesOpen(false)} />}
@@ -1531,6 +1666,7 @@ function MainMenu({
           onChoose={(target) => void evolve(contextMenu.mon.id, target)}
           canUseShinyPatch={contextMenu.mon.canUseShinyPatch ?? false}
           onUseShinyPatch={() => void useShinyPatch(contextMenu.mon.id)}
+          shinyPatches={contextMenu.mon.shinyPatches}
           formChanges={contextMenu.mon.formChanges}
           onChangeForm={(form) => void changeForm(contextMenu.mon.id, form, { x: contextMenu.x, y: contextMenu.y })}
           fusions={contextMenu.mon.fusions}
@@ -1571,84 +1707,37 @@ function MainMenu({
         />
       )}
 
-      {bagOpen && (
-        <BagModal
-          onClose={() => setBagOpen(false)}
+      {bagShopTab && (
+        <BagShopModal
+          initialTab={bagShopTab}
+          onClose={() => setBagShopTab(null)}
           onChanged={() => {
             refreshMoney()
             refreshBox()
           }}
-          onOpenShop={() => {
-            setBagOpen(false)
-            setShopOpen(true)
-          }}
+          onMoneyChange={setMoney}
         />
       )}
 
       {notes.layer}
-      {missionsOpen && missions && (
-        <MissionsModal
-          state={missions}
-          onChange={setMissions}
-          onClaimed={(newMoney) => {
-            setMoney(newMoney)
-            refreshBox()
-            refreshEligibility()
-          }}
-          onClose={() => setMissionsOpen(false)}
-        />
-      )}
-      {achievementsOpen && achievements && (
-        <AchievementsModal
-          state={achievements}
-          onChange={setAchievements}
+      {rewardsTab && (
+        <RewardsModal
+          tab={rewardsTab}
+          onSwitch={setRewardsTab}
+          missions={missions}
+          achievements={achievements}
+          onMissionsChange={setMissions}
+          onAchievementsChange={setAchievements}
           onClaimed={(newMoney) => {
             setMoney(newMoney)
             refreshBox()
             // A reward can be Raid Crystals - the Max Raid button counts them.
             refreshEligibility()
           }}
-          onClose={() => setAchievementsOpen(false)}
-        />
-      )}
-      {gameCorner === 'slots' && (
-        <SlotMachine onClose={() => setGameCorner(null)} onOpenCoinShop={toCoinShop} onSwitchGame={openGame} />
-      )}
-      {gameCorner === 'blackjack' && (
-        <BlackjackTable onClose={() => setGameCorner(null)} onOpenCoinShop={toCoinShop} onSwitchGame={openGame} />
-      )}
-      {gameCorner === 'roulette' && (
-        <RouletteTable onClose={() => setGameCorner(null)} onOpenCoinShop={toCoinShop} onSwitchGame={openGame} />
-      )}
-      {gameCorner === 'plinko' && (
-        <PlinkoBoard onClose={() => setGameCorner(null)} onOpenCoinShop={toCoinShop} onSwitchGame={openGame} />
-      )}
-      {coinShopOpen && (
-        <CoinShopModal
-          onClose={() => {
-            setCoinShopOpen(false)
-            // The Coin Shop is only reached from a Game Corner game - closing it goes back there.
-            setGameCorner(lastGame)
-            refreshBox()
-          }}
-          onMoneyChange={setMoney}
+          onClose={() => setRewardsTab(null)}
         />
       )}
 
-      {shopOpen && (
-        <ShopModal
-          onClose={() => {
-            setShopOpen(false)
-            refreshBox()
-          }}
-          onMoneyChange={setMoney}
-          onOpenBag={() => {
-            setShopOpen(false)
-            refreshBox()
-            setBagOpen(true)
-          }}
-        />
-      )}
     </div>
   )
 }

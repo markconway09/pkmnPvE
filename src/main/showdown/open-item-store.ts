@@ -1,6 +1,7 @@
 import type { OpenItemResult, RarityTier, ReelEntry, ShopItemEntry } from '../../shared/battle-types'
 import { LOCK_CAPSULE_ITEM_ID, RANDOM_LEGENDARY_ITEM_ID, RANDOM_POKEMON_ITEM_ID } from '../../shared/battle-types'
 import { LEGEND_KEEPER_RESTRICTED_CHANCE } from '../../shared/titles'
+import { priceRarityTier } from '../../shared/rarity'
 import { hasTitle, monSellPrice } from './title-perks'
 import {
   buildBasicSet,
@@ -78,14 +79,6 @@ export function openBagItem(itemId: string): OpenItemResult {
   }
 }
 
-// An item's colour on the reel, by what it costs in the shop.
-function priceTier(price: number): RarityTier {
-  if (price >= 20000) return 'legendary'
-  if (price >= 10000) return 'epic'
-  if (price >= 5000) return 'rare'
-  if (price >= 1000) return 'uncommon'
-  return 'common'
-}
 
 // The capsule's jackpots have fixed odds of their own, whatever their shop price.
 const CAPSULE_JACKPOTS: [itemId: string, chance: number][] = [
@@ -128,7 +121,8 @@ function openLockCapsule(): OpenItemResult {
   const asEntry = (entry: ShopItemEntry): ReelEntry => ({
     name: entry.name,
     spritenum: entry.spritenum,
-    tier: priceTier(entry.price)
+    // Its colour by its shop price, as on the Shop's own cards.
+    tier: priceRarityTier(entry.price)
   })
   const winner = asEntry(item)
   return {

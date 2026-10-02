@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import FitName from './FitName'
 import { createPortal } from 'react-dom'
 import { useDroppable } from '@dnd-kit/core'
 import type { BoxPokemonView, CompanionSize, CompanionSizeChoice } from '../../shared/battle-types'
 import { COMPANION_SIZES, toSpriteId } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
+import { loadSpriteStyle } from './spriteStyle'
 import ContextMenuPanel from './ContextMenuPanel'
 
 // The drop target's id (see MainMenu's handleDragEnd).
@@ -23,9 +25,19 @@ interface Props {
 // How many hearts float up from one pat.
 const HEARTS = 3
 
+// Where a pat's hearts pop up: anywhere over the companion, each in its own third across
+// (so they never sit on top of each other) at a random height, a moment apart.
+function randomHearts(): { left: number; top: number; delay: number }[] {
+  return Array.from({ length: HEARTS }, (_, i) => ({
+    left: 12 + i * 26 + Math.random() * 20,
+    top: 15 + Math.random() * 45,
+    delay: Math.random() * 0.3
+  })).sort(() => Math.random() - 0.5)
+}
+
 /**
- * The companion beside the team: a Pokemon at max friendship, dragged here from the box or the
- * team (it stays there, still usable). It
+ * The companion beside the team: any Pokemon, dragged here from the box or the team (it stays
+ * there, still usable), gaining friendship from battles as if it were on the team. It
  * bobs about on its own; a click pats it (a hop and some hearts), and a right-click
  * opens its menu - its size, or no longer the companion. Purely for show.
  */
@@ -34,13 +46,13 @@ function CompanionSlot({ companion, dragging, size, sizeChoice, onSetSize, onRet
   // Each pat's own key, so a new one restarts the hop and hearts mid-way.
   const [pat, setPat] = useState(0)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  // New places for every pat.
+  const hearts = useMemo(() => (pat > 0 ? randomHearts() : []), [pat])
 
-  const canDrop = dragging ? !!dragging.maxFriendship : null
   const classes = [
     'companion-slot',
     companion ? `companion-slot-filled companion-size-${size.toLowerCase()}` : 'companion-slot-empty',
-    canDrop === true && 'companion-slot-can-drop',
-    canDrop === false && 'companion-slot-cant-drop',
+    dragging && 'companion-slot-can-drop',
     isOver && 'companion-slot-over'
   ]
     .filter(Boolean)
@@ -50,7 +62,7 @@ function CompanionSlot({ companion, dragging, size, sizeChoice, onSetSize, onRet
     <div
       ref={setNodeRef}
       className={classes}
-      title={companion ? undefined : 'Companion: drag a Pokémon at max friendship here'}
+      title={companion ? undefined : 'Companion: drag a Pokémon here'}
       onClick={() => companion && setPat((n) => n + 1)}
       onContextMenu={(e) => {
         e.preventDefault()
@@ -60,23 +72,28 @@ function CompanionSlot({ companion, dragging, size, sizeChoice, onSetSize, onRet
       {companion ? (
         <>
           <div key={pat} className={`companion-sprite-wrap${pat > 0 ? ' companion-sprite-pat' : ''}`}>
-            <SpriteImage style="2d-animated" className="companion-sprite" spriteId={toSpriteId(companion.species)} shiny={companion.shiny} alt={companion.species} />
+            {/* Drawn in the same sprite style the battles use (see Options). */}
+            <SpriteImage style={loadSpriteStyle()} className="companion-sprite" spriteId={toSpriteId(companion.species)} shiny={companion.shiny} gmax={companion.gmaxLook} alt={companion.species} />
           </div>
           <span className="companion-shadow" />
           {pat > 0 && (
             <span key={`hearts-${pat}`} className="companion-hearts" aria-hidden="true">
-              {Array.from({ length: HEARTS }, (_, i) => (
-                <span key={i} className={`companion-heart companion-heart-${i}`}>
+              {hearts.map((h, i) => (
+                <span
+                  key={i}
+                  className="companion-heart"
+                  style={{ left: `${h.left}%`, top: `${h.top}%`, animationDelay: `${h.delay}s` }}
+                >
                   ❤️
                 </span>
               ))}
             </span>
           )}
-          <span className="companion-name">{companion.species}</span>
+          <FitName className="companion-name" text={companion.species} />
         </>
       ) : (
         <span className="companion-slot-hint">
-          {canDrop === false ? 'Needs max friendship' : 'Companion'}
+          Companion
         </span>
       )}
       {menu &&

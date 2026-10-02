@@ -77,7 +77,7 @@ export function createRunBattle(choice: RunChoice): WildBattle {
     // from any generation, anyone from the run's generation, then any Roguelite boss.
     const allBosses = listTrainers().filter((t) => t.rogueliteBoss)
     if (allBosses.length === 0) throw new Error('There are no Roguelite bosses - add some in Debug → Edit Roguelite Bosses')
-    const bossClass = rogueliteBossClassAt(bossesBeaten)
+    const bossClass = rogueliteBossClassAt(bossesBeaten, difficulty)
     const inGeneration = (t: (typeof allBosses)[number]): boolean => generation === null || t.rogueliteGeneration === generation
     const candidates = [
       allBosses.filter((t) => t.rogueliteClass === bossClass && inGeneration(t)),

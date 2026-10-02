@@ -21,6 +21,7 @@ import {
   packTeam,
   getItemSpritenum,
   heldItemForme,
+  gmaxLookOf,
   parseCondition,
   pokeballPrice,
   speciesStatsAndTypes,
@@ -63,6 +64,8 @@ import {
   finishRunBattleWon,
   type RunBattleOutcome
 } from './run-store'
+import { finishDraftBattle } from './draft-store'
+import type { DraftBattleResult } from '../../shared/draft'
 import {
   CATCHING_CHARM_FREE_CHANCE,
   CATCHING_CHARM_ITEM_ID,
@@ -324,6 +327,9 @@ export interface OpponentConfig {
   // status it had (one entry per team member, in order), and how it ends goes back
   // to the run - never to the box, bag, money, stats or boss progress.
   run?: { conditions: { hp: number; status: string | null }[]; kind: RunNodeKind }
+  // A Draft mode battle (see draft-store): no running, and the win or loss goes to the
+  // draft's record - never to exp, money, drops or boss progress.
+  draft?: boolean
   // A Max Raid: the one opponent is Dynamaxed all battle (Gigantamax if it can) and
   // joins the box when beaten - no Poke Ball needed.
   raid?: { gigantamax: boolean; stars: number }
@@ -402,6 +408,8 @@ export class WildBattle {
   private runFainted: string[] = []
   // Roguelite: a won trainer or boss battle left an item to pick back on the run menu.
   private runItemReward = false
+  // Draft mode: the draft's record once this battle has counted.
+  private draftResult: DraftBattleResult | null = null
 
   constructor(
     p1team: PokemonSet[],
@@ -696,6 +704,11 @@ export class WildBattle {
           this.winner = line.slice('|win|'.length)
           if (this.opponent?.run) {
             this.finishRunBattle()
+          } else if (this.opponent?.draft) {
+            this.draftResult = finishDraftBattle(
+              this.winner === 'You',
+              this.p1Outcome().every((mon) => !mon.fainted)
+            )
           } else if (this.winner === 'You' && !this.opponent?.noRewards) {
             if (this.opponent?.trainerId) {
               // The cap the fight was held under - read before a boss win raises it.
@@ -734,6 +747,8 @@ export class WildBattle {
           this.winner = null
           // Both sides down at once: the run's whole team is gone too.
           if (this.opponent?.run) this.finishRunBattle()
+          // A tie counts as a loss for a draft.
+          if (this.opponent?.draft) this.draftResult = finishDraftBattle(false)
           this.wake()
         }
       }
@@ -927,7 +942,10 @@ export class WildBattle {
     const summary = buildPokemonSummary(species, set)
     return {
       ...summary,
+      rarityTier: speciesRarityTier(species),
       rosterIndex: rosterIndex !== undefined && rosterIndex >= 0 ? rosterIndex : undefined,
+      // Checked against the species it is now - a Mega or other form drops the look.
+      gmaxLook: gmaxLookOf(set, species) || undefined,
       baseTypes: [...summary.types],
       item: set ? (this.heldItems.get(set) ?? set.item) : '',
       hpPercent,
@@ -1095,7 +1113,7 @@ export class WildBattle {
   // you walked away from - it's simply abandoned.
   private runCost(): number | null {
     if (!this.opponent?.trainerId) return 0
-    if (this.opponent.isBoss || this.opponent.run) return null
+    if (this.opponent.isBoss || this.opponent.run || this.opponent.draft) return null
     // A friendly match (another player's team) has nothing riding on it, and the
     // Champion title runs from any trainer for free.
     if (this.opponent.noRewards || hasTitle('Champion')) return 0
@@ -1548,6 +1566,7 @@ export class WildBattle {
       runBattle: !!this.opponent?.run,
       runFainted: this.runFainted,
       runItemReward: this.runItemReward,
+      draftResult: this.draftResult,
       bossBattle: !!this.opponent?.isBoss,
       raid: this.opponent?.raid
         ? { gigantamax: this.opponent.raid.gigantamax, stars: this.opponent.raid.stars, caught: this.raidCatch }
@@ -1559,7 +1578,7 @@ export class WildBattle {
   // with each chance - shown when hovering the opponent.
   private rewardsView(): BattleRewardsView | null {
     const opponent = this.opponent
-    if (opponent?.noRewards || opponent?.run) return null
+    if (opponent?.noRewards || opponent?.run || opponent?.draft) return null
     const catalog = new Map(getEditorOptions().items.map((i) => [i.id, i]))
     const items: RewardItemView[] = []
     const add = (drop: ItemDropConfig | undefined, source: RewardItemView['source']): void => {

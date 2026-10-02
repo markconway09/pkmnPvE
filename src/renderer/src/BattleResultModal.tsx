@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
+import { RarityGlow } from './RarityCard'
 import { createPortal } from 'react-dom'
 import { DEFAULT_POKEBALL_ID, POKEBALL_PRICE, ROGUELITE_MAX_TEAM, toSpriteId } from '../../shared/battle-types'
 import type { ExpGainResult, ItemDropResult, RunMonView } from '../../shared/battle-types'
+import type { DraftBattleResult } from '../../shared/draft'
+import { DRAFT_MAX_WINS } from '../../shared/draft'
 import ItemSprite from './ItemSprite'
 import SpriteImage from './SpriteImage'
 import { formatMoney } from './money'
@@ -26,6 +29,8 @@ interface Props {
   raidGigantamax?: boolean
   // A Max Raid (won or lost).
   isRaid?: boolean
+  // A Draft mode battle: the draft's record after it.
+  draftResult?: DraftBattleResult | null
   onClose: () => void
 }
 
@@ -44,6 +49,7 @@ function BattleResultModal({
   raidStars = 0,
   raidGigantamax = false,
   isRaid = false,
+  draftResult = null,
   onClose
 }: Props): React.JSX.Element {
   const [confirmingLeave, setConfirmingLeave] = useState(false)
@@ -118,7 +124,8 @@ function BattleResultModal({
 
   return createPortal(
     <div className="modal-overlay">
-      <div className="modal-panel battle-result-modal">
+      {/* Tinted green for a win, red for a loss (grey for a tie). */}
+      <div className={`modal-panel battle-result-modal battle-result-${winner === 'You' ? 'won' : winner ? 'lost' : 'tie'}`}>
         <h2>{heading}</h2>
         {canCatch && !replacing && (
           <div className="catch-row">
@@ -135,8 +142,15 @@ function BattleResultModal({
             </p>
             <div className="run-replace-grid">
               {replacing.map((mon) => (
-                <button key={mon.id} disabled={busy} onClick={() => void catchPokemon(mon.id)}>
-                  <SpriteImage style="2d-static" className="run-replace-sprite" spriteId={toSpriteId(mon.species)} shiny={mon.shiny} alt="" />
+                <button
+                  key={mon.id}
+                  className={`run-replace-card rarity-card rarity-tier-${mon.rarityTier ?? 'common'}`}
+                  disabled={busy}
+                  onClick={() => void catchPokemon(mon.id)}
+                >
+                  <RarityGlow size={52}>
+                    <SpriteImage style="3d-static" className="run-replace-sprite" spriteId={toSpriteId(mon.species)} shiny={mon.shiny} alt="" />
+                  </RarityGlow>
                   <span>{mon.species}</span>
                   <span className="box-empty-hint">Lv {mon.level}</span>
                 </button>
@@ -150,7 +164,7 @@ function BattleResultModal({
         {raidCatch && (
           <div className="raid-catch">
             <SpriteImage
-              style="2d-static"
+              style="3d-static"
               className="raid-catch-sprite"
               spriteId={toSpriteId(raidCatch.species)}
               shiny={raidCatch.shiny}
@@ -170,6 +184,18 @@ function BattleResultModal({
           </div>
         )}
         {error && <p className="editor-error">{error}</p>}
+        {draftResult && (
+          <div className="exp-gain-list">
+            <div className="exp-gain-row">
+              <span className="exp-gain-species">Draft record</span>
+              <span className="exp-gain-detail">
+                {draftResult.wins}-{draftResult.losses}
+                {draftResult.over &&
+                  ` · ${draftResult.wins >= DRAFT_MAX_WINS ? 'perfect run!' : 'draft over'} · +${draftResult.reward} coins`}
+              </span>
+            </div>
+          </div>
+        )}
         {runItemReward && (
           <div className="exp-gain-list">
             <div className="exp-gain-row">

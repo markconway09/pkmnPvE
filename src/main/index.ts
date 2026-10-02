@@ -26,6 +26,7 @@ import {
 import { WildBattle, getMoveInfo } from './showdown/battle-runtime'
 import {
   addRandomMon,
+  addMonOfSpecies,
   addStarter,
   evolveMon,
   getBoxState,
@@ -55,7 +56,8 @@ import {
   setTeam,
   updateMon,
   useExpCandy,
-  useExpCandiesUntilCap
+  useExpCandiesUntilCap,
+  getRaidBossPreviews
 } from './showdown/box-store'
 import { getBagState, getItemQuantity, hasItem, removeItem, resetBag } from './showdown/bag-store'
 import { generateRaidBoss } from './showdown/raid'
@@ -98,7 +100,7 @@ import {
   lateItemsUnlocked
 } from './showdown/progression-store'
 import { getMoney, resetMoney, setMoney } from './showdown/money-store'
-import { buyCoinPrize, buyCoins, getCoins, getSlotRules, setCoins, spinSlots } from './showdown/game-corner-store'
+import { buyCoinPrize, buyCoins, buyDailyCoinMon, buyDailyCoinOffer, getCoins, getDailyCoinMon, getDailyCoinOffer, getSlotRules, setCoins, spinSlots } from './showdown/game-corner-store'
 import {
   dealBlackjack,
   doubleBlackjack,
@@ -147,7 +149,9 @@ import {
   useRunFullRestore,
   useRunRevive,
   useRunAbilityCapsule,
+  resetRunAbility,
   buyRunConsumable,
+  buyRunRareCandy,
   buyRunShopTile,
   previewStarterMoves,
   previewEvolutionMoves,
@@ -163,6 +167,7 @@ import { getWildDropFor, listWildDrops, setWildDrop } from './showdown/wild-drop
 import {
   buyItem,
   listShop,
+  listKeyItems,
   listShopPrices,
   quickSellSelection,
   sellItem,
@@ -172,6 +177,8 @@ import {
 import { getGalarFossilPartners, restoreFossil } from './showdown/fossil-store'
 import { openBagItem } from './showdown/open-item-store'
 import { eligibleRandomTrainers, isRocketEventActive } from './showdown/trainer-selection'
+import { abandonDraft, beginDraftBattle, draftEntryFee, getDraftView, pickDraftMon, startDraft } from './showdown/draft-store'
+import type { DraftFormat } from '../shared/draft'
 import {
   getPlayerSummary,
   isAdmin,
@@ -227,6 +234,9 @@ function createWindow(): void {
     // No File/Edit/View menu bar - it's Electron's default, not the game's. A dev
     // copy still shows it on Alt, for reload and the DevTools.
     autoHideMenuBar: true,
+    // The game's own icon in the title bar and taskbar (the packaged exe also
+    // gets it from electron-builder's win.icon).
+    icon: join(__dirname, '../../resources/icon.ico'),
     show: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
@@ -395,6 +405,9 @@ function raidUnlockBossName(): string | null {
   return step ? (listTrainers().find((t) => t.id === step.trainerId)?.name ?? null) : null
 }
 
+// Every Pokemon a Max Raid can bring, for the Max Raid page's carousel.
+ipcMain.handle('raid:bosses', () => getRaidBossPreviews())
+
 ipcMain.handle('battle:startRaid', async () => {
   if (!lateItemsUnlocked()) {
     const boss = raidUnlockBossName()
@@ -496,11 +509,13 @@ ipcMain.handle('run:swapMon', (_event, runMonId: string) => swapRunMon(runMonId)
 ipcMain.handle('run:swapTeam', () => swapRunTeam())
 ipcMain.handle('run:skipSwap', () => skipRunSwap())
 ipcMain.handle('run:fullRestore', (_event, runMonId: string) => useRunFullRestore(runMonId))
-ipcMain.handle('run:revive', (_event, faintedId: string) => useRunRevive(faintedId))
+ipcMain.handle('run:revive', (_event, faintedId: string, replaceId?: string) => useRunRevive(faintedId, replaceId))
 ipcMain.handle('run:abilityCapsule', (_event, runMonId: string, abilityId: string) =>
   useRunAbilityCapsule(runMonId, abilityId)
 )
+ipcMain.handle('run:resetAbility', (_event, runMonId: string) => resetRunAbility(runMonId))
 ipcMain.handle('run:buyConsumable', (_event, id: RunConsumableId) => buyRunConsumable(id))
+ipcMain.handle('run:buyRareCandy', (_event, runMonId: string) => buyRunRareCandy(runMonId))
 ipcMain.handle('run:buyShopTile', (_event, tile: RunShopTile) => buyRunShopTile(tile))
 
 ipcMain.handle('run:choose', async (_event, index: number): Promise<RunChoiceResult> => {
@@ -511,6 +526,27 @@ ipcMain.handle('run:choose', async (_event, index: number): Promise<RunChoiceRes
   if (choice.kind === 'swap') return { run: takeSwapNode() }
   activeBattle = createRunBattle(choice)
   return { battle: await activeBattle.getInitialView(), location: choice.location }
+})
+
+// ---- Draft mode (see draft-store.ts) ----
+ipcMain.handle('draft:get', () => getDraftView())
+ipcMain.handle('draft:entryFee', () => draftEntryFee())
+ipcMain.handle('draft:start', (_event, format: DraftFormat) => startDraft(format))
+ipcMain.handle('draft:pick', (_event, index: number) => pickDraftMon(index))
+ipcMain.handle('draft:abandon', () => abandonDraft())
+// The gauntlet's next battle, in the draft's format, with the picks brought (in lead order).
+ipcMain.handle('draft:battle', async (_event, bring: number[]) => {
+  const { format, p1team, opponent } = beginDraftBattle(bring)
+  const formatId = format === 'singles' ? 'gen9customgame' : 'gen9doublescustomgame'
+  activeBattle = new WildBattle(p1team, formatId, 'gen9randombattle', {
+    team: opponent.team,
+    name: opponent.name,
+    difficulty: opponent.difficulty,
+    trainerId: 'draft',
+    spriteId: opponent.spriteId,
+    draft: true
+  })
+  return activeBattle.getInitialView()
 })
 
 ipcMain.handle('battle:bossRematchList', (): BossRematchInfo[] => {
@@ -536,6 +572,10 @@ ipcMain.handle('box:sellMany', (_event, ids: string[]) => sellMons(ids))
 ipcMain.handle('box:addRandom', () => {
   requireAdmin()
   return addRandomMon()
+})
+ipcMain.handle('box:addMon', (_event, species: string, level: number, shiny: boolean) => {
+  requireAdmin()
+  return addMonOfSpecies(species, level, shiny)
 })
 ipcMain.handle('box:setTeam', (_event, team: (string | null)[]) => setTeam(team))
 ipcMain.handle('box:getMon', (_event, id: string) => getMonSet(id))
@@ -582,7 +622,11 @@ ipcMain.handle('cloud:import', (_event, fileId: string) => importFromCloud(fileI
 ipcMain.handle('achievements:claim', (_event, id: string) => claimAchievement(id))
 ipcMain.handle('achievements:setTitle', (_event, title: string | null) => setAchievementTitle(title))
 ipcMain.handle('coins:buy', (_event, amount: number) => buyCoins(amount))
-ipcMain.handle('coins:prize', (_event, itemId: string) => buyCoinPrize(itemId))
+ipcMain.handle('coins:prize', (_event, itemId: string, quantity?: number) => buyCoinPrize(itemId, quantity))
+ipcMain.handle('coins:dailyOffer', () => getDailyCoinOffer())
+ipcMain.handle('coins:buyDailyOffer', () => buyDailyCoinOffer())
+ipcMain.handle('coins:dailyMon', () => getDailyCoinMon())
+ipcMain.handle('coins:buyDailyMon', () => buyDailyCoinMon())
 ipcMain.handle('slots:spin', (_event, bet: number) => spinSlots(bet))
 ipcMain.handle('slots:rules', () => getSlotRules())
 ipcMain.handle('blackjack:view', () => getBlackjackView())
@@ -599,6 +643,7 @@ ipcMain.handle('debug:setWallet', (_event, money: number, coins: number) => {
   return { money: setMoney(money), coins: setCoins(coins) }
 })
 ipcMain.handle('shop:list', () => listShop())
+ipcMain.handle('shop:listKeyItems', () => listKeyItems())
 ipcMain.handle('shop:buy', (_event, itemId: string, quantity: number) => buyItem(itemId, quantity))
 ipcMain.handle('shop:listPrices', () => {
   requireAdmin()

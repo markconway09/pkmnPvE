@@ -1,22 +1,14 @@
-// Which half of the game the main menu shows - the classic game or Roguelite runs.
-// Remembered per player in this browser's storage; it's only a view, so losing it
-// just means the menu opens in Classic.
-export type MenuMode = 'classic' | 'roguelite'
+// Which page of the main menu is open - Home (the hub), one of the game's modes, or the
+// Game Corner. Remembered only for this session, per player, so a battle comes back to
+// the page it started from; the game itself always opens on Home.
+export type MenuPage = 'home' | 'classic' | 'box' | 'roguelite' | 'draft' | 'raid' | 'corner'
 
-const key = (username: string): string => `pkmnpve.menuMode.${username.toLowerCase()}`
+const openPages = new Map<string, MenuPage>()
 
-export function loadMenuMode(username: string): MenuMode {
-  try {
-    return localStorage.getItem(key(username)) === 'roguelite' ? 'roguelite' : 'classic'
-  } catch {
-    return 'classic'
-  }
+export function loadMenuPage(username: string): MenuPage {
+  return openPages.get(username.toLowerCase()) ?? 'home'
 }
 
-export function saveMenuMode(username: string, mode: MenuMode): void {
-  try {
-    localStorage.setItem(key(username), mode)
-  } catch {
-    // Not remembered - it's only which menu opens first.
-  }
+export function saveMenuPage(username: string, page: MenuPage): void {
+  openPages.set(username.toLowerCase(), page)
 }

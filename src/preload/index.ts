@@ -1,12 +1,13 @@
 import type { MissionClaimResult, MissionsState } from '../shared/missions'
 import { contextBridge, ipcRenderer } from 'electron'
-import type { CoinBalance, SlotRules, SlotSpinResult } from '../shared/slots'
+import type { CoinBalance, DailyCoinMon, DailyCoinMonPurchase, DailyCoinOffer, SlotRules, SlotSpinResult } from '../shared/slots'
 import type { BlackjackView } from '../shared/blackjack'
 import type { AchievementClaimResult, AchievementsState } from '../shared/achievements'
 import type { CloudSave, CloudStatus } from '../shared/cloud'
 import type { RouletteSpin } from '../shared/roulette'
 import type { GameCornerPerks } from '../shared/titles'
 import type { PlinkoDrop, PlinkoRisk } from '../shared/plinko'
+import type { DraftFormat, DraftView } from '../shared/draft'
 import type {
   AutoSetOption,
   AutoSetResult,
@@ -37,6 +38,7 @@ import type {
   RunMovesPreview,
   RunView,
   PokedexEntry,
+  RaidBossPreview,
   UpdateCheckResult,
   UpdateProgress,
   SessionInfo,
@@ -44,6 +46,7 @@ import type {
   ItemQuantity,
   SellResult,
   ShopItemEntry,
+  KeyItemView,
   ShopPriceEntry,
   SpeciesEditInfo,
   Trainer,
@@ -65,6 +68,12 @@ const api = {
     ipcRenderer.invoke('battle:startTrainer', boss, rematchTrainerId),
   getBossRematchList: (): Promise<BossRematchInfo[]> => ipcRenderer.invoke('battle:bossRematchList'),
   getRun: (): Promise<RunView | null> => ipcRenderer.invoke('run:get'),
+  getDraft: (): Promise<DraftView | null> => ipcRenderer.invoke('draft:get'),
+  getDraftEntryFee: (): Promise<number> => ipcRenderer.invoke('draft:entryFee'),
+  startDraft: (format: DraftFormat): Promise<DraftView> => ipcRenderer.invoke('draft:start', format),
+  pickDraftMon: (index: number): Promise<DraftView> => ipcRenderer.invoke('draft:pick', index),
+  abandonDraft: (): Promise<DraftView> => ipcRenderer.invoke('draft:abandon'),
+  startDraftBattle: (bring: number[]): Promise<BattleView> => ipcRenderer.invoke('draft:battle', bring),
   // Generations with a Roguelite boss of every class - the ones a run can be set to.
   getRunGenerations: (): Promise<number[]> => ipcRenderer.invoke('run:generations'),
   startRun: (boxMonId: string, difficulty: RunDifficulty, generation: number | null, keepMoves: boolean): Promise<RunView> =>
@@ -91,10 +100,16 @@ const api = {
   skipRunSwap: (): Promise<RunView> => ipcRenderer.invoke('run:skipSwap'),
   // Roguelite consumables (outside battle) and a boss floor's shop.
   useRunFullRestore: (runMonId: string): Promise<RunView> => ipcRenderer.invoke('run:fullRestore', runMonId),
-  useRunRevive: (faintedId: string): Promise<RunView> => ipcRenderer.invoke('run:revive', faintedId),
+  // With a full team, replaceId is the team member who leaves (to the fainted) to make room.
+  useRunRevive: (faintedId: string, replaceId?: string): Promise<RunView> =>
+    ipcRenderer.invoke('run:revive', faintedId, replaceId),
   useRunAbilityCapsule: (runMonId: string, abilityId: string): Promise<RunView> =>
     ipcRenderer.invoke('run:abilityCapsule', runMonId, abilityId),
+  // Undoes a New Ability pick, back to the ability it came with.
+  resetRunAbility: (runMonId: string): Promise<RunView> => ipcRenderer.invoke('run:resetAbility', runMonId),
   buyRunConsumable: (id: RunConsumableId): Promise<RunView> => ipcRenderer.invoke('run:buyConsumable', id),
+  // A boss shop's Rare Candy, used on the spot on this team member (past the cap).
+  buyRunRareCandy: (runMonId: string): Promise<RunView> => ipcRenderer.invoke('run:buyRareCandy', runMonId),
   buyRunShopTile: (tile: RunShopTile): Promise<RunView> => ipcRenderer.invoke('run:buyShopTile', tile),
   listAllAbilities: (): Promise<{ id: string; name: string }[]> => ipcRenderer.invoke('dex:abilities'),
   rerollRunItems: (): Promise<RunView> => ipcRenderer.invoke('run:rerollItems'),
@@ -119,11 +134,16 @@ const api = {
   },
   // A Max Raid (uses up a Raid Crystal).
   startRaidBattle: (): Promise<BattleView> => ipcRenderer.invoke('battle:startRaid'),
+  // Every Pokemon a Max Raid can bring, registered or not (the Max Raid page's carousel).
+  getRaidBosses: (): Promise<RaidBossPreview[]> => ipcRenderer.invoke('raid:bosses'),
   runFromBattle: (): Promise<void> => ipcRenderer.invoke('battle:run'),
   getBattleEligibility: (): Promise<BattleEligibility> => ipcRenderer.invoke('battle:eligibility'),
   getMoveInfo: (id: string): Promise<MoveInfo | null> => ipcRenderer.invoke('dex:move', id),
   listBox: (): Promise<BoxState> => ipcRenderer.invoke('box:list'),
   addRandomBoxMon: (): Promise<BoxState> => ipcRenderer.invoke('box:addRandom'),
+  // Debug: a chosen species at a chosen level, shiny or not.
+  addBoxMon: (species: string, level: number, shiny: boolean): Promise<BoxState> =>
+    ipcRenderer.invoke('box:addMon', species, level, shiny),
   addStarter: (species: string): Promise<BoxState> => ipcRenderer.invoke('box:addStarter', species),
   setTeam: (team: (string | null)[]): Promise<BoxState> => ipcRenderer.invoke('box:setTeam', team),
   getMonSet: (id: string): Promise<EditablePokemonSet> => ipcRenderer.invoke('box:getMon', id),
@@ -184,7 +204,14 @@ const api = {
     return () => ipcRenderer.removeListener('achievements:unlocked', handler)
   },
   buyCoins: (amount: number): Promise<CoinBalance> => ipcRenderer.invoke('coins:buy', amount),
-  buyCoinPrize: (itemId: string): Promise<CoinBalance & { itemName: string }> => ipcRenderer.invoke('coins:prize', itemId),
+  buyCoinPrize: (itemId: string, quantity = 1): Promise<CoinBalance & { itemName: string; quantity: number }> =>
+    ipcRenderer.invoke('coins:prize', itemId, quantity),
+  // The Coin Shop's once-a-day discounted coins.
+  getDailyCoinOffer: (): Promise<DailyCoinOffer> => ipcRenderer.invoke('coins:dailyOffer'),
+  buyDailyCoinOffer: (): Promise<CoinBalance> => ipcRenderer.invoke('coins:buyDailyOffer'),
+  // The Coin Shop's Pokemon of the day, bought once a day at 2 stars.
+  getDailyCoinMon: (): Promise<DailyCoinMon> => ipcRenderer.invoke('coins:dailyMon'),
+  buyDailyCoinMon: (): Promise<DailyCoinMonPurchase> => ipcRenderer.invoke('coins:buyDailyMon'),
   spinSlots: (bet: number): Promise<SlotSpinResult> => ipcRenderer.invoke('slots:spin', bet),
   getSlotRules: (): Promise<SlotRules> => ipcRenderer.invoke('slots:rules'),
   getBlackjack: (): Promise<BlackjackView> => ipcRenderer.invoke('blackjack:view'),
@@ -219,6 +246,8 @@ const api = {
   debugSetWallet: (money: number, coins: number): Promise<{ money: number; coins: number }> =>
     ipcRenderer.invoke('debug:setWallet', money, coins),
   listShop: (): Promise<ShopItemEntry[]> => ipcRenderer.invoke('shop:list'),
+  // Every key item, owned or still locked (the Bag | Shop window's Key Items tab).
+  listKeyItems: (): Promise<KeyItemView[]> => ipcRenderer.invoke('shop:listKeyItems'),
   buyItem: (itemId: string, quantity: number): Promise<{ success: boolean; money: number }> =>
     ipcRenderer.invoke('shop:buy', itemId, quantity),
   listShopPrices: (): Promise<ShopPriceEntry[]> => ipcRenderer.invoke('shop:listPrices'),

@@ -28,6 +28,7 @@ export type Title =
   | 'Starlight'
   | 'Diligent'
   | 'Croupier'
+  | 'Grand Drafter'
 
 // What each title does, for the title pickers.
 export const TITLE_PERKS: Record<Title, string> = {
@@ -54,7 +55,8 @@ export const TITLE_PERKS: Record<Title, string> = {
   'Gigantamax Hunter': 'Raid bosses Gigantamax more often (65% instead of 50%)',
   Starlight: 'Raid bosses are 3× as likely to be shiny (5× with the Shiny Charm)',
   Diligent: 'One extra daily mission reroll',
-  Croupier: 'A losing roulette spin has a 10% chance to give every bet back'
+  Croupier: 'A losing roulette spin has a 10% chance to give every bet back',
+  'Grand Drafter': 'Drafts cost 25% less to enter'
 }
 
 /** A title's perk, for showing beside it ("" for a title without one). */
@@ -78,6 +80,7 @@ export const GOLDEN_TOUCH_JACKPOT_BONUS = 25
 // ...and every payout (the jackpot included, after its bonus) 10% more.
 export const GOLDEN_TOUCH_PAYOUT_MULTIPLIER = 1.1
 export const HIGH_ROLLER_BET_CAP = 10000
+export const GRAND_DRAFTER_FEE_MULTIPLIER = 0.75
 export const EDGE_LORD_EDGE_MULTIPLIER = 2
 // ...and the slots next to the edges pay 25% more.
 export const EDGE_LORD_NEAR_EDGE_MULTIPLIER = 1.25

@@ -1,27 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { GameCornerLoading } from './GameCornerTabs'
 import type { SlotLineWin, SlotSpinResult, SlotSymbol } from '../../shared/slots'
 import type { SlotRules } from '../../shared/slots'
 import { SLOT_LINES, SLOT_RULES } from '../../shared/slots'
 import ItemSprite from './ItemSprite'
 import BetSlider, { maxBet, placedBet, useGameCornerPerks, useSavedBet, betStep } from './BetSlider'
-import GameCornerTabs, { type GameCornerGame } from './GameCornerTabs'
+import type { GameCornerGameProps } from './GameCornerTabs'
 import SpriteImage from './SpriteImage'
 import { toSpriteId } from '../../shared/battle-types'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
 import { playClunk, playTick } from './ticks'
-import CoinIcon from './CoinIcon'
-
-interface Props {
-  onClose: () => void
-  // "Coin Shop" from inside the machine, for when the coins run out.
-  onOpenCoinShop: () => void
-  // The Game Corner's other game.
-  onSwitchGame: (game: GameCornerGame) => void
-}
 
 // One symbol's cell on a reel.
-const CELL = 64
+const CELL = 96
 // The strip is drawn this many times over, so a spin can travel a few loops before it stops.
 const REPEATS = 6
 // Each reel stops a little after the one before it, left to right.
@@ -54,7 +45,7 @@ function SymbolIcon({ symbol, pokemon }: { symbol: SlotSymbol; pokemon: SlotPoke
  * lines (the rows and both diagonals); the bet (a slider, up to every coin held or the bet cap)
  * multiplies whatever they win, and the winning lines light up once the last reel stops.
  */
-function SlotMachine({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JSX.Element {
+function SlotMachine({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCornerGameProps): React.JSX.Element {
   const [coins, setCoins] = useState<number | null>(null)
   const [betWanted, setBet] = useSavedBet('slots')
   const perks = useGameCornerPerks()
@@ -93,6 +84,14 @@ function SlotMachine({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JS
       .catch(() => {})
     return () => timers.current.forEach(clearTimeout)
   }, [])
+
+  // The Game Corner window shows the coins, and locks its tabs while the reels turn.
+  useEffect(() => {
+    onCoinsChange(coins)
+  }, [coins])
+  useEffect(() => {
+    onBusyChange(spinning)
+  }, [spinning])
 
   const bet = placedBet(betWanted, coins, perks.betCap)
 
@@ -185,111 +184,97 @@ function SlotMachine({ onClose, onOpenCoinShop, onSwitchGame }: Props): React.JS
 
   const winningLines = new Set(wins.map((w) => w.line))
 
-  return createPortal(
-    <div className="modal-overlay" onMouseDown={() => !spinning && onClose()}>
-      <div className="modal-panel slots-modal" onMouseDown={(e) => e.stopPropagation()}>
-        <GameCornerTabs current="slots" disabled={spinning} onSwitch={onSwitchGame} />
-        <div className="slots-header">
-          <h2>Slot Machine</h2>
-          <span className="slots-coins">
-            <CoinIcon /> {coins === null ? '…' : coins.toLocaleString('en-US')} coins</span>
-        </div>
+  if (coins === null && !error) return <GameCornerLoading />
 
-        <div className="slots-machine">
-          <div className="slots-window" style={{ height: CELL * 3 }}>
-            {rules.reels.map((strip, r) => (
-              <div key={r} className="slots-reel" style={{ height: CELL * 3 }}>
-                <div
-                  ref={(el) => {
-                    stripRefs.current[r] = el
-                  }}
-                  className="slots-strip"
-                  style={{
-                    transform: `translateY(${offsets[r]}px)`,
-                    transition: animating ? `transform ${REEL_SPIN_MS[r]}ms cubic-bezier(0.15, 0.6, 0.25, 1)` : 'none'
-                  }}
-                >
-                  {Array.from({ length: REPEATS }, (_, rep) =>
-                    strip.map((symbol, i) => (
-                      <div key={`${rep}-${i}`} className="slots-cell" style={{ height: CELL }}>
-                        <SymbolIcon symbol={symbol} pokemon={rules.pokemon} />
-                      </div>
-                    ))
-                  )}
-                </div>
+  return (
+    <div className="game-corner-game slots-game">
+      <div className="slots-machine">
+        <div className="slots-window" style={{ height: CELL * 3 }}>
+          {rules.reels.map((strip, r) => (
+            <div key={r} className="slots-reel" style={{ height: CELL * 3 }}>
+              <div
+                ref={(el) => {
+                  stripRefs.current[r] = el
+                }}
+                className="slots-strip"
+                style={{
+                  transform: `translateY(${offsets[r]}px)`,
+                  transition: animating ? `transform ${REEL_SPIN_MS[r]}ms cubic-bezier(0.15, 0.6, 0.25, 1)` : 'none'
+                }}
+              >
+                {Array.from({ length: REPEATS }, (_, rep) =>
+                  strip.map((symbol, i) => (
+                    <div key={`${rep}-${i}`} className="slots-cell" style={{ height: CELL }}>
+                      <SymbolIcon symbol={symbol} pokemon={rules.pokemon} />
+                    </div>
+                  ))
+                )}
               </div>
-            ))}
-            {/* The five lines every spin plays, faint - and the winners lit once the reels stop. */}
-            <svg className="slots-lines" viewBox={`0 0 300 ${CELL * 3}`} preserveAspectRatio="none">
-              {SLOT_LINES.map(({ rows }, line) => (
-                <polyline
-                  key={line}
-                  points={rows.map((row, reel) => `${50 + reel * 100},${CELL / 2 + row * CELL}`).join(' ')}
-                  className={`slots-line${winningLines.has(line) ? ' slots-line-win' : ''}`}
-                />
-              ))}
-            </svg>
-          </div>
-        </div>
-
-        <div className="slots-controls">
-          <BetSlider bet={bet} max={maxBet(coins, perks.betCap)}
-            step={betStep(perks.betCap)} disabled={spinning || !coins} onChange={setBet} />
-          <button
-            ref={spinButtonRef}
-            className="slots-spin"
-            disabled={spinning || coins === null || coins < bet}
-            onClick={() => void spin()}
-          >
-            {spinning ? 'Spinning…' : 'Spin'}
-          </button>
-        </div>
-        <p className="editor-hint slots-hint">
-          Every spin plays five lines - the three rows and both diagonals. Each winning line pays the amount below times your bet (single and double cherries count on the rows only).
-        </p>
-        {error && <p className="editor-error">{error}</p>}
-        {coins !== null && coins < 1 && !spinning && (
-          <p className="editor-hint">
-            You&apos;re out of coins.{' '}
-            <button className="link-button" onClick={onOpenCoinShop}>
-              Buy some at the Coin Shop
-            </button>
-          </p>
-        )}
-
-        <div className="slots-paytable">
-          {(['gholdengo', 'ball', 'high', 'mid', 'low'] as const).map((symbol) => (
-            <div key={symbol} className="slots-pay">
-              <span className="slots-pay-icons">
-                <SymbolIcon symbol={symbol} pokemon={rules.pokemon} />
-                <SymbolIcon symbol={symbol} pokemon={rules.pokemon} />
-                <SymbolIcon symbol={symbol} pokemon={rules.pokemon} />
-              </span>
-              <span>×{rules.payouts[symbol].toLocaleString('en-US')}</span>
             </div>
           ))}
-          <div className="slots-pay">
-            <span className="slots-pay-icons">
-              <SymbolIcon symbol="cherry" pokemon={rules.pokemon} />
-            </span>
-            <span>
-              ×{rules.cherryOne} · two: ×{rules.cherryTwo} · three: ×{rules.payouts.cherry}
-            </span>
-          </div>
+          {/* The five lines every spin plays, faint - and the winners lit once the reels stop. */}
+          <svg className="slots-lines" viewBox={`0 0 300 ${CELL * 3}`} preserveAspectRatio="none">
+            {SLOT_LINES.map(({ rows }, line) => (
+              <polyline
+                key={line}
+                points={rows.map((row, reel) => `${50 + reel * 100},${CELL / 2 + row * CELL}`).join(' ')}
+                className={`slots-line${winningLines.has(line) ? ' slots-line-win' : ''}`}
+              />
+            ))}
+          </svg>
         </div>
-
-        <div className="editor-actions">
-          <button className="coin-shop-button" onClick={onOpenCoinShop} disabled={spinning}>
-            <CoinIcon /> Coin Shop
-          </button>
-          <button onClick={onClose} disabled={spinning}>
-            Close
-          </button>
-        </div>
-        {notes.layer}
       </div>
-    </div>,
-    document.body
+
+      <div className="slots-controls">
+        <BetSlider bet={bet} max={maxBet(coins, perks.betCap)}
+          step={betStep(perks.betCap)} disabled={spinning || !coins} onChange={setBet}
+          info={
+            <>
+              Every spin plays five lines - the three rows and both diagonals. Each winning line pays the amount below times your bet (single and double cherries count on the rows only).
+            </>
+          }
+        />
+        <button
+          ref={spinButtonRef}
+          className="slots-spin"
+          disabled={spinning || coins === null || coins < bet}
+          onClick={() => void spin()}
+        >
+          {spinning ? 'Spinning…' : 'Spin'}
+        </button>
+      </div>
+      {error && <p className="editor-error">{error}</p>}
+      {coins !== null && coins < 1 && !spinning && (
+        <p className="editor-hint">
+          You&apos;re out of coins.{' '}
+          <button className="link-button" onClick={onOpenCoinShop}>
+            Buy some at the Coin Shop
+          </button>
+        </p>
+      )}
+
+      <div className="slots-paytable">
+        {(['gholdengo', 'ball', 'high', 'mid', 'low'] as const).map((symbol) => (
+          <div key={symbol} className="slots-pay">
+            <span className="slots-pay-icons">
+              <SymbolIcon symbol={symbol} pokemon={rules.pokemon} />
+              <SymbolIcon symbol={symbol} pokemon={rules.pokemon} />
+              <SymbolIcon symbol={symbol} pokemon={rules.pokemon} />
+            </span>
+            <span>×{rules.payouts[symbol].toLocaleString('en-US')}</span>
+          </div>
+        ))}
+        <div className="slots-pay">
+          <span className="slots-pay-icons">
+            <SymbolIcon symbol="cherry" pokemon={rules.pokemon} />
+          </span>
+          <span>
+            ×{rules.cherryOne} · two: ×{rules.cherryTwo} · three: ×{rules.payouts.cherry}
+          </span>
+        </div>
+      </div>
+      {notes.layer}
+    </div>
   )
 }
 

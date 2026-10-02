@@ -1,8 +1,10 @@
 import type { BoxPokemonView } from '../../shared/battle-types'
+import FitName from './FitName'
 import { MERGE_MAX_STARS, mergeBonusText, toSpriteId } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
 import ItemSprite from './ItemSprite'
 import ShinyIcon from './ShinyIcon'
+import { RarityGlow } from './RarityCard'
 
 interface Props {
   mon: BoxPokemonView
@@ -13,22 +15,36 @@ function PokemonIconVisual({ mon }: Props): React.JSX.Element {
 
   return (
     <>
-      {/* A fully merged (★5) Pokemon glows gold behind its sprite. */}
-      {mon.mergeStars === MERGE_MAX_STARS && <span className="box-icon-star-glow" />}
-      <SpriteImage
-        style="2d-static"
-        className="box-icon-img"
-        spriteId={spriteId}
-        shiny={mon.shiny}
-        alt={mon.species}
-        draggable={false}
-      />
-      {mon.itemSpritenum != null && (
-        <ItemSprite spritenum={mon.itemSpritenum} className="box-icon-item" />
-      )}
-      {(mon.favorite || mon.shiny) && (
+      {/* The sprite in a glow of its rarity colour - and a fully merged (★5) Pokemon's
+          pulsing gold glow behind it too. */}
+      <RarityGlow tier={mon.rarityTier ?? 'common'} size={null} className="box-icon-glow">
+        {mon.mergeStars === MERGE_MAX_STARS && <span className="box-icon-star-glow" />}
+        <SpriteImage
+          style="3d-static"
+          className="box-icon-img"
+          spriteId={spriteId}
+          shiny={mon.shiny}
+          gmax={mon.gmaxLook}
+          alt={mon.species}
+          draggable={false}
+        />
+        {/* Its held item, tucked in beside the sprite - clear of the name below. */}
+        {mon.itemSpritenum != null && <ItemSprite spritenum={mon.itemSpritenum} className="box-icon-item" />}
+      </RarityGlow>
+      {(mon.favorite || mon.shiny || mon.companion) && (
         <span className="box-icon-badges">
-          {mon.favorite && <span title="Favorite">❤️</span>}
+          {mon.companion && (
+            <span className="box-icon-companion" title="Your companion - it can't be merged into anything while it's in the slot">
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <ellipse cx="8" cy="11" rx="3.6" ry="3" />
+                <ellipse cx="3.2" cy="7" rx="1.6" ry="2" />
+                <ellipse cx="6.2" cy="3.8" rx="1.6" ry="2.1" />
+                <ellipse cx="9.8" cy="3.8" rx="1.6" ry="2.1" />
+                <ellipse cx="12.8" cy="7" rx="1.6" ry="2" />
+              </svg>
+            </span>
+          )}
+          {mon.favorite && <span className="box-icon-favorite" title="Favorite">❤️</span>}
           {mon.shiny && <ShinyIcon />}
         </span>
       )}
@@ -42,7 +58,7 @@ function PokemonIconVisual({ mon }: Props): React.JSX.Element {
           ▲
         </span>
       )}
-      <span className="box-icon-name">{mon.species}</span>
+      <FitName className="box-icon-name" text={mon.species} />
       {mon.expPercent !== undefined && (
         <div className="exp-bar-track" title={`${mon.expPercent}% to next level`}>
           <div className="exp-bar-fill" style={{ width: `${mon.expPercent}%` }} />

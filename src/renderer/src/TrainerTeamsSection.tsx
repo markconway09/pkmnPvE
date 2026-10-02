@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { RarityGlow } from './RarityCard'
 import type { ItemOptionEntry, PremadeTeamSummary, TeamMode } from '../../shared/battle-types'
 import { POKEMON_TYPES, toSpriteId } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
@@ -23,8 +24,14 @@ export function TeamIcons({ team }: { team: PremadeTeamSummary }): React.JSX.Ele
   return (
     <span className="trainer-team-icons">
       {team.mons.map((m) => (
-        <span key={m.id} className="trainer-team-icon" title={`${m.species} · Lv ${m.level}`}>
-          <SpriteImage style="2d-static" spriteId={toSpriteId(m.species)} shiny={m.shiny} alt={m.species} />
+        <span
+          key={m.id}
+          className={`trainer-team-icon rarity-card rarity-tier-${m.rarityTier ?? 'common'}`}
+          title={`${m.species} · Lv ${m.level}`}
+        >
+          <RarityGlow size={40}>
+            <SpriteImage style="3d-static" spriteId={toSpriteId(m.species)} shiny={m.shiny} alt={m.species} />
+          </RarityGlow>
           <span className="trainer-team-icon-level">{m.level}</span>
         </span>
       ))}

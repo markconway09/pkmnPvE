@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { LeagueMilestone, TrainerProfile } from '../../shared/battle-types'
+import { runDifficultyInfo } from '../../shared/battle-types'
 import type { AchievementsState } from '../../shared/achievements'
 import { titlePerk } from '../../shared/titles'
 import { trainerSpriteUrl } from './trainerSprite'
@@ -140,7 +141,12 @@ function PlayerTrainerModal({
                 <span className="profile-stat-label">Max Raids won</span>
               </div>
               <div className="profile-stat">
-                <span className="profile-stat-value">{profile.stats.bestFloor || '—'}</span>
+                <span className="profile-stat-value">
+                  {profile.stats.bestFloor || '—'}
+                  {profile.stats.bestFloor && profile.stats.bestFloorDifficulty
+                    ? ` (${runDifficultyInfo(profile.stats.bestFloorDifficulty).label})`
+                    : ''}
+                </span>
                 <span className="profile-stat-label">Roguelite best floor</span>
               </div>
             </div>

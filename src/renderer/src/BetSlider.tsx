@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { MAX_BET } from '../../shared/slots'
 import { BLACKJACK_PAYOUT, BLACKJACK_WIN_PAYOUT, type GameCornerPerks } from '../../shared/titles'
 import CoinIcon from './CoinIcon'
+import Tooltip from './Tooltip'
 
 interface Props {
   // The bet as placed (already kept between 1 and max - see placedBet).
@@ -12,6 +13,8 @@ interface Props {
   // How far each stop on the slider (and each − / +) moves the bet - see betStep.
   step?: number
   onChange: (bet: number) => void
+  // How the game plays: shown on hovering an info icon left of the slider.
+  info?: ReactNode
 }
 
 /**
@@ -82,7 +85,7 @@ export function placedBet(bet: number, coins: number | null, cap: number = MAX_B
  * a slider that stops at 1, then every 10 (every 100 with High Roller) up to what's held, and Max
  * for the exact total.
  */
-function BetSlider({ bet, max, disabled, step = 10, onChange }: Props): React.JSX.Element {
+function BetSlider({ bet, max, disabled, step = 10, onChange, info }: Props): React.JSX.Element {
   // The bet as typed: kept apart from the bet itself while typing (so the box can be
   // cleared and retyped), and put back to the bet whenever that changes elsewhere.
   const [typed, setTyped] = useState(String(bet))
@@ -101,6 +104,13 @@ function BetSlider({ bet, max, disabled, step = 10, onChange }: Props): React.JS
   const higher = stepIndex < steps.length - 1 ? steps[stepIndex + 1] : max
   return (
     <>
+      {info && (
+        <Tooltip className="game-corner-info" placement="above" content={<div className="tooltip-panel game-corner-info-panel">{info}</div>}>
+          <span className="game-corner-info-icon" aria-label="How to play">
+            i
+          </span>
+        </Tooltip>
+      )}
       <span className="slots-bet-label">Bet</span>
       <button className="slots-bet-step" title="Bet less" disabled={disabled || bet <= 1} onClick={() => onChange(lower)}>
         −

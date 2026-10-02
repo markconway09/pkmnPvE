@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { loadSpriteStyle } from './spriteStyle'
 import { createPortal } from 'react-dom'
 import type { AutoSetOption, EditablePokemonSet, EditorOptions, SpeciesEditInfo, StatBlock, BoxPokemonView } from '../../shared/battle-types'
 import { MERGE_MAX_STARS, NON_HELD_ITEM_IDS, mergeBonusText, mergeStarsFor, mergeStatMultiplier, toSpriteId } from '../../shared/battle-types'
@@ -191,6 +192,8 @@ function PokemonEditor({
   const [bagItemIds, setBagItemIds] = useState<Set<string> | null>(null)
   const [speciesInfo, setSpeciesInfo] = useState<SpeciesEditInfo | null>(null)
   const [set, setSet] = useState<EditablePokemonSet | null>(null)
+  // The set as it was opened - Save stays greyed out until something differs from it.
+  const [loadedSet, setLoadedSet] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -278,6 +281,7 @@ function PokemonEditor({
         setOptions(opts)
         setBagItemIds(bag ? new Set(bag.map((i) => i.id)) : null)
         setSet(mon)
+        setLoadedSet(JSON.stringify(mon))
         const info = await window.api.getSpeciesInfo(mon.species, isAdmin ? 100 : mon.level)
         if (cancelled) return
         setSpeciesInfo(info)
@@ -437,8 +441,10 @@ function PokemonEditor({
     }
   }
 
+  const changed = !!set && JSON.stringify(set) !== loadedSet
+
   async function save(): Promise<void> {
-    if (!set) return
+    if (!set || !changed) return
     setSaving(true)
     setError(null)
     try {
@@ -535,7 +541,25 @@ function PokemonEditor({
                         {favorite ? '❤️' : '🤍'}
                       </button>
                     )}
-                    <SpriteImage style="2d-animated" spriteId={toSpriteId(set.species)} shiny={set.shiny} alt={set.species} />
+                    {/* Cosmetic only: its Gigantamax sprite everywhere, same size, no Dynamax. Saved with the rest. */}
+                    {set.canGmax && (
+                      <button
+                        type="button"
+                        className={`pokemon-editor-gmax${set.gmaxLook ? ' pokemon-editor-gmax-on' : ''}`}
+                        title={set.gmaxLook ? 'Gigantamax look - click to show its usual sprite' : 'Click to show its Gigantamax sprite (cosmetic only)'}
+                        onClick={() => update('gmaxLook', !set.gmaxLook)}
+                      >
+                        <img src={set.gmaxLook ? './sprites/misc/gmax-on.png' : './sprites/misc/gmax-off.png'} alt="" />
+                      </button>
+                    )}
+                    {/* In the sprite style picked in Options. */}
+                    <SpriteImage
+                      style={loadSpriteStyle()}
+                      spriteId={toSpriteId(set.species)}
+                      shiny={set.shiny}
+                      gmax={!!set.gmaxLook && !!set.canGmax}
+                      alt={set.species}
+                    />
                     <span className="pokemon-editor-portrait-name">
                       {set.shiny && <ShinyIcon />}
                       {set.species} · Lv {set.level}
@@ -744,7 +768,7 @@ function PokemonEditor({
                           onClick={() => onEvolve(evo.species)}
                         >
                           <SpriteImage
-                            style="2d-static"
+                            style="3d-static"
                             className="editor-evolution-sprite"
                             spriteId={toSpriteId(evo.species)}
                             shiny={set.shiny}
@@ -796,7 +820,7 @@ function PokemonEditor({
                           onClick={() => onChangeForm(form)}
                         >
                           <SpriteImage
-                            style="2d-static"
+                            style="3d-static"
                             className="editor-evolution-sprite"
                             spriteId={toSpriteId(form)}
                             shiny={set.shiny}
@@ -968,10 +992,12 @@ function PokemonEditor({
           {error && <p className="editor-error">{error}</p>}
           {/* Pinned to the bottom of the panel, however far it's scrolled. */}
           <div className="editor-actions editor-actions-pinned">
-            <button onClick={onClose} disabled={saving}>
-              Cancel
-            </button>
-            <button onClick={() => void save()} disabled={saving || !set}>
+            <button
+              className="editor-save-full"
+              title={changed ? undefined : 'Nothing has changed yet'}
+              onClick={() => void save()}
+              disabled={saving || !changed}
+            >
               Save
             </button>
           </div>
@@ -991,7 +1017,7 @@ function PokemonEditor({
                   }}
                 >
                   <SpriteImage
-                    style="2d-static"
+                    style="3d-static"
                     className="selector-row-icon"
                     spriteId={toSpriteId(s.name)}
                     draggable={false}

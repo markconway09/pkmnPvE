@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { loadSpriteStyle } from './spriteStyle'
 import { createPortal } from 'react-dom'
 import type { RunMonEditInfo, RunMonView, RunView } from '../../shared/battle-types'
 import { toSpriteId } from '../../shared/battle-types'
@@ -8,6 +9,7 @@ import ShinyIcon from './ShinyIcon'
 import { TYPE_COLORS } from './moveAnimations'
 import ModalSpinner from './ModalSpinner'
 import { teraTypeStyle } from './PokemonEditor'
+import Tooltip from './Tooltip'
 
 interface Props {
   runMonId: string
@@ -82,6 +84,22 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved }: Props): React.JSX.Ele
     }
   }
 
+  // Undoes its New Ability pick right away (moves being edited stay as they are), then
+  // picks up the restored ability's description for its tooltip.
+  async function resetAbility(): Promise<void> {
+    setBusy(true)
+    setError(null)
+    try {
+      onSaved(await window.api.resetRunAbility(runMonId))
+      const fresh = await window.api.getRunMonEditInfo(runMonId)
+      setInfo((current) => (current ? { ...current, abilityDescription: fresh.abilityDescription } : fresh))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function save(): Promise<void> {
     setBusy(true)
     setError(null)
@@ -119,8 +137,9 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved }: Props): React.JSX.Ele
               <div className="pokemon-editor-top">
                 <div className="pokemon-editor-side">
                   <div className="pokemon-editor-portrait" title={mon?.shiny ? `Shiny ${info.species}` : info.species}>
+                    {/* In the sprite style picked in Options. */}
                     <SpriteImage
-                      style="2d-animated"
+                      style={loadSpriteStyle()}
                       spriteId={toSpriteId(info.species)}
                       shiny={mon?.shiny}
                       alt={info.species}
@@ -143,21 +162,59 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved }: Props): React.JSX.Ele
                           'Genderless'
                         )}
                       </div>
-                      <div>
-                        <span className="editor-hint">Ability</span> {mon.ability}
-                        {mon.abilityLocked && ' 🔒'}
-                      </div>
-                      <div className="run-editor-item">
-                        <span className="editor-hint">Item</span>
-                        {mon.item ? (
-                          <>
+                      {/* Hovering the ability or the item says what it does. */}
+                      <Tooltip
+                        className="run-editor-fact-tip"
+                        placement="below"
+                        content={
+                          <div className="tooltip-panel">
+                            <div className="tooltip-title">
+                              {mon.ability}
+                              {mon.abilityLocked && ' 🔒'}
+                            </div>
+                            <div className="tooltip-desc">{info?.abilityDescription || 'No description.'}</div>
+                            {mon.abilityLocked && <div className="tooltip-desc">From a New Ability pick - kept through evolution.</div>}
+                          </div>
+                        }
+                      >
+                        <div>
+                          <span className="editor-hint">Ability</span> {mon.ability}
+                          {mon.abilityLocked && ' 🔒'}
+                        </div>
+                      </Tooltip>
+                      {mon.abilityResetTo && (
+                        <button
+                          type="button"
+                          className="run-editor-reset-ability"
+                          disabled={busy}
+                          title={`Undo the New Ability pick - back to ${mon.abilityResetTo}`}
+                          onClick={() => void resetAbility()}
+                        >
+                          ↺ Reset to {mon.abilityResetTo}
+                        </button>
+                      )}
+                      {mon.item ? (
+                        <Tooltip
+                          className="run-editor-fact-tip"
+                          placement="below"
+                          content={
+                            <div className="tooltip-panel">
+                              <div className="tooltip-title">{mon.item}</div>
+                              <div className="tooltip-desc">{info?.itemDescription || 'No description.'}</div>
+                            </div>
+                          }
+                        >
+                          <div className="run-editor-item">
+                            <span className="editor-hint">Item</span>
                             {mon.itemSpritenum != null && <ItemSprite spritenum={mon.itemSpritenum} />}
                             {mon.item}
-                          </>
-                        ) : (
-                          ' None'
-                        )}
-                      </div>
+                          </div>
+                        </Tooltip>
+                      ) : (
+                        <div className="run-editor-item">
+                          <span className="editor-hint">Item</span> None
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

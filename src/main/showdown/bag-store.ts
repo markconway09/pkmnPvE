@@ -1,7 +1,9 @@
 import { readFileSync, writeFileSync } from 'node:fs'
-import type { BagItemView, EvolutionItemUse } from '../../shared/battle-types'
+import type { BagItemView, EvolutionItemUse, RarityTier } from '../../shared/battle-types'
+import { COIN_PRIZES } from '../../shared/slots'
+import { coinPrizeRarityTier, priceRarityTier } from '../../shared/rarity'
 import { EXP_CANDY_EXP, OPENABLE_ITEM_IDS } from '../../shared/battle-types'
-import { BAG_CATEGORY_ORDER, RETIRED_ITEMS, bagCategoryFor, getEditorOptions, sellPriceFor } from './sim-access'
+import { BAG_CATEGORY_ORDER, RETIRED_ITEMS, bagCategoryFor, getEditorOptions, sellPriceFor, shopPriceFor } from './sim-access'
 import { addMoney } from './money-store'
 import { fossilKindOf, singleFossilSpecies } from './fossils'
 import { playerPathFor } from './save-paths'
@@ -49,6 +51,23 @@ function retireItems(bag: StoredBag): boolean {
   return changed
 }
 
+/**
+ * A bag item's colour on its card: by its Shop price when the Shop sells it, else by its
+ * Coin Shop price for a coin prize; key items are gold, Mega Stones red, evolution items
+ * purple, and anything else grey.
+ */
+function bagItemRarity(itemId: string): RarityTier {
+  const price = shopPriceFor(itemId)
+  if (price !== null) return priceRarityTier(price)
+  const prize = COIN_PRIZES.find((p) => p.itemId === itemId)
+  if (prize) return coinPrizeRarityTier(prize.coins)
+  const category = bagCategoryFor(itemId)
+  if (category === 'Key Items') return 'legendary'
+  if (category === 'Mega Stones') return 'epic'
+  if (category === 'Evolution Items') return 'rare'
+  return 'common'
+}
+
 let state: StoredBag | null = null
 
 // Each player has their own bag: forget the cached one when the player changes.
@@ -83,7 +102,8 @@ export function getBagState(): BagItemView[] {
       opens: OPENABLE_ITEM_IDS.has(item.id),
       fossil: fossilKindOf(item.id),
       restoresTo: singleFossilSpecies(item.id),
-      teamExp: EXP_CANDY_EXP[item.id] ?? null
+      teamExp: EXP_CANDY_EXP[item.id] ?? null,
+      rarityTier: bagItemRarity(item.id)
     })
   }
   // Grouped by category in the shop's order, then by name within each.

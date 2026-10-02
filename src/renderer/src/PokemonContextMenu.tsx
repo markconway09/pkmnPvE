@@ -3,10 +3,13 @@ import { createPortal } from 'react-dom'
 import ContextMenuPanel from './ContextMenuPanel'
 import ItemSprite from './ItemSprite'
 import ShinyIcon from './ShinyIcon'
+import { MenuIcon, PokemonMenuAction, PokemonMenuHeader, PokemonMenuSection } from './PokemonMenuParts'
 import type { BoxPokemonView, EvolutionItemUse } from '../../shared/battle-types'
 
 // The Poke Ball item icon - an evolution already in the Pokedex.
 const POKE_BALL_SPRITENUM = 345
+// The Shiny Patch's icon (see ItemSprite).
+const SHINY_PATCH_SPRITENUM = -8
 
 interface Props {
   x: number
@@ -23,6 +26,8 @@ interface Props {
   onChoose?: (targetSpecies: string) => void
   canUseShinyPatch?: boolean
   onUseShinyPatch?: () => void
+  // How many Shiny Patches the bag holds.
+  shinyPatches?: number
   // With a form-change item (Rotom Catalog, Prison Bottle...): the forms it can change into.
   formChanges?: BoxPokemonView['formChanges']
   onChangeForm?: (form: string) => void
@@ -58,6 +63,7 @@ function PokemonContextMenu({
   onChoose,
   canUseShinyPatch = false,
   onUseShinyPatch,
+  shinyPatches,
   formChanges,
   onChangeForm,
   fusions = [],
@@ -91,115 +97,139 @@ function PokemonContextMenu({
       }}
     >
       <ContextMenuPanel x={x} y={y}>
-        <div className="context-menu-title">
-          {onToggleFavorite && (
-            <button
-              type="button"
-              className="context-menu-heart"
-              title={isFavorite ? 'Unfavorite' : 'Favorite'}
-              onClick={() => {
-                setIsFavorite(!isFavorite)
-                onToggleFavorite()
-              }}
-            >
-              {isFavorite ? '❤️' : '🤍'}
-            </button>
+        <PokemonMenuHeader
+          species={species}
+          shiny={shiny}
+          favorite={isFavorite}
+          onToggleFavorite={
+            onToggleFavorite &&
+            (() => {
+              setIsFavorite(!isFavorite)
+              onToggleFavorite()
+            })
+          }
+        />
+
+        <PokemonMenuSection label="Manage">
+          {onEdit && <PokemonMenuAction tone="edit" icon={<MenuIcon name="edit" />} label="Edit" detail="Moves, item, ability and more" onClick={onEdit} />}
+          {onAdminEdit && <PokemonMenuAction tone="admin" icon={<MenuIcon name="admin" />} label="Admin Edit" detail="Change anything" onClick={onAdminEdit} />}
+          {onMerge && mergeCount > 0 && (
+            <PokemonMenuAction
+              tone="merge"
+              icon={<MenuIcon name="merge" />}
+              label="Merge"
+              detail={`${mergeCount} duplicate${mergeCount === 1 ? '' : 's'} in your box`}
+              onClick={onMerge}
+            />
           )}
-          {species}
-        </div>
-        {onEdit && (
-          <button className="context-menu-item" onClick={onEdit}>
-            Edit Pokemon
-          </button>
-        )}
-        {onAdminEdit && (
-          <button className="context-menu-item" onClick={onAdminEdit}>
-            Admin Edit
-          </button>
-        )}
-        {canUseShinyPatch && onUseShinyPatch && (
-          <button
-            className={`context-menu-item${confirmingPatch ? ' context-menu-confirm' : ''}`}
-            onClick={() => {
-              if (!confirmingPatch) setConfirmingPatch(true)
-              else onUseShinyPatch()
-            }}
-          >
-            <span className="context-menu-evo-target">
-              <ShinyIcon /> {confirmingPatch ? 'Use the Shiny Patch? Click again' : 'Turn Shiny (use Shiny Patch)'}
-            </span>
-          </button>
-        )}
-        {onChangeForm &&
-          formChanges?.ready &&
-          formChanges.forms.map((form) => (
-            <button
-              key={form}
-              className="context-menu-item"
-              title={`Use the ${formChanges.itemName}`}
-              onClick={() => onChangeForm(form)}
-            >
-              <span className="context-menu-evo-target">
-                <ItemSprite spritenum={formChanges.spritenum} />
-                Change into {form}
-              </span>
-            </button>
-          ))}
-        {onFuse &&
-          fusions.map((fusion) => (
-            <button key={fusion.partnerId} className="context-menu-item" onClick={() => onFuse(fusion.partnerId)}>
-              <span className="context-menu-evo-target">
-                Fuse with {fusion.partnerFavorite && '❤️ '}
-                {fusion.partnerSpecies} (Lv{fusion.partnerLevel}) → {fusion.result}
-              </span>
-              <span className="context-menu-evo-item">use the {fusion.itemName}</span>
-            </button>
-          ))}
-        {onMerge && mergeCount > 0 && (
-          <button className="context-menu-item" onClick={onMerge}>
-            <span className="context-menu-evo-target">★ Merge duplicates ({mergeCount})</span>
-          </button>
-        )}
-        {onUnfuse && unfuse && (
-          <button className="context-menu-item" onClick={onUnfuse}>
-            <span className="context-menu-evo-target">Unfuse (get {unfuse.partnerSpecies} back)</span>
-            <span className="context-menu-evo-item">use the {unfuse.itemName}</span>
-          </button>
-        )}
-        {onChoose &&
-          evolutions.map((target) => {
-            const item = evolutionItems[target]
-            return (
-              <button key={target} className="context-menu-item" onClick={() => onChoose(target)}>
-                <span className="context-menu-evo-target">
-                  Evolve into {target}
-                  {registered.includes(target) && (
-                    <span className="context-menu-caught" title="Already in your Pokédex">
-                      <ItemSprite spritenum={POKE_BALL_SPRITENUM} />
-                    </span>
-                  )}
-                </span>
-                {item && (
-                  <span className="context-menu-evo-item">
-                    <ItemSprite spritenum={item.spritenum} />
-                    use {item.name} (×{item.quantity})
-                  </span>
-                )}
-              </button>
-            )
-          })}
+        </PokemonMenuSection>
+
+        <PokemonMenuSection label="Transform">
+          {onChoose &&
+            evolutions.map((target) => {
+              const item = evolutionItems[target]
+              return (
+                <PokemonMenuAction
+                  key={target}
+                  tone="evolve"
+                  icon={<MenuIcon name="evolve" />}
+                  label={
+                    <>
+                      Evolve into {target}
+                      {registered.includes(target) && (
+                        <span className="context-menu-caught" title="Already in your Pokédex">
+                          <ItemSprite spritenum={POKE_BALL_SPRITENUM} />
+                        </span>
+                      )}
+                    </>
+                  }
+                  detail={
+                    item && (
+                      <>
+                        <ItemSprite spritenum={item.spritenum} />
+                        Uses {item.name} (×{item.quantity})
+                      </>
+                    )
+                  }
+                  onClick={() => onChoose(target)}
+                />
+              )
+            })}
+          {onChangeForm &&
+            formChanges?.ready &&
+            formChanges.forms.map((form) => (
+              <PokemonMenuAction
+                key={form}
+                tone="form"
+                icon={<ItemSprite spritenum={formChanges.spritenum} />}
+                label={`Change into ${form}`}
+                detail={`Uses the ${formChanges.itemName}`}
+                onClick={() => onChangeForm(form)}
+              />
+            ))}
+          {onFuse &&
+            fusions.map((fusion) => (
+              <PokemonMenuAction
+                key={fusion.partnerId}
+                tone="fuse"
+                icon={<MenuIcon name="fuse" />}
+                label={`Fuse into ${fusion.result}`}
+                detail={
+                  <>
+                    With {fusion.partnerFavorite && '❤️ '}
+                    {fusion.partnerSpecies} (Lv{fusion.partnerLevel}), uses the {fusion.itemName}
+                  </>
+                }
+                onClick={() => onFuse(fusion.partnerId)}
+              />
+            ))}
+          {onUnfuse && unfuse && (
+            <PokemonMenuAction
+              tone="fuse"
+              icon={<MenuIcon name="unfuse" />}
+              label="Unfuse"
+              detail={`Get ${unfuse.partnerSpecies} back, uses the ${unfuse.itemName}`}
+              onClick={onUnfuse}
+            />
+          )}
+          {canUseShinyPatch && onUseShinyPatch && (
+            <PokemonMenuAction
+              tone="shiny"
+              icon={<ShinyIcon />}
+              label={confirmingPatch ? 'Click again to turn Shiny' : 'Turn Shiny'}
+              detail={
+                <>
+                  <ItemSprite spritenum={SHINY_PATCH_SPRITENUM} />
+                  Uses up a Shiny Patch{shinyPatches !== undefined && ` (×${shinyPatches})`}
+                </>
+              }
+              confirming={confirmingPatch}
+              onClick={() => {
+                if (!confirmingPatch) setConfirmingPatch(true)
+                else onUseShinyPatch()
+              }}
+            />
+          )}
+        </PokemonMenuSection>
+
         {onSell && sellPrice !== undefined && (
-          <button
-            className={`context-menu-item context-menu-sell${confirmingSell ? ' context-menu-confirm' : ''}`}
-            onClick={() => {
-              if (sellNeedsConfirm && !confirmingSell) setConfirmingSell(true)
-              else onSell()
-            }}
-          >
-            {confirmingSell
-              ? `Sell ${shiny ? 'this shiny ' : ''}${species}? Click again`
-              : `Sell for ₽${sellPrice.toLocaleString('en-US')}`}
-          </button>
+          <PokemonMenuSection>
+            <PokemonMenuAction
+              tone="sell"
+              icon={<MenuIcon name="sell" />}
+              label={confirmingSell ? 'Click again to sell' : 'Sell'}
+              detail={
+                confirmingSell
+                  ? `This ${shiny ? 'shiny ' : ''}${species}, for ₽${sellPrice.toLocaleString('en-US')}`
+                  : `₽${sellPrice.toLocaleString('en-US')}`
+              }
+              confirming={confirmingSell}
+              onClick={() => {
+                if (sellNeedsConfirm && !confirmingSell) setConfirmingSell(true)
+                else onSell()
+              }}
+            />
+          </PokemonMenuSection>
         )}
       </ContextMenuPanel>
     </div>,

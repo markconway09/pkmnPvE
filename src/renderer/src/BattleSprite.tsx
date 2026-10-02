@@ -14,7 +14,7 @@ import Tooltip from './Tooltip'
 import SubstituteDoll from './SubstituteDoll'
 import ProtectShield from './ProtectShield'
 import SideScreens from './SideScreens'
-import { spriteCandidates, type SpriteStyle } from './spriteStyle'
+import { gmaxSpriteCandidates, spriteCandidates, type SpriteStyle } from './spriteStyle'
 import ItemSprite from './ItemSprite'
 import ShinyIcon from './ShinyIcon'
 
@@ -185,12 +185,14 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
     }
   }, [pokemon])
 
-  // Gigantamax: its own picture (e.g. charizardgmax), the usual one if there's none.
-  const spriteId = displayed ? toSpriteId(displayed.species) + (displayed.gigantamax ? 'gmax' : '') : ''
+  // Gigantamax (a raid boss, or the player's cosmetic look - which never grows or glows):
+  // its own picture (e.g. charizardgmax), the usual one if there's none.
+  const gmax = !!displayed && (!!displayed.gigantamax || !!displayed.gmaxLook)
+  const spriteId = displayed ? toSpriteId(displayed.species) : ''
   const isShiny = !!displayed?.shiny
   useEffect(() => {
     setFallbackStep(0)
-  }, [spriteId, spriteStyle, isShiny, facing])
+  }, [spriteId, gmax, spriteStyle, isShiny, facing])
 
   if (!displayed) return <div className={slotClass} />
 
@@ -207,10 +209,7 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
   ]
     .filter(Boolean)
     .join(' ')
-  const candidates = [
-    ...spriteCandidates(spriteStyle, facing, spriteId, displayed.shiny),
-    ...(displayed.gigantamax ? spriteCandidates(spriteStyle, facing, toSpriteId(displayed.species), displayed.shiny) : [])
-  ]
+  const candidates = (gmax ? gmaxSpriteCandidates : spriteCandidates)(spriteStyle, facing, spriteId, displayed.shiny)
   const src = candidates[Math.min(fallbackStep, candidates.length - 1)]
 
   return (

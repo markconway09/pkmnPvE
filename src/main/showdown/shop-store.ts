@@ -1,4 +1,4 @@
-import type { ItemQuantity, SellResult, ShopItemEntry, ShopPriceEntry } from '../../shared/battle-types'
+import type { ItemQuantity, KeyItemView, SellResult, ShopItemEntry, ShopPriceEntry } from '../../shared/battle-types'
 import { KEY_ITEM_IDS } from '../../shared/battle-types'
 import { ACHIEVEMENTS } from '../../shared/achievements'
 import { addItem, getBagState, getItemQuantity, hasItem, removeItem } from './bag-store'
@@ -28,25 +28,25 @@ function buyableCatalog(discounted = true): ShopItemEntry[] {
 }
 
 /**
- * The shop's shelves: what can be bought, with the key items shown after the Recommended
- * ones - never for sale, just whether the player has each and the achievement that
- * unlocks it. `discounted` false gives the Shop's own prices (for the Lock Capsule's odds).
+ * The shop's shelves: what can be bought. `discounted` false gives the Shop's own prices
+ * (for the Lock Capsule's odds).
  */
 export function listShop(discounted = true): ShopItemEntry[] {
-  const catalog = buyableCatalog(discounted)
-  const keyItems: ShopItemEntry[] = getEditorOptions()
+  return buyableCatalog(discounted)
+}
+
+/**
+ * Every key item, for the Bag | Shop window's Key Items tab: never sold, just whether the
+ * player has each and the achievement that unlocks it.
+ */
+export function listKeyItems(): KeyItemView[] {
+  return getEditorOptions()
     .items.filter((item) => KEY_ITEM_IDS.has(item.id))
     .map((item) => ({
       ...item,
-      price: 0,
-      category: 'Key Items',
-      keyItem: {
-        owned: hasItem(item.id),
-        unlockedBy: ACHIEVEMENTS.find((a) => a.reward.keyItems?.includes(item.id))?.name ?? 'an achievement'
-      }
+      owned: hasItem(item.id),
+      unlockedBy: ACHIEVEMENTS.find((a) => a.reward.keyItems?.includes(item.id))?.name ?? 'an achievement'
     }))
-  const afterRecommended = catalog.filter((i) => i.category === 'Recommended').length
-  return [...catalog.slice(0, afterRecommended), ...keyItems, ...catalog.slice(afterRecommended)]
 }
 
 /** The whole shop with each item's default price beside its current one, for the admin price editor. */
@@ -100,8 +100,9 @@ export function sellItems(entries: ItemQuantity[]): SellResult {
 }
 
 /**
- * The bag's Quick sell: every berry, and every Memory, Plate and Drive while there's no
- * Silvally, Arceus or Genesect (respectively) in the box to hold one - all of each.
+ * The bag's Quick sell: every sell-only item (Bottle Caps...), every berry but the ones
+ * worth holding, and every Memory, Plate and Drive while there's no Silvally, Arceus or
+ * Genesect (respectively) in the box to hold one - all of each.
  */
 export function quickSellSelection(): ItemQuantity[] {
   const owned = new Map<string, boolean>()
@@ -114,7 +115,7 @@ export function quickSellSelection(): ItemQuantity[] {
     .filter((item) => {
       const kind = quickSellKind(item.id)
       if (!kind) return false
-      return kind.kind === 'berry' || !ownsCached(kind.species)
+      return kind.kind !== 'forPokemon' || !ownsCached(kind.species)
     })
     .map((item) => ({ itemId: item.id, quantity: item.quantity }))
 }

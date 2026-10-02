@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { TRAINER_SPRITE_IDS, trainerSpriteUrl } from './trainerSprite'
+import SearchBar from './SearchBar'
 
 interface Props {
   value: string
@@ -16,16 +17,12 @@ function TrainerSpritePicker({ value, onChange, onClose }: Props): React.JSX.Ele
   return createPortal(
     <div className="modal-overlay" onMouseDown={onClose}>
       <div className="modal-panel trainer-picker" onMouseDown={(e) => e.stopPropagation()}>
-        <h2>Choose Trainer Sprite</h2>
-        <input
-          type="text"
-          className="trainer-picker-search"
-          placeholder="Search..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          autoFocus
-        />
-        <div className="trainer-picker-count">{filtered.length} sprites</div>
+        {/* The title, how many sprites are shown, and the search - on one bar. */}
+        <div className="trainer-picker-header">
+          <h2>Choose trainer sprite</h2>
+          <span className="trainer-picker-count">{filtered.length} sprites</span>
+          <SearchBar className="trainer-picker-search" placeholder="Search sprites..." value={query} onChange={setQuery} autoFocus />
+        </div>
         <div className="trainer-picker-grid">
           {filtered.map((id) => (
             <button

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { RarityGlow } from './RarityCard'
 import { createPortal } from 'react-dom'
 import type { BoxPokemonView, BoxState } from '../../shared/battle-types'
 import {
@@ -109,7 +110,7 @@ function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
         <h2>Merge into {keeper.species}</h2>
         <div className="merge-keeper">
           <div className="box-icon merge-keeper-icon">
-            <div className="box-icon-draggable">
+            <div className={`box-icon-draggable rarity-card rarity-tier-${keeper.rarityTier ?? 'common'}`}>
               <PokemonIconVisual mon={{ ...keeper, expPercent: undefined }} />
             </div>
           </div>
@@ -142,13 +143,15 @@ function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
               return (
                 <button
                   key={c.id}
-                  className={`merge-candidate${picked.has(c.id) ? ' merge-candidate-picked' : ''}${c.notReady ? ' merge-candidate-not-ready' : ''}`}
+                  className={`merge-candidate rarity-card rarity-tier-${keeper.rarityTier ?? 'common'}${picked.has(c.id) ? ' merge-candidate-picked' : ''}${c.notReady ? ' merge-candidate-not-ready' : ''}`}
                   // A pre-evolution that can't evolve into it yet can't go in.
                   disabled={busy || !!c.notReady}
                   title={c.notReady ? `Can't merge in yet - ${c.notReady}` : undefined}
                   onClick={() => toggle(c.id)}
                 >
-                  <SpriteImage style="2d-static" className="merge-candidate-sprite" spriteId={toSpriteId(c.species)} shiny={c.shiny} alt={c.species} />
+                  <RarityGlow size={56}>
+                    <SpriteImage style="3d-static" className="merge-candidate-sprite" spriteId={toSpriteId(c.species)} shiny={c.shiny} alt={c.species} />
+                  </RarityGlow>
                   <span className="merge-candidate-name">
                     {c.favorite && '❤️ '}
                     {c.species}

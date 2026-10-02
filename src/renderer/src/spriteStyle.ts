@@ -95,3 +95,28 @@ export function spriteCandidates(style: SpriteStyle, facing: 'front' | 'back', s
   }
   return urls
 }
+
+/**
+ * A Gigantamax Pokemon's pictures, best first: its Gigantamax sprite in the chosen style,
+ * then the 3D one when 2D has none (most Gigantamax art is 3D only), then the still ones,
+ * and only then its ordinary sprite (spriteCandidates).
+ */
+export function gmaxSpriteCandidates(style: SpriteStyle, facing: 'front' | 'back', spriteId: string, shiny: boolean): string[] {
+  const gmaxId = `${spriteId}gmax`
+  const animated = style === '2d-animated' || style === '3d-animated'
+  const styles: SpriteStyle[] = [style]
+  if (style === '2d-animated') styles.push('3d-animated')
+  if (style === '2d-static') styles.push('3d-static')
+  if (style === '3d-static') styles.push('2d-static')
+  if (animated) styles.push(style === '3d-animated' ? '3d-static' : '2d-static', style === '3d-animated' ? '2d-static' : '3d-static')
+  const urls: string[] = []
+  const add = (url: string): void => {
+    if (!urls.includes(url)) urls.push(url)
+  }
+  for (const s of styles) {
+    if (shiny) add(spriteUrl(s, facing, gmaxId, true))
+    add(spriteUrl(s, facing, gmaxId, false))
+  }
+  for (const url of spriteCandidates(style, facing, spriteId, shiny)) add(url)
+  return urls
+}

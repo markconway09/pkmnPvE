@@ -255,7 +255,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
   // The player's companion, beside their sprite in battle. Both are read again every time the
   // battle screen opens (the last battle's view lingers on after it, so inBattle alone
   // wouldn't notice a new one) - a companion or size changed since then shows up.
-  const [playerCompanion, setPlayerCompanion] = useState<{ species: string; shiny: boolean; size: CompanionSize } | null>(null)
+  const [playerCompanion, setPlayerCompanion] = useState<{ species: string; shiny: boolean; gmaxLook?: boolean; size: CompanionSize } | null>(null)
   const onBattleScreen = screen === 'battle'
   useEffect(() => {
     if (!inBattle || !onBattleScreen) return
@@ -265,7 +265,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
       .catch(() => setPlayerTitle(null))
     window.api
       .listBox()
-      .then((box) => setPlayerCompanion(box.companion ? { species: box.companion.species, shiny: box.companion.shiny, size: box.companionSize ?? 'S' } : null))
+      .then((box) => setPlayerCompanion(box.companion ? { species: box.companion.species, shiny: box.companion.shiny, gmaxLook: box.companion.gmaxLook, size: box.companionSize ?? 'S' } : null))
       .catch(() => setPlayerCompanion(null))
   }, [inBattle, onBattleScreen])
   const logRef = useRef<HTMLDivElement>(null)
@@ -358,10 +358,18 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
     } else if (request && 'forceSwitch' in request && request.forceSwitch) {
       // In doubles, when both Pokemon faint with only one left on the bench, the
       // sim still flags both slots - the ones there's nobody to send in for pass.
+      // A Revival Blessing slot picks from the fainted instead of the bench.
       let benchLeft = request.side.pokemon.filter((p) => !p.active && !p.condition.endsWith(' fnt')).length
+      let faintedLeft = request.side.pokemon.filter((p) => !p.active && p.condition.endsWith(' fnt')).length
       setPendingChoices(
-        request.forceSwitch.map((mustSwitch) => {
-          if (!mustSwitch || benchLeft <= 0) return 'pass'
+        request.forceSwitch.map((mustSwitch, i) => {
+          if (!mustSwitch) return 'pass'
+          if (request.side.pokemon[i]?.reviving) {
+            if (faintedLeft <= 0) return 'pass'
+            faintedLeft--
+            return null
+          }
+          if (benchLeft <= 0) return 'pass'
           benchLeft--
           return null
         })
@@ -598,11 +606,14 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
   // Whichever Pokemon a click in the switch column would apply to right now -
   // the active slot mid move-selection, or the first forced replacement still
   // needed - or null when there's nothing to switch into at the moment.
-  function currentSwitchTarget(): { slotIndex: number; disabled: boolean; forced: boolean } | null {
+  function currentSwitchTarget(): { slotIndex: number; disabled: boolean; forced: boolean; reviving?: boolean } | null {
     const request = view?.request
     if (request && 'forceSwitch' in request && request.forceSwitch) {
       const slotIndex = request.forceSwitch.findIndex((mustSwitch, i) => mustSwitch && pendingChoices[i] == null)
-      return slotIndex < 0 ? null : { slotIndex, disabled: !caughtUp || busy, forced: true }
+      if (slotIndex < 0) return null
+      // Revival Blessing: this slot brings back a fainted Pokemon rather than switching.
+      const reviving = !!request.side.pokemon[slotIndex]?.reviving
+      return { slotIndex, disabled: !caughtUp || busy, forced: true, reviving }
     }
     if (request && 'active' in request && request.active) {
       const active = request.active[activeSelectSlot]
@@ -777,7 +788,11 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
           />
         )}
         <MainMenu
-          onFight={() => void startBattle(wildLocation, wildLevelCap)}
+          onFight={(location) => {
+            // A location's own button fights there, and it becomes the one remembered.
+            if (location) setWildLocation(location)
+            void startBattle(location ?? wildLocation, wildLevelCap)
+          }}
           wildLocation={wildLocation}
           onChangeWildLocation={setWildLocation}
           wildLevelCap={wildLevelCap}
@@ -832,6 +847,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
             lockedNote={switchTrapped && !view.ended ? "Trapped - can't switch out" : undefined}
             matchups={teamMatchupChips()}
             reservedSlots={switchTarget ? reservedSwitchSlots(switchTarget.slotIndex) : undefined}
+            reviveMode={!!switchTarget?.reviving}
             onSwitch={(slot) => {
               if (!switchTarget) return
               if (switchTarget.forced) setPendingChoice(switchTarget.slotIndex, `switch ${slot}`)
@@ -937,6 +953,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
             runBattle={view.runBattle}
             runFainted={view.runFainted}
             runItemReward={view.runItemReward}
+            draftResult={view.draftResult}
             onClose={() => setScreen('menu')}
           />
         )}
@@ -1057,7 +1074,9 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
         {!view?.ended && forceSwitchRequest && (
           <div className="battle-action-slots">
             <div className="battle-action-slot">
-              <div className="battle-action-slot-label">Choose a replacement</div>
+              <div className="battle-action-slot-label">
+                {switchTarget?.reviving ? 'Choose a fainted Pokémon to revive' : 'Choose a replacement'}
+              </div>
               <p className="box-empty-hint">Pick one from the list on the left.</p>
             </div>
           </div>

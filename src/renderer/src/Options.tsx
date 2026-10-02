@@ -47,8 +47,11 @@ function Options({
           </button>
         </div>
         <div className="options-modal-body">
-          <UpdatesSection />
+          <section className="options-section">
+            <UpdatesSection />
+          </section>
 
+          <section className="options-section">
           <h2 className="options-heading">Account</h2>
           <p className="editor-hint">Logged in as {username}</p>
           <div>
@@ -62,9 +65,13 @@ function Options({
               Log out
             </button>
           </div>
+          </section>
 
-          <CloudSavesSection />
+          <section className="options-section">
+            <CloudSavesSection />
+          </section>
 
+          <section className="options-section">
           <h2 className="options-heading">Sprite style</h2>
           <div className="sprite-style-grid">
             {SPRITE_STYLES.map((style) => (
@@ -82,8 +89,11 @@ function Options({
               </button>
             ))}
           </div>
+          </section>
 
-          <BackgroundSection background={background} onChange={onChangeBackground} />
+          <section className="options-section">
+            <BackgroundSection background={background} onChange={onChangeBackground} />
+          </section>
         </div>
 
         <div className="editor-actions">
