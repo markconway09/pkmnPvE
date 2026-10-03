@@ -237,7 +237,13 @@ function BagPanel({ onChanged }: Props): React.JSX.Element {
             kind: 'use',
             title: `+${item.teamExp.toLocaleString('en-US')} exp to each Pokemon on your team`
           })}
-          {button('To cap', () => void useExpCandiesUntilCap(item), {
+          {button(
+            // An up arrow to the bar on top: level the team up to the cap.
+            <svg className="item-card-btn-icon" viewBox="0 0 16 16" aria-label="To cap">
+              <path d="M3 2.5h10M8 13.5V5.5M4.5 9 8 5.5 11.5 9" />
+            </svg>,
+            () => void useExpCandiesUntilCap(item),
+            {
             kind: 'use',
             title: `Keeps using them until your whole team is at the level cap, or you run out (×${item.quantity} left)`
           })}

@@ -3,6 +3,7 @@ import type { AutoSetOption, AutoSetResult, StatBlock } from '../../shared/battl
 import smogonSets from './data/smogon-sets.json'
 import { learnableMoveIds } from './sim-access'
 import { hasItem } from './bag-store'
+import { lockedTmMoves } from './tm-store'
 
 // pokemon-showdown is CommonJS - loaded the same way sim-access.ts does.
 const require = createRequire(import.meta.url)
@@ -164,14 +165,22 @@ function bestAttacks(pool: string[], count: number, types: string[], physical: b
 /**
  * Builds the chosen set for a Pokemon at a level. `admin` lifts the game's limits
  * (any move it can ever learn, any item) - otherwise moves must be learnable at
- * its level, and an item it doesn't have in the bag is left off. What had to
- * change to fit comes back in `notes`.
+ * its level and not need a TM the player doesn't own (knownMoves: the ones it already
+ * has, which it keeps either way), and an item it doesn't have in the bag is left off.
+ * What had to change to fit comes back in `notes`.
  */
-export function buildAutoSet(speciesName: string, level: number, optionId: string, admin: boolean): AutoSetResult {
+export function buildAutoSet(
+  speciesName: string,
+  level: number,
+  optionId: string,
+  admin: boolean,
+  knownMoves: string[] = []
+): AutoSetResult {
   const species = Dex.species.get(speciesName)
   const types = [...species.types]
   const physical = species.baseStats.atk >= species.baseStats.spa
-  const learnablePool = learnableMoveIds(species.id, admin ? 100 : level)
+  const locked = admin ? new Set<string>() : lockedTmMoves(species.name, knownMoves)
+  const learnablePool = learnableMoveIds(species.id, admin ? 100 : level).filter((id) => !locked.has(id))
   const learnable = new Set(learnablePool)
   const canUse = (moveId: string): boolean => admin || learnable.has(moveId)
   const speciesAbilities = Object.values(species.abilities) as string[]
@@ -184,6 +193,9 @@ export function buildAutoSet(speciesName: string, level: number, optionId: strin
   let evs: StatBlock
   let ivs = statBlock(31)
   let teraType: string | null = types[0] ?? null
+
+  // Why a set's move was left off: its TM isn't owned, or it isn't learnable yet.
+  const whyNot = (name: string): string => (locked.has(toID(name)) ? 'needs its TM' : `isn't learnable at Lv ${level}`)
 
   const [kind, indexText] = optionId.split(':')
   const index = Number(indexText)
@@ -209,9 +221,9 @@ export function buildAutoSet(speciesName: string, level: number, optionId: strin
         bestAttacks(sameType, 1, types, physical, taken)[0] ?? bestAttacks(learnablePool, 1, types, physical, taken)[0]
       if (pick) {
         moves.push(pick)
-        notes.push(`${name} isn't learnable at Lv ${level} - used ${Dex.moves.get(pick).name} instead`)
+        notes.push(`${name} ${whyNot(name)} - used ${Dex.moves.get(pick).name} instead`)
       } else {
-        notes.push(`${name} isn't learnable at Lv ${level}, and there was nothing to replace it with`)
+        notes.push(`${name} ${whyNot(name)}, and there was nothing to replace it with`)
       }
     }
     abilityChoices = list(smogon.ability)

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { loadSpriteStyle } from './spriteStyle'
 import { createPortal } from 'react-dom'
 import type { AutoSetOption, EditablePokemonSet, EditorOptions, SpeciesEditInfo, StatBlock, BoxPokemonView } from '../../shared/battle-types'
@@ -12,6 +12,7 @@ import ShinyIcon from './ShinyIcon'
 import { itemIconStyle } from './itemIcon'
 import { TYPE_COLORS } from './moveAnimations'
 import ModalSpinner from './ModalSpinner'
+import { TmIcon } from './TmBits'
 
 export type PokemonEditorSource = { kind: 'box'; monId: string } | { kind: 'premadeTeam'; teamId: string; monId: string }
 
@@ -55,6 +56,8 @@ interface Props {
   // Its form changes (Rotom Catalog, Prison Bottle...), listed the same way.
   formChanges?: BoxPokemonView['formChanges']
   onChangeForm?: (form: string) => void
+  // Opened from the right-click Change Form: scroll to the Form changes and flash them.
+  focusForms?: boolean
   // A box Pokemon's merge stars: the Stat column shows them (+10% each in classic battles - less for red and gold).
   mergeStars?: number
   // And how many copies it's made of - its progress to the next star, under the portrait.
@@ -177,6 +180,7 @@ function PokemonEditor({
   onEvolve,
   formChanges,
   onChangeForm,
+  focusForms = false,
   mergeStars,
   rarityTier,
   mergeCopies
@@ -194,6 +198,8 @@ function PokemonEditor({
   const [set, setSet] = useState<EditablePokemonSet | null>(null)
   // The set as it was opened - Save stays greyed out until something differs from it.
   const [loadedSet, setLoadedSet] = useState<string | null>(null)
+  // The moves it knew when the editor opened: it keeps them at any level.
+  const knownMovesRef = useRef<string[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -209,6 +215,16 @@ function PokemonEditor({
       .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // The Form changes section only appears once the species has loaded, so it's
+  // scrolled to (and highlighted) the first time it shows up.
+  const formsFocusedRef = useRef(false)
+  function focusFormsSection(section: HTMLDivElement | null): void {
+    if (!section || !focusForms || formsFocusedRef.current) return
+    formsFocusedRef.current = true
+    section.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    section.classList.add('editor-section-highlight')
+  }
 
   const [activeSelector, setActiveSelector] = useState<ActiveSelector>(null)
   const [speciesQuery, setSpeciesQuery] = useState('')
@@ -282,7 +298,8 @@ function PokemonEditor({
         setBagItemIds(bag ? new Set(bag.map((i) => i.id)) : null)
         setSet(mon)
         setLoadedSet(JSON.stringify(mon))
-        const info = await window.api.getSpeciesInfo(mon.species, isAdmin ? 100 : mon.level)
+        knownMovesRef.current = mon.moves.filter(Boolean)
+        const info = await window.api.getSpeciesInfo(mon.species, isAdmin ? 100 : mon.level, knownMovesRef.current)
         if (cancelled) return
         setSpeciesInfo(info)
       } catch (e) {
@@ -378,7 +395,7 @@ function PokemonEditor({
     if (!set) return
     if (isAdmin) return // movepool is already unrestricted, no need to refetch on level change
     try {
-      const info = await window.api.getSpeciesInfo(set.species, level)
+      const info = await window.api.getSpeciesInfo(set.species, level, knownMovesRef.current)
       setSpeciesInfo(info)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -426,6 +443,8 @@ function PokemonEditor({
       }
     })
     try {
+      // A new species starts with no moves, so there's nothing it already knows.
+      knownMovesRef.current = []
       const info = await window.api.getSpeciesInfo(newSpecies, isAdmin ? 100 : (set?.level ?? 1))
       setSpeciesInfo(info)
       setSet((prev) => {
@@ -523,7 +542,6 @@ function PokemonEditor({
     <div className="modal-overlay" onMouseDown={onClose}>
       <div className="modal-row" onMouseDown={(e) => e.stopPropagation()}>
         <div className={`modal-panel pokemon-editor pokemon-editor-main${!(options && set && speciesInfo) && !error ? ' modal-panel-loading' : ''}`}>
-          <h2>Edit Pokemon</h2>
           {!(options && set && speciesInfo) && !error && <ModalSpinner />}
           {options && set && speciesInfo && (
             <div className="pokemon-editor-layout" onFocus={handleFormFocus}>
@@ -738,9 +756,6 @@ function PokemonEditor({
                         Apply
                       </button>
                     </div>
-                    <p className="editor-hint">
-                      Fills in moves, ability, item, nature, EVs, IVs and Tera type - check them over before saving.
-                    </p>
                     {autoNotes && autoNotes.length > 0 && (
                       <ul className="auto-set-notes">
                         {autoNotes.map((note, i) => (
@@ -791,7 +806,7 @@ function PokemonEditor({
                   </div>
                 )}
                 {onChangeForm && formChanges && formChanges.forms.length > 0 && (
-                  <div className="editor-section">
+                  <div className="editor-section" ref={focusFormsSection}>
                     {/* Many forms (Rotom, Alcremie): small tiles, the item named once in the heading. */}
                     <h3>
                       Form changes
@@ -1121,11 +1136,14 @@ function PokemonEditor({
                 const currentMoves = set?.moves ?? []
                 return moveResults.map((m) => {
                   const learnedElsewhere = currentMoves.some((id, i) => id === m.id && i !== activeSelector)
+                  // Learned only by TM, and the TM isn't owned yet (admin editing ignores it).
+                  const tmLocked = !isAdmin && !!m.tmLocked
                   return (
                     <button
                       key={m.id}
-                      className={`selector-row ${learnedElsewhere ? 'selector-row-disabled' : ''}`}
-                      disabled={learnedElsewhere}
+                      className={`selector-row ${learnedElsewhere || tmLocked ? 'selector-row-disabled' : ''}`}
+                      disabled={learnedElsewhere || tmLocked}
+                      title={tmLocked ? `Find or buy the ${m.name} TM to teach it` : undefined}
                       onClick={() => {
                         updateMove(activeSelector, m.id)
                         setActiveSelector(null)
@@ -1136,6 +1154,11 @@ function PokemonEditor({
                           {m.name}
                           <span className={`type-badge type-${m.type.toLowerCase()}`}>{m.type}</span>
                           {learnedElsewhere && <span className="learned-badge">Learned</span>}
+                          {tmLocked && (
+                            <span className="tm-locked-badge">
+                              <TmIcon type={m.type} /> Needs TM
+                            </span>
+                          )}
                         </div>
                         <div className="selector-row-sub">
                           {m.category} · Pow {m.basePower || '—'} · Acc {m.accuracy === true ? '—' : m.accuracy} · PP{' '}

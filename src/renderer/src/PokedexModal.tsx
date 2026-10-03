@@ -72,8 +72,8 @@ function PokedexModal({ onClose }: Props): React.JSX.Element {
           </span>
           <SearchBar className="pokedex-search" placeholder="Search name or number…" value={search} onChange={setSearch} autoFocus />
         </div>
-        {!entries && <ModalSpinner />}
-        <div className="pokedex-grid">
+        <div className={`pokedex-grid${entries ? '' : ' pokedex-grid-loading'}`}>
+          {!entries && <ModalSpinner />}
           {shown.map((e) => {
             // An alternate form shows its species' name, and the form itself in a tag on
             // the corner ("Rotom" tagged "Wash") - the full name on hover.

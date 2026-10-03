@@ -34,6 +34,8 @@ import {
   FORM_CHANGES,
   ZYGARDE_CUBE_ITEM_ID,
   DECORATION_BOX_ITEM_ID,
+  FASHION_CASE_ITEM_ID,
+  SCANNER_ITEM_ID,
   PRISON_BOTTLE_ITEM_ID,
   REVEAL_GLASS_ITEM_ID,
   GRACIDEA_ITEM_ID,
@@ -173,6 +175,22 @@ export function speciesStatsAndTypes(species: string, set: PokemonSet | null): {
     ? computeStats(dexSpecies.baseStats, set.level, set.ivs, set.evs, set.nature)
     : { ...dexSpecies.baseStats }
   return { types, stats }
+}
+
+/**
+ * The ability a Pokemon has after a lasting forme change in battle (Mega Evolution,
+ * Primal Reversion, Ultra Burst, Zygarde's Power Construct...): the new forme's own
+ * ability, which replaces the one it came in with. Falls back when the name is unknown.
+ */
+export function formeAbility(species: string, fallback: string): string {
+  const dexSpecies = Dex.species.get(species)
+  return dexSpecies.exists ? dexSpecies.abilities[0] || fallback : fallback
+}
+
+/** An ability's display name from its id (as a request reports it), e.g. "toughclaws" -> "Tough Claws". */
+export function abilityName(id: string): string {
+  const ability = Dex.abilities.get(id)
+  return ability.exists ? ability.name : id
 }
 
 export function buildPokemonSummary(species: string, set: PokemonSet | null): PokemonSummary {
@@ -1010,6 +1028,12 @@ const FORM_CHANGE_ITEMS: ItemOptionEntry[] = [
     name: 'Decoration Box',
     description: 'Right-click an Alcremie to change its cream to any of its nine forms.',
     spritenum: -27
+  },
+  {
+    id: FASHION_CASE_ITEM_ID,
+    name: 'Fashion Case',
+    description: "Right-click a Pikachu to change its outfit - a cap, a Cosplay costume, Partner or World.",
+    spritenum: -28
   }
 ]
 
@@ -1040,6 +1064,14 @@ const FUSION_ITEMS: ItemOptionEntry[] = [
     spritenum: -17
   }
 ]
+
+// The Scanner: a key item bought in the Coin Shop (see tm-store). -29 maps to its own image (see ItemSprite).
+const SCANNER_ITEM: ItemOptionEntry = {
+  id: SCANNER_ITEM_ID,
+  name: 'Scanner',
+  description: 'After a wild win, one quick skill check can turn up a TM from the area - 5% on a Good, 15% on a Great.',
+  spritenum: -29
+}
 
 const ROTOM_CATALOG_ITEM: ItemOptionEntry = {
   id: ROTOM_CATALOG_ITEM_ID,
@@ -1115,6 +1147,7 @@ export function getEditorOptions(): EditorOptions {
       ...MORE_CHARMS,
       ...FORM_CHANGE_ITEMS,
       ...FUSION_ITEMS,
+      SCANNER_ITEM,
       ...EXP_CANDY_ITEMS
     ])
     .sort(byName)
@@ -1510,24 +1543,11 @@ export function moveUsageFor(speciesName: string): Map<string, number> {
   )
 }
 
-// Most of a species' gen 9 movepool has no level-up source at all (former
-// level-up moves were shifted to TM/tutor over the generations), so it has
-// no natural level to gate on. Its raw power stands in instead - status
-// moves (no basePower) are always available, and the strongest attackers stay
-// locked until level 60, so a low-level Pokemon can't be handed something
-// like Hyper Beam just because it's technically TM-taught. 60 rather than
-// the level cap itself, since by then a Pokemon has room to actually use
-// whatever a TM hands it for a while before the game's over.
-// From this level a Pokemon can learn every move its species has ever learned - even
-// one it only learns by level-up later (Pidgeot's Hurricane at 62, Nidorino's Earth Power
-// at 71).
+// Only level-up moves wait for their level; anything taught (TM, tutor, egg, event)
+// is open from level 1. From this level a Pokemon can learn every move its species has
+// ever learned - even one it only learns by level-up later (Pidgeot's Hurricane at 62,
+// Nidorino's Earth Power at 71).
 const ALL_MOVES_LEVEL = 60
-
-function powerBasedRequiredLevel(moveId: string): number {
-  const basePower = Dex.moves.get(moveId).basePower || 0
-  if (basePower <= 0) return 1
-  return clampInt(basePower / 1.5, 1, ALL_MOVES_LEVEL)
-}
 
 // Every move it has ever been able to learn, in any generation - Emolga's Knock Off and
 // Beedrill's Fell Stinger are Gen 5-7 / 6-7 only (from Gen 8 they're gone), yet Smogon's
@@ -1561,21 +1581,44 @@ export function learnableMoveIds(speciesId: string, level: number, anyGeneration
     }
   }
   const genPrefix = String(maxGen || 9)
+  // Tera Blast is a TM nearly everything learns in Scarlet/Violet, but Pokemon cut from
+  // those games (Alakazam, Machamp, Pidgeot...) never got it. Here anything that can be
+  // taught a TM at all learns it too; Caterpie, which can't, still doesn't. Species that
+  // are in those games keep their real list (Magikarp, Ditto and Terapagos go without).
+  if (
+    Dex.species.get(speciesId).isNonstandard === 'Past' &&
+    !merged.has('terablast') &&
+    [...merged.values()].some((sources) => sources.some((s) => s[1] === 'M'))
+  ) {
+    merged.set('terablast', ['9M'])
+  }
 
   const ids: string[] = []
   for (const [moveId, sources] of merged) {
     const genSources = anyGeneration ? sources : sources.filter((s) => s.startsWith(genPrefix))
     if (genSources.length === 0) continue
     // The earliest it can come: a level-up source at its level, any other source (TM,
-    // tutor, egg...) at its power-based level - and from ALL_MOVES_LEVEL on, everything.
-    const levels = genSources.map((s) => (s[1] === 'L' ? parseInt(s.slice(2), 10) : powerBasedRequiredLevel(moveId)))
+    // tutor, egg...) at level 1 - and from ALL_MOVES_LEVEL on, everything.
+    const levels = genSources.map((s) => (s[1] === 'L' ? parseInt(s.slice(2), 10) : 1))
     const requiredLevel = Math.min(ALL_MOVES_LEVEL, ...levels.filter(Number.isFinite))
     if (level >= requiredLevel) ids.push(moveId)
   }
   return ids
 }
 
-export function getSpeciesEditInfo(speciesName: string, level: number): SpeciesEditInfo {
+// knownMoves: the moves the Pokemon already knows. They stay on its list even when its
+// level wouldn't let it pick them now, so it keeps them (and they show their details).
+export function getSpeciesEditInfo(speciesName: string, level: number, knownMoves: string[] = []): SpeciesEditInfo {
+  const info = speciesEditInfoAt(speciesName, level)
+  const listed = new Set(info.moves.map((m) => m.id))
+  const extra = [...new Set(knownMoves.map((m) => toID(m)))]
+    .filter((id) => id && !listed.has(id))
+    .map((id) => getMoveInfo(id))
+    .filter((m): m is MoveInfo => !!m)
+  return extra.length > 0 ? { ...info, moves: [...info.moves, ...extra] } : info
+}
+
+function speciesEditInfoAt(speciesName: string, level: number): SpeciesEditInfo {
   const species = Dex.species.get(speciesName)
   const cacheKey = `${species.id}@${level}`
   const cached = speciesEditInfoCache.get(cacheKey)
@@ -1611,7 +1654,8 @@ export function getSpeciesEditInfo(speciesName: string, level: number): SpeciesE
       target: m.target,
       contact: !!m.flags?.contact,
       multihit: !!m.multihit,
-      priority: m.priority
+      priority: m.priority,
+      ...moveAnimExtras(m)
     }))
     .sort((a, b) => (usage.get(b.id) ?? 0) - (usage.get(a.id) ?? 0) || a.name.localeCompare(b.name))
 
@@ -2556,7 +2600,8 @@ export function moveDoesNothing(moveId: string, user: MoveParty, target: MovePar
   if (move.category !== 'Status') {
     if (move.id === 'synchronoise') return !user.types.some((t) => target.types.includes(t))
     if (move.id === 'dreameater') return target.status !== 'slp'
-    const ignores = move.ignoreImmunity
+    // Future Sight / Doom Desire skip immunity only when used - the hit itself still respects it.
+    const ignores = move.flags.futuremove ? false : move.ignoreImmunity
     const ignoresThisType = ignores === true || (!!ignores && typeof ignores === 'object' && !!ignores[move.type])
     if (ignoresThisType) return false
     if (!Dex.getImmunity(move.type, target.types) || target.immuneTypes?.includes(move.type)) return true
@@ -2621,6 +2666,27 @@ const MOVE_DESCRIPTIONS: Record<string, string> = {
 /** A move's short description, with this game's corrections. */
 export function moveDescription(move: { id: string; shortDesc?: string; desc?: string }): string {
   return MOVE_DESCRIPTIONS[move.id] ?? (move.shortDesc || move.desc || '')
+}
+
+// The flags that change a move's animation (see moveAnimations.ts in the renderer).
+const ANIM_FLAGS = ['punch', 'bite', 'slicing', 'sound', 'wind', 'pulse', 'bullet'] as const
+
+/** What a move's animation needs beyond its basic data: its stat change direction and its flags. */
+function moveAnimExtras(move: ReturnType<typeof Dex.moves.get>): Pick<MoveInfo, 'boostDir' | 'animFlags'> {
+  const flags = move.flags as Record<string, number | undefined>
+  const animFlags = ANIM_FLAGS.filter((f) => flags[f])
+  let boostDir: MoveInfo['boostDir']
+  if (move.category === 'Status') {
+    // A move's own boosts land on whoever it's aimed at (itself for Swords Dance, the
+    // foe for Growl); self.boosts always land on the user. Added up, the sign says
+    // which way the arrows go.
+    const total = [move.boosts, move.self?.boosts]
+      .flatMap((b) => Object.values(b ?? {}) as number[])
+      .reduce((sum, v) => sum + v, 0)
+    if (total > 0) boostDir = 'up'
+    else if (total < 0) boostDir = 'down'
+  }
+  return { boostDir, animFlags }
 }
 
 /**
@@ -2769,7 +2835,9 @@ export function moveTypeEffectiveness(battle: Battle, source: Pokemon, target: P
       : toID(target.ability)
 
   const targetTypes = target.getTypes()
-  const ignores = move.ignoreImmunity
+  // Future Sight / Doom Desire skip immunity only when used - the hit two turns later
+  // still respects it (Future Sight does nothing to a Dark type).
+  const ignores = move.flags.futuremove ? false : move.ignoreImmunity
   const ignoresType = ignores === true || (!!ignores && typeof ignores === 'object' && !!ignores[move.type])
   // Scrappy / Mind's Eye: Normal and Fighting moves hit Ghost types.
   const hitsGhosts = ['scrappy', 'mindseye'].includes(sourceAbility) && ['Normal', 'Fighting'].includes(move.type)
@@ -2853,6 +2921,53 @@ export function getMoveInfo(id: string): MoveInfo | null {
     target: move.target,
     contact: !!move.flags?.contact,
     multihit: !!move.multihit,
-    priority: move.priority
+    priority: move.priority,
+    ...moveAnimExtras(move)
   }
+}
+
+/**
+ * Every move any Pokemon learns by TM, in any generation (each gets a TM - see tm-store),
+ * with how widely the random battle sets run it: the more Pokemon's sets use it, the
+ * rarer its TM.
+ */
+export function tmMoveList(): { id: string; name: string; type: string; category: 'Physical' | 'Special' | 'Status'; usage: number }[] {
+  const ids = new Set<string>(['terablast'])
+  const learnsets = Dex.data.Learnsets as Record<string, { learnset?: Record<string, string[]> }>
+  for (const speciesId in learnsets) {
+    const learnset = learnsets[speciesId].learnset
+    if (!learnset) continue
+    for (const moveId in learnset) if (learnset[moveId].some((s) => s[1] === 'M')) ids.add(moveId)
+  }
+  const usage = new Map<string, number>()
+  for (const entry of Object.values(getRandbatsSets())) {
+    for (const set of entry.sets ?? []) {
+      for (const moveName of set.movepool) usage.set(toID(moveName), (usage.get(toID(moveName)) ?? 0) + 1)
+    }
+  }
+  return [...ids]
+    .map((id) => Dex.moves.get(id))
+    .filter((m) => m.exists && !m.isZ && !m.isMax)
+    .map((m) => ({ id: m.id, name: m.name, type: m.type, category: m.category, usage: usage.get(m.id) ?? 0 }))
+}
+
+/**
+ * The moves this species learns only by TM - no level-up, egg, tutor or event source in
+ * any generation (see learnableMoveIds). These need the player to own the TM (tm-store);
+ * a move it also learns some other way never does.
+ */
+export function tmOnlyMoveIds(speciesName: string): Set<string> {
+  const species = Dex.species.get(speciesName)
+  const merged = new Map<string, string[]>()
+  for (const moveId of EXTRA_LEARNABLE[species.id] ?? []) merged.set(moveId, ['9L1'])
+  for (const { learnset } of Dex.species.getFullLearnset(species.id)) {
+    for (const moveId in learnset) merged.set(moveId, [...(merged.get(moveId) ?? []), ...learnset[moveId]])
+  }
+  // The Tera Blast learnableMoveIds hands to anything cut from Scarlet/Violet that takes TMs.
+  if (species.isNonstandard === 'Past' && !merged.has('terablast') && [...merged.values()].some((s) => s.some((x) => x[1] === 'M'))) {
+    merged.set('terablast', ['9M'])
+  }
+  const ids = new Set<string>()
+  for (const [moveId, sources] of merged) if (sources.length > 0 && sources.every((s) => s[1] === 'M')) ids.add(moveId)
+  return ids
 }

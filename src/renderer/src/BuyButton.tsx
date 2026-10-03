@@ -66,6 +66,7 @@ function BuyButton({
   return (
     <button
       className={`buy-button${compact ? ' buy-button-compact' : ''}${short ? ' buy-button-short' : ''}${previewing ? ' buy-button-preview' : ''}`}
+      data-sfx="buy"
       disabled={busy || soldOut || held === null || held < price}
       title={shortTitle ?? title ?? exactPrice}
       onClick={onBuy}
@@ -105,6 +106,7 @@ export function SellButton({
   return (
     <button
       className={`buy-button${compact ? ' buy-button-compact' : ''}${previewing ? ' buy-button-preview' : ''}`}
+      data-sfx="buy"
       disabled={busy}
       title={title}
       onClick={onSell}

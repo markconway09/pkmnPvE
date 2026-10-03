@@ -4,7 +4,7 @@ import type { SlotLineWin, SlotSpinResult, SlotSymbol } from '../../shared/slots
 import type { SlotRules } from '../../shared/slots'
 import { SLOT_LINES, SLOT_RULES } from '../../shared/slots'
 import ItemSprite from './ItemSprite'
-import BetSlider, { maxBet, placedBet, useGameCornerPerks, useSavedBet, betStep } from './BetSlider'
+import BetSlider, { maxBet, placedBet, useGameCornerPerks, useSavedBet, betStep, TITLE_CHANGED_EVENT } from './BetSlider'
 import type { GameCornerGameProps } from './GameCornerTabs'
 import SpriteImage from './SpriteImage'
 import { toSpriteId } from '../../shared/battle-types'
@@ -83,6 +83,20 @@ function SlotMachine({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorner
       })
       .catch(() => {})
     return () => timers.current.forEach(clearTimeout)
+  }, [])
+
+  // A new title (e.g. Golden Touch) changes the payouts - reload them, keeping this visit's Pokemon.
+  useEffect(() => {
+    const reload = (): void => {
+      window.api
+        .getSlotRules()
+        .then((loaded) =>
+          setRules((old) => ({ ...old, payouts: loaded.payouts, cherryOne: loaded.cherryOne, cherryTwo: loaded.cherryTwo }))
+        )
+        .catch(() => {})
+    }
+    window.addEventListener(TITLE_CHANGED_EVENT, reload)
+    return () => window.removeEventListener(TITLE_CHANGED_EVENT, reload)
   }, [])
 
   // The Game Corner window shows the coins, and locks its tabs while the reels turn.

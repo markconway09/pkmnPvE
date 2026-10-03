@@ -20,3 +20,6 @@ export function itemIconStyle(spritenum: number): CSSProperties {
     flexShrink: 0
   }
 }
+
+// A TR's icon on the item sheet (every TR shares it).
+export const TR_SPRITENUM = 721

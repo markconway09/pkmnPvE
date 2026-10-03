@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
-import type { MoveInfo, PokemonSummary, StatBlock } from '../../shared/battle-types'
+import type { MoveInfo, MoveMatchup, PokemonSummary, StatBlock } from '../../shared/battle-types'
 import { fetchMoveInfo } from './moveInfoCache'
 import { fetchItemSpritenum } from './itemSpritenumCache'
 import { itemIconStyle } from './itemIcon'
+import { effectivenessClass, effectivenessText, effectivenessWords } from './effectiveness'
 
 interface Props {
   // A Pokemon out in battle also carries the stats it has right now (stat stages,
   // item, ability, status and field applied); everywhere else it's just the base stats.
-  pokemon: PokemonSummary & { effectiveStats?: StatBlock }
+  // It also carries its moves' effectiveness against the foes out.
+  pokemon: PokemonSummary & { effectiveStats?: StatBlock; moveMatchups?: Record<string, MoveMatchup[]> }
 }
 
 type ShownStat = 'atk' | 'def' | 'spa' | 'spd' | 'spe'
@@ -81,11 +83,25 @@ function PokemonTooltipContent({ pokemon }: Props): React.JSX.Element {
         {stat('Spe', 'spe')}
       </div>
       <div className="tooltip-moves">
-        {pokemon.moveIds.map((id, i) => (
-          <div key={id} className="tooltip-move-line">
-            {moves[i] ? `${moves[i]!.name} (${moves[i]!.type})` : id}
-          </div>
-        ))}
+        {pokemon.moveIds.map((id, i) => {
+          const move = moves[i]
+          return (
+            <div key={id} className="tooltip-move-line">
+              {move ? move.name : id}
+              {move && <span className={`type-badge tooltip-move-type type-${move.type.toLowerCase()}`}>{move.type}</span>}
+              {/* In battle: how hard it hits each foe out, left to right as on screen. */}
+              {pokemon.moveMatchups?.[id]?.map((chip, n) => (
+                <span
+                  key={n}
+                  className={`eff-chip ${effectivenessClass(chip.multiplier)}`}
+                  title={`vs ${chip.foeName}: ${effectivenessWords(chip.multiplier)}`}
+                >
+                  {effectivenessText(chip.multiplier)}
+                </span>
+              ))}
+            </div>
+          )
+        })}
       </div>
     </div>
   )

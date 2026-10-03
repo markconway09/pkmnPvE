@@ -49,7 +49,6 @@ textarea,
     .trainer-hud-large,
     .sprite-info,
     .log,
-    .target-picker,
     .tooltip-moves,
     .exp-gain-row,
     .bag-item,
@@ -1270,9 +1269,9 @@ textarea,
 
 /* AnimationLayer's generic move animation - see AnimationLayer.tsx,
    moveAnimations.ts and moveParticleShapes.tsx. A particle's shape comes
-   from moveParticleShapes (one per type); its color comes from the
-   .anim-particle.type-X rules further down (next to .move-button's matching
-   type colors). Both a flung projectile and a status move's burst ring use
+   from moveParticleShapes (one per type); its color is set inline from
+   TYPE_COLORS (no type-X class - those paint a type badge's square
+   background). Both a flung projectile and a status move's burst ring use
    the same fly animation - the burst's "to" point is just computed as an
    outward ring in AnimationLayer instead of a straight line at a target. */
 .anim-layer {
@@ -1285,10 +1284,10 @@ textarea,
 
 .anim-particle {
   position: absolute;
-  width: 22px;
-  height: 22px;
+  width: 40px;
+  height: 40px;
   transform: translate(-50%, -50%);
-  filter: drop-shadow(0 0 5px currentcolor);
+  filter: drop-shadow(0 0 6px currentcolor);
   animation-name: anim-particle-fly-kf;
   animation-timing-function: ease-out;
   /* "both", not just "forwards" - a staggered trail spark has an
@@ -1306,9 +1305,9 @@ textarea,
 
 /* A shot's trailing sparks - smaller, fainter, same shape and path. */
 .anim-particle-trail {
-  width: 11px;
-  height: 11px;
-  opacity: 0.7;
+  width: 18px;
+  height: 18px;
+  opacity: 0.75;
 }
 
 /* Passes through --mid-x/-y at 50% rather than interpolating straight from
@@ -1320,24 +1319,24 @@ textarea,
   0% {
     left: var(--from-x);
     top: var(--from-y);
-    opacity: 0.9;
+    opacity: 1;
     transform: translate(-50%, -50%) scale(0.7) rotate(0deg);
   }
   20% {
-    transform: translate(-50%, -50%) scale(1) rotate(20deg);
+    transform: translate(-50%, -50%) scale(1) rotate(15deg);
   }
   50% {
     left: var(--mid-x);
     top: var(--mid-y);
   }
-  85% {
+  92% {
     opacity: 1;
   }
   100% {
     left: var(--to-x);
     top: var(--to-y);
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.85) rotate(-10deg);
+    transform: translate(-50%, -50%) scale(0.95) rotate(-8deg);
   }
 }
 
@@ -1748,8 +1747,8 @@ textarea,
   }
 }
 
-/* Reflect/Light Screen/Aurora Veil - side-wide (see SideScreens.tsx and
-   SideHazards' own comment for why this only renders once per side). */
+/* Reflect/Light Screen/Aurora Veil - side-wide, so drawn over each of the
+   side's Pokemon (see SideScreens.tsx). */
 .side-screens {
   position: absolute;
   inset: 0;
@@ -2177,33 +2176,6 @@ textarea,
   color: #b7c0cf;
 }
 
-.target-picker-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1300;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.target-picker {
-  background: #171b22;
-  border: 2px solid #3a4150;
-  padding: 16px 20px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 220px;
-}
-
-.target-picker-title {
-  font-size: 13px;
-  font-weight: bold;
-  margin-bottom: 4px;
-}
-
 .gimmick-toggle-on {
   border-color: #6bb0ff;
   background: #223049;
@@ -2371,65 +2343,6 @@ button:disabled {
   background: #ee99ac;
   color: #10141a;
   border-color: #c26f83;
-}
-
-/* A generic attack's particle - tinted (fill=currentColor, see
-   moveParticleShapes.tsx) by the move's type, reusing the same palette as
-   the move buttons above so it reads as "the same move" rather than a
-   mismatched color. */
-.anim-particle.type-normal {
-  color: #a4acaf;
-}
-.anim-particle.type-fire {
-  color: #f08030;
-}
-.anim-particle.type-water {
-  color: #6890f0;
-}
-.anim-particle.type-electric {
-  color: #f8d030;
-}
-.anim-particle.type-grass {
-  color: #78c850;
-}
-.anim-particle.type-ice {
-  color: #98d8d8;
-}
-.anim-particle.type-fighting {
-  color: #c03028;
-}
-.anim-particle.type-poison {
-  color: #a040a0;
-}
-.anim-particle.type-ground {
-  color: #e0c068;
-}
-.anim-particle.type-flying {
-  color: #a890f0;
-}
-.anim-particle.type-psychic {
-  color: #f85888;
-}
-.anim-particle.type-bug {
-  color: #a8b820;
-}
-.anim-particle.type-rock {
-  color: #b8a038;
-}
-.anim-particle.type-ghost {
-  color: #705898;
-}
-.anim-particle.type-dragon {
-  color: #7038f8;
-}
-.anim-particle.type-dark {
-  color: #705848;
-}
-.anim-particle.type-steel {
-  color: #b8b8d0;
-}
-.anim-particle.type-fairy {
-  color: #ee99ac;
 }
 
 .tooltip-portal {
@@ -12660,13 +12573,11 @@ button.trainer-danger {
   margin-top: auto;
 }
 
-/* A row of buttons joined into one bar. */
+/* A row of buttons joined into one bar, in the buy buttons' flat outlined look. */
 .item-card-bar {
   display: flex;
   width: 100%;
   margin-top: auto;
-  border-radius: 6px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
 }
 
 .item-card-actions .item-card-bar {
@@ -12677,8 +12588,7 @@ button.trainer-danger {
   position: relative;
   flex: 1;
   min-width: 0;
-  padding: 5px 6px;
-  font-size: 12px;
+  padding: 7px 10px;
   font-weight: bold;
   white-space: nowrap;
   overflow: hidden;
@@ -12686,9 +12596,9 @@ button.trainer-danger {
   border: 1px solid;
   border-radius: 0;
   transition:
-    box-shadow 0.15s ease,
-    border-color 0.15s ease,
-    background 0.15s ease;
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
 }
 
 .item-card-btn:first-child {
@@ -12703,32 +12613,37 @@ button.trainer-danger {
   border-radius: 6px;
 }
 
+/* Neighbours share one border line, like the sell bar's; the hovered one's comes to the front. */
 .item-card-btn + .item-card-btn {
   flex: none;
-  border-left-color: rgba(0, 0, 0, 0.35);
+  margin-left: -1px;
+  padding: 7px 12px;
 }
 
-/* Using an item: blue. */
+/* Using an item: outlined and tinted in blue, filling in a little on hover and press. */
 .item-card-btn-use {
-  color: #eaf4ff;
-  background: linear-gradient(180deg, #3d7fd9, #2a5fae);
-  border-color: #6ba6f0;
+  color: #8ec3ff;
+  background: rgba(107, 166, 240, 0.08);
+  border-color: rgba(107, 166, 240, 0.45);
 }
 
 .item-card-btn-use:hover:not(:disabled) {
   z-index: 1;
-  background: linear-gradient(180deg, #4b8de6, #3169bd);
-  border-color: #a9cfff;
-  box-shadow: 0 0 8px rgba(107, 176, 255, 0.7);
+  color: #dcecff;
+  background: rgba(107, 166, 240, 0.18);
+  border-color: #6ba6f0;
+}
+
+.item-card-btn-use:active:not(:disabled) {
+  background: rgba(107, 166, 240, 0.28);
 }
 
 
 .item-card-btn:disabled {
   opacity: 1;
-  color: #6b6f7a;
-  background: #20252f;
-  border-color: #343a47;
-  box-shadow: none;
+  color: #6b6478;
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 
@@ -13770,6 +13685,10 @@ img.sprite-smooth {
   grid-row: span 2;
 }
 
+.home-card-box {
+  --card-color: 120, 200, 140;
+}
+
 .home-card-roguelite {
   --card-color: 180, 140, 255;
 }
@@ -13784,6 +13703,21 @@ img.sprite-smooth {
 
 .home-card-corner {
   --card-color: 255, 215, 107;
+}
+
+/* The last row: the Box under Classic, today's missions across the other two
+   columns (the Box takes the whole row when there are no missions). */
+.home-grid .home-missions {
+  grid-column: 2 / -1;
+}
+
+.home-card-box:last-child {
+  grid-column: 1 / -1;
+}
+
+.home-grid .home-mission {
+  grid-template-columns: minmax(0, 1fr) 100px 44px;
+  gap: 10px;
 }
 
 /* The number key that opens it. */
@@ -13816,7 +13750,19 @@ img.sprite-smooth {
   image-rendering: pixelated;
 }
 
+/* Draft's cards lean over, but the tile behind them stays square - so the tile is a
+   wrapper and only the picture inside it turns. */
+.home-card-icon-tile {
+  display: inline-block;
+  flex-shrink: 0;
+}
+
 .home-card-icon-draft {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
   transform: rotate(-12deg) scale(0.85);
 }
 
@@ -16206,22 +16152,6 @@ img.sprite-smooth {
   border-radius: 8px;
 }
 
-.bag-shop-modal .item-card-bar {
-  border-radius: 8px;
-}
-
-.bag-shop-modal .item-card-btn:first-child {
-  border-radius: 8px 0 0 8px;
-}
-
-.bag-shop-modal .item-card-btn:last-child {
-  border-radius: 0 8px 8px 0;
-}
-
-.bag-shop-modal .item-card-btn:only-child {
-  border-radius: 8px;
-}
-
 /* Picking items to sell: the bar along the bottom, sunken, its Sell button gold. */
 .bag-shop-modal .bag-sell-bar {
   margin-top: 10px;
@@ -16272,7 +16202,7 @@ img.sprite-smooth {
   margin: 0 0 10px;
 }
 
-.options-modal-body button:not(.sprite-style-option) {
+.options-modal-body button:not(.sprite-style-option):not(.options-sound-toggle):not([class^="tab-strip"]) {
   height: 32px;
   padding: 0 16px;
   border: 1px solid #2f3746;
@@ -16281,7 +16211,7 @@ img.sprite-smooth {
   font-size: 13px;
 }
 
-.options-modal-body button:not(.sprite-style-option):hover:not(:disabled) {
+.options-modal-body button:not(.sprite-style-option):not(.options-sound-toggle):not([class^="tab-strip"]):hover:not(:disabled) {
   border-color: #4a5468;
   background: #222935;
 }
@@ -16497,7 +16427,7 @@ img.sprite-smooth {
   min-height: 0;
   max-height: none;
   align-content: start;
-  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  grid-template-columns: repeat(6, 1fr);
   gap: 6px;
   padding: 8px;
   border: 1px solid #2c3442;
@@ -16506,7 +16436,7 @@ img.sprite-smooth {
 }
 
 .trainer-picker .trainer-picker-option {
-  height: 64px;
+  height: 104px;
   border: 1px solid transparent;
   border-radius: 10px;
   transition:
@@ -16523,6 +16453,12 @@ img.sprite-smooth {
   border-color: #6bb0ff;
   background: rgba(107, 176, 255, 0.14);
   box-shadow: 0 0 10px rgba(107, 176, 255, 0.3);
+}
+
+/* Six sprites a row, so each one gets drawn bigger to fill its wider cell. */
+.trainer-picker .trainer-picker-img {
+  width: 88px;
+  height: 88px;
 }
 
 .trainer-picker > .editor-actions {
@@ -18325,7 +18261,8 @@ img.sprite-smooth {
   flex-direction: column;
   justify-content: center;
   gap: 8px;
-  height: 92px;
+  /* As tall as a wild area tile with its TM search strip - stretched to match them when it shares their row. */
+  min-height: 118px;
   box-sizing: border-box;
   padding: 10px 14px;
   border: 1px solid #2c3442;
@@ -18762,4 +18699,2496 @@ img.sprite-smooth {
   padding: 0 0 0 10px;
   border-left: 1px solid rgba(255, 255, 255, 0.15);
   color: #b9e6a0;
+}
+
+/* ---- Tabs (TabStrip), in the floating-card look: a sunken rounded trough, pill tabs
+   that brighten on hover, the gold highlight a rounded pill with a soft glow, and the
+   close X a round button that turns red ---- */
+.tab-strip {
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #2c3442;
+  border-radius: 14px;
+  background: rgba(10, 13, 18, 0.55);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.tab-strip-tab {
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 13px;
+  color: #b7c0cf;
+}
+
+.tab-strip-tab:hover:not(:disabled):not(.tab-strip-tab-active) {
+  background: rgba(143, 184, 232, 0.08);
+  color: #fff;
+}
+
+.tab-strip-tab:disabled:not(.tab-strip-tab-active) {
+  opacity: 0.45;
+}
+
+.tab-strip-tab-active {
+  color: #241904;
+}
+
+.tab-strip-highlight {
+  top: 4px;
+  bottom: 4px;
+  border: 1px solid rgba(255, 231, 163, 0.9);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #ffdb7a, #d9a93a);
+  box-shadow:
+    0 2px 8px rgba(255, 215, 107, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.tab-strip-close {
+  align-self: center;
+  width: 40px;
+  min-width: 0;
+  height: 40px;
+  padding: 0;
+  border: 1px solid #2f3746;
+  border-radius: 50%;
+  background: #1a1f28;
+  color: #b7c0cf;
+}
+
+.tab-strip-close:hover:not(:disabled) {
+  border-color: #e0453b;
+  background: rgba(224, 69, 59, 0.25);
+  color: #ffd9d6;
+}
+
+/* The Home page's mode icons are drawn smooth, not pixelated (the boss sprite stays crisp). */
+.home-card-icon,
+.home-card-icon-draft,
+.home-continue-icon {
+  image-rendering: auto;
+}
+
+/* The Edit Pokemon window may grow 35px taller than other windows before it scrolls. */
+.modal-row:has(> .pokemon-editor-main),
+.pokemon-editor.pokemon-editor-main {
+  max-height: calc(90vh + 35px);
+}
+
+.pokemon-editor-main.modal-panel-loading {
+  height: min(calc(90vh - 1px), 725px);
+}
+
+/* The Bag's "use candies to the level cap" button: an up arrow to a bar, drawn in the text colour. */
+.item-card-btn-icon {
+  display: block;
+  width: 14px;
+  height: 14px;
+  margin: 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The Bag | Shop window's TMs tab, empty until the TM items are added: a faded TR and a note. */
+.tms-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 60px 0;
+  color: #8a94a6;
+}
+
+/* The TR from the item sheet, scaled up from its 24px cell. */
+.tms-empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  opacity: 0.5;
+}
+
+.tms-empty-icon > span {
+  transform: scale(3);
+}
+
+/* A tab icon cut from the item sheet: its 24px cell centred in the tab icon's box. */
+.bag-shop-tab-sheet-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tms-empty p {
+  margin: 0;
+}
+
+/* The ground a battle sprite stands on: it holds the side's hazards and screens and
+   doesn't move itself, so they stay put while the sprite box inside dashes, shakes
+   or sways. */
+.sprite-stage {
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* A status move: its user sways side to side a little - toggled on
+   .sprite-image-wrap by AnimationLayer. */
+.anim-status-sway {
+  animation: anim-status-sway-kf 520ms ease-in-out;
+}
+
+@keyframes anim-status-sway-kf {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-8px);
+  }
+  45% {
+    transform: translateX(8px);
+  }
+  70% {
+    transform: translateX(-5px);
+  }
+  85% {
+    transform: translateX(3px);
+  }
+}
+
+/* A thrown entry hazard piece (Stealth Rock's rocks, Spikes' caltrops, Sticky Web's
+   web) - its own picture instead of a type shape, without the type glow. */
+.anim-particle-hazard {
+  width: 26px;
+  height: 26px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+
+.anim-particle-hazard.anim-particle-trail {
+  width: 18px;
+  height: 18px;
+}
+
+.anim-particle-hazard img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Full paralysis ("It can't move!"): a yellow label, the sprite locks up in a fast
+   electric jitter with a yellow flash, and sparks crackle around it. */
+.feedback-paralysis {
+  color: #ffe14d;
+  text-shadow:
+    0 0 4px #b38f00,
+    0 1px 2px #000;
+}
+
+.sprite.sprite-emphasis-paralysis {
+  animation: sprite-paralysis 700ms linear;
+}
+
+@keyframes sprite-paralysis {
+  0%,
+  100% {
+    transform: translate(0, 0);
+    filter: none;
+  }
+  10%,
+  30%,
+  50%,
+  70% {
+    transform: translate(-3px, 1px);
+    filter: brightness(1.6) sepia(1) saturate(4) hue-rotate(5deg);
+  }
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: translate(3px, -1px);
+    filter: brightness(1.1);
+  }
+}
+
+.paralysis-sparks {
+  position: absolute;
+  inset: 10%;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.paralysis-spark {
+  position: absolute;
+  font-size: 20px;
+  color: #ffe14d;
+  text-shadow: 0 0 6px #ffd000;
+  opacity: 0;
+  animation: paralysis-spark-kf 450ms ease-out 2 both;
+}
+
+.paralysis-spark:nth-child(1) {
+  left: 8%;
+  top: 20%;
+}
+
+.paralysis-spark:nth-child(2) {
+  right: 6%;
+  top: 12%;
+}
+
+.paralysis-spark:nth-child(3) {
+  left: 42%;
+  top: 0;
+}
+
+.paralysis-spark:nth-child(4) {
+  left: 2%;
+  bottom: 18%;
+}
+
+.paralysis-spark:nth-child(5) {
+  right: 10%;
+  bottom: 24%;
+}
+
+@keyframes paralysis-spark-kf {
+  0% {
+    opacity: 0;
+    transform: scale(0.5) rotate(-15deg);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1.15) rotate(10deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.8) rotate(-5deg);
+  }
+}
+
+/* Asleep ("It's fast asleep."): a slow, dimmed breathing sway with Zs drifting up
+   (they reuse the paralysis sparks' spots and timing, restyled). */
+.feedback-sleep {
+  color: #b8c4ff;
+  text-shadow:
+    0 0 4px #3b4aa8,
+    0 1px 2px #000;
+}
+
+.sprite.sprite-emphasis-sleep {
+  animation: sprite-sleep 1300ms ease-in-out;
+}
+
+@keyframes sprite-sleep {
+  0%,
+  100% {
+    transform: translateY(0) scaleY(1);
+    filter: none;
+  }
+  35% {
+    transform: translateY(4px) scaleY(0.95) rotate(-3deg);
+    filter: brightness(0.7) saturate(0.6);
+  }
+  70% {
+    transform: translateY(1px) scaleY(1.02) rotate(2deg);
+    filter: brightness(0.8) saturate(0.7);
+  }
+}
+
+.cant-move-sleep .paralysis-spark {
+  font-weight: 800;
+  font-size: 18px;
+  color: #c7d0ff;
+  text-shadow: 0 0 6px #4a5bd4;
+  animation: sleep-z-kf 900ms ease-out 1 both;
+}
+
+@keyframes sleep-z-kf {
+  0% {
+    opacity: 0;
+    transform: translate(0, 6px) scale(0.6);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(10px, -22px) scale(1.15) rotate(12deg);
+  }
+}
+
+/* Frozen ("It's frozen solid!"): an icy blue tint with a stiff, tight shiver, and
+   snowflakes glinting around it. */
+.feedback-freeze {
+  color: #9fe8ff;
+  text-shadow:
+    0 0 4px #1a7ea8,
+    0 1px 2px #000;
+}
+
+.sprite.sprite-emphasis-freeze {
+  animation: sprite-freeze 900ms linear;
+}
+
+@keyframes sprite-freeze {
+  0%,
+  100% {
+    transform: translateX(0);
+    filter: none;
+  }
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    transform: translateX(-2px);
+    filter: brightness(1.3) saturate(0.4) sepia(0.4) hue-rotate(160deg);
+  }
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: translateX(2px);
+    filter: brightness(1.4) saturate(0.4) sepia(0.4) hue-rotate(160deg);
+  }
+}
+
+.cant-move-freeze .paralysis-spark {
+  color: #d6f6ff;
+  text-shadow: 0 0 6px #4cc4f0;
+  animation: freeze-flake-kf 700ms ease-out 1 both;
+}
+
+@keyframes freeze-flake-kf {
+  0% {
+    opacity: 0;
+    transform: scale(0.4) rotate(0deg);
+  }
+  35% {
+    opacity: 1;
+    transform: scale(1.1) rotate(45deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.9) rotate(90deg);
+  }
+}
+
+/* Hurt by its burn: an orange-red flare with a hot shudder, and flames licking up
+   around it (the pieces reuse the paralysis sparks' spots). */
+.feedback-burn {
+  color: #ff9a4a;
+  text-shadow:
+    0 0 4px #b32a00,
+    0 1px 2px #000;
+}
+
+.sprite.sprite-emphasis-burn {
+  animation: sprite-burn 800ms ease-out;
+}
+
+@keyframes sprite-burn {
+  0%,
+  100% {
+    transform: translateY(0);
+    filter: none;
+  }
+  20% {
+    transform: translateY(-2px) translateX(-2px);
+    filter: brightness(1.3) sepia(1) saturate(5) hue-rotate(-25deg);
+  }
+  45% {
+    transform: translateY(0) translateX(2px);
+    filter: brightness(1.15) sepia(0.8) saturate(4) hue-rotate(-25deg);
+  }
+  70% {
+    transform: translateX(-1px);
+    filter: brightness(1.05) sepia(0.4) saturate(2) hue-rotate(-25deg);
+  }
+}
+
+.cant-move-burn .paralysis-spark {
+  font-size: 18px;
+  text-shadow: 0 0 6px #ff6a00;
+  animation: burn-flame-kf 650ms ease-out 1 both;
+}
+
+@keyframes burn-flame-kf {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.5);
+  }
+  35% {
+    opacity: 1;
+    transform: translateY(0) scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-18px) scale(0.7);
+  }
+}
+
+/* Hurt by poison: a sickly purple tint with a queasy wobble, and bubbles rising. */
+.feedback-poison {
+  color: #d58cff;
+  text-shadow:
+    0 0 4px #6a1b9a,
+    0 1px 2px #000;
+}
+
+.sprite.sprite-emphasis-poison {
+  animation: sprite-poison 900ms ease-in-out;
+}
+
+@keyframes sprite-poison {
+  0%,
+  100% {
+    transform: scale(1, 1);
+    filter: none;
+  }
+  25% {
+    transform: scale(1.04, 0.96);
+    filter: sepia(1) saturate(4) hue-rotate(230deg) brightness(0.9);
+  }
+  50% {
+    transform: scale(0.97, 1.03);
+    filter: sepia(0.8) saturate(3) hue-rotate(230deg) brightness(0.95);
+  }
+  75% {
+    transform: scale(1.02, 0.98);
+    filter: sepia(0.4) saturate(2) hue-rotate(230deg);
+  }
+}
+
+.cant-move-poison .paralysis-spark {
+  font-size: 14px;
+  color: #b84cff;
+  text-shadow: 0 0 5px #7b1fa2;
+  animation: poison-bubble-kf 750ms ease-out 1 both;
+}
+
+@keyframes poison-bubble-kf {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.4);
+  }
+  40% {
+    opacity: 0.95;
+    transform: translateY(-2px) scale(1);
+  }
+  85% {
+    opacity: 0.8;
+    transform: translateY(-14px) scale(1.25);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-16px) scale(1.5);
+  }
+}
+
+/* Leech Seed: three green orbs on the ground at the seeded Pokemon's feet (on its
+   still .sprite-stage, like the hazards), gently pulsing. */
+.leech-seed-orbs {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 30px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.leech-seed-orb {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #d8ffb0, #5fcf3a 45%, #1f7a12 100%);
+  box-shadow: 0 0 6px rgba(120, 230, 80, 0.8);
+  opacity: 0.75;
+  transform: translateX(-50%);
+  animation: leech-seed-pulse 1600ms ease-in-out infinite;
+}
+
+.leech-seed-orb:nth-child(1) {
+  left: calc(50% - 32px);
+  bottom: 4px;
+}
+
+.leech-seed-orb:nth-child(2) {
+  left: calc(50% + 4px);
+  bottom: 0;
+  animation-delay: -500ms;
+}
+
+.leech-seed-orb:nth-child(3) {
+  left: calc(50% + 36px);
+  bottom: 6px;
+  animation-delay: -1000ms;
+}
+
+@keyframes leech-seed-pulse {
+  0%,
+  100% {
+    transform: translateX(-50%) scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translateX(-50%) scale(1.18);
+    opacity: 0.9;
+  }
+}
+
+/* A sapped orb flying from the seeded Pokemon to the one it heals. */
+.anim-particle-seed {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #e6ffc8, #6ee04a 45%, #23861a 100%);
+  filter: drop-shadow(0 0 6px #7be655);
+}
+
+/* Pokemon tooltip moves: the move's type as a coloured badge, and in battle its
+   effectiveness against each foe out. */
+.tooltip-move-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 2px 0;
+}
+
+.tooltip-move-type {
+  margin-left: 2px;
+}
+
+.tooltip-move-line .eff-chip {
+  font-size: 10px;
+  line-height: 15px;
+}
+
+/* ---- Doubles target picker, in the floating-card look: each target a rounded tile
+   with its sprite on a soft spotlight, lighting up blue on hover, and a pill Cancel ---- */
+.modal-overlay.target-picker-overlay {
+  z-index: 1300;
+}
+
+.modal-panel.target-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 260px;
+}
+
+.target-picker > h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.target-picker .target-picker-options {
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid #2c3442;
+  border-radius: 14px;
+  background: rgba(10, 13, 18, 0.4);
+}
+
+.target-picker .target-option {
+  flex: 1;
+  gap: 6px;
+  padding: 10px 12px 12px;
+  border: 1px solid #2c3442;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(34, 41, 54, 0.92), rgba(20, 24, 31, 0.94));
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.target-picker .target-option:hover:not(:disabled) {
+  border-color: #6bb0ff;
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(107, 176, 255, 0.16), transparent 65%),
+    linear-gradient(180deg, rgba(34, 41, 54, 0.92), rgba(20, 24, 31, 0.94));
+  box-shadow: 0 0 12px rgba(107, 176, 255, 0.25);
+  transform: translateY(-2px);
+}
+
+.target-picker .target-option-sprite {
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 60%, rgba(143, 184, 232, 0.12), transparent 70%);
+}
+
+.target-picker .eff-chip {
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+
+.target-picker > .editor-actions {
+  margin-top: 0;
+}
+
+.target-picker > .editor-actions button {
+  height: 34px;
+  padding: 0 20px;
+  border: 1px solid #2f3746;
+  border-radius: 17px;
+  background: #1a1f28;
+}
+
+.target-picker > .editor-actions button:hover:not(:disabled) {
+  border-color: #4a5468;
+  background: #222935;
+}
+
+/* ---- Team dock: its PC button pulls a small box up from under it, floating like the
+   dock, and the dock rises to sit on top of it ---- */
+.team-dock .team-dock-box-button-icon {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+.team-dock .team-dock-box-button.team-dock-box-button-open {
+  border-color: #5fd4b0;
+  background: #1d2b28;
+}
+
+.team-dock-holder {
+  --dock-box-height: 230px;
+}
+
+.team-dock-holder-raised .team-dock {
+  translate: 0 calc(-1 * (var(--dock-box-height) + 28px));
+}
+
+.team-dock-box {
+  position: absolute;
+  bottom: 12px;
+  left: 0;
+  right: 0;
+  width: min(760px, calc(100% - 32px));
+  height: var(--dock-box-height);
+  margin: 0 auto;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px 10px;
+  border: 1px solid rgba(95, 212, 176, 0.3);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(34, 41, 54, 0.95), rgba(20, 24, 31, 0.96));
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.5),
+    0 2px 6px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  animation: team-dock-box-in 0.3s cubic-bezier(0.22, 0.8, 0.3, 1);
+}
+
+@keyframes team-dock-box-in {
+  from {
+    opacity: 0;
+    translate: 0 40px;
+  }
+}
+
+.team-dock-box-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+  padding: 0 2px;
+}
+
+.team-dock-box-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.team-dock-box-title {
+  font-size: 12px;
+  font-weight: bold;
+  color: #c9d1dd;
+  white-space: nowrap;
+}
+
+.team-dock-box .search-bar.team-dock-box-search {
+  flex: 0 1 220px;
+  height: 24px;
+  margin: 0 0 0 auto;
+  padding: 0 8px;
+  gap: 6px;
+  border-radius: 12px;
+}
+
+.team-dock-box .team-dock-box-search .search-bar-icon {
+  width: 12px;
+  height: 12px;
+}
+
+.team-dock-box .team-dock-box-search input {
+  font-size: 12px;
+}
+
+.team-dock-box .team-dock-box-search .search-bar-clear {
+  width: 16px;
+  height: 16px;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* Smaller cards than the Box page, so a few rows fit. */
+.team-dock-box .box-grid {
+  margin-top: 0;
+  padding: 6px;
+  gap: 6px;
+  border-width: 1px;
+  border-radius: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+}
+
+/* Home: small buttons under the cards for the windows the sidebar's lower buttons open. */
+.home-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.home-tool {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px 6px 10px;
+  border: 1px solid #3a4150;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(34, 41, 54, 0.92), rgba(20, 24, 31, 0.94));
+  color: #c9d3e0;
+  font-size: 13px;
+  font-weight: 600;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.home-tool:hover {
+  border-color: #ffd76b;
+  color: #fff;
+  transform: translateY(-2px);
+}
+
+.home-tool-icon {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.home-tool-icon-smooth {
+  image-rendering: auto;
+}
+
+.home-tool-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: #e5484d;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+/* Skill check (Dead by Daylight style): a ring, a white zone with a solid Great slice at
+   its start, and a red needle that sweeps once around. */
+.skill-check-track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.55);
+  stroke-width: 2;
+}
+
+.skill-check-good {
+  fill: none;
+  stroke: #f2f2f2;
+  stroke-width: 6;
+}
+
+.skill-check-great {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 12;
+}
+
+.skill-check-needle {
+  stroke: #ff3b30;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 3px rgba(255, 59, 48, 0.8));
+}
+
+.skill-check-key {
+  fill: #c9d3e0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.skill-check-result-great .skill-check-key {
+  fill: #ffd76b;
+}
+
+.skill-check-result-good .skill-check-key {
+  fill: #ffffff;
+}
+
+.skill-check-result-miss .skill-check-key {
+  fill: #ff5a50;
+}
+
+.skill-check-result-miss .skill-check-track {
+  stroke: #ff5a50;
+}
+
+.skill-check-ring.skill-check-result-great {
+  animation: skill-check-pop 0.25s ease-out;
+}
+
+.skill-check-ring.skill-check-result-miss {
+  animation: skill-check-shake 0.3s ease-out;
+}
+
+@keyframes skill-check-pop {
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+@keyframes skill-check-shake {
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
+}
+
+/* A TM search's ring: its track and glow in the rarity colour of the TM hidden there. */
+.skill-check-tier .skill-check-track {
+  stroke: var(--tier);
+  stroke-width: 3;
+  filter: drop-shadow(0 0 4px var(--tier));
+}
+
+.skill-check-ring {
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ---- TMs ---- */
+/* TM discs are drawn smooth, never pixelated - wherever they show. */
+.tm-icon {
+  width: 32px;
+  height: 32px;
+  image-rendering: auto;
+}
+
+/* The TR disc cut from the item sheet (the TMs tab, the search strip, the empty TMs list):
+   smooth too, over the sheet's own pixelated look. */
+.bag-shop-tab-sheet-icon > span,
+.tm-search-strip-icon > span,
+.tms-empty-icon > span {
+  image-rendering: auto !important;
+}
+
+.tm-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 10px 8px;
+  text-align: center;
+}
+
+.tm-card-art .tm-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.tm-card-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.tm-card-sub {
+  font-size: 11px;
+  color: #9aa5b5;
+}
+
+.tm-find-card {
+  width: 220px;
+  padding: 14px 12px;
+}
+
+.tm-find-upgraded {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffd76b;
+}
+
+.tm-find-note {
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #7fe08c;
+}
+
+.tm-find-note-dupe {
+  color: #c9d3e0;
+}
+
+/* The quick check on a wild win's result screen. */
+.tm-quick-check {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 4px;
+}
+
+.tm-quick-check-start {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 18px;
+  border: 1px solid #5a6578;
+  background: linear-gradient(180deg, #263040, #1a212c);
+  color: #fff;
+  font-weight: 700;
+}
+
+.tm-quick-check-start:hover {
+  border-color: #ffd76b;
+}
+
+.tm-quick-check-start span,
+.tm-quick-check-note {
+  font-size: 11px;
+  font-weight: 400;
+  color: #9aa5b5;
+}
+
+/* The search window: its frame in the rarity colour of the TM hidden there. */
+.tm-search-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 340px;
+  padding: 18px 20px 14px;
+  border: 1px solid var(--tier, #3a4150);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--tier, transparent) 35%, transparent);
+}
+
+.tm-search-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tm-search-loc-icon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.tm-search-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.tm-search-tier {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 13px;
+  color: #c9d3e0;
+}
+
+.tm-search-tier strong {
+  color: var(--tier);
+}
+
+.tm-search-pity {
+  font-size: 11px;
+  color: #ffd76b;
+}
+
+.tm-search-bar {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+}
+
+.tm-search-step {
+  flex: 1;
+  height: 10px;
+  border-radius: 3px;
+  background: #232a36;
+  transition: background 0.2s ease;
+}
+
+.tm-search-step-on {
+  background: var(--tier);
+  box-shadow: 0 0 6px var(--tier);
+}
+
+.tm-search-misses {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #8a94a6;
+}
+
+.tm-search-miss {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid #5a6578;
+}
+
+.tm-search-miss-on {
+  border-color: #ff5a50;
+  background: #ff5a50;
+}
+
+.tm-search-note,
+.tm-search-error {
+  margin: 0;
+  font-size: 12px;
+  color: #8a94a6;
+}
+
+.tm-search-error,
+.tm-search-ambush {
+  color: #ff7a70;
+}
+
+.tm-search-ambush {
+  margin: 6px 0;
+  font-weight: 700;
+}
+
+/* The Bag's TMs tab. */
+.tms-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.tms-count {
+  font-size: 13px;
+  color: #9aa5b5;
+}
+
+.tms-count strong {
+  color: #fff;
+}
+
+.tms-filter {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: #151a22;
+}
+
+.tms-filter button {
+  padding: 3px 10px;
+  border: none;
+  background: transparent;
+  color: #9aa5b5;
+  font-size: 12px;
+}
+
+.tms-filter button.tms-filter-on {
+  background: #2a3342;
+  color: #ffd76b;
+}
+
+.tms-search {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid #3a4150;
+  background: #151a22;
+  color: #e6e6e6;
+  font-size: 12px;
+}
+
+.tms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.tms-card-where {
+  font-size: 10px;
+  color: #8a94a6;
+}
+
+/* The Coin Shop's TMs of the day. */
+.coin-tm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.coin-tm-card .buy-button {
+  margin-top: 4px;
+}
+
+.coin-tm-owned {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #7fe08c;
+}
+
+/* The Pokemon editor's move list: a move it learns only by a TM not owned yet. */
+.tm-locked-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  padding: 0 6px 0 2px;
+  border-radius: 999px;
+  background: rgba(255, 215, 107, 0.12);
+  color: #ffd76b;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.tm-locked-badge .tm-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* A beaten trainer's TMs on the result screen, and in the rewards tooltip. */
+.tm-reward-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 10px 0 4px;
+}
+
+.tm-reward-card {
+  width: 150px;
+}
+
+.rewards-tm-icon {
+  width: 24px;
+  height: 24px;
+}
+
+/* The editor opened from the right-click Change Form: its Form changes flash gold for a moment. */
+.editor-section-highlight {
+  border-radius: 8px;
+  animation: editor-section-flash 2.4s ease-out;
+}
+
+@keyframes editor-section-flash {
+  0%,
+  45% {
+    background: rgba(255, 215, 107, 0.1);
+    box-shadow:
+      0 0 0 2px rgba(255, 215, 107, 0.85),
+      0 0 16px rgba(255, 215, 107, 0.35);
+  }
+  100% {
+    background: transparent;
+    box-shadow:
+      0 0 0 2px rgba(255, 215, 107, 0),
+      0 0 16px rgba(255, 215, 107, 0);
+  }
+}
+
+/* The Box page: room under the last row so the floating team dock never covers it. */
+.menu-page-box .box-grid {
+  padding-bottom: 136px;
+}
+
+/* Classic's wild area tiles with their TM search strip underneath: the cell is the grid
+   item, the tile squared off at the bottom to sit on the strip. */
+.classic-wild-cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-radius: 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s ease;
+}
+
+.classic-wild-cell:hover {
+  transform: translateY(-3px);
+}
+
+.classic-wild-cell .classic-wild-tile {
+  border-bottom: none;
+  border-radius: 14px 14px 0 0;
+  box-shadow: none;
+}
+
+.classic-wild-cell .classic-wild-tile:hover:not(:disabled) {
+  transform: none;
+}
+
+.tm-search-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 8px 0 6px;
+  border: 1px solid #2c3442;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0 0 14px 14px;
+  background: linear-gradient(180deg, #1c232e, #151a22);
+  color: #c9d3e0;
+  font-size: 11px;
+  font-weight: 600;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.tm-search-strip:hover:not(:disabled) {
+  border-color: #ffd76b;
+  color: #fff;
+}
+
+.tm-search-strip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* The TR disc from the item sheet, as on the Bag's TMs tab. */
+.tm-search-strip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.tm-search-strip-label {
+  flex: 1;
+  text-align: left;
+}
+
+.tm-search-strip-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 215, 107, 0.15);
+  color: #ffd76b;
+  font-size: 10px;
+}
+
+.tm-search-strip-empty .tm-search-strip-left {
+  background: rgba(255, 255, 255, 0.06);
+  color: #8a94a6;
+}
+
+/* While the Pokedex loads, its spinner sits centred inside the grid's box. */
+.pokedex-modal .pokedex-grid.pokedex-grid-loading {
+  display: flex;
+}
+
+/* The Coin Shop's Scanner: a key item in a banner above the TMs of the day. */
+.coin-scanner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 10px;
+  padding: 10px 18px;
+}
+
+.coin-scanner-icon {
+  width: 44px;
+  height: 44px;
+  image-rendering: pixelated;
+}
+
+.coin-scanner-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.coin-scanner-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.coin-scanner-tag {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(255, 210, 63, 0.15);
+  color: #ffd23f;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.coin-scanner-note {
+  font-size: 12px;
+  color: #a79fb8;
+}
+
+.coin-scanner-buy {
+  flex: none;
+  width: 160px;
+  text-align: center;
+}
+
+@media (max-width: 560px) {
+  .coin-scanner {
+    flex-wrap: wrap;
+  }
+
+  .coin-scanner-buy {
+    width: 100%;
+  }
+}
+
+/* Specialist giving a TM search back. */
+.tm-search-refund {
+  margin: 4px 0 0;
+  text-align: center;
+  color: #ffd76b;
+  font-weight: 600;
+}
+
+/* ---- Roguelite: Villain Takeover ---- */
+
+/* The banner over a taken-over floor. */
+.run-takeover-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.run-takeover-name {
+  font-size: 18px;
+  font-weight: bold;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #c86bff;
+  text-shadow: 0 0 10px rgba(200, 107, 255, 0.6);
+  animation: run-takeover-flicker 2.4s steps(1) infinite;
+}
+
+.run-takeover-sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #d5c2ea;
+}
+
+@keyframes run-takeover-flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  46% {
+    opacity: 0.55;
+  }
+  48% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* The villain's own tile: the one free path, glowing purple. */
+.run-choice-grid .run-node-villain {
+  --node: #c86bff;
+  animation:
+    run-deal 0.42s cubic-bezier(0.22, 1, 0.36, 1) backwards,
+    run-villain-glow 2s ease-in-out 0.5s infinite;
+  animation-delay: calc(var(--i, 0) * 70ms), 0.5s;
+}
+
+@keyframes run-villain-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 4px 12px rgba(0, 0, 0, 0.35),
+      0 0 6px rgba(200, 107, 255, 0.35);
+  }
+  50% {
+    box-shadow:
+      0 4px 12px rgba(0, 0, 0, 0.35),
+      0 0 18px rgba(200, 107, 255, 0.75);
+  }
+}
+
+/* Corrupted tiles: tinted dark purple, with their gem cost in the corner. */
+.run-choice-grid .run-node-button.run-node-corrupted {
+  border-color: color-mix(in srgb, #8e3dbf 70%, #3a4150);
+}
+
+.run-choice-grid .run-node-button.run-node-corrupted::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(135deg, rgba(142, 61, 191, 0.16) 0 6px, transparent 6px 14px),
+    radial-gradient(circle at 50% 110%, rgba(110, 30, 160, 0.45), transparent 70%);
+  mix-blend-mode: screen;
+}
+
+.run-choice-grid .run-node-button.run-node-corrupted .big-battle-icon,
+.run-choice-grid .run-node-button.run-node-corrupted .run-node-tr {
+  filter: hue-rotate(250deg) saturate(1.3) brightness(0.85);
+}
+
+.run-choice-grid .run-node-button > .run-node-cost {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  z-index: 1;
+  padding: 1px 6px 1px 2px;
+  border: 1px solid rgba(200, 107, 255, 0.5);
+  border-radius: 8px;
+  background: rgba(20, 8, 30, 0.8);
+  text-shadow: none;
+}
+
+.run-node-cost .run-shop-price {
+  margin-left: 0;
+}
+
+/* A beaten villain's reward Pokémon. */
+.run-reward-mons {
+  gap: 10px;
+}
+
+.run-reward-mons .run-reward-mon {
+  width: 128px;
+}
+
+.run-revive-card.run-reward-mon .run-revive-sprite {
+  filter: none;
+}
+
+.run-reward-mon:hover:not(:disabled) {
+  border-color: #c86bff;
+  box-shadow:
+    0 10px 20px rgba(0, 0, 0, 0.45),
+    0 0 14px rgba(200, 107, 255, 0.45);
+}
+
+.run-reward-mon.run-reward-mon-chosen {
+  border-color: #ffd76b;
+  box-shadow: 0 0 14px rgba(255, 215, 107, 0.55);
+}
+
+.run-reward-mon .run-revive-ability {
+  color: #ffd76b;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .run-takeover-name,
+  .run-choice-grid .run-node-villain {
+    animation: none;
+  }
+}
+
+/* ---- Draft: Chaos mode - its tile above Singles / Doubles, the field chips, the stat
+   boost badge on a Pokemon, and the modifier offer (cards, then the Pokemon and the
+   ability or stat for an Ability / Stat one) ---- */
+.draft-format-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.draft-format-tile-chaos {
+  background:
+    linear-gradient(120deg, rgba(186, 104, 200, 0.16), rgba(255, 112, 67, 0.12) 50%, rgba(79, 195, 247, 0.14)),
+    rgba(10, 13, 18, 0.5);
+}
+
+.draft-format-tile-chaos strong {
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #f3d1ff;
+}
+
+.draft-chaos-chip {
+  border-color: #ba68c8;
+  color: #f3d1ff;
+}
+
+.draft-mon-icon {
+  position: relative;
+}
+
+.draft-chaos-boosts {
+  position: absolute;
+  bottom: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 110%;
+  padding: 0 5px;
+  overflow: hidden;
+  border-radius: 6px;
+  font-size: 9px;
+  font-weight: bold;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #1b1f27;
+  background: #ffb74d;
+  pointer-events: none;
+}
+
+.draft-modifier-weather .draft-modifier-icon {
+  color: #ffd54f;
+}
+
+.draft-modifier-terrain .draft-modifier-icon {
+  color: #81c784;
+}
+
+.draft-modifier-trickroom .draft-modifier-icon {
+  color: #ce93d8;
+}
+
+.draft-modifier-ability .draft-modifier-icon {
+  color: #4fc3f7;
+}
+
+.draft-modifier-stat .draft-modifier-icon {
+  color: #ff8a65;
+}
+
+.draft-modifier-choices {
+  justify-content: center;
+}
+
+.draft-modifier-abilities {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(520px, 100%);
+}
+
+.draft-ability-filter {
+  padding: 6px 10px;
+  border: 1px solid #3a4150;
+  border-radius: 8px;
+  color: inherit;
+  background: #171b22;
+}
+
+.draft-ability-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.draft-ability-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: inherit;
+  text-align: left;
+  background: rgba(10, 13, 18, 0.4);
+  cursor: pointer;
+}
+
+.draft-ability-option span {
+  font-size: 11px;
+  color: #b7c0cf;
+}
+
+.draft-ability-option:hover:not(:disabled) {
+  background: rgba(255, 183, 77, 0.06);
+}
+
+.draft-ability-option-on {
+  border-color: #ffb74d;
+  background: #4a3418;
+}
+
+/* Chaos: clicking a Pokemon sends it out first and starts the battle - a "Lead" tag on hover. */
+.draft-chaos-lead-button {
+  position: relative;
+}
+
+.draft-chaos-lead-button:hover:not(:disabled)::after {
+  content: 'Lead';
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #1b1f27;
+  background: #ffb74d;
+  pointer-events: none;
+}
+
+.draft-reroll-button {
+  margin-left: auto;
+}
+
+.draft-reroll-button + .run-forfeit-button {
+  margin-left: 0;
+}
+
+/* Chaos: the whole modifier offer as small chips, a labelled row per type, and what the
+   picked one does underneath. */
+.draft-modifier-groups {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 6px 10px;
+  width: min(760px, 100%);
+}
+
+.draft-modifier-group {
+  display: contents;
+}
+
+.draft-modifier-group-label {
+  font-size: 11px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #7d8799;
+}
+
+.draft-modifier-offer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.draft-modifier-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px 3px 7px;
+  border: 1px solid #2c3442;
+  border-radius: 999px;
+  font-size: 12px;
+  color: inherit;
+  background: rgba(10, 13, 18, 0.5);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.draft-modifier-chip:hover:not(:disabled):not(.draft-modifier-chosen) {
+  border-color: rgba(255, 183, 77, 0.45);
+  background: rgba(255, 183, 77, 0.05);
+}
+
+.draft-modifier-chosen {
+  border-color: #ffb74d;
+  background: #4a3418;
+  box-shadow: 0 0 8px rgba(255, 183, 77, 0.3);
+}
+
+.draft-modifier-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.draft-modifier-tailwind .draft-modifier-icon,
+.draft-modifier-screens .draft-modifier-icon {
+  color: #80deea;
+}
+
+.draft-modifier-hazard .draft-modifier-icon {
+  color: #bcaaa4;
+}
+
+.draft-modifier-intimidate .draft-modifier-icon {
+  color: #ef5350;
+}
+
+.draft-modifier-tutor .draft-modifier-icon,
+.draft-modifier-item .draft-modifier-icon {
+  color: #aed581;
+}
+
+.draft-modifier-glasscannon .draft-modifier-icon,
+.draft-modifier-wildcard .draft-modifier-icon {
+  color: #f48fb1;
+}
+
+.draft-modifier-desc {
+  margin: 0;
+  font-size: 12px;
+  color: #ffe0b2;
+}
+
+.draft-ability-option strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.draft-tutor {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.draft-tutor .draft-modifier-choices {
+  align-items: center;
+}
+
+.draft-tutor-type {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+/* Options: the sound volume slider */
+/* One row per sound (menus, cries, music): on/off switch, name, slider, value, and the
+   menus' sound picker button. */
+.options-volume {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto auto;
+  align-items: center;
+  gap: 10px 12px;
+}
+.options-volume-label {
+  opacity: 0.85;
+}
+.options-volume input[type='range'] {
+  min-width: 0;
+  accent-color: #e8b931;
+}
+.options-volume input[type='range']:disabled {
+  opacity: 0.35;
+}
+.options-volume-off {
+  opacity: 0.45;
+}
+.options-volume-value {
+  min-width: 52px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+/* The sound picker: a tab per menu sound, every Kenney sound below as numbered chips
+   grouped by kind, the pick lit blue. */
+.sound-picker {
+  width: 680px;
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px 16px;
+}
+.sound-picker-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sound-picker-hint {
+  flex: 1;
+  font-size: 13px;
+  opacity: 0.85;
+}
+.sound-picker-hint b {
+  color: #e8b931;
+  font-weight: 600;
+}
+.sound-picker-bar button {
+  height: 28px;
+  padding: 0 14px;
+  border: 1px solid #2f3746;
+  border-radius: 14px;
+  background: #1a1f28;
+  font-size: 12px;
+}
+.sound-picker-bar button:hover:not(:disabled) {
+  border-color: #4a5468;
+  background: #222935;
+}
+.sound-picker-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sound-picker-pack {
+  padding: 10px 14px 12px;
+  border: 1px solid #2c3442;
+  border-radius: 14px;
+  background: rgba(10, 13, 18, 0.45);
+}
+.sound-picker-pack-name {
+  margin: 0 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #8fb8e8;
+}
+.sound-picker-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 3px 0;
+}
+.sound-picker-group-name {
+  width: 84px;
+  flex-shrink: 0;
+  padding-top: 5px;
+  font-size: 12px;
+  text-transform: capitalize;
+  opacity: 0.75;
+}
+.sound-picker-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.sound-picker-chip {
+  min-width: 30px;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid #2c3442;
+  border-radius: 8px;
+  background: rgba(10, 13, 18, 0.5);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.sound-picker-chip:hover {
+  border-color: rgba(107, 176, 255, 0.5);
+}
+.sound-picker .sound-picker-active {
+  border-color: #6bb0ff;
+  background: rgba(107, 176, 255, 0.14);
+  box-shadow: 0 0 10px rgba(107, 176, 255, 0.25);
+}
+
+/* The sound on/off switches in Options: a pill with a knob, gold and knob right when on. */
+.options-sound-toggle {
+  grid-column: 1;
+  position: relative;
+  flex: none;
+  box-sizing: border-box;
+  width: 38px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid #4a5566;
+  border-radius: 999px;
+  background: #1b2029;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+.options-sound-toggle:hover {
+  border-color: #6b7688;
+}
+.options-sound-toggle-knob {
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  border-radius: 50%;
+  background: #8a94a6;
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease;
+}
+.options-sound-toggle-on,
+.options-sound-toggle-on:hover {
+  background: #e8b931;
+  border-color: #e8b931;
+}
+.options-sound-toggle-on .options-sound-toggle-knob {
+  transform: translateX(16px);
+  background: #1b2029;
+}
+
+/* The music player in the top bar: cover, title and artist over a progress bar, the time,
+   and round previous / play / next buttons. */
+.music-player {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  max-width: 460px;
+  flex: 0 1 460px;
+  margin: 0 auto;
+  padding: 4px 10px 4px 4px;
+  border: 1px solid #3a4352;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #2a3240, #1b2029);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+.music-player-cover {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 5px;
+  object-fit: cover;
+  background: #12161d;
+}
+.music-player-playing .music-player-cover {
+  box-shadow: 0 0 0 1px rgba(232, 185, 49, 0.6);
+}
+.music-player-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  gap: 1px;
+}
+.music-player-title,
+.music-player-artist {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.music-player-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+.music-player-artist {
+  font-size: 11px;
+  opacity: 0.65;
+}
+.music-player-bar {
+  position: relative;
+  height: 4px;
+  margin-top: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+}
+/* A taller invisible strip, so the thin bar is easy to click. */
+.music-player-bar::before {
+  content: '';
+  position: absolute;
+  inset: -5px 0;
+}
+.music-player-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: #e8b931;
+}
+.music-player-time {
+  flex: none;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.65;
+}
+.music-player-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+.music-player-button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #c9d1dd;
+}
+.music-player-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+.music-player-button svg {
+  width: 14px;
+  height: 14px;
+}
+.music-player-play {
+  width: 30px;
+  height: 30px;
+  background: #e8b931;
+  color: #1b2029;
+}
+.music-player-play:hover {
+  background: #f3cb52;
+  color: #1b2029;
+}
+
+/* The music player's mute button, red while muted. */
+.music-player-button.music-player-muted {
+  color: #ff7b7b;
+}
+
+/* The music player's stand-in cover (a music note) for tracks without one, and a radio
+   stream's bar - full, and not clickable since a stream can't be jumped through. */
+.music-player-cover-blank {
+  display: grid;
+  place-items: center;
+  color: #e8b931;
+}
+.music-player-cover-blank svg {
+  width: 20px;
+  height: 20px;
+}
+.music-player-bar-live {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* Options' music source: the source tabs, then that source's settings - the links box, the
+   folder's buttons and path. */
+.options-music-source {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+.options-music-source .editor-hint {
+  margin: 0;
+}
+.options-music-links {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+}
+.options-music-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.options-music-folder {
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+
+/* Achievements: the Unlocked / Locked / All filter's empty note. */
+.achievements-empty {
+  margin: 24px 0;
+  text-align: center;
+  color: #9aa5b5;
+  font-size: 13px;
+}
+
+/* Achievements: the categories as one TMs-style button row instead of tabs. */
+.achievements-categories {
+  display: flex;
+  flex-wrap: wrap;
+}
+.achievements-categories button {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+}
+.achievements-categories button.achievements-category-glow:not(.tms-filter-on) {
+  color: #ffd76b;
+}
+.achievements-categories button.achievements-category-complete:not(.tms-filter-on) .achievements-tab-count {
+  color: #ffd76b;
+  opacity: 1;
+}
+
+/* Achievements on one page: no top padding on the scroll, so the sticky button row sits
+   flush under the window's tabs with no gap for cards to show through. */
+.achievements-view {
+  padding-top: 0;
+}
+.achievements-view .achievements-summary {
+  margin-top: 12px;
+}
+.achievements-view .achievements-tabs-bar {
+  padding: 6px 0 8px;
+}
+.achievements-section-heading {
+  margin: 10px 0 6px;
+}
+.achievements-categories button:disabled {
+  opacity: 0.4;
+}
+
+/* Achievement cards, a bit more compact. */
+.achievement-grid {
+  gap: 8px;
+}
+.achievement {
+  gap: 6px;
+  padding: 9px 10px;
+  border-radius: 10px;
+}
+.achievement-head {
+  align-items: center;
+  gap: 9px;
+}
+.achievement-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  font-size: 17px;
+}
+.achievement-name {
+  font-size: 13px;
+}
+.achievement-desc {
+  font-size: 11px;
+  line-height: 1.3;
+}
+.achievement-rewards {
+  gap: 3px;
+  padding: 5px 8px;
+  border-radius: 8px;
+}
+.achievement-action button {
+  height: 28px;
+  border-radius: 14px;
+  font-size: 12px;
+}
+.achievement-action .mission-col-done {
+  padding: 4px 0;
+}
+
+/* Move animation styles beyond the plain arcing shot - see AnimationLayer.tsx
+   and moveAnimations.ts. Colors come inline from TYPE_COLORS (currentcolor). */
+
+/* Flies straight, without the projectile's spin - falling rocks, rising
+   arrows, eruption sparks, ring icons. */
+.anim-particle-straight {
+  animation-name: anim-particle-straight-kf;
+  animation-timing-function: ease-in;
+}
+
+@keyframes anim-particle-straight-kf {
+  0% {
+    left: var(--from-x);
+    top: var(--from-y);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  50% {
+    left: var(--mid-x);
+    top: var(--mid-y);
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    left: var(--to-x);
+    top: var(--to-y);
+    opacity: 0;
+  }
+}
+
+/* A stream's poured icons, and an eruption's smaller sparks. */
+.anim-particle-stream {
+  width: 28px;
+  height: 28px;
+}
+
+/* A status move's ring, and the icons riding a wave. */
+.anim-particle-ring {
+  width: 30px;
+  height: 30px;
+  animation-timing-function: ease-out;
+}
+
+/* A quake's dust kicked up around the target's feet. */
+.anim-particle-dust {
+  width: 20px;
+  height: 20px;
+  animation-timing-function: ease-out;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+
+/* A stat move's arrows rising (boost) or falling (drop) over the Pokemon. */
+.anim-particle-arrow {
+  width: 30px;
+  height: 30px;
+  animation-timing-function: ease-in-out;
+}
+
+/* The move's icon (or a contact move's mark) popping on its target as it lands. */
+.anim-pop {
+  position: absolute;
+  width: 58px;
+  height: 58px;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 0 8px currentcolor);
+  animation-name: anim-pop-kf;
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
+}
+
+.anim-pop svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.anim-pop-mark {
+  width: 84px;
+  height: 84px;
+}
+
+@keyframes anim-pop-kf {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(var(--pop-rot, 0deg)) scale(0.4);
+  }
+  25% {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(var(--pop-rot, 0deg)) scale(1.15);
+  }
+  60% {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(var(--pop-rot, 0deg)) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(var(--pop-rot, 0deg)) scale(1.35);
+  }
+}
+
+/* A beam: a solid line from the user to the target that shoots out, swells
+   and thins away. Its length is set inline, its angle in --beam-angle. */
+.anim-beam {
+  position: absolute;
+  height: 16px;
+  border-radius: 8px;
+  transform-origin: 0 50%;
+  background: linear-gradient(to right, transparent, currentcolor 15%, currentcolor);
+  box-shadow: 0 0 14px currentcolor;
+  animation-name: anim-beam-kf;
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
+}
+
+.anim-beam::after {
+  content: '';
+  position: absolute;
+  left: 15%;
+  right: 0;
+  top: 35%;
+  bottom: 35%;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+@keyframes anim-beam-kf {
+  0% {
+    opacity: 1;
+    transform: translateY(-50%) rotate(var(--beam-angle)) scale(0, 0.5);
+  }
+  30% {
+    transform: translateY(-50%) rotate(var(--beam-angle)) scale(1, 1);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(-50%) rotate(var(--beam-angle)) scale(1, 1.5);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-50%) rotate(var(--beam-angle)) scale(1, 0.2);
+  }
+}
+
+/* A wave: a ring spreading out from the user to --wave-size across. */
+.anim-wave {
+  position: absolute;
+  border-radius: 50%;
+  border: 5px solid currentcolor;
+  box-shadow:
+    0 0 16px currentcolor,
+    inset 0 0 16px currentcolor;
+  transform: translate(-50%, -50%);
+  animation-name: anim-wave-kf;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+
+.anim-wave-thin {
+  border-width: 2px;
+}
+
+@keyframes anim-wave-kf {
+  0% {
+    width: 20px;
+    height: 20px;
+    opacity: 0.95;
+  }
+  75% {
+    opacity: 0.7;
+  }
+  100% {
+    width: var(--wave-size);
+    height: var(--wave-size);
+    opacity: 0;
+  }
+}
+
+/* A lightning bolt striking down from the top of the field onto the target,
+   flickering as it goes. */
+.anim-bolt {
+  position: absolute;
+  top: 0;
+  filter: drop-shadow(0 0 6px currentcolor) drop-shadow(0 0 14px currentcolor);
+  animation-name: anim-bolt-kf;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+
+.anim-bolt svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+@keyframes anim-bolt-kf {
+  0% {
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  22% {
+    opacity: 0.35;
+  }
+  32% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* A quake (Earthquake, Bulldoze...): the whole field rumbles hard for the
+   move's length (--quake-ms, set inline), dying down at the end. */
+.battle-field-quake {
+  animation: battle-field-quake-kf var(--quake-ms, 700ms) linear;
+}
+
+@keyframes battle-field-quake-kf {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  6% {
+    transform: translate(-10px, 3px);
+  }
+  12% {
+    transform: translate(9px, -4px);
+  }
+  18% {
+    transform: translate(-11px, 2px);
+  }
+  24% {
+    transform: translate(10px, 4px);
+  }
+  30% {
+    transform: translate(-9px, -3px);
+  }
+  38% {
+    transform: translate(8px, 3px);
+  }
+  46% {
+    transform: translate(-8px, -2px);
+  }
+  54% {
+    transform: translate(7px, 3px);
+  }
+  62% {
+    transform: translate(-6px, -2px);
+  }
+  72% {
+    transform: translate(4px, 2px);
+  }
+  82% {
+    transform: translate(-3px, -1px);
+  }
+  92% {
+    transform: translate(1px, 1px);
+  }
+}
+
+/* Options: the move animation speed tabs. */
+.options-anim-tabs {
+  max-width: 320px;
 }

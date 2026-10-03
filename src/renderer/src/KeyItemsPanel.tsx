@@ -25,13 +25,15 @@ function KeyItemsPanel(): React.JSX.Element {
     <div
       key={item.id}
       className={`item-card shop-key-item${item.owned ? ' shop-key-item-owned' : ''}`}
-      title={`${item.description}\n\n${item.owned ? 'You have it.' : `Unlocked by the achievement "${item.unlockedBy}".`}`}
+      title={`${item.description}\n\n${
+        item.owned ? 'You have it.' : item.coinShop ? 'Sold in the Game Corner\'s Coin Shop.' : `Unlocked by the achievement "${item.unlockedBy}".`
+      }`}
     >
       <span className="item-card-art">
         <ItemSprite spritenum={item.spritenum} className="item-card-icon shop-item-icon" />
       </span>
       <span className="item-card-name">{item.name}</span>
-      <span className="item-card-note shop-key-item-status">{item.owned ? '✓ Owned' : `🔒 ${item.unlockedBy}`}</span>
+      <span className="item-card-note shop-key-item-status">{item.owned ? '✓ Owned' : `🔒 ${item.coinShop ? 'Coin Shop' : item.unlockedBy}`}</span>
     </div>
   )
 
@@ -51,7 +53,7 @@ function KeyItemsPanel(): React.JSX.Element {
           )}
           {locked.length > 0 && (
             <>
-              <h3 className="shop-category-heading">Locked - unlocked by achievements</h3>
+              <h3 className="shop-category-heading">Locked - unlocked by achievements or the Coin Shop</h3>
               <div className="item-card-grid">{locked.map(card)}</div>
             </>
           )}

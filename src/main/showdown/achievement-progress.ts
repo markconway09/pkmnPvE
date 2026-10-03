@@ -63,7 +63,7 @@ const MISSION_STATS: Partial<Record<AchievementStat, MissionStat>> = {
   rouletteSpins: 'rouletteSpins',
   plinkoDrops: 'plinkoDrops',
   evolutions: 'evolutions',
-  pokemonSold: 'sold',
+  skillGreats: 'skillGreats',
   pokemonMerged: 'merges',
   raidsWon: 'raidsWon'
 }

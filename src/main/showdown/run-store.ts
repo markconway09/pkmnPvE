@@ -15,7 +15,8 @@ import type {
   RunRewardLine,
   RunView,
   RunConsumableId,
-  RunShopTile
+  RunShopTile,
+  RogueliteBossClass
 } from '../../shared/battle-types'
 import {
   ROGUELITE_BOSS_COUNT,
@@ -40,6 +41,8 @@ import {
   RUN_GEMS_PER_TRAINER,
   RUN_SHOP_TILE_PRICES,
   RUN_RARE_CANDY_PRICE,
+  RUN_TAKEOVER_CHANCE,
+  RUN_TAKEOVER_TILE_COST,
   SELL_ONLY_ITEM_IDS,
   WILD_LOCATIONS
 } from '../../shared/battle-types'
@@ -145,6 +148,10 @@ interface StoredRun {
   shopTilesUsed?: RunShopTile[]
   // A Random Swap bought in the shop - no floor to finish afterwards.
   swapReason?: 'shop'
+  // This floor's Villain Takeover (see rollTakeover): the villain waiting on it.
+  takeover?: { villainId: string } | null
+  // A beaten villain's reward, until one is taken (or all turned down).
+  monOffer?: PokemonSet[] | null
 }
 
 // The run's level cap only goes up by beating a boss - a ceiling, not something to
@@ -450,8 +457,48 @@ const choiceKey = (c: RunChoice): string => `${c.kind}:${c.location ?? ''}`
 
 // FLOOR_OPTIONS different options - an option already on the floor is rolled again,
 // so there's at most one trainer, item and rest. A boss floor offers only the boss.
+// A regular floor may be taken over by a villain (see rollTakeover).
 function rollChoices(current: StoredRun): RunChoice[] {
+  current.takeover = null
   if (isBossFloor(current.floor)) return [{ kind: 'boss' }]
+  const choices = rollRegularChoices(current)
+  rollTakeover(current, choices)
+  return choices
+}
+
+// Which villains can take a floor over right now: Grunts until the Elite Four, Elite
+// villains once the first Elite Four member is beaten (up to the Champion). From the
+// run's generation only - none there, no takeover.
+function villainPool(current: StoredRun): string[] {
+  const { gymLeaders } = runDifficultyInfo(current.difficulty)
+  const villainClass: RogueliteBossClass = current.bossesBeaten <= gymLeaders ? 'villainGrunt' : 'villainElite'
+  const generation = current.generation ?? null
+  return listTrainers()
+    .filter((t) => t.rogueliteBoss && t.rogueliteClass === villainClass && (generation === null || t.rogueliteGeneration === generation))
+    .map((t) => t.id)
+}
+
+// A Villain Takeover, RUN_TAKEOVER_CHANCE of the time: the floor's trainer (if it rolled
+// one) becomes the villain, otherwise the villain takes a random tile's place - so the
+// villain is the floor's one and only trainer. A villain not met yet this run if possible.
+function rollTakeover(current: StoredRun, choices: RunChoice[]): void {
+  if (Math.random() >= RUN_TAKEOVER_CHANCE) return
+  const pool = villainPool(current)
+  if (pool.length === 0) return
+  const fresh = pool.filter((id) => !current.usedBossIds.includes(id))
+  const villainId = pickRandom(fresh.length > 0 ? fresh : pool, 1)[0]
+  const trainerAt = choices.findIndex((c) => c.kind === 'trainer')
+  choices[trainerAt >= 0 ? trainerAt : Math.floor(Math.random() * choices.length)] = { kind: 'villain' }
+  current.takeover = { villainId }
+}
+
+// What taking a tile costs on a taken-over floor: up to RUN_TAKEOVER_TILE_COST gems,
+// whatever's left if fewer (free with none) - the villain's own tile is always free.
+function takeoverTileCost(current: StoredRun): number {
+  return current.takeover ? Math.min(RUN_TAKEOVER_TILE_COST, current.gems ?? 0) : 0
+}
+
+function rollRegularChoices(current: StoredRun): RunChoice[] {
   // No Pokémon Center floors at all on a no-healing difficulty.
   const hurt = !runDifficultyInfo(current.difficulty).noHealing && current.team.some((m) => m.hp < 1 || m.status)
   const choices: RunChoice[] = []
@@ -512,6 +559,28 @@ function itemOfferView(ids: string[]): RunItemOffer[] {
   })
 }
 
+function takeoverView(current: StoredRun): RunView['takeover'] {
+  if (!current.takeover) return null
+  const villain = listTrainers().find((t) => t.id === current.takeover!.villainId)
+  return {
+    villainName: villain ? runName(villain.name) : 'Villain',
+    spriteId: villain?.spriteId ?? 'giovanni',
+    classLabel: ROGUELITE_BOSS_CLASSES.find((c) => c.id === villain?.rogueliteClass)?.label ?? 'Villain',
+    tileCost: takeoverTileCost(current)
+  }
+}
+
+// Normal-mode trainer names carry tags that mean nothing in a run - "(Lv 66)" for the
+// level their team is at, "#2" for a second copy - so a run shows the name alone.
+export function runName(name: string): string {
+  return name.replace(/\s*\(Lv [^)]*\)/g, '').replace(/\s*#\d+$/, '').trim() || name
+}
+
+// A villain's reward Pokemon as a run Pokemon (its place in the offer as its id), at full health.
+function offeredMon(set: PokemonSet, index: number): RunMon {
+  return { id: `offer-${index}`, set, exp: totalExpForSpeciesLevel(set.species, set.level), hp: 1, status: null }
+}
+
 /** The player's run, or null before their first one. */
 export function getRunView(): RunView | null {
   const current = getRun()
@@ -540,6 +609,8 @@ export function getRunView(): RunView | null {
           fromMonId: current.displacedItem.fromMonId
         }
       : null,
+    takeover: current.status === 'active' ? takeoverView(current) : null,
+    monOffer: current.monOffer ? current.monOffer.map((set, i) => toView(offeredMon(set, i))) : null,
     starterSpecies: current.starterSpecies,
     difficulty: current.difficulty ?? 'normal',
     generation: current.generation ?? null,
@@ -562,12 +633,13 @@ export function getRunView(): RunView | null {
 /**
  * The generations a run can be set to: those with at least one Roguelite boss of every
  * class (a Gym Leader, an Elite Four member and a Champion) - anything less and the run
- * would have to borrow bosses from other generations.
+ * would have to borrow bosses from other generations. Villains aren't needed: without
+ * any, the generation's runs just never have a Villain Takeover.
  */
 export function completeRunGenerations(): number[] {
   const bosses = listTrainers().filter((t) => t.rogueliteBoss)
   return POKEMON_GENERATIONS.filter((generation) =>
-    ROGUELITE_BOSS_CLASSES.every((c) =>
+    ROGUELITE_BOSS_CLASSES.filter((c) => !c.villain).every((c) =>
       bosses.some((t) => t.rogueliteGeneration === generation && t.rogueliteClass === c.id)
     )
   )
@@ -648,6 +720,8 @@ function endRun(current: StoredRun, status: 'lost' | 'won'): void {
   current.status = status
   current.choices = []
   current.itemOffer = null
+  current.monOffer = null
+  current.takeover = null
   current.rewards = payRunRewards(current)
   recordBestFloor(current.floor, runDifficultyInfo(current.difficulty).id)
   persist()
@@ -703,15 +777,26 @@ function nextFloor(current: StoredRun): void {
   current.choices = rollChoices(current)
 }
 
-/** One of this floor's options, by its place in the list (and nothing else may be pending). */
+/**
+ * One of this floor's options, by its place in the list (and nothing else may be pending) -
+ * on a taken-over floor, paid for here (see takeoverTileCost) unless it's the villain.
+ */
 export function runChoiceAt(index: number): RunChoice {
   const current = activeRun()
   if (current.itemOffer) throw new Error('Pick an item first')
   if (current.displacedItem) throw new Error('Choose who gets the item that was replaced first')
   if (current.pickOffer) throw new Error('Pick an ability or move first')
   if (current.swapOffer) throw new Error('Choose what to swap first')
+  if (current.monOffer) throw new Error('Pick your reward Pokémon first')
   const choice = current.choices[index]
   if (!choice) throw new Error("This floor doesn't offer that")
+  if (choice.kind !== 'villain') {
+    const cost = takeoverTileCost(current)
+    if (cost > 0) {
+      current.gems = (current.gems ?? 0) - cost
+      persist()
+    }
+  }
   return { ...choice }
 }
 
@@ -1066,6 +1151,69 @@ export function skipRunSwap(): RunView {
   return finishSwap(current)
 }
 
+// ---- A beaten villain's reward ----
+
+const VILLAIN_REWARD_OPTIONS = 3
+
+// Three different random Pokemon (each with Random Swap's chance of a legendary) at the
+// next level cap - the one the next boss raises it to - with a run moveset and a random
+// held item from the item floors' pool.
+function rollVillainReward(current: StoredRun): PokemonSet[] {
+  const level = Math.min(100, runLevelCap(current.bossesBeaten + 1))
+  const offer: PokemonSet[] = []
+  for (let tries = 0; offer.length < VILLAIN_REWARD_OPTIONS && tries < 50; tries++) {
+    const species = pickRandomSwapSpecies(swapKind())
+    if (offer.some((set) => set.species === species)) continue
+    const set: PokemonSet = { ...buildBasicSet(species, level), nature: randomNatureName() }
+    refreshMoves(set)
+    const itemId = pickItems(1)[0]
+    set.item = itemId ? (itemOfferView([itemId])[0]?.itemName ?? itemId) : ''
+    offer.push(set)
+  }
+  return offer
+}
+
+/**
+ * Takes one of a beaten villain's reward Pokemon onto the team, item and all. A full team
+ * has to let someone go for it (`replaceRunMonId`) - if that one held an item, it waits
+ * for a new holder (or to be let go) before the run moves on.
+ */
+export function takeRunRewardMon(index: number, replaceRunMonId?: string): RunView {
+  const current = activeRun()
+  const set = current.monOffer?.[index]
+  if (!set) throw new Error("That Pokémon isn't on offer")
+  const full = current.team.length >= ROGUELITE_MAX_TEAM
+  const replaceAt = replaceRunMonId ? current.team.findIndex((m) => m.id === replaceRunMonId) : -1
+  if (full && replaceAt === -1) throw new Error('Your run team is full - choose who to replace')
+  const newcomer: RunMon = { ...offeredMon(structuredClone(set), index), id: randomUUID() }
+  current.monOffer = null
+  if (replaceAt >= 0) {
+    const [left] = current.team.splice(replaceAt, 1, newcomer)
+    if (left.set.item) {
+      current.displacedItem = { item: left.set.item, fromMonId: newcomer.id }
+      // Placing it finishes the floor like a won battle's reward (no extra level).
+      current.itemOfferReason = 'reward'
+      persist()
+      return getRunView()!
+    }
+  } else {
+    current.team.push(newcomer)
+  }
+  nextFloor(current)
+  persist()
+  return getRunView()!
+}
+
+/** Turns a beaten villain's reward Pokemon down and moves on. */
+export function skipRunRewardMon(): RunView {
+  const current = activeRun()
+  if (!current.monOffer) throw new Error('No Pokémon are on offer')
+  current.monOffer = null
+  nextFloor(current)
+  persist()
+  return getRunView()!
+}
+
 /** A New Ability / New Move floor: four choices from its list. */
 export function takePickNode(kind: 'ability' | 'move'): RunView {
   const current = activeRun()
@@ -1202,6 +1350,16 @@ export function runFloorInfo(): {
   }
 }
 
+/** The villain waiting on this taken-over floor - met now, so later takeovers pick someone new. */
+export function runVillainId(): string {
+  const current = activeRun()
+  if (!current.takeover) throw new Error('No villain has taken this floor over')
+  const { villainId } = current.takeover
+  if (!current.usedBossIds.includes(villainId)) current.usedBossIds.push(villainId)
+  persist()
+  return villainId
+}
+
 export function markRunBossUsed(trainerId: string): void {
   const current = activeRun()
   if (!current.usedBossIds.includes(trainerId)) current.usedBossIds.push(trainerId)
@@ -1244,18 +1402,20 @@ export function finishRunBattleWon(
   kind: RunNodeKind
 ): { expGains: ExpGainResult[]; fainted: string[]; itemReward: boolean } {
   const wasBoss = kind === 'boss'
+  // A villain counts as a trainer (exp, gems, missions) - only its reward differs.
+  const wasTrainer = kind === 'trainer' || kind === 'villain'
   const current = activeRun()
-  if (kind === 'trainer') recordMission('runTrainerWins')
+  if (wasTrainer) recordMission('runTrainerWins')
   if (wasBoss) recordMission('runBossWins')
   const fainted = applyOutcome(current, outcome)
   // A beaten boss brings everyone up to its own level (the cap it was fought at) -
   // nobody is left behind for the next stretch - then raises the cap.
   const expGains = wasBoss
     ? levelTeamTo(current, runBossLevel(current.bossesBeaten))
-    : levelUpTeam(current, kind === 'trainer' ? LEVELS_PER_TRAINER_WIN : LEVELS_PER_WILD_WIN)
+    : levelUpTeam(current, wasTrainer ? LEVELS_PER_TRAINER_WIN : LEVELS_PER_WILD_WIN)
   if (wasBoss) current.bossesBeaten += 1
   // Easy pays one extra gem per trainer and boss win.
-  if (kind === 'trainer' || wasBoss) {
+  if (wasTrainer || wasBoss) {
     const easyBonus = runDifficultyInfo(current.difficulty).id === 'easy' ? 1 : 0
     current.gems = (current.gems ?? 0) + (wasBoss ? RUN_GEMS_PER_BOSS : RUN_GEMS_PER_TRAINER) + easyBonus
   }
@@ -1276,11 +1436,20 @@ export function finishRunBattleWon(
     persist()
     return { expGains, fainted, itemReward: false }
   }
-  // A boss with a reward ability of its own offers that (one choice) instead of items.
-  const rewardAbility = wasBoss
-    ? listTrainers().find((t) => t.id === current.currentBossId)?.rogueliteRewardAbility
-    : undefined
-  if (rewardAbility && abilityInfo(rewardAbility)) {
+  if (kind === 'villain') {
+    current.monOffer = rollVillainReward(current)
+    persist()
+    return { expGains, fainted, itemReward: true }
+  }
+  // A boss's reward is its own reward ability (one choice) - a boss without one gives
+  // nothing, and the run moves straight on.
+  if (wasBoss) {
+    const rewardAbility = listTrainers().find((t) => t.id === current.currentBossId)?.rogueliteRewardAbility
+    if (!rewardAbility || !abilityInfo(rewardAbility)) {
+      nextFloor(current)
+      persist()
+      return { expGains, fainted, itemReward: false }
+    }
     current.pickOffer = { kind: 'ability', options: [rewardAbility], reason: 'reward' }
   } else {
     current.itemOffer = rollItemOffer(current, REWARD_CHANCES)
@@ -1420,7 +1589,7 @@ export function useRunAbilityCapsule(runMonId: string, abilityId: string): RunVi
 // The shop is on boss floors, and not while something else is waiting on a choice.
 function requireShop(current: StoredRun): void {
   if (!isBossFloor(current.floor)) throw new Error('The shop is only on boss floors')
-  if (current.itemOffer || current.displacedItem || current.pickOffer || current.swapOffer) {
+  if (current.itemOffer || current.displacedItem || current.pickOffer || current.swapOffer || current.monOffer) {
     throw new Error('Finish what you picked first')
   }
 }

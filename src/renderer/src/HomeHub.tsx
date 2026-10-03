@@ -12,10 +12,19 @@ interface Props {
   bossHint: string
   run: RunView | null
   bestFloor: { floor: number; difficulty: RunDifficulty | null } | null
+  // How many Pokemon the box holds, for the Box card.
+  boxCount: number | null
   missions: MissionsState | null
   fightBusy: boolean
   onGo: (page: MenuPage, from: HTMLElement) => void
   onOpenMissions: () => void
+  // Mission rewards and achievements waiting to be claimed, shown on the Rewards button.
+  rewardsWaiting: number
+  onBag: () => void
+  onShop: () => void
+  onPokedex: () => void
+  onRewards: () => void
+  onOptions: () => void
 }
 
 const DIFFICULTY_LABELS: Record<RunDifficulty, string> = { easy: 'Easy', normal: 'Normal', hard: 'Hard', extreme: 'Extreme' }
@@ -31,10 +40,17 @@ function HomeHub({
   bossHint,
   run,
   bestFloor,
+  boxCount,
   missions,
   fightBusy,
   onGo,
-  onOpenMissions
+  onOpenMissions,
+  rewardsWaiting,
+  onBag,
+  onShop,
+  onPokedex,
+  onRewards,
+  onOptions
 }: Props): React.JSX.Element {
   const [coins, setCoins] = useState<number | null>(null)
   useEffect(() => {
@@ -48,6 +64,14 @@ function HomeHub({
   const nextBoss = eligibility?.nextBoss ?? null
   const raidsUnlocked = !!eligibility?.raidsUnlocked
   const crystals = eligibility?.wishingPieces ?? 0
+  // The windows the sidebar's lower buttons open, repeated as small buttons under the cards.
+  const tools: { label: string; icon: string; smooth?: boolean; action: () => void; badge?: number }[] = [
+    { label: 'Bag', icon: './icons/nav/bag.png', action: onBag },
+    { label: 'Shop', icon: './icons/nav/shop.svg', smooth: true, action: onShop },
+    { label: 'Pokédex', icon: './icons/nav/pokedex.png', action: onPokedex },
+    { label: 'Achievements', icon: './icons/nav/achievements.png', action: onRewards, badge: rewardsWaiting },
+    { label: 'Options', icon: './icons/nav/options.png', action: onOptions }
+  ]
 
   return (
     <div className="home-hub">
@@ -84,7 +108,7 @@ function HomeHub({
         </button>
 
         <button className="home-card home-card-roguelite" onClick={(e) => onGo('roguelite', e.currentTarget)}>
-          <span className="home-card-key">3</span>
+          <span className="home-card-key">2</span>
           <span className="home-card-head">
             <img className="home-card-icon" src="./icons/nav/roguelite.png" alt="" />
             <span className="home-card-title">Roguelite</span>
@@ -100,9 +124,11 @@ function HomeHub({
         </button>
 
         <button className="home-card home-card-draft" onClick={(e) => onGo('draft', e.currentTarget)}>
-          <span className="home-card-key">4</span>
+          <span className="home-card-key">3</span>
           <span className="home-card-head">
-            <img className="home-card-icon home-card-icon-draft" src="./icons/nav/draft.png" alt="" />
+            <span className="home-card-icon home-card-icon-tile">
+              <img className="home-card-icon-draft" src="./icons/nav/draft.png" alt="" />
+            </span>
             <span className="home-card-title">Draft</span>
           </span>
           <span className="home-card-sub">Build a team from random picks</span>
@@ -110,7 +136,7 @@ function HomeHub({
         </button>
 
         <button className="home-card home-card-raid" onClick={(e) => onGo('raid', e.currentTarget)}>
-          <span className="home-card-key">5</span>
+          <span className="home-card-key">4</span>
           <span className="home-card-head">
             <img className="home-card-icon" src="./sprites/misc/raidcrystal.png" alt="" />
             <span className="home-card-title">{raidsUnlocked ? 'Max Raid' : '🔒 Max Raid'}</span>
@@ -122,7 +148,7 @@ function HomeHub({
         </button>
 
         <button className="home-card home-card-corner" onClick={(e) => onGo('corner', e.currentTarget)}>
-          <span className="home-card-key">6</span>
+          <span className="home-card-key">5</span>
           <span className="home-card-head">
             <img className="home-card-icon" src="./icons/nav/gamecorner.png" alt="" />
             <span className="home-card-title">Game Corner</span>
@@ -132,31 +158,53 @@ function HomeHub({
           </span>
           <span className="home-card-go">Open ▸</span>
         </button>
+
+        <button className="home-card home-card-box" onClick={(e) => onGo('box', e.currentTarget)}>
+          <span className="home-card-key">6</span>
+          <span className="home-card-head">
+            <img className="home-card-icon" src="./icons/nav/box.png" alt="" />
+            <span className="home-card-title">Box</span>
+          </span>
+          <span className="home-card-sub">
+            {boxCount === null ? 'Your Pokémon and team' : `${boxCount} Pokémon`}
+          </span>
+          <span className="home-card-go">Open ▸</span>
+        </button>
+
+        {missions && (
+          <button className="home-missions" onClick={onOpenMissions}>
+            <span className="home-missions-head">
+              <img className="home-card-icon" src="./icons/nav/missions.png" alt="" />
+              Today&apos;s missions
+            </span>
+            {missions.missions.map((m) => {
+              const done = m.progress >= m.goal
+              return (
+                <span
+                  key={m.slot}
+                  className={`home-mission home-mission-${m.tier}${m.claimed ? ' home-mission-claimed' : done ? ' home-mission-done' : ''}`}
+                >
+                  <span className="home-mission-text">{m.text}</span>
+                  <span className="home-mission-bar">
+                    <span style={{ width: `${Math.min(100, (m.progress / m.goal) * 100)}%` }} />
+                  </span>
+                  <span className="home-mission-count">{m.claimed ? '✓' : `${Math.min(m.progress, m.goal)}/${m.goal}`}</span>
+                </span>
+              )
+            })}
+          </button>
+        )}
       </div>
 
-      {missions && (
-        <button className="home-missions" onClick={onOpenMissions}>
-          <span className="home-missions-head">
-            <img className="home-card-icon" src="./icons/nav/missions.png" alt="" />
-            Today&apos;s missions
-          </span>
-          {missions.missions.map((m) => {
-            const done = m.progress >= m.goal
-            return (
-              <span
-                key={m.slot}
-                className={`home-mission home-mission-${m.tier}${m.claimed ? ' home-mission-claimed' : done ? ' home-mission-done' : ''}`}
-              >
-                <span className="home-mission-text">{m.text}</span>
-                <span className="home-mission-bar">
-                  <span style={{ width: `${Math.min(100, (m.progress / m.goal) * 100)}%` }} />
-                </span>
-                <span className="home-mission-count">{m.claimed ? '✓' : `${Math.min(m.progress, m.goal)}/${m.goal}`}</span>
-              </span>
-            )
-          })}
-        </button>
-      )}
+      <div className="home-tools">
+        {tools.map((t) => (
+          <button key={t.label} className="home-tool" onClick={t.action}>
+            <img className={`home-tool-icon${t.smooth ? ' home-tool-icon-smooth' : ''}`} src={t.icon} alt="" />
+            {t.label}
+            {!!t.badge && <span className="home-tool-badge">{t.badge}</span>}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }

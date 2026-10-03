@@ -22,6 +22,9 @@ interface Props {
   // Hidden away: only a small tab shows, to bring it back.
   collapsed: boolean
   onCollapsedChange: (collapsed: boolean) => void
+  // The PC button: pulls a small box up from under the dock (no button without it).
+  boxOpen?: boolean
+  onToggleBox?: () => void
 }
 
 const sameTeam = (a: (string | null)[], b: (string | null)[]): boolean => a.every((id, i) => id === b[i])
@@ -66,7 +69,9 @@ function TeamDock({
   manageOpen,
   leadCount = 0,
   collapsed,
-  onCollapsedChange
+  onCollapsedChange,
+  boxOpen = false,
+  onToggleBox
 }: Props): React.JSX.Element {
   const [loadouts, setLoadouts] = useState<LoadoutView[] | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -179,6 +184,16 @@ function TeamDock({
             </>
           )}
         </span>
+        {onToggleBox && (
+          <button
+            className={`team-dock-side-button team-dock-box-button${boxOpen ? ' team-dock-box-button-open' : ''}`}
+            title={boxOpen ? 'Put the box away' : 'Pull up the box'}
+            aria-label="Box"
+            onClick={onToggleBox}
+          >
+            <img className="team-dock-box-button-icon" src="./icons/nav/box.png" alt="" />
+          </button>
+        )}
       </div>
       <div className="team-dock-slots">
         {team.map((id, slot) => (

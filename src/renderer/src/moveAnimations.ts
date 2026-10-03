@@ -1,20 +1,38 @@
 import type { MoveInfo } from '../../shared/battle-types'
 
-// A generic animation for any move, worked out from its own data (type,
-// category, whether it makes contact, whether it hits more than once)
-// instead of a hand-authored table per move - the only way to cover the
-// whole move list without writing ~600 bespoke entries. A status move plays
-// on whoever it's really aimed at (itself, or its target); a damaging move
-// either lunges in for contact or flings a type-shaped particle cluster
-// (see moveParticleShapes.tsx), repeated a couple of times for a multi-hit
-// move, and scaled a bit faster/slower by the move's own power.
-export type MoveAnimKind = 'projectile' | 'burst' | 'melee'
+// An animation for any move, worked out from its own data (type, category,
+// target, flags, whether it makes contact or hits more than once) instead of
+// a hand-authored table per move - the only way to cover the whole move list
+// without writing ~600 bespoke entries. A short override table (MOVE_KINDS)
+// fixes the well-known moves the rules get wrong. The styles:
+// - projectile: a type icon cluster arcs over to the target and pops on it
+// - stream: a quick line of icons pours into the target (Flamethrower, Scald...)
+// - beam: a solid line from user to target swells and fades (Hyper Beam...)
+// - strike: it drops onto the target from the top of the field (Thunderbolt, Rock Slide)
+// - quake: nothing flies - the field shakes hard and dust kicks up under the target
+// - eruption: the type's icons burst up from under the target (Earth Power)
+// - wave: a ring spreads out from the user across the field (Discharge, Hyper Voice)
+// - melee: the user dashes in, with a slash, fist, kick or bite mark on the target
+// - burst / arrows: a status move - a ring of icons, or stat arrows rising or falling
+export type MoveAnimKind =
+  | 'projectile'
+  | 'stream'
+  | 'beam'
+  | 'strike'
+  | 'quake'
+  | 'eruption'
+  | 'wave'
+  | 'burst'
+  | 'arrows'
+  | 'melee'
+
+// The mark a contact move leaves on its target as it lands (see moveParticleShapes.tsx).
+export type MeleeMark = 'slash' | 'fist' | 'kick' | 'bite'
 
 export interface MoveAnimRecipe {
   kind: MoveAnimKind
   // Which particle shape/color it uses (see moveParticleShapes.tsx and the
-  // .anim-particle.type-X rules in styles.css) - burst reuses the same
-  // shape, just animated outward in a ring instead of at a target.
+  // .anim-particle.type-X rules in styles.css).
   type: string
   // A move with no useful animation (a stat move with no attack, most
   // Status moves on the field itself, ...) plays nothing rather than a
@@ -27,12 +45,29 @@ export interface MoveAnimRecipe {
   // A strong hit (see BIG_HIT_POWER) also shakes the whole field, not just
   // flashing the target - AnimationLayer reads this to decide whether to.
   bigHit: boolean
+  // An entry hazard move (Stealth Rock, Spikes...): its pieces (battle/fx images) are
+  // thrown across at the foe's side as the projectile, instead of a type particle.
+  hazardImages?: string[]
+  // A contact move's mark on the target, if it has one.
+  mark?: MeleeMark
+  // A stat move's arrows: rising for a boost, falling for a drop - on the user
+  // when it targets itself (Swords Dance), else on its target (Growl).
+  arrows?: { dir: 'up' | 'down'; onSelf: boolean }
+  // How many icons a stream pours out - more for a stronger move.
+  streamCount?: number
 }
 
-const BASE_DURATION_MS = 480
-const MELEE_DURATION_MS = 380
-const BURST_DURATION_MS = 460
-const REP_STAGGER_MS = 140
+const BASE_DURATION_MS = 600
+const MELEE_DURATION_MS = 400
+const BURST_DURATION_MS = 520
+const STRIKE_DURATION_MS = 520
+const QUAKE_DURATION_MS = 700
+const BEAM_DURATION_MS = 620
+const WAVE_DURATION_MS = 640
+const STREAM_DURATION_MS = 460
+const ERUPTION_DURATION_MS = 600
+const ARROWS_DURATION_MS = 700
+const REP_STAGGER_MS = 160
 const BIG_HIT_POWER = 90
 
 function clampedLerp(x: number, x0: number, x1: number, y0: number, y1: number): number {
@@ -43,21 +78,126 @@ function clampedLerp(x: number, x0: number, x1: number, y0: number, y1: number):
 
 // A weak move (Pound, 40 BP) snaps out quickly; a heavy one (Hyper Beam, 150
 // BP) has more wind-up and follow-through - scales the base duration between
-// 75% and 145% across a move's normal power range instead of every hit
+// 80% and 145% across a move's normal power range instead of every hit
 // taking exactly the same time regardless of how hard it lands.
 function scaledDuration(basePower: number, base: number): number {
-  return Math.round(base * clampedLerp(basePower, 40, 150, 0.75, 1.45))
+  return Math.round(base * clampedLerp(basePower, 40, 150, 0.8, 1.45))
 }
 
 /** Field/team effects and moves with no real attack of their own - nothing worth animating. */
 const NO_TARGET_TYPES = new Set(['foeSide', 'allySide', 'allyTeam'])
+// A status move aimed at these plays its arrows on the user itself.
+const SELF_TARGETS = new Set(['self', 'adjacentAllyOrSelf', 'allies'])
+// Moves that hit everything around the user (or every foe).
+const SPREAD_TARGETS = new Set(['allAdjacent', 'allAdjacentFoes', 'all'])
+
+// Entry hazard moves throw their own pieces at the foe's side (the same images
+// SideHazards draws on the ground).
+const HAZARD_IMAGES: Record<string, string[]> = {
+  stealthrock: ['rock1', 'rock2'],
+  spikes: ['caltrop'],
+  toxicspikes: ['poisoncaltrop'],
+  stickyweb: ['web']
+}
+
+// The well-known moves whose style the rules below would get wrong.
+const MOVE_KINDS: Record<string, MoveAnimKind> = {
+  // Things that come down from above.
+  rockslide: 'strike',
+  stoneedge: 'strike',
+  iciclecrash: 'strike',
+  dracometeor: 'strike',
+  weatherball: 'strike',
+  hurricane: 'strike',
+  // Things that come up from the ground under the target.
+  earthpower: 'eruption',
+  precipiceblades: 'eruption',
+  frenzyplant: 'eruption',
+  blastburn: 'eruption',
+  magmastorm: 'eruption',
+  firepledge: 'eruption',
+  grasspledge: 'eruption',
+  waterpledge: 'eruption',
+  // Beams the name doesn't give away.
+  dragonpulse: 'beam',
+  nightshade: 'beam',
+  freezedry: 'beam',
+  photongeyser: 'beam',
+  fleurcannon: 'beam',
+  // Auras and spreading shockwaves on a single target.
+  darkpulse: 'wave',
+  psychic: 'wave',
+  psyshock: 'wave',
+  petalblizzard: 'wave',
+  waterspout: 'wave',
+  eruption: 'wave',
+  // Pours, not single shots.
+  leafstorm: 'stream',
+  bubblebeam: 'stream',
+  // Ground moves that are thrown, not quakes.
+  mudshot: 'projectile',
+  mudbomb: 'projectile',
+  mudslap: 'projectile',
+  scorchingsands: 'projectile',
+  bonemerang: 'projectile',
+  bonerush: 'projectile',
+  boneclub: 'projectile',
+  // Electric moves that are thrown or aimed, not lightning from above.
+  electroball: 'projectile',
+  voltswitch: 'projectile',
+  chargebeam: 'beam',
+  electroweb: 'wave'
+}
 
 // A priority move (Quick Attack, Extreme Speed, Sucker Punch...) plays this much faster.
-const PRIORITY_SPEED = 0.5
+const PRIORITY_SPEED = 0.55
 
 export function animationFor(info: MoveInfo): MoveAnimRecipe {
   const recipe = baseAnimationFor(info)
   return info.priority > 0 ? { ...recipe, durationMs: Math.round(recipe.durationMs * PRIORITY_SPEED) } : recipe
+}
+
+function hasFlag(info: MoveInfo, flag: string): boolean {
+  return !!info.animFlags?.includes(flag)
+}
+
+// The mark a contact move leaves, from its flags and name: Showdown flags
+// punches, bites and slicing moves; kicks and claws only show in the name.
+function meleeMarkFor(info: MoveInfo): MeleeMark | undefined {
+  const id = info.id
+  if (hasFlag(info, 'bite') || /fang|bite|crunch|jaw/.test(id)) return 'bite'
+  if (hasFlag(info, 'punch')) return 'fist'
+  if (/kick|stomp|knee|axe/.test(id)) return 'kick'
+  if (hasFlag(info, 'slicing') || /slash|claw|cut|scissor|blade|razor|swipe|scratch/.test(id)) return 'slash'
+  if (info.type === 'Fighting') return 'fist'
+  return undefined
+}
+
+function kindFor(info: MoveInfo): MoveAnimKind {
+  const override = MOVE_KINDS[info.id]
+  if (override) return override
+  if (info.contact) return 'melee'
+  const special = info.category === 'Special'
+  const spread = SPREAD_TARGETS.has(info.target)
+  if (info.type === 'Ground') return 'quake'
+  if (/beam|laser|cannon/.test(info.id)) return 'beam'
+  if (special && (spread || hasFlag(info, 'sound'))) return 'wave'
+  if (info.type === 'Electric') return 'strike'
+  if (special && (info.type === 'Fire' || info.type === 'Water') && !hasFlag(info, 'bullet')) return 'stream'
+  return 'projectile'
+}
+
+const KIND_DURATIONS: Record<MoveAnimKind, number> = {
+  projectile: BASE_DURATION_MS,
+  stream: STREAM_DURATION_MS,
+  beam: BEAM_DURATION_MS,
+  strike: STRIKE_DURATION_MS,
+  quake: QUAKE_DURATION_MS,
+  eruption: ERUPTION_DURATION_MS,
+  wave: WAVE_DURATION_MS,
+  burst: BURST_DURATION_MS,
+  arrows: ARROWS_DURATION_MS,
+  melee: MELEE_DURATION_MS
 }
 
 function baseAnimationFor(info: MoveInfo): MoveAnimRecipe {
@@ -65,17 +205,34 @@ function baseAnimationFor(info: MoveInfo): MoveAnimRecipe {
   const type = info.type.toLowerCase()
   const bigHit = info.basePower >= BIG_HIT_POWER
 
+  const hazardImages = HAZARD_IMAGES[info.id]
+  if (hazardImages) {
+    return { kind: 'projectile', type, durationMs: BASE_DURATION_MS, reps: 1, bigHit: false, hazardImages }
+  }
+
   if (info.category === 'Status') {
+    if (info.boostDir) {
+      const arrows = { dir: info.boostDir, onSelf: SELF_TARGETS.has(info.target) }
+      return { kind: 'arrows', type, durationMs: ARROWS_DURATION_MS, reps: 1, bigHit: false, arrows }
+    }
     if (NO_TARGET_TYPES.has(info.target)) {
       return { kind: 'burst', type, none: true, durationMs: 0, reps: 1, bigHit: false }
     }
     return { kind: 'burst', type, durationMs: BURST_DURATION_MS, reps: 1, bigHit: false }
   }
 
-  if (info.contact) {
-    return { kind: 'melee', type, durationMs: scaledDuration(info.basePower, MELEE_DURATION_MS), reps, bigHit }
+  const kind = kindFor(info)
+  const recipe: MoveAnimRecipe = {
+    kind,
+    type,
+    durationMs: scaledDuration(info.basePower, KIND_DURATIONS[kind]),
+    reps,
+    // A quake always shakes the field - that's the whole animation.
+    bigHit: bigHit || kind === 'quake'
   }
-  return { kind: 'projectile', type, durationMs: scaledDuration(info.basePower, BASE_DURATION_MS), reps, bigHit }
+  if (kind === 'melee') recipe.mark = meleeMarkFor(info)
+  if (kind === 'stream') recipe.streamCount = Math.round(clampedLerp(info.basePower, 40, 120, 5, 9))
+  return recipe
 }
 
 // The same 18-type palette as .anim-particle.type-X / .move-button.type-X in

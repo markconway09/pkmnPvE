@@ -4,6 +4,7 @@ import type { LeagueMilestone, TrainerProfile } from '../../shared/battle-types'
 import { runDifficultyInfo } from '../../shared/battle-types'
 import type { AchievementsState } from '../../shared/achievements'
 import { titlePerk } from '../../shared/titles'
+import { TITLE_CHANGED_EVENT } from './BetSlider'
 import { trainerSpriteUrl } from './trainerSprite'
 import TrainerSpritePicker from './TrainerSpritePicker'
 
@@ -48,6 +49,7 @@ function PlayerTrainerModal({
   async function chooseTitle(title: string | null): Promise<void> {
     try {
       setTitles(await window.api.setAchievementTitle(title))
+      window.dispatchEvent(new Event(TITLE_CHANGED_EVENT))
       onTitleChanged?.()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))

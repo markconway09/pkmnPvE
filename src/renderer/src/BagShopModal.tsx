@@ -4,6 +4,7 @@ import BagShopTabs, { type BagShopTab } from './BagShopTabs'
 import BagPanel from './BagPanel'
 import ShopPanel from './ShopPanel'
 import KeyItemsPanel from './KeyItemsPanel'
+import TMsPanel from './TMsPanel'
 
 interface Props {
   initialTab: BagShopTab
@@ -39,6 +40,7 @@ function BagShopModal({ initialTab, onClose, onChanged, onMoneyChange }: Props):
         {tab === 'bag' && <BagPanel onChanged={onChanged} />}
         {tab === 'shop' && <ShopPanel onMoneyChange={onMoneyChange} />}
         {tab === 'keys' && <KeyItemsPanel />}
+        {tab === 'tms' && <TMsPanel />}
       </div>
     </div>,
     document.body

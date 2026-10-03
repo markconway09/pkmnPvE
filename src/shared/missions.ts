@@ -15,7 +15,8 @@ export type MissionStat =
   | 'raidsWon'
   | 'evolutions'
   | 'merges'
-  | 'sold'
+  | 'tmSearches'
+  | 'skillGreats'
   | 'slotSpins'
   | 'blackjackWins'
   | 'rouletteSpins'
@@ -50,7 +51,7 @@ export const MISSION_TEMPLATES: MissionTemplate[] = [
   { id: 'slots20', tier: 'easy', text: 'Spin the slots 20 times', stat: 'slotSpins', goal: 20, reward: { coins: 200 } },
   { id: 'roulette10', tier: 'easy', text: 'Spin the roulette wheel 10 times', stat: 'rouletteSpins', goal: 10, reward: { coins: 200 } },
   { id: 'plinko25', tier: 'easy', text: 'Drop 25 Plinko balls', stat: 'plinkoDrops', goal: 25, reward: { coins: 200 } },
-  { id: 'sell5', tier: 'easy', text: 'Sell 5 Pokémon', stat: 'sold', goal: 5, reward: { money: 2000 } },
+  { id: 'tmsearch5', tier: 'easy', text: 'Search for TMs 5 times', stat: 'tmSearches', goal: 5, reward: { money: 2000 } },
   { id: 'runfloors5', tier: 'easy', text: 'Clear 5 Roguelite floors', stat: 'runFloors', goal: 5, reward: { money: 2000 } },
 
   // Medium
@@ -59,6 +60,7 @@ export const MISSION_TEMPLATES: MissionTemplate[] = [
   { id: 'evolve1', tier: 'medium', text: 'Evolve a Pokémon', stat: 'evolutions', goal: 1, reward: { items: [item('rarecandy', 3)] } },
   { id: 'merge1', tier: 'medium', text: 'Merge a Pokémon', stat: 'merges', goal: 1, reward: { items: [item('rarecandy', 3)] } },
   { id: 'wild15', tier: 'medium', text: 'Win 15 wild battles', stat: 'wildWins', goal: 15, reward: { items: [item('expcandym', 2)] } },
+  { id: 'greats3', tier: 'medium', text: 'Hit 3 Great skill checks (in a search or a quick check)', stat: 'skillGreats', goal: 3, reward: { coins: 500 } },
   { id: 'runtrainers3', tier: 'medium', text: 'Beat 3 trainers in Roguelite runs', stat: 'runTrainerWins', goal: 3, reward: { coins: 500 } },
 
   // Hard

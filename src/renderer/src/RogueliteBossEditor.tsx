@@ -6,6 +6,7 @@ import { trainerSpriteUrl } from './trainerSprite'
 import { randomTrainerName } from './trainerNames'
 import TrainerSpritePicker from './TrainerSpritePicker'
 import TrainerTeamsSection from './TrainerTeamsSection'
+import FieldStartPicker from './FieldStartPicker'
 
 interface Props {
   trainer: Trainer | null
@@ -37,6 +38,9 @@ function RogueliteBossEditor({ trainer, trainers, onClose, onSaved }: Props): Re
   const [generation, setGeneration] = useState<number | ''>(trainer?.rogueliteGeneration ?? '')
   // The ability beating this boss offers (typed by name, stored by id).
   const [rewardAbility, setRewardAbility] = useState('')
+  const [fieldWeather, setFieldWeather] = useState<string | null>(trainer?.fieldWeather ?? null)
+  const [fieldTerrain, setFieldTerrain] = useState<string | null>(trainer?.fieldTerrain ?? null)
+  const [fieldTrickRoom, setFieldTrickRoom] = useState(trainer?.fieldTrickRoom ?? false)
   const [abilities, setAbilities] = useState<{ id: string; name: string }[]>([])
   const [pickerOpen, setPickerOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -92,6 +96,9 @@ function RogueliteBossEditor({ trainer, trainers, onClose, onSaved }: Props): Re
         rogueliteClass: bossClass || undefined,
         rogueliteGeneration: generation || undefined,
         rogueliteRewardAbility: rewardAbilityId || undefined,
+        fieldWeather,
+        fieldTerrain,
+        fieldTrickRoom,
         // Run bosses don't drop anything - whatever a trainer already had is just kept.
         drops: trainer?.drops ?? []
       }
@@ -193,7 +200,8 @@ function RogueliteBossEditor({ trainer, trainers, onClose, onSaved }: Props): Re
                 {generation !== '' && (
                   <p className="editor-hint">
                     Gen {generation} already has {classCount('gymLeader')}/8 Gym Leaders, {classCount('eliteFour')}/4 Elite
-                    Four and {classCount('champion')}/1 Champion besides this one
+                    Four and {classCount('champion')}/1 Champion besides this one, plus {classCount('villainGrunt')} Villain
+                    Grunts and {classCount('villainElite')} Villain Elites for Villain Takeovers
                   </p>
                 )}
                 <label className="editor-field">
@@ -213,6 +221,14 @@ function RogueliteBossEditor({ trainer, trainers, onClose, onSaved }: Props): Re
                 </label>
                 <p className="editor-hint">Its premade teams are set to the floor&apos;s level and trimmed to the boss&apos;s size.</p>
               </div>
+              <FieldStartPicker
+                weather={fieldWeather}
+                terrain={fieldTerrain}
+                onWeatherChange={setFieldWeather}
+                onTerrainChange={setFieldTerrain}
+                trickRoom={fieldTrickRoom}
+                onTrickRoomChange={setFieldTrickRoom}
+              />
             </div>
           </div>
 

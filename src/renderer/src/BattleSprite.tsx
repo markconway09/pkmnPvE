@@ -17,6 +17,7 @@ import SideScreens from './SideScreens'
 import { gmaxSpriteCandidates, spriteCandidates, type SpriteStyle } from './spriteStyle'
 import ItemSprite from './ItemSprite'
 import ShinyIcon from './ShinyIcon'
+import { playCry } from './cries'
 
 interface Props {
   pokemon: ActivePokemonView | null
@@ -26,11 +27,11 @@ interface Props {
   // Which of the (up to 2) active slots on this side this sprite is for -
   // slot 1 (doubles only) renders shifted inward from slot 0's position.
   slotIndex?: 0 | 1
-  // This side's entry hazards - drawn on the ground under the slot-0 sprite
-  // only, since a side has one patch of ground however many Pokemon it has out.
+  // This side's entry hazards - drawn on the ground under each of its Pokemon
+  // (both of them in doubles, since they cover the whole side).
   hazards?: FieldEffectView[]
-  // This side's screens (Reflect/Light Screen/Aurora Veil) - same slot-0-only
-  // deal as hazards, since they're side-wide too.
+  // This side's screens (Reflect/Light Screen/Aurora Veil) - shown on each of its
+  // Pokemon the same way.
   screens?: FieldEffectView[]
   // The result to flash over this sprite right now (a miss, a crit, Protect
   // working, ...) - null most of the time. Only set for the one tick it
@@ -56,6 +57,17 @@ const GIMMICK_MS = 1100
 const ABILITY_MS = 1600
 // Crits, flinches and confusion stay up a bit longer than the other labels.
 const EMPHASIS_FEEDBACK_MS = 1300
+
+// A Pokemon that can't move shows its status as little pieces around it: sparks for
+// full paralysis, drifting Zs for sleep, snowflakes for a freeze - and the same for a
+// burn's flames and poison's bubbles when they hurt it.
+const CANT_MOVE_PIECES: Partial<Record<NonNullable<FeedbackEvent['emphasis']>, { glyph: string; staggerMs: number }>> = {
+  paralysis: { glyph: '⚡', staggerMs: 110 },
+  sleep: { glyph: 'Z', staggerMs: 100 },
+  freeze: { glyph: '❄', staggerMs: 140 },
+  burn: { glyph: '🔥', staggerMs: 90 },
+  poison: { glyph: '●', staggerMs: 120 }
+}
 
 const STATUS_LABELS: Record<string, string> = {
   par: 'PAR',
@@ -162,6 +174,7 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
         setDisplayed(pokemon)
         prevHpRef.current = pokemon.hpPercent
         setPhase('sending-out')
+        playCry(toSpriteId(pokemon.species))
         setTimeout(() => setPhase('idle'), SEND_OUT_MS)
       }, RECALL_MS)
       return () => clearTimeout(recallTimer)
@@ -174,6 +187,7 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
     if (prevSeq === null) {
       // First Pokemon shown this battle - just a plain send-out, nothing to recall.
       setPhase('sending-out')
+      playCry(toSpriteId(pokemon.species))
       const sendOutTimer = setTimeout(() => setPhase('idle'), SEND_OUT_MS)
       return () => clearTimeout(sendOutTimer)
     }
@@ -219,70 +233,98 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
       placement={align === 'right' ? 'below' : 'above'}
       content={<PokemonTooltipContent pokemon={displayed} />}
     >
-      <div className="sprite-image-wrap" data-slot={slot}>
-        {slotIndex === 0 && hazards && hazards.length > 0 && <SideHazards hazards={hazards} />}
-        {slotIndex === 0 && screens && screens.length > 0 && <SideScreens screens={screens} />}
-        <img
-          className={imgClasses}
-          src={src}
-          alt={displayed.species}
-          onError={(e) => {
-            if (fallbackStep < candidates.length - 1) setFallbackStep(fallbackStep + 1)
-            else e.currentTarget.style.visibility = 'hidden'
-          }}
-        />
-        {displayed.substituted && <SubstituteDoll facing={facing} className="substitute-doll" />}
-        {displayed.protecting && <ProtectShield className="protect-shield" />}
-        {shownGimmick && (
-          <div
-            key={shownGimmick.kind + shownGimmick.slot}
-            className={`gimmick-burst gimmick-${shownGimmick.kind}`}
-          >
-            <span
-              className={`gimmick-ring${shownGimmick.teraType ? ` type-${shownGimmick.teraType.toLowerCase()}` : ''}`}
-            />
-            <span className="gimmick-flash" />
+      {/* The hazards and screens sit on the ground in front of it, outside the box that
+          dashes, shakes and sways - so they stay put while the Pokemon moves. */}
+      <div className="sprite-stage">
+        {hazards && hazards.length > 0 && <SideHazards hazards={hazards} />}
+        {screens && screens.length > 0 && <SideScreens screens={screens} />}
+        {/* Seeded: little green orbs on the ground at its feet, like the hazards. */}
+        {displayed.volatiles.some((b) => b.id === 'leechseed') && (
+          <div className="leech-seed-orbs" title="Leech Seed">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <span key={i} className="leech-seed-orb" />
+            ))}
           </div>
         )}
-        {shownFeedback?.emphasis === 'confusion' && (
-          <div key={'stars' + shownFeedback.label} className="confusion-stars">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <span key={i} className="confusion-star" style={{ animationDelay: `${i * -200}ms` }}>
-                ★
+        <div className="sprite-image-wrap" data-slot={slot}>
+          <img
+            className={imgClasses}
+            src={src}
+            alt={displayed.species}
+            onError={(e) => {
+              if (fallbackStep < candidates.length - 1) setFallbackStep(fallbackStep + 1)
+              else e.currentTarget.style.visibility = 'hidden'
+            }}
+          />
+          {displayed.substituted && <SubstituteDoll facing={facing} className="substitute-doll" />}
+          {displayed.protecting && <ProtectShield className="protect-shield" />}
+          {shownGimmick && (
+            <div
+              key={shownGimmick.kind + shownGimmick.slot}
+              className={`gimmick-burst gimmick-${shownGimmick.kind}`}
+            >
+              <span
+                className={`gimmick-ring${shownGimmick.teraType ? ` type-${shownGimmick.teraType.toLowerCase()}` : ''}`}
+              />
+              <span className="gimmick-flash" />
+            </div>
+          )}
+        {shownFeedback?.emphasis && CANT_MOVE_PIECES[shownFeedback.emphasis] && (
+          <div
+            key={'cant' + shownFeedback.label}
+            className={`paralysis-sparks cant-move-${shownFeedback.emphasis}`}
+          >
+            {Array.from({ length: 5 }).map((_, i) => (
+              <span
+                key={i}
+                className="paralysis-spark"
+                style={{ animationDelay: `${i * CANT_MOVE_PIECES[shownFeedback.emphasis!]!.staggerMs}ms` }}
+              >
+                {CANT_MOVE_PIECES[shownFeedback.emphasis!]!.glyph}
               </span>
             ))}
           </div>
         )}
-        {shownFeedback && (
-          <div
-            key={shownFeedback.label + shownFeedback.slot}
-            className={`feedback-label feedback-${shownFeedback.tone}${shownFeedback.emphasis ? ` feedback-emphasis feedback-${shownFeedback.emphasis}` : ''}`}
-          >
-            {shownFeedback.label}
-          </div>
-        )}
-        {shownAbility && (
-          <div
-            key={shownAbility.ability + shownAbility.slot}
-            className={`ability-popup ability-popup-${align}${shownAbility.itemSpritenum !== undefined ? ' ability-popup-item' : ''}`}
-          >
-            <span className="ability-popup-mon">{shownAbility.pokemon}&apos;s</span>
-            <span className="ability-popup-name">
-              {/* A held item at work shows its icon. */}
-              {shownAbility.itemSpritenum !== undefined && (
-                <ItemSprite spritenum={shownAbility.itemSpritenum} className="ability-popup-icon" />
-              )}
-              {shownAbility.ability}
-            </span>
-          </div>
-        )}
-        {phase === 'sending-out' && displayed.shiny && (
-          <div className="shiny-sparkle">
-            {Array.from({ length: 7 }).map((_, i) => (
-              <span key={i} className="shiny-spark" />
-            ))}
-          </div>
-        )}
+        {shownFeedback?.emphasis === 'confusion' && (
+            <div key={'stars' + shownFeedback.label} className="confusion-stars">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <span key={i} className="confusion-star" style={{ animationDelay: `${i * -200}ms` }}>
+                  ★
+                </span>
+              ))}
+            </div>
+          )}
+          {shownFeedback && (
+            <div
+              key={shownFeedback.label + shownFeedback.slot}
+              className={`feedback-label feedback-${shownFeedback.tone}${shownFeedback.emphasis ? ` feedback-emphasis feedback-${shownFeedback.emphasis}` : ''}`}
+            >
+              {shownFeedback.label}
+            </div>
+          )}
+          {shownAbility && (
+            <div
+              key={shownAbility.ability + shownAbility.slot}
+              className={`ability-popup ability-popup-${align}${shownAbility.itemSpritenum !== undefined ? ' ability-popup-item' : ''}`}
+            >
+              <span className="ability-popup-mon">{shownAbility.pokemon}&apos;s</span>
+              <span className="ability-popup-name">
+                {/* A held item at work shows its icon. */}
+                {shownAbility.itemSpritenum !== undefined && (
+                  <ItemSprite spritenum={shownAbility.itemSpritenum} className="ability-popup-icon" />
+                )}
+                {shownAbility.ability}
+              </span>
+            </div>
+          )}
+          {phase === 'sending-out' && displayed.shiny && (
+            <div className="shiny-sparkle">
+              {Array.from({ length: 7 }).map((_, i) => (
+                <span key={i} className="shiny-spark" />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
       <div className="sprite-info">
         <div className="sprite-name-row">

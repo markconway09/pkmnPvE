@@ -74,6 +74,7 @@ function TabStrip<T extends string>({
               tabRefs.current[id] = el
             }}
             role="tab"
+            data-sfx="tab"
             aria-selected={current === id}
             title={title}
             className={`tab-strip-tab${tabClass ? ` ${tabClass}` : ''}${current === id ? ' tab-strip-tab-active' : ''}`}
@@ -85,7 +86,7 @@ function TabStrip<T extends string>({
         ))}
     </div>
     {onClose && (
-      <button className="tab-strip-close" title="Close" aria-label="Close" disabled={closeDisabled} onClick={onClose}>
+      <button className="tab-strip-close" data-sfx="close" title="Close" aria-label="Close" disabled={closeDisabled} onClick={onClose}>
         <svg viewBox="0 0 16 16" aria-hidden="true">
           <path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
         </svg>

@@ -1,0 +1,1490 @@
+[
+  {
+    "id": "9fc7d845-8ed9-4bda-9ff9-9e428aaaf85e",
+    "title": "A Beautiful Garden",
+    "artist": "Aventure",
+    "duration": 132
+  },
+  {
+    "id": "4438d0fd-4335-2142-2036-63c8cb3086b1",
+    "title": "A New Day",
+    "artist": "Nebulite",
+    "duration": 202
+  },
+  {
+    "id": "affdbccb-2ec1-b3cb-9076-b892bbf6585a",
+    "title": "Absent",
+    "artist": "Pufino",
+    "duration": 143
+  },
+  {
+    "id": "18d05342-e857-0df7-e09c-12cec5bbcb79",
+    "title": "Adventure",
+    "artist": "Moavii",
+    "duration": 195
+  },
+  {
+    "id": "74b1deb4-7063-3c70-0a3e-1ceaa32b3bd4",
+    "title": "Affogato",
+    "artist": "Lukrembo",
+    "duration": 161
+  },
+  {
+    "id": "871f052a-e2e8-5cef-afab-72e2e90840ce",
+    "title": "Afternoon",
+    "artist": "Lukrembo",
+    "duration": 159
+  },
+  {
+    "id": "90368336-d39f-4298-96a8-feaa5c550425",
+    "title": "Afternoon Coffee",
+    "artist": "Aventure",
+    "duration": 132
+  },
+  {
+    "id": "b4743676-f72b-4d1e-c8ef-b3e80657c9fd",
+    "title": "Alone",
+    "artist": "Lukrembo",
+    "duration": 189
+  },
+  {
+    "id": "4d51ddb8-e81c-4f94-9a91-7520c5ae9179",
+    "title": "Angel Walking In The Clouds",
+    "artist": "Johny Grimes",
+    "duration": 138
+  },
+  {
+    "id": "32266329-562f-46b9-8fd3-a14de4f9a777",
+    "title": "Animal Friends",
+    "artist": "Lukrembo",
+    "duration": 258
+  },
+  {
+    "id": "3e636a48-05ff-96aa-1f68-afa3cfb0ddeb",
+    "title": "Apple Tree",
+    "artist": "Lukrembo",
+    "duration": 174
+  },
+  {
+    "id": "5173ceee-be91-708f-dcfb-64cca01d57c7",
+    "title": "Apricity",
+    "artist": "Lukrembo",
+    "duration": 167
+  },
+  {
+    "id": "216a2e13-dc5d-4e83-fe85-3e3fa1dfb1ba",
+    "title": "aromatic",
+    "artist": "massobeats",
+    "duration": 155
+  },
+  {
+    "id": "8c748bd2-017a-4e85-9253-7a67136ff1ab",
+    "title": "Asleep",
+    "artist": "Moavii",
+    "duration": 162
+  },
+  {
+    "id": "ba1fa94b-1d39-7b71-7fc1-63ef5c30f357",
+    "title": "At Ease",
+    "artist": "Hazelwood",
+    "duration": 106
+  },
+  {
+    "id": "eb62c8db-81c2-09d1-aa8d-8c9625cff8c0",
+    "title": "Autumn",
+    "artist": "Lukrembo",
+    "duration": 176
+  },
+  {
+    "id": "9995001a-4111-4e9a-aa5d-0c11c0a24030",
+    "title": "back then",
+    "artist": "massobeats",
+    "duration": 148
+  },
+  {
+    "id": "ab08d835-4774-4799-9fc0-17764702f04a",
+    "title": "Bake A Pie",
+    "artist": "Lukrembo",
+    "duration": 163
+  },
+  {
+    "id": "6312a61e-2559-ce05-0950-40a0908ccfee",
+    "title": "Balloon",
+    "artist": "Lukrembo",
+    "duration": 145
+  },
+  {
+    "id": "c501fb69-b32e-4bdb-a777-18fc0c9f4d84",
+    "title": "Bean",
+    "artist": "Lukrembo",
+    "duration": 143
+  },
+  {
+    "id": "72bb59b2-aedf-45f1-8087-63e5dbd1270a",
+    "title": "Before Christmas",
+    "artist": "Aventure",
+    "duration": 147
+  },
+  {
+    "id": "ea8e954d-07bc-8b24-03e6-46020f2ae734",
+    "title": "bloom",
+    "artist": "massobeats",
+    "duration": 148
+  },
+  {
+    "id": "f78ea6a2-1063-654f-ddff-a052198609a2",
+    "title": "Bloom",
+    "artist": "Nebulite",
+    "duration": 181
+  },
+  {
+    "id": "7b35003f-10d8-1d66-b14d-938a8317518d",
+    "title": "Boba Tea",
+    "artist": "Lukrembo",
+    "duration": 192
+  },
+  {
+    "id": "42a132c4-9042-432b-8b8b-4f41647684f2",
+    "title": "bonsai",
+    "artist": "massobeats",
+    "duration": 134
+  },
+  {
+    "id": "4a8e2fad-41da-1bbd-c6bc-d4de269b2601",
+    "title": "Bored",
+    "artist": "Lukrembo",
+    "duration": 183
+  },
+  {
+    "id": "5ba93f79-21cc-8a7a-6543-31fcf5a4283c",
+    "title": "Branch",
+    "artist": "Lukrembo",
+    "duration": 159
+  },
+  {
+    "id": "1028a982-25d2-9b50-71a8-dbc9a3c7cb81",
+    "title": "Bread",
+    "artist": "Lukrembo",
+    "duration": 161
+  },
+  {
+    "id": "af0c614a-994f-a7e9-a7f1-2e7a7de0a95e",
+    "title": "Break Up",
+    "artist": "Lukrembo",
+    "duration": 267
+  },
+  {
+    "id": "813a8dea-cb78-198e-a7cc-5b714b1fa790",
+    "title": "breeze",
+    "artist": "massobeats",
+    "duration": 167
+  },
+  {
+    "id": "4f716c56-e86f-d87a-400f-ceab8d24d5d4",
+    "title": "Brunch",
+    "artist": "Lukrembo",
+    "duration": 153
+  },
+  {
+    "id": "99edb868-4467-dcab-7e96-f20158d0b6f5",
+    "title": "Butter",
+    "artist": "Lukrembo",
+    "duration": 155
+  },
+  {
+    "id": "3b3c9a55-149c-4709-866c-9e3c294aa5ce",
+    "title": "By the Fireplace",
+    "artist": "Aventure",
+    "duration": 158
+  },
+  {
+    "id": "496ab6fc-c37c-66f6-1873-189f43cee30e",
+    "title": "Cafe",
+    "artist": "Lukrembo",
+    "duration": 162
+  },
+  {
+    "id": "b11211ec-fd3e-b38f-db96-4286bafea680",
+    "title": "chamomile",
+    "artist": "massobeats",
+    "duration": 152
+  },
+  {
+    "id": "0d790cec-e1bc-4753-c183-c30f0ea6bd15",
+    "title": "Charmed",
+    "artist": "Pufino",
+    "duration": 133
+  },
+  {
+    "id": "4fb26980-92f3-03d4-433a-6e40582e0ed9",
+    "title": "Cheese",
+    "artist": "Lukrembo",
+    "duration": 154
+  },
+  {
+    "id": "c3b4be4a-e39a-4d07-bee9-dcac7986eefd",
+    "title": "Childhood",
+    "artist": "Aventure",
+    "duration": 161
+  },
+  {
+    "id": "ba910317-7ff7-cfb6-0032-6ca49b0187dc",
+    "title": "Chill Vibes",
+    "artist": "Pufino",
+    "duration": 132
+  },
+  {
+    "id": "c968c541-c132-45bd-98aa-f0c6138b1bb5",
+    "title": "Chill Walk",
+    "artist": "Aventure",
+    "duration": 124
+  },
+  {
+    "id": "d5272a6b-6f37-62e3-4279-4563e1d91ec6",
+    "title": "Chillout",
+    "artist": "Pufino",
+    "duration": 134
+  },
+  {
+    "id": "74468a92-1c20-4a9d-8bf7-7cdc277b43a5",
+    "title": "chilly",
+    "artist": "massobeats",
+    "duration": 156
+  },
+  {
+    "id": "928cca2b-6f68-9959-3e77-4c17c711c70e",
+    "title": "Chinese Traditions",
+    "artist": "Aylex",
+    "duration": 111
+  },
+  {
+    "id": "6f647821-d25e-0d95-1e1b-c839cc882898",
+    "title": "Chocolate",
+    "artist": "Lukrembo",
+    "duration": 131
+  },
+  {
+    "id": "b70271a2-5be0-3416-e3aa-e9d6dc6ce767",
+    "title": "Chrome",
+    "artist": "Chill Pulse",
+    "duration": 123
+  },
+  {
+    "id": "654e7631-341d-4af6-a40b-0f38039365c1",
+    "title": "citrus",
+    "artist": "massobeats",
+    "duration": 136
+  },
+  {
+    "id": "cc3d9f0e-53a1-405f-812b-abea2e3fb8be",
+    "title": "city",
+    "artist": "massobeats",
+    "duration": 140
+  },
+  {
+    "id": "ffe5f357-28d4-493a-b7d8-9c581e3e7f6a",
+    "title": "City Life",
+    "artist": "Spiring",
+    "duration": 99
+  },
+  {
+    "id": "986319e0-3ac7-6123-f794-ca60da968aa8",
+    "title": "City Lights",
+    "artist": "Moavii",
+    "duration": 174
+  },
+  {
+    "id": "829bd6b8-9122-4809-9642-35bcfd409d3d",
+    "title": "Clean Sheet",
+    "artist": "Aventure",
+    "duration": 147
+  },
+  {
+    "id": "77150365-316a-4acb-92c9-1d2fbb4766fe",
+    "title": "Close Friends",
+    "artist": "Aventure",
+    "duration": 182
+  },
+  {
+    "id": "3b8280eb-dc65-4288-96db-d2f36de03cc9",
+    "title": "Coffee & Vinyl",
+    "artist": "Aventure",
+    "duration": 143
+  },
+  {
+    "id": "737ee114-ca13-6522-10f4-68903d52e17e",
+    "title": "Coffee Time",
+    "artist": "Pufino",
+    "duration": 144
+  },
+  {
+    "id": "38728f04-a8a9-b66f-50e0-3973f9ffa038",
+    "title": "Cold",
+    "artist": "Lukrembo",
+    "duration": 182
+  },
+  {
+    "id": "6ebc2c15-2e43-4163-901d-e25ab823db96",
+    "title": "Cold Coffee",
+    "artist": "Aventure",
+    "duration": 158
+  },
+  {
+    "id": "eabaf213-04cc-e8e3-5ee3-a513bd45ea1f",
+    "title": "Coming Of Age",
+    "artist": "Hazelwood",
+    "duration": 208
+  },
+  {
+    "id": "f872f6c8-2bb9-561d-67cb-0c71136afc7a",
+    "title": "Concierge Lounge",
+    "artist": "Lukrembo",
+    "duration": 171
+  },
+  {
+    "id": "a3eb8aa6-5418-192f-9b42-1a5962c3fc71",
+    "title": "Cool Lofi",
+    "artist": "Pufino",
+    "duration": 143
+  },
+  {
+    "id": "2968cdd3-21a0-40c9-998f-719da7cc9c94",
+    "title": "Cozy Evening",
+    "artist": "Chill Pulse",
+    "duration": 119
+  },
+  {
+    "id": "cf5b87b0-00d4-4381-eef1-c9735daedb46",
+    "title": "Cream",
+    "artist": "Lukrembo",
+    "duration": 141
+  },
+  {
+    "id": "a4941409-41b2-f41a-d974-37313fdf5a67",
+    "title": "Creamy",
+    "artist": "Aylex",
+    "duration": 128
+  },
+  {
+    "id": "66958d45-70d1-5aa2-7043-c42fc73998a2",
+    "title": "Crow's Quest",
+    "artist": "Filo Starquez",
+    "duration": 208
+  },
+  {
+    "id": "c40fc3d1-1cd5-4793-4618-667de8e69cb3",
+    "title": "Daily",
+    "artist": "Lukrembo",
+    "duration": 124
+  },
+  {
+    "id": "8c14a3db-7e5d-442f-9b71-2f3e391b2e35",
+    "title": "dainty",
+    "artist": "massobeats",
+    "duration": 161
+  },
+  {
+    "id": "e6207929-3a45-ea7a-9f63-5b3e3917f7dd",
+    "title": "daydream",
+    "artist": "massobeats",
+    "duration": 175
+  },
+  {
+    "id": "804f43dc-eb28-b5fc-23fa-8f67db48d384",
+    "title": "Deep Thoughts",
+    "artist": "Moavii",
+    "duration": 120
+  },
+  {
+    "id": "c0a1a939-795e-bf30-aed8-3f9463d3dd8d",
+    "title": "Donut",
+    "artist": "Lukrembo",
+    "duration": 144
+  },
+  {
+    "id": "158e9227-d671-4280-b14c-cf228c52cc64",
+    "title": "downtown",
+    "artist": "massobeats",
+    "duration": 156
+  },
+  {
+    "id": "919f6e99-d3ef-b391-4edb-1edb702c582f",
+    "title": "Downtown",
+    "artist": "Moavii",
+    "duration": 155
+  },
+  {
+    "id": "3a9f7952-064d-1e07-9316-4d254a6c1957",
+    "title": "Dream With Tea",
+    "artist": "Lukrembo",
+    "duration": 130
+  },
+  {
+    "id": "4d07d727-d059-526e-7fa2-c7352d89667f",
+    "title": "Dreaming After Work",
+    "artist": "Lukrembo",
+    "duration": 133
+  },
+  {
+    "id": "d5093bb6-c235-fc21-f3e7-f127cfb7f7a1",
+    "title": "Dreams of the Future",
+    "artist": "Moavii",
+    "duration": 137
+  },
+  {
+    "id": "19c1210f-049d-6d3b-6646-895784a7cc86",
+    "title": "drizzle",
+    "artist": "massobeats",
+    "duration": 152
+  },
+  {
+    "id": "059ce49c-50c6-cdda-ddb0-9f8fb3d655fb",
+    "title": "Early Morning In Winter",
+    "artist": "Lukrembo",
+    "duration": 96
+  },
+  {
+    "id": "ef3224a7-288d-4368-8123-0727803da801",
+    "title": "Echo Valley",
+    "artist": "Avanti",
+    "duration": 161
+  },
+  {
+    "id": "fc53dca9-1a86-3a32-eead-4d4d6e278a2a",
+    "title": "Empty",
+    "artist": "Lukrembo",
+    "duration": 144
+  },
+  {
+    "id": "8b0b5620-8e03-404d-975a-0c880a28e48b",
+    "title": "Enough Time",
+    "artist": "Unheard",
+    "duration": 124
+  },
+  {
+    "id": "17c668bd-ec37-4986-81e6-4ca0a44eb618",
+    "title": "Evening Nostalgia",
+    "artist": "Aventure",
+    "duration": 103
+  },
+  {
+    "id": "045a8fed-fe80-4b88-8afb-725d80383c58",
+    "title": "Evening Tone",
+    "artist": "Aventure",
+    "duration": 184
+  },
+  {
+    "id": "fe442069-a2e2-5ebf-6092-e03ffc0fc697",
+    "title": "Every Day",
+    "artist": "Lukrembo",
+    "duration": 248
+  },
+  {
+    "id": "e87382eb-8d7f-55cf-4e49-8f739bedc6d5",
+    "title": "Every Day (Jazz Version)",
+    "artist": "Lukrembo",
+    "duration": 141
+  },
+  {
+    "id": "52970478-61e2-41bc-8dee-3e1a3db9d3ae",
+    "title": "falling",
+    "artist": "massobeats",
+    "duration": 161
+  },
+  {
+    "id": "5a20ebdb-6943-4e92-bdbf-67ba8188ea92",
+    "title": "Falling Into You",
+    "artist": "Aventure",
+    "duration": 166
+  },
+  {
+    "id": "3c26c8e7-3fab-4f83-6968-b3023aab714c",
+    "title": "familiar places",
+    "artist": "massobeats",
+    "duration": 151
+  },
+  {
+    "id": "442aac36-7abf-18b1-e0ff-342da9c386a8",
+    "title": "Fantasy",
+    "artist": "Pufino",
+    "duration": 131
+  },
+  {
+    "id": "51ba83ee-55cb-0f12-e294-64d972f9981a",
+    "title": "Far Away",
+    "artist": "Moavii",
+    "duration": 123
+  },
+  {
+    "id": "a230a236-50ef-482b-86e1-856fd400b212",
+    "title": "farlands",
+    "artist": "massobeats",
+    "duration": 156
+  },
+  {
+    "id": "448a9e04-4aab-401a-b61c-d66a37008224",
+    "title": "Feel Good",
+    "artist": "Aventure",
+    "duration": 150
+  },
+  {
+    "id": "71a6cd5f-a75c-e927-7316-f60b5ad2cd0d",
+    "title": "Feeling Good",
+    "artist": "Pufino",
+    "duration": 131
+  },
+  {
+    "id": "26d9cba1-5dda-2960-a001-5c05fcfbf3bb",
+    "title": "First Time",
+    "artist": "Chill Pulse",
+    "duration": 151
+  },
+  {
+    "id": "667c016c-10b4-ee0a-21ed-a8606f750dbc",
+    "title": "floral",
+    "artist": "massobeats",
+    "duration": 147
+  },
+  {
+    "id": "e59976bf-b499-4dbe-9563-105e90f5a077",
+    "title": "Florida Keys",
+    "artist": "Hoffy Beats",
+    "duration": 147
+  },
+  {
+    "id": "07ce4507-fa07-341e-4cd3-6acc0d0ff912",
+    "title": "Flower Cup",
+    "artist": "Lukrembo",
+    "duration": 176
+  },
+  {
+    "id": "f9ed5409-c0c0-4a64-944a-b1d800c14518",
+    "title": "Fly With Me",
+    "artist": "Moavii",
+    "duration": 126
+  },
+  {
+    "id": "2b1f6c78-ed8a-6530-47ea-9c7a2ff0bfd2",
+    "title": "Forest",
+    "artist": "Lukrembo",
+    "duration": 192
+  },
+  {
+    "id": "085dfa63-9ddc-aedf-f417-8d1cfe7ab056",
+    "title": "Getaway",
+    "artist": "Pufino",
+    "duration": 144
+  },
+  {
+    "id": "107b20c1-2121-a9c1-946f-4e9fb716dfe7",
+    "title": "gift",
+    "artist": "massobeats",
+    "duration": 180
+  },
+  {
+    "id": "07eb4398-8c28-b1e9-64b1-ea2dafa2af6f",
+    "title": "gingersweet",
+    "artist": "massobeats",
+    "duration": 156
+  },
+  {
+    "id": "06ab6f7a-077c-45de-bf00-0ed687c28afe",
+    "title": "glimmer",
+    "artist": "massobeats",
+    "duration": 151
+  },
+  {
+    "id": "67ccf3a3-097b-8dc0-cbc5-e2ac25745068",
+    "title": "glisten",
+    "artist": "massobeats",
+    "duration": 151
+  },
+  {
+    "id": "cd1dab3b-38a9-75fa-fda7-8f2ec9ed6b44",
+    "title": "Gloomy Morning",
+    "artist": "Chill Pulse",
+    "duration": 116
+  },
+  {
+    "id": "cacf9f96-0b55-43d3-a9d3-8bb82297e1ff",
+    "title": "Good Old Days",
+    "artist": "Aventure",
+    "duration": 146
+  },
+  {
+    "id": "d9494571-916b-5320-dd43-d889bc9230fc",
+    "title": "Hello",
+    "artist": "Lukrembo",
+    "duration": 141
+  },
+  {
+    "id": "fb1a7375-f1d8-d55c-d06e-bf4caf9ce40d",
+    "title": "Highball",
+    "artist": "Lukrembo",
+    "duration": 155
+  },
+  {
+    "id": "f6155470-9a9b-86c7-a8fb-a0aa21e87c9c",
+    "title": "hillside",
+    "artist": "massobeats",
+    "duration": 151
+  },
+  {
+    "id": "baf4ef15-4d31-65c7-51e1-2cf2956dd939",
+    "title": "Home",
+    "artist": "Lukrembo",
+    "duration": 155
+  },
+  {
+    "id": "ae352768-1abe-9214-638a-b355e2dacbea",
+    "title": "Homely",
+    "artist": "Pufino",
+    "duration": 145
+  },
+  {
+    "id": "f5096754-4ce7-f995-4ce8-25daef51ade9",
+    "title": "honey jam",
+    "artist": "massobeats",
+    "duration": 133
+  },
+  {
+    "id": "f926dcd5-31ef-08b1-db52-e6bb941e60d9",
+    "title": "Hot Mocha",
+    "artist": "Lukrembo",
+    "duration": 135
+  },
+  {
+    "id": "b8ef2825-6089-2617-ca11-eab557aab05c",
+    "title": "I Always Love You",
+    "artist": "Lukrembo",
+    "duration": 175
+  },
+  {
+    "id": "ae9faa8c-961d-7039-2b78-c104304e08ab",
+    "title": "I Snowboard",
+    "artist": "Lukrembo",
+    "duration": 156
+  },
+  {
+    "id": "5d35077b-64b1-44a1-a33c-43c1d4ef7840",
+    "title": "Iced Tea",
+    "artist": "Aventure",
+    "duration": 159
+  },
+  {
+    "id": "5fa52877-d009-fd7f-d417-6e45d055aaac",
+    "title": "Imagine",
+    "artist": "Lukrembo",
+    "duration": 154
+  },
+  {
+    "id": "0eb2a756-e3c1-4c37-b487-1547c044192f",
+    "title": "In Your Hands",
+    "artist": "Aventure",
+    "duration": 138
+  },
+  {
+    "id": "6407b483-dd0f-9cf1-ce56-1cf2c691ee72",
+    "title": "Jam",
+    "artist": "Lukrembo",
+    "duration": 156
+  },
+  {
+    "id": "b7a2716f-dac7-6cf4-cf78-a7bff9c832b8",
+    "title": "jasmine tea",
+    "artist": "massobeats",
+    "duration": 158
+  },
+  {
+    "id": "c67a17e9-1f90-bd18-9a90-74fc398ab958",
+    "title": "Jay",
+    "artist": "Lukrembo",
+    "duration": 159
+  },
+  {
+    "id": "3a2a28cb-b40e-20ee-ddb7-8be3e20d2304",
+    "title": "Joyful Boredom",
+    "artist": "Avanti",
+    "duration": 111
+  },
+  {
+    "id": "794990e3-6962-f42b-092b-ceebd62d3069",
+    "title": "Just a Dream",
+    "artist": "Filo Starquez",
+    "duration": 131
+  },
+  {
+    "id": "8798d4fd-baf1-4247-bc1a-e605d6cbcb10",
+    "title": "Knowsum",
+    "artist": "Johny Grimes",
+    "duration": 134
+  },
+  {
+    "id": "814de776-7dbd-032f-39d6-b93973b4e0fa",
+    "title": "Kyoto",
+    "artist": "Nebulite",
+    "duration": 144
+  },
+  {
+    "id": "9624e7cd-9ba5-0dd4-ab9a-c35a1f1a38a1",
+    "title": "Lagoon",
+    "artist": "Filo Starquez",
+    "duration": 154
+  },
+  {
+    "id": "a406b1ca-95be-de61-3d9e-e3021a5474ca",
+    "title": "Lamp",
+    "artist": "Lukrembo",
+    "duration": 117
+  },
+  {
+    "id": "76bfc7a1-42db-4127-888e-8833697d257a",
+    "title": "last dance",
+    "artist": "massobeats",
+    "duration": 146
+  },
+  {
+    "id": "5e5f2780-a652-c90e-d681-f54f4ba163b5",
+    "title": "Latency",
+    "artist": "Chill Pulse",
+    "duration": 132
+  },
+  {
+    "id": "bdcb8b1c-3750-ac33-401f-802d3257fdd8",
+    "title": "Life is Beautiful",
+    "artist": "Aylex",
+    "duration": 109
+  },
+  {
+    "id": "a4982469-e6a7-511e-4364-f75aac2002ee",
+    "title": "Little Voices",
+    "artist": "Amine Maxwell",
+    "duration": 138
+  },
+  {
+    "id": "fdec3c78-4c28-4edb-ac84-dc13c36f65c3",
+    "title": "Lofi Kid",
+    "artist": "Johny Grimes",
+    "duration": 127
+  },
+  {
+    "id": "7aa93197-375a-47fe-8327-420c2db619d3",
+    "title": "Lonely Walk",
+    "artist": "Nebulite",
+    "duration": 171
+  },
+  {
+    "id": "259bfd2a-81e0-4167-6940-c27a151b377e",
+    "title": "Longing",
+    "artist": "Pufino",
+    "duration": 155
+  },
+  {
+    "id": "fa8be536-fe39-a7a9-1f1e-d0ccb84d33eb",
+    "title": "Lost Treasure",
+    "artist": "Filo Starquez",
+    "duration": 151
+  },
+  {
+    "id": "b4642193-32ec-3292-53f0-387c55f73e95",
+    "title": "lotus",
+    "artist": "massobeats",
+    "duration": 157
+  },
+  {
+    "id": "893644a0-a1d0-08eb-7780-f1d881d755b3",
+    "title": "Lounge",
+    "artist": "Chill Pulse",
+    "duration": 130
+  },
+  {
+    "id": "5c40f234-cd1d-8a8f-2ba2-77342de95b70",
+    "title": "Lounge Bar Lofi",
+    "artist": "Filo Starquez",
+    "duration": 160
+  },
+  {
+    "id": "41534df2-453d-f317-c81c-9c432d536df5",
+    "title": "Love in Japan",
+    "artist": "Nebulite",
+    "duration": 117
+  },
+  {
+    "id": "8a73e24f-2d53-b5e5-20f7-eaa52f182c52",
+    "title": "lucid",
+    "artist": "massobeats",
+    "duration": 169
+  },
+  {
+    "id": "2cd600d7-9b08-e58d-2d08-bec7a1cf32de",
+    "title": "Lunch",
+    "artist": "Lukrembo",
+    "duration": 120
+  },
+  {
+    "id": "ea5dcd08-57c5-ff05-c0c9-68dd2915b668",
+    "title": "lush",
+    "artist": "massobeats",
+    "duration": 147
+  },
+  {
+    "id": "f751071d-1983-5160-8444-0cea28cd3be4",
+    "title": "mango tea",
+    "artist": "massobeats",
+    "duration": 161
+  },
+  {
+    "id": "786a8c33-797f-252c-0470-c30a07861f5c",
+    "title": "Meadow Mountain",
+    "artist": "Filo Starquez & S.I.N.",
+    "duration": 163
+  },
+  {
+    "id": "ccc7edfc-3075-40df-98b1-6c6382665c38",
+    "title": "Mellow Sky",
+    "artist": "Zambolino",
+    "duration": 157
+  },
+  {
+    "id": "0c662dcc-3d0e-4f65-8738-6e02aa6f4b90",
+    "title": "Mellow Summer",
+    "artist": "Aventure",
+    "duration": 167
+  },
+  {
+    "id": "103e1b68-5b31-41e7-bc84-9b11b61d7597",
+    "title": "memories",
+    "artist": "massobeats",
+    "duration": 154
+  },
+  {
+    "id": "e66cd9ee-3227-c591-e7d5-c048bb4ab374",
+    "title": "Memories",
+    "artist": "Lukrembo",
+    "duration": 152
+  },
+  {
+    "id": "8ad5dc4c-68ea-d64f-37ba-53889fc66a93",
+    "title": "Meticulous",
+    "artist": "Pufino",
+    "duration": 139
+  },
+  {
+    "id": "7d0c86bc-b5f6-f6ab-d414-b2aa113372b9",
+    "title": "midnight",
+    "artist": "massobeats",
+    "duration": 139
+  },
+  {
+    "id": "5c557a87-b788-3f09-ada6-20a480e2502a",
+    "title": "Midnight Bliss",
+    "artist": "Moavii",
+    "duration": 120
+  },
+  {
+    "id": "5a252413-b0e8-98ba-0121-a5a8305b3242",
+    "title": "Mindwave",
+    "artist": "Avanti",
+    "duration": 151
+  },
+  {
+    "id": "372fbc6c-b365-4159-97d9-0a83f88295e9",
+    "title": "missed call",
+    "artist": "massobeats",
+    "duration": 144
+  },
+  {
+    "id": "c7c31884-f971-4430-8190-31b1f79f3e68",
+    "title": "Monday Routine",
+    "artist": "Aventure",
+    "duration": 143
+  },
+  {
+    "id": "cfdaaaca-1bf2-48a2-af99-ffe7bf067bc3",
+    "title": "Moody Weather",
+    "artist": "Aventure",
+    "duration": 150
+  },
+  {
+    "id": "5b515798-1d49-4c3d-9783-d7a2a78b5781",
+    "title": "moonlit",
+    "artist": "massobeats",
+    "duration": 170
+  },
+  {
+    "id": "feae4f6f-9cb6-c336-d6a2-d3edf37d6181",
+    "title": "Morning",
+    "artist": "Lukrembo",
+    "duration": 122
+  },
+  {
+    "id": "12be0155-b3f1-44a8-84bf-24248fb20cb0",
+    "title": "Morning Rain",
+    "artist": "Lukrembo",
+    "duration": 148
+  },
+  {
+    "id": "84e575c6-be1c-40d8-acb8-4d83bef050d1",
+    "title": "near you",
+    "artist": "massobeats",
+    "duration": 143
+  },
+  {
+    "id": "1464ebc0-1d86-ab67-3587-ac5a541d58b5",
+    "title": "Night",
+    "artist": "Lukrembo",
+    "duration": 151
+  },
+  {
+    "id": "5ea81f3d-89e2-41ef-dd34-dddff2623c77",
+    "title": "Nightfall",
+    "artist": "Balynt",
+    "duration": 119
+  },
+  {
+    "id": "202f6745-784e-97aa-73c5-50653f5bdf16",
+    "title": "noon",
+    "artist": "massobeats",
+    "duration": 188
+  },
+  {
+    "id": "9fab7c51-811b-5a40-ff91-e2224a4ab27e",
+    "title": "Northern Lights",
+    "artist": "Avanti",
+    "duration": 146
+  },
+  {
+    "id": "f14bf3ec-349c-41dc-979e-f00526906ada",
+    "title": "ocean",
+    "artist": "massobeats",
+    "duration": 151
+  },
+  {
+    "id": "5317074a-f175-00ae-2418-108b0e6a3d95",
+    "title": "Office",
+    "artist": "Chill Pulse",
+    "duration": 148
+  },
+  {
+    "id": "7fea0d46-b7f1-49c0-b6a5-0a5c39a02a7c",
+    "title": "once was",
+    "artist": "massobeats",
+    "duration": 151
+  },
+  {
+    "id": "7ae87680-b483-245d-161f-52f820e26eed",
+    "title": "Pancake",
+    "artist": "Lukrembo",
+    "duration": 208
+  },
+  {
+    "id": "2e078088-4b84-4d57-a3b3-7d7c8057750b",
+    "title": "Park Vibes",
+    "artist": "Filo Starquez",
+    "duration": 149
+  },
+  {
+    "id": "6f9516bd-ec8d-527e-30a7-9b25d028829e",
+    "title": "Passing Time",
+    "artist": "Filo Starquez",
+    "duration": 174
+  },
+  {
+    "id": "b9cdc912-f067-cfad-cad6-d5a858b63958",
+    "title": "peach prosecco",
+    "artist": "massobeats",
+    "duration": 158
+  },
+  {
+    "id": "56193a8c-d821-4a73-83ed-9e96f3e6caa2",
+    "title": "petals",
+    "artist": "massobeats",
+    "duration": 134
+  },
+  {
+    "id": "270bc9cd-2aa3-5ca2-55d0-6e5469e60df8",
+    "title": "Picnic",
+    "artist": "Lukrembo",
+    "duration": 97
+  },
+  {
+    "id": "c793b370-25cf-46d5-a88f-559a554338d1",
+    "title": "Pixel Duck",
+    "artist": "Johny Grimes",
+    "duration": 172
+  },
+  {
+    "id": "0ca27c3d-b234-46c3-82a0-67b334299711",
+    "title": "Poolside",
+    "artist": "Aventure",
+    "duration": 138
+  },
+  {
+    "id": "663cd1e1-9f2b-4a6f-8e88-c3ebc487ba29",
+    "title": "Prepare",
+    "artist": "Moavii",
+    "duration": 146
+  },
+  {
+    "id": "c6110ad3-ef27-4337-b561-cb366fe80bbb",
+    "title": "Quiet Bounce",
+    "artist": "Aventure",
+    "duration": 144
+  },
+  {
+    "id": "fda176af-8cc3-60f9-9d81-9f2ab9784af3",
+    "title": "Rainy Day",
+    "artist": "Chill Pulse",
+    "duration": 111
+  },
+  {
+    "id": "d3ffca3f-b7f5-4a48-569a-46cd475723bb",
+    "title": "Rainy Day",
+    "artist": "Lukrembo",
+    "duration": 200
+  },
+  {
+    "id": "56f15ba4-46c8-28c3-3fe0-07f6c90ae29d",
+    "title": "Reach",
+    "artist": "Balynt",
+    "duration": 108
+  },
+  {
+    "id": "9e6a474f-c462-d38e-2c16-587cc134537a",
+    "title": "Reflection",
+    "artist": "Hazelwood",
+    "duration": 120
+  },
+  {
+    "id": "4a5a2691-46b7-4624-a1f7-d83914f65c74",
+    "title": "remedy",
+    "artist": "massobeats",
+    "duration": 108
+  },
+  {
+    "id": "1709cb3e-d191-46c1-b9a2-f188b79184fc",
+    "title": "Riding the Waves",
+    "artist": "Hoffy Beats",
+    "duration": 149
+  },
+  {
+    "id": "0696b7ae-6d76-4780-9b85-5ede4094c9f8",
+    "title": "Rise",
+    "artist": "Chill Pulse",
+    "duration": 138
+  },
+  {
+    "id": "7bbc1129-d9f9-d48f-6a3e-46c24ed7f7eb",
+    "title": "River",
+    "artist": "Lukrembo",
+    "duration": 128
+  },
+  {
+    "id": "07397534-09dd-9693-24e8-54e09ff1e015",
+    "title": "Rose",
+    "artist": "Lukrembo",
+    "duration": 163
+  },
+  {
+    "id": "98a11343-39a2-1870-73db-cb408980fd09",
+    "title": "rose water",
+    "artist": "massobeats",
+    "duration": 139
+  },
+  {
+    "id": "a6a99e1e-71cc-0f72-0f84-af0688946847",
+    "title": "Rudolph",
+    "artist": "Lukrembo",
+    "duration": 212
+  },
+  {
+    "id": "b84080cc-801e-46c8-94de-6ad02cae37d9",
+    "title": "sable",
+    "artist": "massobeats",
+    "duration": 168
+  },
+  {
+    "id": "9e1d85cc-9fc5-466e-a699-64cf230097ab",
+    "title": "September Rain",
+    "artist": "Hoffy Beats",
+    "duration": 169
+  },
+  {
+    "id": "a3c97041-e91e-60cc-c943-a4c6c9ea38a1",
+    "title": "serenity",
+    "artist": "massobeats",
+    "duration": 150
+  },
+  {
+    "id": "7a58cdf0-f724-4170-956a-71d8935da829",
+    "title": "Silent Wish",
+    "artist": "Aventure",
+    "duration": 165
+  },
+  {
+    "id": "947eedd6-6f23-4503-9d27-e4c472682a77",
+    "title": "sky",
+    "artist": "massobeats",
+    "duration": 136
+  },
+  {
+    "id": "99b0de4d-49a1-ba52-4f78-ac20cb0c57e3",
+    "title": "Sleepless",
+    "artist": "Moavii",
+    "duration": 173
+  },
+  {
+    "id": "5a4ac3dd-b6e0-42fb-9f2b-bca2f58225a2",
+    "title": "Sleepy",
+    "artist": "Johny Grimes",
+    "duration": 171
+  },
+  {
+    "id": "1914d68a-ee89-4819-81e3-43e3aae2458f",
+    "title": "Slow Tide",
+    "artist": "Aventure",
+    "duration": 156
+  },
+  {
+    "id": "3b7931f2-25e7-2194-9458-ed2d7b67ed88",
+    "title": "Snow",
+    "artist": "Lukrembo",
+    "duration": 153
+  },
+  {
+    "id": "cd7a8866-7015-7906-dec1-7a8107fc68bb",
+    "title": "Snow Walk",
+    "artist": "Lukrembo",
+    "duration": 98
+  },
+  {
+    "id": "f9e3b4f6-7867-6a5b-9758-5ebf0caef622",
+    "title": "Snowflake",
+    "artist": "Nebulite",
+    "duration": 167
+  },
+  {
+    "id": "8b55c2b4-9640-486b-bd5f-b1ee9807b420",
+    "title": "Soft Morning",
+    "artist": "Aventure",
+    "duration": 166
+  },
+  {
+    "id": "05b697d3-150a-dfbd-94ff-044d790b070a",
+    "title": "Spaceship",
+    "artist": "Lukrembo",
+    "duration": 159
+  },
+  {
+    "id": "8ff6b09a-e811-6cac-97f6-148db451b7a0",
+    "title": "Sprinkles",
+    "artist": "Moavii",
+    "duration": 120
+  },
+  {
+    "id": "7d0bd840-3b05-8859-e3e7-db942c0ea37b",
+    "title": "Starlight",
+    "artist": "Moavii",
+    "duration": 132
+  },
+  {
+    "id": "7d57ea7a-85a8-4f71-97c8-7b777eaa02f6",
+    "title": "Stellar",
+    "artist": "Aventure",
+    "duration": 182
+  },
+  {
+    "id": "ef6c8300-ddae-403b-9f36-2e252ed03280",
+    "title": "Sticks & Stones",
+    "artist": "Hoffy Beats",
+    "duration": 148
+  },
+  {
+    "id": "002ea45d-5816-6572-6b5c-0bcc226fe0a1",
+    "title": "Store",
+    "artist": "Lukrembo",
+    "duration": 150
+  },
+  {
+    "id": "ed5c726d-6d2c-4575-6638-2102f652336e",
+    "title": "Story",
+    "artist": "Chill Pulse",
+    "duration": 198
+  },
+  {
+    "id": "f99c7917-4225-4340-360c-c967fb36527d",
+    "title": "Storybook",
+    "artist": "Lukrembo",
+    "duration": 176
+  },
+  {
+    "id": "30b86e8e-0fcf-b68e-08b9-a94789186a90",
+    "title": "Streetview",
+    "artist": "Moavii",
+    "duration": 122
+  },
+  {
+    "id": "3e6024e2-d36c-439e-af62-6d6b2d79f3b3",
+    "title": "stroll",
+    "artist": "massobeats",
+    "duration": 180
+  },
+  {
+    "id": "86a08ccc-6e7f-4aa2-97cf-767bc244cc1c",
+    "title": "Study Night",
+    "artist": "Filo Starquez",
+    "duration": 176
+  },
+  {
+    "id": "fc2f9bfe-9ff5-47ae-b8bb-45d601745751",
+    "title": "Subway Reverie",
+    "artist": "ESCP",
+    "duration": 218
+  },
+  {
+    "id": "3b51a997-3c4d-0db6-43df-35befe757eb3",
+    "title": "Summertide",
+    "artist": "Moavii",
+    "duration": 174
+  },
+  {
+    "id": "7d1e6aaf-f28c-e998-02fa-a81b8dc3a307",
+    "title": "Sunbeams",
+    "artist": "Moavii",
+    "duration": 127
+  },
+  {
+    "id": "e8a288f2-1bd9-e30a-0a24-e88bfbadb13e",
+    "title": "Sunday Sessions",
+    "artist": "Tetuano",
+    "duration": 136
+  },
+  {
+    "id": "86a93d53-65cd-4227-b28a-2849d55e9a43",
+    "title": "Sunflower",
+    "artist": "Aventure",
+    "duration": 140
+  },
+  {
+    "id": "1696171b-4b1c-0c61-4252-d0c05f5d6170",
+    "title": "Sunflower",
+    "artist": "Lukrembo",
+    "duration": 138
+  },
+  {
+    "id": "5f11ae49-f022-4b27-9564-d2a591b60907",
+    "title": "Sunny Vibes",
+    "artist": "Aventure",
+    "duration": 124
+  },
+  {
+    "id": "a857894e-5f42-4a2b-bf06-8a21d8904217",
+    "title": "Sunrise Breeze",
+    "artist": "Aventure",
+    "duration": 147
+  },
+  {
+    "id": "51d52c1c-a3b3-4397-8554-075dc3ca7834",
+    "title": "Sunset",
+    "artist": "Aventure",
+    "duration": 141
+  },
+  {
+    "id": "e9ff9604-d9d9-4fe0-8afb-26e1bc532680",
+    "title": "Sunset Dreams",
+    "artist": "Moavii",
+    "duration": 87
+  },
+  {
+    "id": "44749d67-bfa3-413f-9490-a2b99f078c52",
+    "title": "Survival Mode",
+    "artist": "Unheard",
+    "duration": 231
+  },
+  {
+    "id": "a6aadf90-330f-1f9b-edd8-ca3a01753d87",
+    "title": "swing",
+    "artist": "massobeats",
+    "duration": 141
+  },
+  {
+    "id": "e877a9c5-1e5a-7149-5dcf-ad0ec43c8113",
+    "title": "Talk",
+    "artist": "Chill Pulse",
+    "duration": 122
+  },
+  {
+    "id": "e01a5d26-66d3-6c07-4c51-646534ac6d12",
+    "title": "taro swirl",
+    "artist": "massobeats",
+    "duration": 147
+  },
+  {
+    "id": "4d98d270-65ba-c78a-f7f1-bf5f5a5ca7ba",
+    "title": "Tea Cozy",
+    "artist": "Lukrembo",
+    "duration": 158
+  },
+  {
+    "id": "a5bf75aa-df2b-5656-7614-0d2d8bfa4649",
+    "title": "Teapot",
+    "artist": "Lukrembo",
+    "duration": 123
+  },
+  {
+    "id": "f58126e1-6516-192a-8a96-c8145fb11d6f",
+    "title": "This Is For You",
+    "artist": "Lukrembo",
+    "duration": 183
+  },
+  {
+    "id": "f67fd291-a51f-4b23-b4fa-1130871ec892",
+    "title": "thoughts",
+    "artist": "massobeats",
+    "duration": 157
+  },
+  {
+    "id": "1225304a-f22d-9d1b-a3db-c9d3afc76fea",
+    "title": "Thrilled",
+    "artist": "Pufino",
+    "duration": 120
+  },
+  {
+    "id": "3d35b402-6de3-9d4a-3ddf-679ba04f1c9b",
+    "title": "Time",
+    "artist": "Avanti",
+    "duration": 116
+  },
+  {
+    "id": "d4247218-17f2-4375-81a3-efd5c092533b",
+    "title": "timeless",
+    "artist": "massobeats",
+    "duration": 148
+  },
+  {
+    "id": "919e0455-6d41-281e-e631-3acc2cb07ac1",
+    "title": "Together",
+    "artist": "Lukrembo",
+    "duration": 138
+  },
+  {
+    "id": "25bea29e-e1f6-5fc0-f5be-8d0d07a0a00d",
+    "title": "Tower",
+    "artist": "Lukrembo",
+    "duration": 166
+  },
+  {
+    "id": "0797bde3-5cd8-3588-be58-8b9aed88017f",
+    "title": "Train Covered In White",
+    "artist": "Lukrembo",
+    "duration": 156
+  },
+  {
+    "id": "822c7f80-232a-9dde-98a0-56e66e07fc92",
+    "title": "Umbrella",
+    "artist": "Moavii",
+    "duration": 120
+  },
+  {
+    "id": "34dc5b7a-3c92-4fb5-2f0d-f5bb48d95958",
+    "title": "Universal",
+    "artist": "Moavii",
+    "duration": 113
+  },
+  {
+    "id": "82f27d06-0f49-5c42-183d-80f736a4d93e",
+    "title": "Until Late At Night",
+    "artist": "Lukrembo",
+    "duration": 98
+  },
+  {
+    "id": "5d7a1139-7704-41ee-aef5-f0e8010a28bf",
+    "title": "until then",
+    "artist": "massobeats",
+    "duration": 162
+  },
+  {
+    "id": "f2d549f5-a115-a5a9-f720-42678da655be",
+    "title": "Vibing",
+    "artist": "Pufino",
+    "duration": 132
+  },
+  {
+    "id": "8bb7ab60-c980-1ceb-37ee-398e9fb397b5",
+    "title": "Vintage Store",
+    "artist": "Lukrembo",
+    "duration": 151
+  },
+  {
+    "id": "3886c06c-86f8-1b0f-4861-e48653e28104",
+    "title": "Waiting",
+    "artist": "Lukrembo",
+    "duration": 165
+  },
+  {
+    "id": "45041b33-f778-43d3-ab6b-d227eb009280",
+    "title": "Want You Back",
+    "artist": "Chill Pulse",
+    "duration": 110
+  },
+  {
+    "id": "d3c93e78-d827-8bc6-ce02-8441a0d886d3",
+    "title": "Warm Cup of Coffe",
+    "artist": "Moavii",
+    "duration": 116
+  },
+  {
+    "id": "98dd5cde-767d-4c47-91c7-51686d489f6f",
+    "title": "Warm Morning",
+    "artist": "Dagored",
+    "duration": 163
+  },
+  {
+    "id": "962fa7b4-f24d-cb5b-9d7d-6db661d92ff5",
+    "title": "Warm Place",
+    "artist": "Pufino",
+    "duration": 139
+  },
+  {
+    "id": "1a79157c-ec0f-14f3-1f84-bbfda082c7d2",
+    "title": "warmth",
+    "artist": "massobeats",
+    "duration": 152
+  },
+  {
+    "id": "740c14f1-f660-952f-cf8e-0c58c25916ab",
+    "title": "Waterfall",
+    "artist": "Filo Starquez",
+    "duration": 161
+  },
+  {
+    "id": "755f0f0b-5c4f-a261-01a4-1cd76751f288",
+    "title": "Wine",
+    "artist": "Lukrembo",
+    "duration": 160
+  },
+  {
+    "id": "6eb71ddf-28d9-9085-c090-b8c051e4b712",
+    "title": "Wintry Street",
+    "artist": "Lukrembo",
+    "duration": 120
+  },
+  {
+    "id": "ac4a23c2-87d2-a854-53a0-1a4aed9467ce",
+    "title": "Without You",
+    "artist": "Avanti",
+    "duration": 188
+  },
+  {
+    "id": "2e3f9b1a-9323-75b1-8f2c-ba0b774acba7",
+    "title": "Wooden Table",
+    "artist": "Lukrembo",
+    "duration": 149
+  },
+  {
+    "id": "c143f178-e745-8499-cbed-ad8beddca56c",
+    "title": "Your Vibe",
+    "artist": "Pufino",
+    "duration": 134
+  }
+]

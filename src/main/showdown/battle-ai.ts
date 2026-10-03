@@ -158,6 +158,9 @@ export interface AiMovePower {
   fixedDamagePercent: number | null
   // Certain to fail right now (Fake Out after the Pokemon's first turn out).
   fails?: boolean
+  // Its type as its user would use it right now, when the user decides it (Judgment's
+  // plate, Tera Blast, Multi-Attack's memory, Pixilate and the like).
+  type?: string
 }
 
 // The coarse "power -> percent of the foe's HP" scale the scoring uses (no real
@@ -385,7 +388,7 @@ export class AIPlayer extends BattlePlayer {
       opponent.species = parts[2].split(',')[0].trim()
       opponent.types = speciesStatsAndTypes(opponent.species, null).types
       opponent.addedType = null
-    } else if (cmd === '-damage' || cmd === '-heal') {
+    } else if (cmd === '-damage' || cmd === '-heal' || cmd === '-sethp') {
       const { hpPercent, fainted, status } = parseCondition(parts[2])
       opponent.hpPercent = hpPercent
       opponent.fainted = fainted
@@ -915,14 +918,21 @@ export class AIPlayer extends BattlePlayer {
     if (!info || !combat) return 0
     const weather = this.activeWeather(ownActive)
     const grounded = this.ownGrounded(ownActive, ownTypes)
+    // What the move actually hits for right now (Last Respects, Eruption, Low Kick,
+    // Facade, Hex...), not its printed number - which is 0 for many of those.
+    const live = this.livePower?.(mySlotIndex, moveId) ?? null
     // Weather Ball and Terrain Pulse change type (and double in power) with the field.
-    const moveType = this.fieldMoveType(moveId, info.type, weather, grounded)
+    const fieldType = this.fieldMoveType(moveId, info.type, weather, grounded)
+    const fieldTyped = fieldType !== info.type
+    // Otherwise its user may decide its type: Judgment takes Arceus's plate, Tera Blast
+    // its Tera type, Pixilate turns Normal moves Fairy...
+    const moveType = fieldTyped ? fieldType : (live?.type ?? info.type)
     const typeChanged = moveType !== info.type
     // Grassy Glide jumps the queue on Grassy Terrain.
     const priority = moveId === 'grassyglide' && this.terrain === 'grassyterrain' && grounded ? 1 : combat.priority
 
     // A move that would certainly do nothing to any foe out is never worth a turn
-    // (skipped when the field changed its type - the check below covers that case).
+    // (skipped when its type changed - the check below covers that case).
     const foes = this.aliveOpponents()
     if (!typeChanged && foes.length > 0 && foes.every((foe) =>
         moveDoesNothing(moveId, own, { ...this.foeParty(foe, this.moldBreaker), types: this.typesFacing(foe, moveType) })
@@ -930,9 +940,6 @@ export class AIPlayer extends BattlePlayer {
     ) {
       return 0
     }
-    // What the move actually hits for right now (Last Respects, Eruption, Low Kick,
-    // Facade, Hex...), not its printed number - which is 0 for many of those.
-    const live = this.livePower?.(mySlotIndex, moveId) ?? null
     // Fake Out and First Impression only work on a Pokemon's first turn out.
     if (live?.fails) return 0
     // Steel Roller fails with no terrain to roll over; the extreme weathers wash
@@ -1001,7 +1008,7 @@ export class AIPlayer extends BattlePlayer {
     } else {
       // Moves that roll their power at random (Magnitude, Present) report none - use an average.
       let power = live?.basePower ?? (info.basePower || RANDOM_POWER_FALLBACK)
-      if (typeChanged) power *= 2 // Weather Ball / Terrain Pulse: 50 -> 100
+      if (fieldTyped) power *= 2 // Weather Ball / Terrain Pulse: 50 -> 100
       // Every hit of a multi-hit move counts, not just the first (live power is per hit).
       score =
         this.expectedTotalPower(moveId, combat, power, accuracy, ownActive) *

@@ -1,5 +1,6 @@
 import type { MissionClaimResult, MissionsState } from '../shared/missions'
 import { contextBridge, ipcRenderer } from 'electron'
+import type { LocalMusicFile } from '../shared/music'
 import type { CoinBalance, DailyCoinMon, DailyCoinMonPurchase, DailyCoinOffer, SlotRules, SlotSpinResult } from '../shared/slots'
 import type { BlackjackView } from '../shared/blackjack'
 import type { AchievementClaimResult, AchievementsState } from '../shared/achievements'
@@ -7,7 +8,8 @@ import type { CloudSave, CloudStatus } from '../shared/cloud'
 import type { RouletteSpin } from '../shared/roulette'
 import type { GameCornerPerks } from '../shared/titles'
 import type { PlinkoDrop, PlinkoRisk } from '../shared/plinko'
-import type { DraftFormat, DraftView } from '../shared/draft'
+import type { ChaosModifierTarget, ChaosTutorMove, DraftFormat, DraftView } from '../shared/draft'
+import type { SkillCheckResult, TmInfo, TmQuickCheckResult, TmSearchProgress, TmSearchStart, TmShopView, TmState } from '../shared/tms'
 import type {
   AutoSetOption,
   AutoSetResult,
@@ -73,6 +75,14 @@ const api = {
   startDraft: (format: DraftFormat): Promise<DraftView> => ipcRenderer.invoke('draft:start', format),
   pickDraftMon: (index: number): Promise<DraftView> => ipcRenderer.invoke('draft:pick', index),
   abandonDraft: (): Promise<DraftView> => ipcRenderer.invoke('draft:abandon'),
+  rerollDraftPack: (): Promise<DraftView> => ipcRenderer.invoke('draft:reroll'),
+  getChaosItems: (): Promise<{ id: string; name: string; description: string; spritenum: number }[]> =>
+    ipcRenderer.invoke('draft:chaosItems'),
+  getChaosTutorMoves: (pick: number): Promise<ChaosTutorMove[]> => ipcRenderer.invoke('draft:chaosTutor', pick),
+  getChaosAbilities: (): Promise<{ id: string; name: string; description: string }[]> =>
+    ipcRenderer.invoke('draft:chaosAbilities'),
+  chooseChaosModifier: (index: number, target?: ChaosModifierTarget): Promise<DraftView> =>
+    ipcRenderer.invoke('draft:chaosModifier', index, target),
   startDraftBattle: (bring: number[]): Promise<BattleView> => ipcRenderer.invoke('draft:battle', bring),
   // Generations with a Roguelite boss of every class - the ones a run can be set to.
   getRunGenerations: (): Promise<number[]> => ipcRenderer.invoke('run:generations'),
@@ -98,6 +108,10 @@ const api = {
   swapRunMon: (runMonId: string): Promise<RunView> => ipcRenderer.invoke('run:swapMon', runMonId),
   swapRunTeam: (): Promise<RunView> => ipcRenderer.invoke('run:swapTeam'),
   skipRunSwap: (): Promise<RunView> => ipcRenderer.invoke('run:skipSwap'),
+  // A beaten villain's reward: one of its Pokemon by place, in someone's place on a full team.
+  takeRunRewardMon: (index: number, replaceRunMonId?: string): Promise<RunView> =>
+    ipcRenderer.invoke('run:takeRewardMon', index, replaceRunMonId),
+  skipRunRewardMon: (): Promise<RunView> => ipcRenderer.invoke('run:skipRewardMon'),
   // Roguelite consumables (outside battle) and a boss floor's shop.
   useRunFullRestore: (runMonId: string): Promise<RunView> => ipcRenderer.invoke('run:fullRestore', runMonId),
   // With a full team, replaceId is the team member who leaves (to the fainted) to make room.
@@ -212,6 +226,17 @@ const api = {
   // The Coin Shop's Pokemon of the day, bought once a day at 2 stars.
   getDailyCoinMon: (): Promise<DailyCoinMon> => ipcRenderer.invoke('coins:dailyMon'),
   buyDailyCoinMon: (): Promise<DailyCoinMonPurchase> => ipcRenderer.invoke('coins:buyDailyMon'),
+  getTmCatalog: (): Promise<TmInfo[]> => ipcRenderer.invoke('tm:catalog'),
+  getTmState: (): Promise<TmState> => ipcRenderer.invoke('tm:state'),
+  startTmSearch: (location: WildLocationId): Promise<TmSearchStart> => ipcRenderer.invoke('tm:startSearch', location),
+  reportTmSearchCheck: (result: SkillCheckResult, timedOut = false): Promise<TmSearchProgress> =>
+    ipcRenderer.invoke('tm:searchCheck', result, timedOut),
+  abandonTmSearch: (): Promise<void> => ipcRenderer.invoke('tm:abandonSearch'),
+  takeTmQuickCheck: (result: SkillCheckResult, timedOut = false): Promise<TmQuickCheckResult> =>
+    ipcRenderer.invoke('tm:quickCheck', result, timedOut),
+  getTmShop: (): Promise<TmShopView> => ipcRenderer.invoke('tm:shop'),
+  buyTm: (moveId: string): Promise<{ coins: number; shop: TmShopView }> => ipcRenderer.invoke('tm:buy', moveId),
+  buyTmScanner: (): Promise<{ coins: number; shop: TmShopView }> => ipcRenderer.invoke('tm:buyScanner'),
   spinSlots: (bet: number): Promise<SlotSpinResult> => ipcRenderer.invoke('slots:spin', bet),
   getSlotRules: (): Promise<SlotRules> => ipcRenderer.invoke('slots:rules'),
   getBlackjack: (): Promise<BlackjackView> => ipcRenderer.invoke('blackjack:view'),
@@ -262,8 +287,9 @@ const api = {
   restoreFossil: (itemId: string, secondItemId?: string): Promise<RestoreFossilResult> =>
     ipcRenderer.invoke('fossil:restore', itemId, secondItemId),
   getEditorOptions: (): Promise<EditorOptions> => ipcRenderer.invoke('dex:editorOptions'),
-  getSpeciesInfo: (species: string, level: number): Promise<SpeciesEditInfo> =>
-    ipcRenderer.invoke('dex:speciesInfo', species, level),
+  // knownMoves: moves the Pokemon already knows - kept on the list whatever its level.
+  getSpeciesInfo: (species: string, level: number, knownMoves?: string[]): Promise<SpeciesEditInfo> =>
+    ipcRenderer.invoke('dex:speciesInfo', species, level, knownMoves),
 
   listWildDrops: (): Promise<WildDropEntry[]> => ipcRenderer.invoke('wildDrops:list'),
   setWildDrop: (species: string, drop: ItemDropConfig): Promise<WildDropEntry[]> =>
@@ -308,7 +334,10 @@ const api = {
   setPremadeTeamDrop: (teamId: string, drop: ItemDropConfig): Promise<PremadeTeamSummary[]> =>
     ipcRenderer.invoke('premadeTeams:setDrop', teamId, drop),
   setPremadeTeamDoubleBattle: (teamId: string, isDoubleBattle: boolean): Promise<PremadeTeamSummary[]> =>
-    ipcRenderer.invoke('premadeTeams:setDoubleBattle', teamId, isDoubleBattle)
+    ipcRenderer.invoke('premadeTeams:setDoubleBattle', teamId, isDoubleBattle),
+  // The "local folder" music source: pick a folder, then list the audio files in it.
+  pickMusicFolder: (): Promise<string | null> => ipcRenderer.invoke('music:pickFolder'),
+  listMusicFolder: (folder: string): Promise<LocalMusicFile[]> => ipcRenderer.invoke('music:listFolder', folder)
 }
 
 contextBridge.exposeInMainWorld('api', api)

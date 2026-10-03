@@ -905,6 +905,8 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
             align="right"
             slotIndex={1}
             spriteStyle={spriteStyle}
+            hazards={hazardsFor('p2')}
+            screens={screensFor('p2')}
             feedback={feedbackFor('p2b')}
             gimmick={gimmickFor('p2b')}
             ability={abilityFor('p2b')}
@@ -929,6 +931,8 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
             align="left"
             slotIndex={1}
             spriteStyle={spriteStyle}
+            hazards={hazardsFor('p1')}
+            screens={screensFor('p1')}
             feedback={feedbackFor('p1b')}
             gimmick={gimmickFor('p1b')}
             ability={abilityFor('p1b')}
@@ -954,6 +958,8 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
             runFainted={view.runFainted}
             runItemReward={view.runItemReward}
             draftResult={view.draftResult}
+            tmQuickCheck={!!view.tmQuickCheck}
+            tmRewards={view.tmRewards ?? []}
             onClose={() => setScreen('menu')}
           />
         )}
@@ -1083,9 +1089,9 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
         )}
 
         {targeting && (
-          <div className="target-picker-overlay" onMouseDown={() => setTargeting(null)}>
-            <div className="target-picker" onMouseDown={(e) => e.stopPropagation()}>
-              <div className="target-picker-title">Choose a target</div>
+          <div className="modal-overlay target-picker-overlay" onMouseDown={() => setTargeting(null)}>
+            <div className="modal-panel target-picker" onMouseDown={(e) => e.stopPropagation()}>
+              <h2>Choose a target</h2>
               <div className="target-picker-options">
                 {targeting.options.map((opt) => (
                   <button key={opt.loc} className="target-option" onClick={() => confirmTarget(opt.loc)}>
@@ -1103,7 +1109,9 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
                   </button>
                 ))}
               </div>
-              <button onClick={() => setTargeting(null)}>Cancel</button>
+              <div className="editor-actions">
+                <button onClick={() => setTargeting(null)}>Cancel</button>
+              </div>
             </div>
           </div>
         )}

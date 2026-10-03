@@ -1,5 +1,5 @@
 import type { ItemQuantity, KeyItemView, SellResult, ShopItemEntry, ShopPriceEntry } from '../../shared/battle-types'
-import { KEY_ITEM_IDS } from '../../shared/battle-types'
+import { KEY_ITEM_IDS, SCANNER_ITEM_ID } from '../../shared/battle-types'
 import { ACHIEVEMENTS } from '../../shared/achievements'
 import { addItem, getBagState, getItemQuantity, hasItem, removeItem } from './bag-store'
 import { ownsSpecies } from './box-store'
@@ -45,7 +45,8 @@ export function listKeyItems(): KeyItemView[] {
     .map((item) => ({
       ...item,
       owned: hasItem(item.id),
-      unlockedBy: ACHIEVEMENTS.find((a) => a.reward.keyItems?.includes(item.id))?.name ?? 'an achievement'
+      unlockedBy: ACHIEVEMENTS.find((a) => a.reward.keyItems?.includes(item.id))?.name ?? 'an achievement',
+      coinShop: item.id === SCANNER_ITEM_ID
     }))
 }
 

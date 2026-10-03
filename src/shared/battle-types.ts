@@ -1,3 +1,4 @@
+import type { TmInfo } from './tms'
 import type { ChoiceRequest } from 'pokemon-showdown/dist/sim/side.js'
 import type { DraftBattleResult } from './draft'
 
@@ -40,7 +41,8 @@ export const SHINY_PATCH_ITEM_ID = 'shinypatch'
 // Starts a Max Raid Battle from the Classic menu (used up when the raid begins).
 export const WISHING_PIECE_ITEM_ID = 'wishingpiece'
 
-// Key items: never bought or sold - each is unlocked by an achievement and kept for good.
+// Key items: never sold back - each is unlocked by an achievement (or, the Scanner, bought
+// in the Coin Shop) and kept for good.
 // The Rotom Catalog changes a Rotom's form from its right-click menu; the Exp. Charm gives
 // 1.5x exp from battles; the Shiny Charm triples the odds of a shiny wild one.
 export const ROTOM_CATALOG_ITEM_ID = 'rotomcatalog'
@@ -70,6 +72,29 @@ export const GRACIDEA_ITEM_ID = 'gracidea'
 export const METEORITE_ITEM_ID = 'meteorite'
 export const ZYGARDE_CUBE_ITEM_ID = 'zygardecube'
 export const DECORATION_BOX_ITEM_ID = 'decorationbox'
+export const FASHION_CASE_ITEM_ID = 'fashioncase'
+// The one key item bought instead (in the Coin Shop): it opens the TM quick check after wild wins.
+export const SCANNER_ITEM_ID = 'scanner'
+
+// Pikachu's forms the Fashion Case changes between: plain Pikachu, the caps, the Cosplay
+// outfits, Partner and World. Owning three different ones at once unlocks it.
+export const PIKACHU_FORMS = [
+  'Pikachu',
+  'Pikachu-Original',
+  'Pikachu-Hoenn',
+  'Pikachu-Sinnoh',
+  'Pikachu-Unova',
+  'Pikachu-Kalos',
+  'Pikachu-Alola',
+  'Pikachu-Partner',
+  'Pikachu-World',
+  'Pikachu-Cosplay',
+  'Pikachu-Rock-Star',
+  'Pikachu-Belle',
+  'Pikachu-Pop-Star',
+  'Pikachu-PhD',
+  'Pikachu-Libre'
+]
 
 // Alcremie's nine creams - each its own Pokedex form here. Vanilla Cream is plain Alcremie.
 export const ALCREMIE_FORMS = [
@@ -109,7 +134,9 @@ export const KEY_ITEM_IDS = new Set([
   GRACIDEA_ITEM_ID,
   METEORITE_ITEM_ID,
   ZYGARDE_CUBE_ITEM_ID,
-  DECORATION_BOX_ITEM_ID
+  DECORATION_BOX_ITEM_ID,
+  FASHION_CASE_ITEM_ID,
+  SCANNER_ITEM_ID
 ])
 
 // The form-change key items: with one in the bag, a Pokemon in its group can be changed
@@ -128,7 +155,9 @@ export const FORM_CHANGES: { itemId: string; forms: string[] }[] = [
   { itemId: METEORITE_ITEM_ID, forms: ['Deoxys', 'Deoxys-Attack', 'Deoxys-Defense', 'Deoxys-Speed'] },
   { itemId: ZYGARDE_CUBE_ITEM_ID, forms: ['Zygarde', 'Zygarde-10%'] },
   // Only the cream changes - the same Pokemon otherwise (see changeForm).
-  { itemId: DECORATION_BOX_ITEM_ID, forms: ALCREMIE_FORMS }
+  { itemId: DECORATION_BOX_ITEM_ID, forms: ALCREMIE_FORMS },
+  // Only the outfit changes, as with Alcremie.
+  { itemId: FASHION_CASE_ITEM_ID, forms: PIKACHU_FORMS }
 ]
 
 export interface FusionRule {
@@ -212,6 +241,34 @@ export interface WildLocationConfig {
   // Only there once every boss is beaten, with an encounter table of its own
   // (the Lab - see generateLabWildMon) instead of the type filters.
   requiresAllBosses?: boolean
+}
+
+// Weather and terrain a battle can start with (a boss's Field setting, or the chance of
+// weather in a wild area): up from the first turn, and lasting until something replaces it.
+export const FIELD_START_WEATHERS: { id: string; label: string }[] = [
+  { id: 'sunnyday', label: 'Sun' },
+  { id: 'raindance', label: 'Rain' },
+  { id: 'sandstorm', label: 'Sandstorm' },
+  { id: 'snowscape', label: 'Snow' }
+]
+
+export const FIELD_START_TERRAINS: { id: string; label: string }[] = [
+  { id: 'electricterrain', label: 'Electric' },
+  { id: 'grassyterrain', label: 'Grassy' },
+  { id: 'mistyterrain', label: 'Misty' },
+  { id: 'psychicterrain', label: 'Psychic' }
+]
+
+// The chance a wild battle starts with a random one of those weathers - anywhere but
+// the places with no sky (the Cave and the Lab).
+export const WILD_WEATHER_CHANCE = 0.15
+export const WILD_WEATHERLESS_LOCATIONS: WildLocationId[] = ['cave', 'lab']
+
+/** The weather a wild battle in this area starts with, if the 15% roll comes up. */
+export function rollWildWeather(location: WildLocationId | null | undefined): string | null {
+  if (location && WILD_WEATHERLESS_LOCATIONS.includes(location)) return null
+  if (Math.random() >= WILD_WEATHER_CHANCE) return null
+  return FIELD_START_WEATHERS[Math.floor(Math.random() * FIELD_START_WEATHERS.length)].id
 }
 
 export const WILD_LOCATIONS: WildLocationConfig[] = [
@@ -323,6 +380,14 @@ export interface MoveInfo {
   multihit: boolean
   // Above 0 for a priority move (Quick Attack, Extreme Speed...) - it animates faster.
   priority: number
+  // A status move that raises or lowers stats: which way, overall - its animation shows
+  // rising or falling arrows (see moveAnimations.ts).
+  boostDir?: 'up' | 'down'
+  // The Showdown flags that change how it animates (punch, bite, slicing, sound...).
+  animFlags?: string[]
+  // In the box's editor: this Pokemon learns it only by TM, and the player doesn't own
+  // that TM yet (see tm-store's lockedTmMoves).
+  tmLocked?: boolean
 }
 
 export interface PokemonSummary {
@@ -346,6 +411,12 @@ export interface VolatileBadge {
   label: string
   // Colours it: good for its side (Aqua Ring), bad (Taunted) or neither (Uproar).
   kind: 'good' | 'bad' | 'neutral'
+}
+
+// One move against one foe: who it is, and the type multiplier (0, 0.5, 2...).
+export interface MoveMatchup {
+  foeName: string
+  multiplier: number
 }
 
 export interface ActivePokemonView extends PokemonSummary {
@@ -395,6 +466,12 @@ export interface ActivePokemonView extends PokemonSummary {
    * on the Pokemon out in battle, in the field snapshots.
    */
   effectiveStats?: StatBlock
+  /**
+   * Each of its moves' type effectiveness against each opposing Pokemon out, in screen
+   * order (left to right), keyed by move id - for its tooltip. Only set in battle; a
+   * status move (or one the type chart doesn't apply to) has no entry.
+   */
+  moveMatchups?: Record<string, MoveMatchup[]>
   /**
    * Increments only when this side's active slot is switched to a new team
    * member (not on in-place form changes like Mega Evolution) - lets the UI
@@ -584,6 +661,8 @@ export interface BattleRewardsView {
   items: RewardItemView[]
   // Percent chance of one extra item picked at random from the whole drop pool.
   randomDropChance: number
+  // The trainer's TMs the player doesn't own yet - all of them given on a win.
+  tms?: TmInfo[]
 }
 
 // Items that do nothing in this game, only worth selling: Bottle Caps (there's no Hyper
@@ -621,12 +700,16 @@ export interface WildDropEntry {
   drop: ItemDropConfig
 }
 
-export type RogueliteBossClass = 'gymLeader' | 'eliteFour' | 'champion'
+export type RogueliteBossClass = 'gymLeader' | 'eliteFour' | 'champion' | 'villainGrunt' | 'villainElite'
 
-export const ROGUELITE_BOSS_CLASSES: { id: RogueliteBossClass; label: string }[] = [
+// The villains are no boss floor's: they're met in a Villain Takeover (see run-store), so
+// a generation never needs any to be picked for a run.
+export const ROGUELITE_BOSS_CLASSES: { id: RogueliteBossClass; label: string; villain?: boolean }[] = [
   { id: 'gymLeader', label: 'Gym Leader' },
   { id: 'eliteFour', label: 'Elite Four' },
-  { id: 'champion', label: 'Champion' }
+  { id: 'champion', label: 'Champion' },
+  { id: 'villainGrunt', label: 'Villain Grunt', villain: true },
+  { id: 'villainElite', label: 'Villain Elite', villain: true }
 ]
 
 /** The class of a run's n-th boss (0 = the first): Gym Leaders, the Elite Four, then the Champion. */
@@ -666,6 +749,9 @@ export interface Trainer {
   monotype: string | null
   isBoss: boolean
   drops: ItemDropConfig[]
+  // TMs (move ids) beating this trainer gives - each one only while the player doesn't
+  // own it yet, so in practice on the first win (see tm-store's grantRewardTms).
+  tmRewards?: string[]
   // A Team Rocket member: the only trainers the Trainer Battle button fights while a
   // Team Rocket event boss is queued (see rocketEvent).
   teamRocket?: boolean
@@ -689,6 +775,12 @@ export interface Trainer {
   // Bosses only: while this boss is the next one queued, the Trainer Battle button
   // only fights Team Rocket members, and shows a grunt. On for Giovanni's fights.
   rocketEvent?: boolean
+  // Bosses only (classic and Roguelite): weather and terrain up from the start of the
+  // fight, lasting until a move or ability replaces them. Off (none) by default.
+  fieldWeather?: string | null
+  fieldTerrain?: string | null
+  // Bosses only: Trick Room up from the start, until someone uses Trick Room to end it.
+  fieldTrickRoom?: boolean
   // Set on trainers created by an importer (e.g. "rr41:0x19e"), so importing
   // again can tell what it already made instead of adding duplicates.
   importKey?: string
@@ -914,6 +1006,8 @@ export interface ShopItemEntry extends ItemOptionEntry {
 export interface KeyItemView extends ItemOptionEntry {
   owned: boolean
   unlockedBy: string
+  // Bought in the Coin Shop (the Scanner) rather than unlocked by an achievement.
+  coinShop: boolean
 }
 
 /** What buying this many of a Shop item costs - at its bulk price from TYCOON_BULK_MIN on. */
@@ -974,8 +1068,10 @@ export interface FeedbackEvent {
   tone: 'good' | 'bad' | 'neutral'
   // The results worth seeing at a glance get a bigger label and their own effect on
   // the sprite: a crit's white flash and hard shake, a flinch's stagger, confusion's
-  // spinning stars.
-  emphasis?: 'crit' | 'flinch' | 'confusion'
+  // spinning stars, and for a Pokemon that can't move: full paralysis's electric jolt,
+  // sleep's drifting Zs, a freeze's icy shiver; and the end-of-turn hurt from a burn
+  // (rising flames) or poison (bubbles).
+  emphasis?: 'crit' | 'flinch' | 'confusion' | 'paralysis' | 'sleep' | 'freeze' | 'burn' | 'poison'
 }
 
 // An ability doing something (Intimidate, Drizzle, Rough Skin, Volt Absorb...) - the
@@ -1001,6 +1097,10 @@ export interface GimmickEvent {
   // The Tera type, for a tera.
   teraType?: string
 }
+
+// The moveId of the MoveEvent for Leech Seed sapping HP at the end of a turn: the
+// "attacker" is the seeded Pokemon, the target the one it heals.
+export const LEECH_SEED_DRAIN_EVENT = '$leechseeddrain'
 
 export interface MoveEvent {
   moveId: string
@@ -1327,6 +1427,10 @@ export interface BattleView {
   winner: string | null
   expGains: ExpGainResult[]
   itemDrops: ItemDropResult[]
+  // Won a Classic wild battle: one quick skill check for a TM from its area (see tm-store).
+  tmQuickCheck?: boolean
+  // The TMs a beaten trainer gave (only ones the player didn't own yet).
+  tmRewards?: TmInfo[]
   moneyGained: number
   p1: (ActivePokemonView | null)[]
   p2: (ActivePokemonView | null)[]
@@ -1383,7 +1487,13 @@ export const ROGUELITE_FINAL_FLOOR = ROGUELITE_BOSS_EVERY * ROGUELITE_BOSS_COUNT
 export const ROGUELITE_START_LEVEL = 5
 export const ROGUELITE_MAX_TEAM = 6
 
-export type RunNodeKind = 'wild' | 'trainer' | 'item' | 'heal' | 'boss' | 'ability' | 'move' | 'swap'
+export type RunNodeKind = 'wild' | 'trainer' | 'item' | 'heal' | 'boss' | 'ability' | 'move' | 'swap' | 'villain'
+
+// Villain Takeover: now and then a villain takes a regular floor over. Every tile is
+// corrupted - taking one costs up to this many gems (free with none) - except the fight
+// against the villain itself, the floor's only trainer, which is free.
+export const RUN_TAKEOVER_CHANCE = 0.1
+export const RUN_TAKEOVER_TILE_COST = 3
 
 // Keep or change moves: a starter's own moves against a run moveset, or an evolving
 // Pokemon's moves against what it would get as its new species (locked moves kept).
@@ -1611,6 +1721,10 @@ export interface RunView {
   swapLevel: number
   // An item a newly given one replaced, waiting for a new holder before the run goes on.
   displacedItem: { itemName: string; spritenum: number; fromMonId: string } | null
+  // A Villain Takeover on this floor: who took it over, and what taking any other tile costs now.
+  takeover: { villainName: string; spriteId: string; classLabel: string; tileCost: number } | null
+  // A beaten villain's reward: one of these three Pokemon (each holding an item) joins the team.
+  monOffer: RunMonView[] | null
   // The species the run started with, for the result banner.
   starterSpecies: string
   difficulty: RunDifficulty

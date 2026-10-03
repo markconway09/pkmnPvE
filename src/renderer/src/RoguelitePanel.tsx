@@ -39,6 +39,7 @@ import SpriteImage from './SpriteImage'
 import PokemonTooltipContent from './PokemonTooltipContent'
 import Tooltip from './Tooltip'
 import ItemSprite from './ItemSprite'
+import { TR_SPRITENUM } from './itemIcon'
 import { formatMoney } from './money'
 import RunMonContextMenu from './RunMonContextMenu'
 import RunMonEditor from './RunMonEditor'
@@ -128,6 +129,11 @@ const NODE_INFO: Record<RunNodeKind, { label: string; hint: string; short: strin
     label: 'Random Swap',
     hint: 'Swap one Pokémon - or your whole team - for completely random ones at the next boss’s level',
     short: 'Roll the dice'
+  },
+  villain: {
+    label: 'Villain',
+    hint: 'The villain who took this floor over - free to fight. Beat them to pick one of 3 Pokémon at the next level cap, each holding an item',
+    short: 'Free · Win a Pokémon'
   }
 }
 
@@ -135,13 +141,14 @@ const NODE_INFO: Record<RunNodeKind, { label: string; hint: string; short: strin
 const locationOf = (choice: RunChoice): (typeof WILD_LOCATIONS)[number] | undefined =>
   WILD_LOCATIONS.find((l) => l.id === choice.location)
 
-// A TR's icon on Showdown's item sheet (every TR shares it).
-const TR_SPRITENUM = 721
 // The Choice Band on the same sheet, for item floors.
 const CHOICE_BAND_SPRITENUM = 68
 
-function NodeIcon({ choice }: { choice: RunChoice }): React.JSX.Element {
+// villainSprite: who took the floor over, for the villain's own tile.
+function NodeIcon({ choice, villainSprite }: { choice: RunChoice; villainSprite?: string }): React.JSX.Element {
   const { kind } = choice
+  // Unlike a boss, the villain is shown as who they are: the takeover already gave them away.
+  if (kind === 'villain') return <img className="big-battle-icon" src={trainerSpriteUrl(villainSprite ?? 'giovanni')} alt="" />
   if (kind === 'wild') {
     // The location's own icon over its backdrop (wild grass for an older run's "anywhere").
     return <img className="big-battle-icon run-node-location-icon" src={locationIconUrl(locationOf(choice)?.id)} alt="" />
@@ -209,7 +216,9 @@ const RAID_CRYSTAL_SPRITENUM = -26
 const BOSS_CLASS_NAMES: Record<RogueliteBossClass, string> = {
   gymLeader: 'Gym Leaders',
   eliteFour: 'Elite Four',
-  champion: 'Champion'
+  champion: 'Champion',
+  villainGrunt: 'Villain Grunts',
+  villainElite: 'Villain Elites'
 }
 
 function RewardChip({ spritenum, label }: { spritenum?: number; label: string }): React.JSX.Element {
@@ -430,6 +439,8 @@ function RoguelitePanel({
   const [reviving, setReviving] = useState<RunMonView | null>(null)
   // Buying Rare Candies in a boss shop: each click on a team member buys and uses one.
   const [candyMode, setCandyMode] = useState(false)
+  // A villain's reward with a full team: the Pokemon picked (by place), waiting for who leaves.
+  const [rewardPick, setRewardPick] = useState<number | null>(null)
   const [itemBusy, setItemBusy] = useState(false)
   const [itemError, setItemError] = useState<string | null>(null)
 
@@ -452,6 +463,7 @@ function RoguelitePanel({
     !!run &&
     run.status === 'active' &&
     !run.swapOffer &&
+    !run.monOffer &&
     !run.pickOffer &&
     !run.itemOffer &&
     !run.displacedItem &&
@@ -473,6 +485,7 @@ function RoguelitePanel({
         setLearner(null)
         setChosenPick(null)
         setSwapMode(null)
+        setRewardPick(null)
         return
       }
       if (!canPickFloor || !run) return
@@ -518,6 +531,7 @@ function RoguelitePanel({
       setUsing(null)
       setCapsuleMon(null)
       setReviving(null)
+      setRewardPick(null)
     } catch (e) {
       setItemError(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']*': (?:Error: )?/, '') : String(e))
     } finally {
@@ -674,6 +688,10 @@ function RoguelitePanel({
   // What clicking a team member does right now, if anything.
   const pickTarget = (mon: RunMonView): (() => void) | null => {
     if (busy || swapBusy || itemBusy) return null
+    // A villain's reward Pokemon picked with a full team: whoever's clicked makes room.
+    if (run.monOffer && rewardPick !== null) {
+      return () => void runItemAction(() => window.api.takeRunRewardMon(rewardPick, mon.id))
+    }
     if (candyMode && run.consumables.bossShop) {
       return mon.level < 100 && run.consumables.gems >= RUN_RARE_CANDY_PRICE
         ? () => void runItemAction(() => window.api.buyRunRareCandy(mon.id))
@@ -716,12 +734,17 @@ function RoguelitePanel({
   const displacedFrom = displaced ? run.team.find((m) => m.id === displaced.fromMonId) : undefined
   const shop = run.consumables.bossShop
   // One of the floor's options as a tile.
+  const takeover = run.takeover
   const choiceTile = (choice: RunChoice, index: number): React.JSX.Element => {
     const location = choice.kind === 'wild' ? locationOf(choice) : undefined
+    const villain = choice.kind === 'villain' && takeover
+    // On a taken-over floor every other tile is corrupted: it costs gems to take.
+    const corrupted = !!takeover && choice.kind !== 'villain'
+    const cost = takeover?.tileCost ?? 0
     return (
       <button
         key={index}
-        className={`big-battle-button run-node-button run-node-${choice.kind}${location?.id === 'lab' ? ' run-node-lab' : ''}${location ? ' run-node-located' : ''}`}
+        className={`big-battle-button run-node-button run-node-${choice.kind}${location?.id === 'lab' ? ' run-node-lab' : ''}${location ? ' run-node-located' : ''}${corrupted ? ' run-node-corrupted' : ''}`}
         style={
           {
             '--i': index,
@@ -729,16 +752,31 @@ function RoguelitePanel({
           } as React.CSSProperties
         }
         disabled={busy}
-        title={NODE_INFO[choice.kind].hint}
+        title={
+          corrupted
+            ? `${NODE_INFO[choice.kind].hint} - corrupted: costs ${cost} gem${cost === 1 ? '' : 's'}`
+            : villain
+              ? `${villain.classLabel} ${villain.villainName}: ${NODE_INFO.villain.hint}`
+              : NODE_INFO[choice.kind].hint
+        }
         onClick={() => onChoose(index)}
       >
         {/* The number key that picks it. */}
         <span className="run-node-key">{index + 1}</span>
-        <NodeIcon choice={choice} />
+        {corrupted && <span className="run-node-cost">{gemPrice(cost)}</span>}
+        <NodeIcon choice={choice} villainSprite={takeover?.spriteId} />
         <span className="run-node-label">
-          {location ? location.label : choice.kind === 'boss' ? run.nextBossLabel : NODE_INFO[choice.kind].label}
+          {location
+            ? location.label
+            : choice.kind === 'boss'
+              ? run.nextBossLabel
+              : villain
+                ? villain.villainName
+                : NODE_INFO[choice.kind].label}
         </span>
-        <span className="run-node-sub">{location ? 'Wild Pokémon' : NODE_INFO[choice.kind].short}</span>
+        <span className="run-node-sub">
+          {location ? 'Wild Pokémon' : villain ? `${villain.classLabel} · ${NODE_INFO.villain.short}` : NODE_INFO[choice.kind].short}
+        </span>
       </button>
     )
   }
@@ -806,7 +844,62 @@ function RoguelitePanel({
       </div>
       <RunProgressBar floor={run.floor} difficulty={run.difficulty} />
 
-      {run.swapOffer ? (
+      {run.monOffer ? (
+        // A beaten villain's reward: one of three Pokemon, each holding an item.
+        <div className="run-item-offer">
+          <p className="run-reward-heading">Villain defeated!</p>
+          <p className="box-empty-hint">
+            {rewardPick !== null
+              ? `Your team is full - click the Pokémon ${run.monOffer[rewardPick]?.species ?? 'it'} replaces (its held item then needs a new holder).`
+              : 'Pick one Pokémon to join your team, held item and all.'}
+          </p>
+          <div className="run-item-row run-reward-mons">
+            {run.monOffer.map((mon, i) => (
+              <Tooltip key={mon.id} placement="below" content={<PokemonTooltipContent pokemon={mon} />}>
+                <button
+                  className={`run-revive-card run-reward-mon rarity-card rarity-tier-${mon.rarityTier ?? 'common'}${rewardPick === i ? ' run-reward-mon-chosen' : ''}`}
+                  style={{ '--i': i } as React.CSSProperties}
+                  disabled={busy || itemBusy}
+                  onClick={() => {
+                    if (run.team.length < ROGUELITE_MAX_TEAM) void runItemAction(() => window.api.takeRunRewardMon(i))
+                    else setRewardPick(rewardPick === i ? null : i)
+                  }}
+                >
+                  <div className="run-revive-sprite rarity-glow" title={mon.item || undefined}>
+                    <SpriteImage
+                      style="3d-static"
+                      className="run-revive-img"
+                      spriteId={toSpriteId(mon.species)}
+                      shiny={mon.shiny}
+                      gmax={mon.gmaxLook}
+                      alt={mon.species}
+                      draggable={false}
+                    />
+                    {mon.itemSpritenum != null && <ItemSprite spritenum={mon.itemSpritenum} className="run-revive-item" />}
+                  </div>
+                  <FitName className="run-revive-name" text={mon.species} />
+                  <span className="run-revive-ability">{mon.item || mon.ability}</span>
+                  <span className="run-revive-level">Lv {mon.level}</span>
+                </button>
+              </Tooltip>
+            ))}
+          </div>
+          <div className="run-item-row">
+            {rewardPick !== null && (
+              <button className="run-item-button run-item-skip" disabled={busy || itemBusy} onClick={() => setRewardPick(null)}>
+                Back
+              </button>
+            )}
+            <button
+              className="run-item-button run-item-skip"
+              disabled={busy || itemBusy}
+              onClick={() => void runItemAction(() => window.api.skipRunRewardMon())}
+            >
+              Skip
+            </button>
+          </div>
+        </div>
+      ) : run.swapOffer ? (
         <div className="run-item-offer">
           <p className="run-reward-heading">Random Swap</p>
           <p className="box-empty-hint">
@@ -1101,10 +1194,25 @@ function RoguelitePanel({
           </div>
         </div>
       ) : (
-        <div className="run-floor-pick">
-          <p className="run-floor-title">
-            {run.choices.length === 1 && run.choices[0].kind === 'boss' ? 'A boss blocks the way' : 'Choose your path'}
-          </p>
+        <div className={`run-floor-pick${takeover ? ' run-floor-takeover' : ''}`}>
+          {takeover ? (
+            // A Villain Takeover: who took the floor over, and what the corrupted tiles cost.
+            <p className="run-floor-title run-takeover-title">
+              <span className="run-takeover-name">Villain Takeover!</span>
+              <span className="run-takeover-sub">
+                {takeover.classLabel} {takeover.villainName} corrupted this floor -{' '}
+                {takeover.tileCost > 0 ? (
+                  <>every other path costs {gemPrice(takeover.tileCost)}</>
+                ) : (
+                  'with no gems, every path is free'
+                )}
+              </span>
+            </p>
+          ) : (
+            <p className="run-floor-title">
+              {run.choices.length === 1 && run.choices[0].kind === 'boss' ? 'A boss blocks the way' : 'Choose your path'}
+            </p>
+          )}
           {/* Keyed on the floor, so the tiles deal themselves in again each new floor. */}
           <div className="run-choice-grid" key={run.floor}>
             {run.choices.map(choiceTile)}

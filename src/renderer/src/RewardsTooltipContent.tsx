@@ -1,5 +1,6 @@
 import type { BattleRewardsView, RewardItemView } from '../../shared/battle-types'
 import ItemSprite from './ItemSprite'
+import { TmIcon } from './TmBits'
 
 interface Props {
   // Null for a friendly match against another player's team, which pays nothing.
@@ -23,7 +24,8 @@ function RewardsTooltipContent({ rewards }: Props): React.JSX.Element {
       </div>
     )
   }
-  const nothing = rewards.money === null && rewards.items.length === 0 && rewards.randomDropChance <= 0
+  const tms = rewards.tms ?? []
+  const nothing = rewards.money === null && rewards.items.length === 0 && rewards.randomDropChance <= 0 && tms.length === 0
   return (
     <div className="tooltip-panel rewards-tooltip">
       <div className="tooltip-title">Rewards for winning</div>
@@ -39,6 +41,14 @@ function RewardsTooltipContent({ rewards }: Props): React.JSX.Element {
           <span className="rewards-name">{item.itemName}</span>
           <span className="rewards-source">{SOURCE_LABELS[item.source]}</span>
           <span className="rewards-chance">{item.chance}%</span>
+        </div>
+      ))}
+      {tms.map((tm) => (
+        <div key={tm.moveId} className="rewards-row">
+          <TmIcon type={tm.type} className="rewards-tm-icon" />
+          <span className="rewards-name">TM {tm.name}</span>
+          <span className="rewards-source">First win</span>
+          <span className="rewards-chance">100%</span>
         </div>
       ))}
       {rewards.randomDropChance > 0 && (

@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import type { BattleView, BoxPokemonView } from '../../shared/battle-types'
+import { FIELD_START_TERRAINS, FIELD_START_WEATHERS, type BattleView, type BoxPokemonView, type StatBlock } from '../../shared/battle-types'
 import {
+  CHAOS_MON_MODIFIERS,
+  CHAOS_STAT_LABELS,
+  type ChaosField,
+  type ChaosModifier,
+  type ChaosModifierTarget,
+  type ChaosTutorMove,
   DRAFT_FORMATS,
   draftBring,
   draftLeads,
@@ -20,6 +26,7 @@ import PokemonIconVisual from './PokemonIconVisual'
 import CoinIcon from './CoinIcon'
 import { DraftPackOpening, OpponentReveal } from './DraftPackOpening'
 import { trainerSpriteUrl } from './trainerSprite'
+import ItemSprite from './ItemSprite'
 
 interface Props {
   // Another fight (or the menu) holds things up.
@@ -40,7 +47,8 @@ const FORMAT_KEY = 'pkmnpve.draftFormat'
 
 function loadFormat(): DraftFormat {
   try {
-    return localStorage.getItem(FORMAT_KEY) === 'singles' ? 'singles' : 'doubles'
+    const saved = localStorage.getItem(FORMAT_KEY)
+    return saved === 'singles' || saved === 'chaos' ? saved : 'doubles'
   } catch {
     return 'doubles'
   }
@@ -52,6 +60,82 @@ function saveFormat(format: DraftFormat): void {
   } catch {
     // Not remembered - it only picks which button starts lit.
   }
+}
+
+function formatLabel(format: DraftFormat): string {
+  return format === 'chaos' ? 'Chaos' : format === 'singles' ? 'Singles' : 'Doubles'
+}
+
+function fieldLabel(kind: 'weather' | 'terrain', id: string): string {
+  const option = (kind === 'weather' ? FIELD_START_WEATHERS : FIELD_START_TERRAINS).find((o) => o.id === id)
+  return kind === 'weather' ? (option?.label ?? id) : `${option?.label ?? id} Terrain`
+}
+
+// A chaos modifier's chip: its name, and what it does (shown once it's picked).
+function modifierText(modifier: ChaosModifier): { icon: string; title: string; text: string } {
+  switch (modifier.kind) {
+    case 'weather':
+      return { icon: '☀', title: fieldLabel('weather', modifier.id), text: 'Every battle starts in it, until a move or ability replaces it' }
+    case 'terrain':
+      return { icon: '⛰', title: fieldLabel('terrain', modifier.id), text: 'Every battle starts with it, until a move or ability replaces it' }
+    case 'trickroom':
+      return { icon: '⧗', title: 'Trick Room', text: 'Every battle starts in Trick Room (slower Pokémon move first) - until someone uses Trick Room' }
+    case 'tailwind':
+      return { icon: '༄', title: 'Tailwind Start', text: 'Tailwind on your side for the first 4 turns of every battle' }
+    case 'screens':
+      return { icon: '▣', title: 'Screens Up', text: 'Reflect and Light Screen on your side for the first 5 turns of every battle' }
+    case 'hazard':
+      return modifier.id === 'stealthrock'
+        ? { icon: '◆', title: 'Stealth Rock', text: "Stealth Rock on the opponent's side from the start of every battle" }
+        : { icon: '⋀', title: 'Spikes', text: "A layer of Spikes on the opponent's side from the start of every battle (up to 3)" }
+    case 'intimidate':
+      return { icon: '☠', title: 'Intimidating Aura', text: "The opponent's lead starts every battle at -1 Attack" }
+    case 'ability':
+      return { icon: '✦', title: 'Ability Change', text: 'Give one of your Pokémon any ability' }
+    case 'stat':
+      return { icon: '▲', title: 'Stat Boost', text: '+50% to one stat of one of your Pokémon, for good' }
+    case 'tutor':
+      return { icon: '✎', title: 'Move Tutor', text: 'Swap one of its moves for one of 3 random moves it can learn' }
+    case 'glasscannon':
+      return { icon: '✸', title: 'Glass Cannon', text: '+50% Attack and Sp. Atk, -30% Defense and Sp. Def' }
+    case 'wildcard':
+      return { icon: '⁇', title: 'Wild Card', text: 'Swap it for a random Pokémon from the tier above (its stat modifiers stay)' }
+    case 'item':
+      return { icon: '◈', title: 'Held Item', text: 'Give one of your Pokémon any item in the game' }
+  }
+}
+
+// The modifier offer's rows, in order.
+const MODIFIER_GROUPS: { label: string; kinds: ChaosModifier['kind'][] }[] = [
+  { label: 'Weather', kinds: ['weather'] },
+  { label: 'Terrain', kinds: ['terrain'] },
+  { label: 'Battle start', kinds: ['trickroom', 'tailwind', 'screens', 'hazard', 'intimidate'] },
+  { label: 'Pokémon', kinds: CHAOS_MON_MODIFIERS }
+]
+
+// The chaos field so far, as chips (nothing while it's empty).
+function ChaosFieldChips({ field }: { field?: ChaosField }): React.JSX.Element | null {
+  if (!field) return null
+  const chips = [
+    field.weather ? fieldLabel('weather', field.weather) : null,
+    field.terrain ? fieldLabel('terrain', field.terrain) : null,
+    field.trickRoom ? 'Trick Room' : null,
+    field.tailwind ? 'Tailwind' : null,
+    field.screens ? 'Screens' : null,
+    field.stealthRock ? 'Stealth Rock' : null,
+    field.spikes ? `Spikes${field.spikes > 1 ? ` x${field.spikes}` : ''}` : null,
+    field.intimidate ? 'Intimidating Aura' : null
+  ].filter((c): c is string => !!c)
+  if (chips.length === 0) return null
+  return (
+    <span className="draft-tiers" title="Every chaos battle starts with these">
+      {chips.map((chip) => (
+        <span key={chip} className="draft-tier-chip draft-chaos-chip">
+          {chip}
+        </span>
+      ))}
+    </span>
+  )
 }
 
 // "the first leads" / "the first two lead".
@@ -69,6 +153,7 @@ function DraftMonIcon({ mon }: { mon: DraftMonView }): React.JSX.Element {
           <PokemonIconVisual mon={asBoxMon} />
         </div>
       </div>
+      {mon.chaosTags && <span className="draft-chaos-boosts">{mon.chaosTags.join(' · ')}</span>}
     </Tooltip>
   )
 }
@@ -115,6 +200,18 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
   const slotRefs = useRef<(HTMLDivElement | null)[]>([])
   // The pick that just landed, to pop it into its slot.
   const [justPicked, setJustPicked] = useState<number | null>(null)
+  // Chaos: the modifier being taken, and (for a Pokemon one) its Pokemon and what goes on it.
+  const [modifierIndex, setModifierIndex] = useState<number | null>(null)
+  const [modifierMon, setModifierMon] = useState<number | null>(null)
+  const [modifierStat, setModifierStat] = useState<keyof StatBlock | null>(null)
+  const [modifierAbility, setModifierAbility] = useState<string | null>(null)
+  const [modifierItem, setModifierItem] = useState<string | null>(null)
+  const [tutorSlot, setTutorSlot] = useState<number | null>(null)
+  const [tutorMove, setTutorMove] = useState<string | null>(null)
+  const [tutorMoves, setTutorMoves] = useState<ChaosTutorMove[]>([])
+  const [listFilter, setListFilter] = useState('')
+  const [chaosAbilities, setChaosAbilities] = useState<{ id: string; name: string; description: string }[]>([])
+  const [chaosItems, setChaosItems] = useState<{ id: string; name: string; description: string; spritenum: number }[]>([])
 
   function refresh(): void {
     window.api
@@ -136,6 +233,48 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
 
   useEffect(refresh, [refreshKey])
 
+  // Picking another modifier or Pokemon starts its choices over.
+  function resetModifierChoices(): void {
+    setModifierStat(null)
+    setModifierAbility(null)
+    setModifierItem(null)
+    setTutorSlot(null)
+    setTutorMove(null)
+    setTutorMoves([])
+    setListFilter('')
+  }
+
+  // A fresh modifier offer starts with nothing chosen; the ability and item lists load the first time they're needed.
+  const offerKey = draft?.status === 'modifier' ? `${draft.wins}-${draft.losses}-${draft.picks.length}` : ''
+  useEffect(() => {
+    setModifierIndex(null)
+    setModifierMon(null)
+    resetModifierChoices()
+    if (offerKey && chaosAbilities.length === 0) {
+      window.api
+        .getChaosAbilities()
+        .then(setChaosAbilities)
+        .catch(() => {})
+    }
+    if (offerKey && chaosItems.length === 0) {
+      window.api
+        .getChaosItems()
+        .then(setChaosItems)
+        .catch(() => {})
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offerKey])
+
+  // Move Tutor: its three moves for the chosen Pokemon.
+  const tutorFor = draft?.status === 'modifier' && modifierIndex !== null && draft.modifierOffer?.[modifierIndex]?.kind === 'tutor' ? modifierMon : null
+  useEffect(() => {
+    if (tutorFor === null) return
+    window.api
+      .getChaosTutorMoves(tutorFor)
+      .then(setTutorMoves)
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+  }, [tutorFor])
+
   // Every draft action goes through here: one at a time, and a failure is shown.
   async function act(action: () => Promise<void>): Promise<void> {
     setWorking(true)
@@ -150,7 +289,7 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
   }
 
   function toggleBring(index: number): void {
-    const count = draftBring(draft?.format ?? 'doubles')
+    const count = draftBring(draft?.format ?? 'doubles', draft?.picks.length)
     const next = bring.includes(index)
       ? bring.filter((i) => i !== index)
       : bring.length < count
@@ -183,6 +322,21 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
               <span>Build a team from packs, then battle the gauntlet</span>
             </div>
           </div>
+          <div className="draft-format-picker">
+          {/* Chaos: just for fun, above the two serious formats. */}
+          <button
+            className={`draft-format-tile draft-format-tile-chaos${format === 'chaos' ? ' draft-format-tile-selected' : ''}`}
+            disabled={disabled}
+            onClick={() => {
+              setFormat('chaos')
+              saveFormat('chaos')
+            }}
+          >
+            <strong>Chaos</strong>
+            <span className="draft-format-sub">
+              Singles for fun · draft 2 at a time, permanent weather, Trick Room, ability swaps and stat boosts
+            </span>
+          </button>
           <div className="draft-format-tiles">
             {DRAFT_FORMATS.map((f) => (
               <button
@@ -211,6 +365,7 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
               </button>
             ))}
           </div>
+          </div>
           <div className="draft-start-row">
             <button
               className="run-start-button draft-start-button"
@@ -235,7 +390,7 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
           </div>
           {draft && (
             <p className={`run-result ${draft.wins > 0 ? 'run-result-won' : 'run-result-lost'}`}>
-              Last draft ({draft.format}): {draft.wins}-{draft.losses}
+              Last draft ({formatLabel(draft.format).toLowerCase()}): {draft.wins}-{draft.losses}
               {draft.reward > 0 ? ` · +${draft.reward.toLocaleString('en-US')} coins` : ''}
             </p>
           )}
@@ -245,6 +400,26 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
         <div className="draft-home-side">
           <div className="draft-home-card">
             <h3>How it works</h3>
+            {format === 'chaos' ? (
+              <ul className="draft-rules">
+                <li>
+                  <span className="draft-rule-icon">1</span>
+                  Draft 2, take a modifier, then battle a hard trainer with as many Pokémon as you
+                </li>
+                <li>
+                  <span className="draft-rule-icon">2</span>
+                  Then 2 more picks before one battle, a modifier before the next - win or lose
+                </li>
+                <li>
+                  <span className="draft-rule-icon">3</span>
+                  Team full at {DRAFT_ROUNDS}: a modifier before every battle
+                </li>
+                <li>
+                  <span className="draft-rule-icon">4</span>
+                  Ends at {DRAFT_MAX_WINS} wins or {DRAFT_MAX_LOSSES} losses
+                </li>
+              </ul>
+            ) : (
             <ul className="draft-rules">
               <li>
                 <span className="draft-rule-icon">1</span>
@@ -263,6 +438,7 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
                 Ends at {DRAFT_MAX_WINS} wins or {DRAFT_MAX_LOSSES} losses
               </li>
             </ul>
+            )}
           </div>
           <div className="draft-home-card">
             <h3>Rewards</h3>
@@ -316,9 +492,25 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
       <div className="run-panel draft-panel">
         <div className="run-status-row">
           <span>
-            {draft.format === 'singles' ? 'Singles' : 'Doubles'} draft · Pick <strong>{draft.round}</strong> of {DRAFT_ROUNDS}
+            {formatLabel(draft.format)} draft · Pick <strong>{draft.round}</strong> of {draft.pickTarget ?? DRAFT_ROUNDS}
           </span>
           <TierChips tiers={draft.tiers} />
+          <ChaosFieldChips field={draft.chaosField} />
+          {/* Chaos: one fresh pack per drafting stretch. */}
+          {draft.format === 'chaos' && (
+            <button
+              className="run-forfeit-button draft-reroll-button"
+              disabled={disabled || !draft.canReroll}
+              title={draft.canReroll ? 'Swap this pack for a new one - once per draft phase' : 'Already rerolled this draft phase'}
+              onClick={() =>
+                void act(async () => {
+                  setDraft(await window.api.rerollDraftPack())
+                })
+              }
+            >
+              {draft.canReroll ? 'Reroll pack' : 'Rerolled'}
+            </button>
+          )}
           {abandonButton}
         </div>
         <DraftPackOpening
@@ -355,22 +547,236 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
     )
   }
 
+  const recordPips = (
+    <>
+      <span className="draft-record">
+        Wins <Pips count={draft.wins} max={DRAFT_MAX_WINS} kind="win" />
+      </span>
+      <span className="draft-record">
+        Losses <Pips count={draft.losses} max={DRAFT_MAX_LOSSES} kind="loss" />
+      </span>
+    </>
+  )
+
+  // ---- Chaos: one of the offered modifiers ----
+  if (draft.status === 'modifier') {
+    const offer = draft.modifierOffer ?? []
+    const chosen = modifierIndex !== null ? offer[modifierIndex] : null
+    const needsMon = !!chosen && CHAOS_MON_MODIFIERS.includes(chosen.kind)
+    const mon = modifierMon !== null ? draft.picks[modifierMon] : null
+    // What the chosen modifier still needs, or null once it can be taken.
+    const missing = !chosen
+      ? 'Pick a modifier'
+      : !needsMon
+        ? null
+        : !mon
+          ? 'Pick a Pokémon'
+          : chosen.kind === 'ability' && !modifierAbility
+            ? 'Pick an ability'
+            : chosen.kind === 'stat' && !modifierStat
+              ? 'Pick a stat'
+              : chosen.kind === 'item' && !modifierItem
+                ? 'Pick an item'
+                : chosen.kind === 'tutor' && (tutorSlot === null || !tutorMove)
+                  ? tutorSlot === null
+                    ? 'Pick a move to forget'
+                    : 'Pick a move to learn'
+                  : null
+    const filter = listFilter.trim().toLowerCase()
+    // The searchable list for an Ability or Held Item.
+    const searchList = (
+      entries: { id: string; name: string; description: string; spritenum?: number }[],
+      value: string | null,
+      onPick: (id: string) => void,
+      placeholder: string
+    ): React.JSX.Element => (
+      <div className="draft-modifier-abilities">
+        <input className="draft-ability-filter" placeholder={placeholder} value={listFilter} onChange={(e) => setListFilter(e.target.value)} />
+        <div className="draft-ability-list">
+          {entries
+            .filter((e) => !filter || e.name.toLowerCase().includes(filter))
+            .map((e) => (
+              <button
+                key={e.id}
+                type="button"
+                className={`draft-ability-option${value === e.id ? ' draft-ability-option-on' : ''}`}
+                disabled={disabled}
+                onClick={() => onPick(e.id)}
+              >
+                <strong>
+                  {e.spritenum !== undefined && <ItemSprite spritenum={e.spritenum} />}
+                  {e.name}
+                </strong>
+                <span>{e.description}</span>
+              </button>
+            ))}
+        </div>
+      </div>
+    )
+    return (
+      <div className="run-panel draft-panel">
+        <div className="run-status-row">
+          <span>Chaos · Pick a modifier</span>
+          <TierChips tiers={draft.tiers} />
+          <ChaosFieldChips field={draft.chaosField} />
+          {recordPips}
+          {abandonButton}
+        </div>
+        {/* Every modifier as a small chip, a row per type. */}
+        <div className="draft-modifier-groups">
+          {MODIFIER_GROUPS.map((group) => {
+            const items = offer.map((modifier, i) => ({ modifier, i })).filter(({ modifier }) => group.kinds.includes(modifier.kind))
+            if (items.length === 0) return null
+            return (
+              <div key={group.label} className="draft-modifier-group">
+                <span className="draft-modifier-group-label">{group.label}</span>
+                <div className="draft-modifier-offer">
+                  {items.map(({ modifier, i }) => {
+                    const text = modifierText(modifier)
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        className={`draft-modifier-chip draft-modifier-${modifier.kind}${modifierIndex === i ? ' draft-modifier-chosen' : ''}`}
+                        disabled={disabled}
+                        title={text.text}
+                        onClick={() => {
+                          setModifierIndex(i)
+                          setModifierMon(null)
+                          resetModifierChoices()
+                        }}
+                      >
+                        <span className="draft-modifier-icon" aria-hidden="true">
+                          {text.icon}
+                        </span>
+                        {text.title}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        {chosen && <p className="draft-modifier-desc">{modifierText(chosen).text}</p>}
+        {/* The whole team is always on show - clickable when a Pokemon modifier needs one. */}
+        <p className="box-empty-hint">{needsMon ? 'Which Pokémon?' : 'Your team'}</p>
+        <div className="draft-team-row">
+          {draft.picks.map((pick, i) =>
+            needsMon ? (
+              <button
+                key={i}
+                type="button"
+                className={`draft-bring-button${modifierMon === i ? ' draft-bring-chosen' : ''}`}
+                disabled={disabled}
+                onClick={() => {
+                  setModifierMon(i)
+                  resetModifierChoices()
+                }}
+              >
+                <DraftMonIcon mon={pick} />
+                {modifierMon === i && (
+                  <span className="draft-bring-order draft-bring-lead">{chosen?.kind === 'item' ? pick.item || 'No item' : pick.ability}</span>
+                )}
+              </button>
+            ) : (
+              <div key={i}>
+                <DraftMonIcon mon={pick} />
+              </div>
+            )
+          )}
+        </div>
+        {chosen?.kind === 'stat' && mon && (
+          <div className="trainer-chips draft-modifier-choices">
+            {(Object.keys(CHAOS_STAT_LABELS) as (keyof StatBlock)[]).map((stat) => (
+              <button
+                key={stat}
+                type="button"
+                className={`trainer-chip${modifierStat === stat ? ' trainer-chip-on' : ''}`}
+                disabled={disabled}
+                onClick={() => setModifierStat(stat)}
+              >
+                {CHAOS_STAT_LABELS[stat]} {mon.stats[stat]}
+              </button>
+            ))}
+          </div>
+        )}
+        {chosen?.kind === 'ability' && mon && searchList(chaosAbilities, modifierAbility, setModifierAbility, 'Search abilities...')}
+        {chosen?.kind === 'item' && mon && searchList(chaosItems, modifierItem, setModifierItem, 'Search items...')}
+        {chosen?.kind === 'tutor' && mon && (
+          <div className="draft-tutor">
+            <div className="trainer-chips draft-modifier-choices">
+              <span className="draft-modifier-group-label">Forget</span>
+              {mon.moveList.map((move, slot) => (
+                <button
+                  key={slot}
+                  type="button"
+                  className={`trainer-chip${tutorSlot === slot ? ' trainer-chip-on' : ''}`}
+                  disabled={disabled}
+                  onClick={() => setTutorSlot(slot)}
+                >
+                  {move.name}
+                </button>
+              ))}
+            </div>
+            <div className="trainer-chips draft-modifier-choices">
+              <span className="draft-modifier-group-label">Learn</span>
+              {tutorMoves.map((move) => (
+                <button
+                  key={move.id}
+                  type="button"
+                  className={`trainer-chip${tutorMove === move.id ? ' trainer-chip-on' : ''}`}
+                  disabled={disabled}
+                  title={`${move.type} · ${move.category} - ${move.description}`}
+                  onClick={() => setTutorMove(move.id)}
+                >
+                  {move.name} <span className="draft-tutor-type">{move.type}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        <button
+          className="run-start-button draft-start-button"
+          disabled={disabled || missing !== null}
+          onClick={() =>
+            void act(async () => {
+              const target: ChaosModifierTarget | undefined =
+                needsMon && modifierMon !== null
+                  ? {
+                      pick: modifierMon,
+                      ability: modifierAbility ?? undefined,
+                      stat: modifierStat ?? undefined,
+                      item: modifierItem ?? undefined,
+                      moveSlot: tutorSlot ?? undefined,
+                      newMove: tutorMove ?? undefined
+                    }
+                  : undefined
+              setDraft(await window.api.chooseChaosModifier(modifierIndex!, target))
+              lastBring = []
+              setBring([])
+            })
+          }
+        >
+          {missing ?? 'Take it'}
+        </button>
+        {error && <p className="editor-error">{error}</p>}
+      </div>
+    )
+  }
+
   // ---- The gauntlet: next opponent, and the three or four to bring ----
   const opponent = draft.opponent
-  const bringCount = draftBring(draft.format)
+  const bringCount = draftBring(draft.format, draft.picks.length)
   const leads = draftLeads(draft.format)
   const validBring = bring.filter((i) => i < draft.picks.length).slice(0, bringCount)
   return (
     <div className="run-panel draft-panel">
       <div className="run-status-row">
-        <span>{draft.format === 'singles' ? 'Singles' : 'Doubles'}</span>
+        <span>{formatLabel(draft.format)}</span>
         <TierChips tiers={draft.tiers} />
-        <span className="draft-record">
-          Wins <Pips count={draft.wins} max={DRAFT_MAX_WINS} kind="win" />
-        </span>
-        <span className="draft-record">
-          Losses <Pips count={draft.losses} max={DRAFT_MAX_LOSSES} kind="loss" />
-        </span>
+        <ChaosFieldChips field={draft.chaosField} />
+        {recordPips}
         {abandonButton}
       </div>
       {opponent && (
@@ -382,7 +788,10 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
           <div className="draft-opponent-side">
             <span className="draft-opponent-name">
               Battle {draft.wins + draft.losses + 1}: <strong>{opponent.name}</strong>
-              <span className="box-empty-hint"> - brings {bringCount} of these</span>
+              <span className="box-empty-hint">
+                {draft.format === 'chaos' ? ` - a hard trainer, bringing all ${bringCount}` : ` - brings ${bringCount} of these`}
+              </span>
+              <ChaosFieldChips field={opponent.chaosField} />
             </span>
             <div className="draft-team-row">
               {opponent.team.map((mon, i) => (
@@ -395,10 +804,32 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
         </OpponentReveal>
       )}
       <p className="box-empty-hint">
-        Pick {bringCount} to bring, in order - {leadText(draft.format)}.
+        {draft.format === 'chaos'
+          ? `All ${bringCount} go in - click one to lead and start the battle.`
+          : `Pick ${bringCount} to bring, in order - ${leadText(draft.format)}.`}
       </p>
       <div className="draft-team-row">
         {draft.picks.map((mon, i) => {
+          // Chaos: the whole team goes in, so a click picks the lead and starts the battle
+          // (the rest follow in team order).
+          if (draft.format === 'chaos') {
+            return (
+              <button
+                key={i}
+                type="button"
+                className="draft-bring-button draft-chaos-lead-button"
+                disabled={disabled}
+                onClick={() =>
+                  void act(async () => {
+                    const order = [i, ...draft.picks.map((_, j) => j).filter((j) => j !== i)]
+                    await onBattle(await window.api.startDraftBattle(order))
+                  })
+                }
+              >
+                <DraftMonIcon mon={mon} />
+              </button>
+            )
+          }
           const order = validBring.indexOf(i)
           return (
             <button
@@ -418,17 +849,19 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
           )
         })}
       </div>
-      <button
-        className="run-start-button draft-start-button"
-        disabled={disabled || validBring.length !== bringCount}
-        onClick={() =>
-          void act(async () => {
-            await onBattle(await window.api.startDraftBattle(validBring))
-          })
-        }
-      >
-        {validBring.length === bringCount ? 'Battle!' : `Pick ${bringCount - validBring.length} more`}
-      </button>
+      {draft.format !== 'chaos' && (
+        <button
+          className="run-start-button draft-start-button"
+          disabled={disabled || validBring.length !== bringCount}
+          onClick={() =>
+            void act(async () => {
+              await onBattle(await window.api.startDraftBattle(validBring))
+            })
+          }
+        >
+          {validBring.length === bringCount ? 'Battle!' : `Pick ${bringCount - validBring.length} more`}
+        </button>
+      )}
       {error && <p className="editor-error">{error}</p>}
     </div>
   )

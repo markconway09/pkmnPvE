@@ -21,14 +21,14 @@ const rock = (image: 'rock1' | 'rock2', dx: number, bottom: number): Piece => ({
   dx,
   bottom,
   width: 26,
-  opacity: 0.5
+  opacity: 0.65
 })
 const caltrop = (image: 'caltrop' | 'poisoncaltrop', dx: number, bottom: number): Piece => ({
   image,
   dx,
   bottom,
   width: 26,
-  opacity: 0.6
+  opacity: 0.75
 })
 
 // Where each layer of each hazard sits (Showdown's placements for the same
@@ -38,7 +38,7 @@ const PIECES: Record<string, Piece[]> = {
   stealthrock: [rock('rock1', -40, 10), rock('rock2', -20, 0), rock('rock1', 30, 6), rock('rock2', 10, 2)],
   spikes: [caltrop('caltrop', -25, 2), caltrop('caltrop', 30, -2), caltrop('caltrop', 50, 2)],
   toxicspikes: [caltrop('poisoncaltrop', 5, 2), caltrop('poisoncaltrop', -15, 6)],
-  stickyweb: [{ image: 'web', dx: 15, bottom: 4, width: 90, opacity: 0.4 }]
+  stickyweb: [{ image: 'web', dx: 15, bottom: 4, width: 90, opacity: 0.55 }]
 }
 
 const LABELS: Record<string, string> = {

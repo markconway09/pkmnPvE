@@ -17,6 +17,9 @@ interface Props {
   info?: ReactNode
 }
 
+/** Sent on the window when the player picks another title. */
+export const TITLE_CHANGED_EVENT = 'pkmnpve:title-changed'
+
 /**
  * What the player's title changes in the Game Corner - the bet cap (High Roller) and
  * Plinko's edge slots (Edge Lord). The usual rules until it's loaded.
@@ -30,10 +33,16 @@ export function useGameCornerPerks(): GameCornerPerks {
     blackjackWinPayout: BLACKJACK_WIN_PAYOUT
   })
   useEffect(() => {
-    window.api
-      .getGameCornerPerks()
-      .then(setPerks)
-      .catch(() => {})
+    // Loaded again whenever the title changes (the trainer profile opens over the games).
+    const load = (): void => {
+      window.api
+        .getGameCornerPerks()
+        .then(setPerks)
+        .catch(() => {})
+    }
+    load()
+    window.addEventListener(TITLE_CHANGED_EVENT, load)
+    return () => window.removeEventListener(TITLE_CHANGED_EVENT, load)
   }, [])
   return perks
 }

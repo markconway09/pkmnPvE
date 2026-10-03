@@ -15,6 +15,7 @@ import { randomTrainerName } from './trainerNames'
 import TrainerSpritePicker from './TrainerSpritePicker'
 import TrainerTeamsSection from './TrainerTeamsSection'
 import ItemDropPicker from './ItemDropPicker'
+import FieldStartPicker from './FieldStartPicker'
 import { formatMoney } from './money'
 
 interface Props {
@@ -54,6 +55,9 @@ function TrainerEditor({ trainer, trainers, onClose, onSaved }: Props): React.JS
   const [teamRocket, setTeamRocket] = useState(trainer?.teamRocket ?? false)
   const [alwaysAvailable, setAlwaysAvailable] = useState(trainer?.alwaysAvailable ?? false)
   const [rocketEvent, setRocketEvent] = useState(trainer?.rocketEvent ?? false)
+  const [fieldWeather, setFieldWeather] = useState<string | null>(trainer?.fieldWeather ?? null)
+  const [fieldTerrain, setFieldTerrain] = useState<string | null>(trainer?.fieldTerrain ?? null)
+  const [fieldTrickRoom, setFieldTrickRoom] = useState(trainer?.fieldTrickRoom ?? false)
   // One row per possible reward, so an unused slot is a row with no item.
   const [drops, setDrops] = useState<ItemDropConfig[]>(() =>
     Array.from({ length: MAX_TRAINER_DROPS }, (_, i) => trainer?.drops[i] ?? { itemId: null, chance: 100 })
@@ -135,6 +139,10 @@ function TrainerEditor({ trainer, trainers, onClose, onSaved }: Props): React.JS
         teamRocket,
         alwaysAvailable,
         rocketEvent: isBoss && rocketEvent,
+        // Only a boss starts its fights with weather or terrain.
+        fieldWeather: isBoss ? fieldWeather : null,
+        fieldTerrain: isBoss ? fieldTerrain : null,
+        fieldTrickRoom: isBoss && fieldTrickRoom,
         drops: drops.filter((d) => d.itemId)
       }
       let id = trainerId
@@ -241,6 +249,16 @@ function TrainerEditor({ trainer, trainers, onClose, onSaved }: Props): React.JS
                   </label>
                 )}
               </div>
+              {isBoss && (
+                <FieldStartPicker
+                  weather={fieldWeather}
+                  terrain={fieldTerrain}
+                  onWeatherChange={setFieldWeather}
+                  onTerrainChange={setFieldTerrain}
+                trickRoom={fieldTrickRoom}
+                onTrickRoomChange={setFieldTrickRoom}
+                />
+              )}
             </div>
 
             <div className="trainer-editor-column">

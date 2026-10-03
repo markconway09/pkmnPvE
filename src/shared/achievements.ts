@@ -34,6 +34,8 @@ export type AchievementStat =
   | 'alcremieForms'
   // Minior's cores ever owned (all seven - see MINIOR_COLORS).
   | 'miniorColors'
+  // Different Pikachu forms owned at once (see PIKACHU_FORMS).
+  | 'pikachuForms'
   | 'money'
   | 'evolutions'
   | 'pokemonSold'
@@ -83,14 +85,32 @@ export type AchievementStat =
   | 'rouletteNumberWins'
   | 'plinkoDrops'
   | 'plinkoEdges'
+  // TMs: searches that found a TM, gold TMs found (searches and quick checks), searches
+  // ended by a wild Pokemon, the base areas (not Anywhere or the Lab) searched, Lab
+  // searches that found a TM, TMs owned, and types whose every TM is owned.
+  | 'tmSearches'
+  | 'legendaryTmsFound'
+  | 'tmAmbushes'
+  | 'tmAreasSearched'
+  | 'labSearches'
+  | 'tmsOwned'
+  | 'tmTypesCompleted'
+  // Skill checks: Greats hit, searches done with every check a Great (and gold ones), the
+  // longest run of Greats in a row, and needles left to go all the way round.
+  | 'skillGreats'
+  | 'flawlessSearches'
+  | 'flawlessLegendarySearches'
+  | 'bestGreatStreak'
+  | 'skillTimeouts'
 
-export type AchievementCategory = 'Battle' | 'Collection' | 'Merges & Raids' | 'Roguelite' | 'Draft' | 'Game Corner' | 'Secret'
+export type AchievementCategory = 'Battle' | 'Collection' | 'Merges & Raids' | 'Roguelite' | 'Draft' | 'TMs' | 'Game Corner' | 'Secret'
 export const ACHIEVEMENT_CATEGORIES: AchievementCategory[] = [
   'Battle',
   'Collection',
   'Merges & Raids',
   'Roguelite',
   'Draft',
+  'TMs',
   'Game Corner',
   'Secret'
 ]
@@ -426,6 +446,15 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     stat: 'miniorColors',
     goal: 7,
     reward: { money: 10000 }
+  },
+  {
+    id: 'pikachu',
+    name: 'Dress-Up Party',
+    description: 'Own 3 different Pikachu forms at once',
+    category: 'Collection',
+    stat: 'pikachuForms',
+    goal: 3,
+    reward: { keyItems: ['fashioncase'] }
   },
   {
     id: 'zygarde',
@@ -806,6 +835,116 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     reward: { title: 'Diligent' }
   },
 
+  // TMs
+  {
+    id: 'tmsearch1',
+    name: 'Rummager',
+    description: 'Find a TM by searching',
+    category: 'TMs',
+    stat: 'tmSearches',
+    goal: 1,
+    reward: { money: 1000 }
+  },
+  {
+    id: 'tmsearch100',
+    name: 'Treasure Hunter',
+    description: 'Find 100 TMs by searching',
+    category: 'TMs',
+    stat: 'tmSearches',
+    goal: 100,
+    reward: { money: 10000 }
+  },
+  {
+    id: 'tmgold',
+    name: 'Golden Find',
+    description: 'Find a gold TM',
+    category: 'TMs',
+    stat: 'legendaryTmsFound',
+    goal: 1,
+    reward: { title: 'Prospector' }
+  },
+  {
+    id: 'tmareas',
+    name: 'Explorer',
+    description: 'Search for TMs in all 7 areas',
+    category: 'TMs',
+    stat: 'tmAreasSearched',
+    goal: 7,
+    reward: { money: 5000 }
+  },
+  {
+    id: 'labsearch25',
+    name: 'Lab Rat',
+    description: 'Find 25 TMs by searching the Lab',
+    category: 'TMs',
+    stat: 'labSearches',
+    goal: 25,
+    reward: { items: [item('randomlegendary')] }
+  },
+  {
+    id: 'tmowned50',
+    name: 'Move Tutor',
+    description: 'Own 50 TMs',
+    category: 'TMs',
+    stat: 'tmsOwned',
+    goal: 50,
+    reward: { money: 5000 }
+  },
+  {
+    id: 'tmowned250',
+    name: 'Technical Machine',
+    description: 'Own 250 TMs',
+    category: 'TMs',
+    stat: 'tmsOwned',
+    goal: 250,
+    reward: { title: 'Walking Disc' }
+  },
+  {
+    id: 'tmtype',
+    name: 'Complete Set',
+    description: 'Own every TM of one type',
+    category: 'TMs',
+    stat: 'tmTypesCompleted',
+    goal: 1,
+    reward: { title: 'Specialist' }
+  },
+  {
+    id: 'greats500',
+    name: 'Steady Hands',
+    description: 'Hit 500 Greats in skill checks',
+    category: 'TMs',
+    stat: 'skillGreats',
+    goal: 500,
+    reward: { title: 'Steady Hands' }
+  },
+  {
+    id: 'flawlesssearch',
+    name: 'Flawless Search',
+    description: 'Finish a TM search with every check a Great',
+    category: 'TMs',
+    stat: 'flawlessSearches',
+    goal: 1,
+    reward: { money: 3000 }
+  },
+  {
+    id: 'flawlessgold',
+    name: 'Perfectionist',
+    description: 'Finish a gold TM search with every check a Great',
+    category: 'TMs',
+    stat: 'flawlessLegendarySearches',
+    goal: 1,
+    reward: { title: 'Hex Master' }
+  },
+  {
+    id: 'greatstreak',
+    name: 'On a Roll',
+    description: 'Hit 10 Greats in a row in skill checks',
+    category: 'TMs',
+    stat: 'bestGreatStreak',
+    goal: 10,
+    reward: { title: 'Unstoppable' }
+  },
+
   // Secret: shown as ??? until unlocked.
   {
     id: 'mergeshiny',
@@ -860,6 +999,24 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     stat: 'earlyRunLosses',
     goal: 1,
     reward: { items: [item('rarecandy')] }
+  },
+  {
+    id: 'tmambush',
+    name: 'Rude Awakening',
+    description: 'Wake a wild Pokémon while searching for a TM',
+    category: 'Secret',
+    stat: 'tmAmbushes',
+    goal: 1,
+    reward: { title: 'Light Sleeper' }
+  },
+  {
+    id: 'afk',
+    name: 'Asleep at the Wheel',
+    description: 'Let a skill check run out 10 times',
+    category: 'Secret',
+    stat: 'skillTimeouts',
+    goal: 10,
+    reward: { title: 'AFK' }
   }
 ]
 

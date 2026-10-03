@@ -33,8 +33,7 @@ function turnsText(turnsLeft: number | null): string {
 // Reflect/Light Screen/Aurora Veil, drawn as translucent 16:9 panels over the
 // side's Pokemon - one panel per active screen, each nudged off from the
 // others so they're all visible even stacked up. Side-wide, so (like
-// SideHazards) only rendered once per side rather than once per active
-// Pokemon.
+// SideHazards) drawn over each of the side's Pokemon in doubles.
 function SideScreens({ screens }: Props): React.JSX.Element | null {
   const active = SCREEN_ORDER.map((id) => screens.find((s) => s.id === id)).filter((s): s is FieldEffectView => !!s)
   if (active.length === 0) return null

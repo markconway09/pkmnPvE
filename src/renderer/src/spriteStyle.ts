@@ -67,6 +67,11 @@ export function fallbackSpriteUrl(facing: 'front' | 'back', spriteId: string): s
   return spriteUrl('2d-static', facing, spriteId)
 }
 
+/** Showdown's own name for a sprite id ("zamazenta-crowned" for "zamazentacrowned"). */
+export function showdownName(spriteId: string): string {
+  return SHOWDOWN_NAMES[spriteId] ?? spriteId
+}
+
 /** The normal form of a form's sprite id ("clefable" for "clefablemega"), or null if it isn't a form. */
 export function baseSpriteId(spriteId: string): string | null {
   const base = SHOWDOWN_NAMES[spriteId]?.split('-')[0]

@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'node:path'
+import { installMusicFolder } from './music-folder'
 import type {
   BattleEligibility,
   BossRematchInfo,
@@ -18,6 +19,7 @@ import type {
 import type { ItemQuantity, CompanionSizeChoice, WildLocationId } from '../shared/battle-types'
 import {
   WILD_LOCATIONS,
+  rollWildWeather,
   WILD_RANDOM_DROP_CHANCE,
   WISHING_PIECE_ITEM_ID,
   normalizeUsername,
@@ -102,6 +104,19 @@ import {
 import { getMoney, resetMoney, setMoney } from './showdown/money-store'
 import { buyCoinPrize, buyCoins, buyDailyCoinMon, buyDailyCoinOffer, getCoins, getDailyCoinMon, getDailyCoinOffer, getSlotRules, setCoins, spinSlots } from './showdown/game-corner-store'
 import {
+  abandonTmSearch,
+  buyScanner,
+  buyTmFromShop,
+  getTmCatalog,
+  getTmShop,
+  getTmState,
+  reportTmSearchCheck,
+  startTmSearch,
+  takeTmQuickCheck,
+  withTmLocks
+} from './showdown/tm-store'
+import type { SkillCheckResult } from '../shared/tms'
+import {
   dealBlackjack,
   doubleBlackjack,
   getBlackjackView,
@@ -146,6 +161,8 @@ import {
   swapRunMon,
   swapRunTeam,
   skipRunSwap,
+  takeRunRewardMon,
+  skipRunRewardMon,
   useRunFullRestore,
   useRunRevive,
   useRunAbilityCapsule,
@@ -177,8 +194,20 @@ import {
 import { getGalarFossilPartners, restoreFossil } from './showdown/fossil-store'
 import { openBagItem } from './showdown/open-item-store'
 import { eligibleRandomTrainers, isRocketEventActive } from './showdown/trainer-selection'
-import { abandonDraft, beginDraftBattle, draftEntryFee, getDraftView, pickDraftMon, startDraft } from './showdown/draft-store'
-import type { DraftFormat } from '../shared/draft'
+import {
+  abandonDraft,
+  beginDraftBattle,
+  chaosAbilityChoices,
+  chaosItemChoices,
+  chaosTutorMoves,
+  chooseChaosModifier,
+  draftEntryFee,
+  getDraftView,
+  pickDraftMon,
+  rerollDraftPack,
+  startDraft
+} from './showdown/draft-store'
+import type { ChaosModifierTarget, DraftFormat } from '../shared/draft'
 import {
   getPlayerSummary,
   isAdmin,
@@ -287,7 +316,10 @@ ipcMain.handle('battle:start', async (_event, locationId?: WildLocationId, level
     name: 'Wild',
     difficulty: 'easy',
     drops: wildDrop ? [wildDrop] : undefined,
-    randomDropChance: WILD_RANDOM_DROP_CHANCE
+    randomDropChance: WILD_RANDOM_DROP_CHANCE,
+    location: location?.id ?? 'all',
+    // Now and then the area's weather is up when the battle starts (never in the Cave or the Lab).
+    startField: { weather: rollWildWeather(location?.id ?? 'all') }
   }, { p1: getTeamMergeStars() })
   return activeBattle.getInitialView()
 })
@@ -350,8 +382,12 @@ ipcMain.handle('battle:startTrainer', async (_event, boss: boolean, rematchTrain
     spriteId: trainer.spriteId,
     drops: trainer.drops,
     teamDrop,
+    tmRewards: trainer.tmRewards,
     isBoss: trainer.isBoss,
-    noPrizeMoney: !!(boss && rematchTrainerId)
+    noPrizeMoney: !!(boss && rematchTrainerId),
+    startField: trainer.isBoss
+      ? { weather: trainer.fieldWeather, terrain: trainer.fieldTerrain, trickRoom: trainer.fieldTrickRoom }
+      : undefined
   }, { p1: getTeamMergeStars() })
   return activeBattle.getInitialView()
 })
@@ -508,6 +544,11 @@ ipcMain.handle('run:reorder', (_event, runMonIds: string[]) => reorderRunTeam(ru
 ipcMain.handle('run:swapMon', (_event, runMonId: string) => swapRunMon(runMonId))
 ipcMain.handle('run:swapTeam', () => swapRunTeam())
 ipcMain.handle('run:skipSwap', () => skipRunSwap())
+// A beaten villain's reward Pokemon: one taken (in someone's place, with a full team), or none.
+ipcMain.handle('run:takeRewardMon', (_event, index: number, replaceRunMonId?: string) =>
+  takeRunRewardMon(index, replaceRunMonId)
+)
+ipcMain.handle('run:skipRewardMon', () => skipRunRewardMon())
 ipcMain.handle('run:fullRestore', (_event, runMonId: string) => useRunFullRestore(runMonId))
 ipcMain.handle('run:revive', (_event, faintedId: string, replaceId?: string) => useRunRevive(faintedId, replaceId))
 ipcMain.handle('run:abilityCapsule', (_event, runMonId: string, abilityId: string) =>
@@ -534,17 +575,27 @@ ipcMain.handle('draft:entryFee', () => draftEntryFee())
 ipcMain.handle('draft:start', (_event, format: DraftFormat) => startDraft(format))
 ipcMain.handle('draft:pick', (_event, index: number) => pickDraftMon(index))
 ipcMain.handle('draft:abandon', () => abandonDraft())
+ipcMain.handle('draft:chaosAbilities', () => chaosAbilityChoices())
+ipcMain.handle('draft:reroll', () => rerollDraftPack())
+ipcMain.handle('draft:chaosItems', () => chaosItemChoices())
+ipcMain.handle('draft:chaosTutor', (_event, pick: number) => chaosTutorMoves(pick))
+ipcMain.handle('draft:chaosModifier', (_event, index: number, target?: ChaosModifierTarget) =>
+  chooseChaosModifier(index, target)
+)
 // The gauntlet's next battle, in the draft's format, with the picks brought (in lead order).
 ipcMain.handle('draft:battle', async (_event, bring: number[]) => {
-  const { format, p1team, opponent } = beginDraftBattle(bring)
-  const formatId = format === 'singles' ? 'gen9customgame' : 'gen9doublescustomgame'
+  const { format, p1team, opponent, chaos } = beginDraftBattle(bring)
+  const formatId = format === 'doubles' ? 'gen9doublescustomgame' : 'gen9customgame'
   activeBattle = new WildBattle(p1team, formatId, 'gen9randombattle', {
     team: opponent.team,
     name: opponent.name,
     difficulty: opponent.difficulty,
     trainerId: 'draft',
     spriteId: opponent.spriteId,
-    draft: true
+    draft: true,
+    // Chaos: its modifiers' starting field and stat boosts.
+    startField: chaos?.field,
+    statMultipliers: chaos ? { p1: chaos.boosts, p2: chaos.foeBoosts } : undefined
   })
   return activeBattle.getInitialView()
 })
@@ -627,6 +678,17 @@ ipcMain.handle('coins:dailyOffer', () => getDailyCoinOffer())
 ipcMain.handle('coins:buyDailyOffer', () => buyDailyCoinOffer())
 ipcMain.handle('coins:dailyMon', () => getDailyCoinMon())
 ipcMain.handle('coins:buyDailyMon', () => buyDailyCoinMon())
+
+// ---- TMs (see tm-store.ts) ----
+ipcMain.handle('tm:catalog', () => getTmCatalog())
+ipcMain.handle('tm:state', () => getTmState())
+ipcMain.handle('tm:startSearch', (_event, location: WildLocationId) => startTmSearch(location, allBossesDefeated()))
+ipcMain.handle('tm:searchCheck', (_event, result: SkillCheckResult, timedOut?: boolean) => reportTmSearchCheck(result, !!timedOut))
+ipcMain.handle('tm:abandonSearch', () => abandonTmSearch())
+ipcMain.handle('tm:quickCheck', (_event, result: SkillCheckResult, timedOut?: boolean) => takeTmQuickCheck(result, !!timedOut))
+ipcMain.handle('tm:shop', () => getTmShop())
+ipcMain.handle('tm:buy', (_event, moveId: string) => buyTmFromShop(moveId))
+ipcMain.handle('tm:buyScanner', () => buyScanner())
 ipcMain.handle('slots:spin', (_event, bet: number) => spinSlots(bet))
 ipcMain.handle('slots:rules', () => getSlotRules())
 ipcMain.handle('blackjack:view', () => getBlackjackView())
@@ -663,7 +725,9 @@ ipcMain.handle('fossil:restore', (_event, itemId: string, secondItemId?: string)
 )
 
 ipcMain.handle('dex:editorOptions', () => getEditorOptions())
-ipcMain.handle('dex:speciesInfo', (_event, species: string, level: number) => getSpeciesEditInfo(species, level))
+ipcMain.handle('dex:speciesInfo', (_event, species: string, level: number, knownMoves?: string[]) =>
+  withTmLocks(getSpeciesEditInfo(species, level, knownMoves), species, knownMoves)
+)
 
 ipcMain.handle('trainers:list', () => listTrainers())
 ipcMain.handle('trainers:add', (_event, input: Omit<Trainer, 'id'>) => {
@@ -796,6 +860,7 @@ ipcMain.handle('autoSets:build', (_event, species: string, level: number, option
 
 void app.whenReady().then(() => {
   restoreRememberedSession()
+  installMusicFolder()
   createWindow()
 
   app.on('activate', () => {

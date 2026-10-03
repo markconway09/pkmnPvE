@@ -8,6 +8,8 @@ import { DRAFT_MAX_WINS } from '../../shared/draft'
 import ItemSprite from './ItemSprite'
 import SpriteImage from './SpriteImage'
 import { formatMoney } from './money'
+import { TmCard, TmQuickCheck } from './TmBits'
+import type { TmInfo } from '../../shared/tms'
 
 interface Props {
   winner: string | null
@@ -31,6 +33,10 @@ interface Props {
   isRaid?: boolean
   // A Draft mode battle: the draft's record after it.
   draftResult?: DraftBattleResult | null
+  // A Classic wild win: one quick skill check for a TM from the area.
+  tmQuickCheck?: boolean
+  // TMs a beaten trainer gave.
+  tmRewards?: TmInfo[]
   onClose: () => void
 }
 
@@ -50,6 +56,8 @@ function BattleResultModal({
   raidGigantamax = false,
   isRaid = false,
   draftResult = null,
+  tmQuickCheck = false,
+  tmRewards = [],
   onClose
 }: Props): React.JSX.Element {
   const [confirmingLeave, setConfirmingLeave] = useState(false)
@@ -252,6 +260,16 @@ function BattleResultModal({
             ))}
           </div>
         )}
+        {tmRewards.length > 0 && (
+          <div className="tm-reward-row">
+            {tmRewards.map((tm) => (
+              <TmCard key={tm.moveId} tm={tm} framed className="tm-reward-card">
+                <span className="tm-find-note">New TM!</span>
+              </TmCard>
+            ))}
+          </div>
+        )}
+        {tmQuickCheck && <TmQuickCheck />}
         <div className="editor-actions">
           <button
             className={leaveNeedsConfirm && confirmingLeave ? 'confirm-button' : undefined}

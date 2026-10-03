@@ -34,11 +34,14 @@ type DraftStep = Omit<BossStep, 'id'>
 const DIFFICULTY_LABELS: Record<AiDifficulty, string> = { easy: 'Easy', normal: 'Normal', hard: 'Hard' }
 const TEAM_MODE_LABELS: Record<TeamMode, string> = { random: 'Random', monotype: 'Monotype', custom: 'Premade' }
 const CLASS_LABELS = Object.fromEntries(ROGUELITE_BOSS_CLASSES.map((c) => [c.id, c.label])) as Record<RogueliteBossClass, string>
-// How many of each class a generation needs for a whole run.
+// How many of each class a generation needs for a whole run - villains are optional
+// (a generation without any just never has a Villain Takeover).
 const CLASS_NEEDED: Record<RogueliteBossClass, number> = {
   gymLeader: ROGUELITE_GYM_LEADERS,
   eliteFour: ROGUELITE_ELITE_FOUR,
-  champion: 1
+  champion: 1,
+  villainGrunt: 0,
+  villainElite: 0
 }
 const DIFFICULTY_RANK: Record<AiDifficulty, number> = { easy: 0, normal: 1, hard: 2 }
 // Only so many rows are drawn at once - "Show more" adds the next lot.
@@ -545,7 +548,7 @@ function TrainerList({ onBack, onPremadeTeams, roguelite = false }: Props): Reac
             <button
               key={g}
               className={`trainer-coverage-gen${generations.has(g) ? ' trainer-chip-on' : ''}${complete ? ' trainer-coverage-complete' : total ? ' trainer-coverage-partial' : ' trainer-coverage-empty'}`}
-              title={`Generation ${g}: ${ROGUELITE_BOSS_CLASSES.map((c) => `${count(c.id)}/${CLASS_NEEDED[c.id]} ${c.label}`).join(', ')}${complete ? '' : ' - not enough for a whole run'}`}
+              title={`Generation ${g}: ${ROGUELITE_BOSS_CLASSES.map((c) => (c.villain ? `${count(c.id)} ${c.label}` : `${count(c.id)}/${CLASS_NEEDED[c.id]} ${c.label}`)).join(', ')}${complete ? '' : ' - not enough for a whole run'}`}
               onClick={() => toggle(generations, g, setGenerations)}
             >
               <span className="trainer-coverage-title">Gen {g}</span>
@@ -568,7 +571,7 @@ function TrainerList({ onBack, onPremadeTeams, roguelite = false }: Props): Reac
               <span className="trainer-coverage-counts">{noGeneration}</span>
             </button>
           )}
-          <span className="trainer-coverage-legend">Gym Leaders · Elite Four · Champion</span>
+          <span className="trainer-coverage-legend">Gym Leaders · Elite Four · Champion · Villain Grunts · Villain Elites</span>
         </div>
       )}
 

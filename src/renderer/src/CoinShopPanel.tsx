@@ -10,6 +10,8 @@ import { errorMessage, pointOf, useFloatingNotes } from './FloatingNotes'
 import BuyButton, { BuyButtonGroup } from './BuyButton'
 import RarityCard, { RarityGlow } from './RarityCard'
 import { coinPrizeRarityTier } from '../../shared/rarity'
+import type { TmShopView } from '../../shared/tms'
+import { TmCard } from './TmBits'
 
 // Each coin pack's name, smallest to biggest.
 const PACK_NAMES = ['Handful', 'Pouch', 'Sack', 'Chest']
@@ -58,6 +60,8 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange }: Props): React.JSX.Eleme
   // A bulk button under the mouse: its prize's main button shows that many's total meanwhile.
   const [bulkHover, setBulkHover] = useState<{ itemId: string; n: number } | null>(null)
   const notes = useFloatingNotes()
+  // Today's TMs (a set only ever sold here) and the Scanner key item.
+  const [tmShop, setTmShop] = useState<TmShopView | null>(null)
 
   // The Raid Crystal and the Shiny Patch are locked until Max Raids open (see BattleEligibility.raidsUnlocked).
   const [raidLock, setRaidLock] = useState<{ unlocked: boolean; boss: string | null } | null>(null)
@@ -83,6 +87,10 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange }: Props): React.JSX.Eleme
     window.api
       .getDailyCoinMon()
       .then(setDailyMon)
+      .catch(() => {})
+    window.api
+      .getTmShop()
+      .then(setTmShop)
       .catch(() => {})
   }, [])
 
@@ -139,6 +147,26 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange }: Props): React.JSX.Eleme
       return result.quantity > 1
         ? `Got ${result.quantity} ${result.itemName} - they're in your bag`
         : `Got a ${result.itemName} - it's in your bag`
+    })
+  }
+
+  function buyTm(e: React.MouseEvent, moveId: string, name: string): void {
+    void act(e, async () => {
+      const result = await window.api.buyTm(moveId)
+      setCoins(result.coins)
+      onCoinsChange(result.coins)
+      setTmShop(result.shop)
+      return `Got the ${name} TM`
+    })
+  }
+
+  function buyScanner(e: React.MouseEvent): void {
+    void act(e, async () => {
+      const result = await window.api.buyTmScanner()
+      setCoins(result.coins)
+      onCoinsChange(result.coins)
+      setTmShop(result.shop)
+      return "Got the Scanner - it's in your Key Items"
     })
   }
 
@@ -266,6 +294,49 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange }: Props): React.JSX.Eleme
           )
         })}
       </div>
+
+      {tmShop && (
+        <>
+          <div className="coin-shop-section-head">
+            <h3>TMs of the day</h3>
+            <span>Only ever sold here · a new set every day</span>
+          </div>
+          {/* The Scanner: a key item, bought once - in a banner above the day's TMs. */}
+          <RarityCard tier="legendary" framed dimmed={tmShop.hasScanner} className="coin-scanner">
+            <RarityGlow size={64} className="coin-scanner-art">
+              <img className="coin-scanner-icon" src="./sprites/misc/scanner.png" alt="" />
+            </RarityGlow>
+            <span className="coin-scanner-text">
+              <span className="coin-scanner-name">
+                Scanner <span className="coin-scanner-tag">Key item</span>
+              </span>
+              <span className="coin-scanner-note">
+                {tmShop.hasScanner
+                  ? 'Owned - a quick TM search waits after every wild win'
+                  : 'Unlocks a quick TM search after every wild win: a Good finds one 5% of the time, a Great 15%'}
+              </span>
+            </span>
+            <span className="coin-scanner-buy">
+              {tmShop.hasScanner ? (
+                <span className="coin-tm-owned">✓ Owned</span>
+              ) : (
+                <BuyButton price={tmShop.scannerCoins} currency="coins" held={coins} busy={busy} onBuy={buyScanner} />
+              )}
+            </span>
+          </RarityCard>
+          <div className="coin-tm-grid">
+            {tmShop.offers.map((offer) => (
+              <TmCard key={offer.tm.moveId} tm={offer.tm} dimmed={offer.owned} className="coin-tm-card">
+                {offer.owned ? (
+                  <span className="coin-tm-owned">Owned</span>
+                ) : (
+                  <BuyButton price={offer.coins} currency="coins" held={coins} busy={busy} onBuy={(e) => buyTm(e, offer.tm.moveId, offer.tm.name)} />
+                )}
+              </TmCard>
+            ))}
+          </div>
+        </>
+      )}
 
       {dailyMon && (
         <>

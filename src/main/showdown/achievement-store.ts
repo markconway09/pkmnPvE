@@ -13,6 +13,7 @@ import { boxAchievementStats } from './box-store'
 import { changeCoins } from './game-corner-store'
 import { addMoney, getMoney } from './money-store'
 import { getEditorOptions } from './sim-access'
+import { tmAchievementStats } from './tm-store'
 import { getTrainerProfile } from './trainer-profile'
 
 /**
@@ -27,6 +28,7 @@ function currentStats(): Record<AchievementStat, number> {
   const { stats, league } = getTrainerProfile()
   const box = boxAchievementStats()
   const counters = getAchievementProgress().counters
+  const tms = tmAchievementStats()
   const beaten = (group: string): number => league.filter((l) => l.group === group && l.defeated).length
   return {
     battlesWon: stats.trainersDefeated + stats.wildDefeated + stats.bossesDefeated,
@@ -52,6 +54,7 @@ function currentStats(): Record<AchievementStat, number> {
     maxFriendship: box.maxFriendship,
     alcremieForms: box.alcremieForms,
     miniorColors: box.miniorColors,
+    pikachuForms: box.pikachuForms,
     money: getMoney(),
     bestFloor: stats.bestFloor,
     evolutions: counters.evolutions ?? 0,
@@ -89,7 +92,19 @@ function currentStats(): Record<AchievementStat, number> {
     rouletteSpins: counters.rouletteSpins ?? 0,
     rouletteNumberWins: counters.rouletteNumberWins ?? 0,
     plinkoDrops: counters.plinkoDrops ?? 0,
-    plinkoEdges: counters.plinkoEdges ?? 0
+    plinkoEdges: counters.plinkoEdges ?? 0,
+    tmSearches: counters.tmSearches ?? 0,
+    legendaryTmsFound: counters.legendaryTmsFound ?? 0,
+    tmAmbushes: counters.tmAmbushes ?? 0,
+    tmAreasSearched: tms.tmAreasSearched,
+    labSearches: counters.labSearches ?? 0,
+    tmsOwned: tms.tmsOwned,
+    tmTypesCompleted: tms.tmTypesCompleted,
+    skillGreats: counters.skillGreats ?? 0,
+    flawlessSearches: counters.flawlessSearches ?? 0,
+    flawlessLegendarySearches: counters.flawlessLegendarySearches ?? 0,
+    bestGreatStreak: counters.bestGreatStreak ?? 0,
+    skillTimeouts: counters.skillTimeouts ?? 0
   }
 }
 

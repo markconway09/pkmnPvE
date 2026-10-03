@@ -9,7 +9,7 @@ import {
   type DragEndEvent,
   type DragStartEvent
 } from '@dnd-kit/core'
-import { CONFIRM_SELL_TIERS, POKEMON_SELL_PRICES, WILD_LOCATIONS } from '../../shared/battle-types'
+import { CONFIRM_SELL_TIERS, MERGE_MAX_STARS, POKEMON_SELL_PRICES, WILD_LOCATIONS } from '../../shared/battle-types'
 import type {
   BattleEligibility,
   BattleView,
@@ -55,8 +55,10 @@ import GameCornerModal from './GameCornerModal'
 import SearchBar from './SearchBar'
 import type { AchievementsState } from '../../shared/achievements'
 import { LOCATION_BUTTON_BACKDROP, backdropUrl, locationIconUrl } from './battleScenery'
+import { TmSearchStrip, useTmSearch } from './TmSearch'
 import { formatMoney } from './money'
 import ShinyIcon from './ShinyIcon'
+import MusicPlayer from './MusicPlayer'
 
 interface Props {
   // A wild battle - in that location, or the one last picked.
@@ -164,12 +166,16 @@ const PAGE_TITLES: Record<MenuPage, string> = {
 const PAGE_KEYS: Record<string, MenuPage> = {
   '0': 'home',
   '1': 'classic',
-  '2': 'box',
-  '3': 'roguelite',
-  '4': 'draft',
-  '5': 'raid',
-  '6': 'corner'
+  '2': 'roguelite',
+  '3': 'draft',
+  '4': 'raid',
+  '5': 'corner',
+  '6': 'box'
 }
+
+// The dock's small box builds its cards a few rows at a time (see dockBoxBuilt).
+const DOCK_BOX_FIRST_CARDS = 40
+const DOCK_BOX_CARDS_PER_FRAME = 40
 
 // Players who've asked their system for less motion get the switch without the effects.
 function reducedMotion(): boolean {
@@ -239,11 +245,21 @@ function MainMenu({
   const runInProgress = mode === 'roguelite' && run?.status === 'active'
   // Draft mode never uses the box, so it always has the whole menu too.
   const fullPanel = runInProgress || mode === 'draft'
+  // A small box pulled up under the team dock (its PC button), to drag Pokemon from it
+  // without going to the Box page. It closes again on changing page, and has its own search.
+  const [dockBoxOpen, setDockBoxOpen] = useState(false)
+  const [dockBoxSearch, setDockBoxSearch] = useState('')
+  useEffect(() => setDockBoxOpen(false), [mode])
+  // How many of its cards are built so far: the first rows at once, the rest a few rows
+  // a frame after, so a big box opens without a pause.
+  const [dockBoxBuilt, setDockBoxBuilt] = useState(DOCK_BOX_FIRST_CARDS)
   const [levelCap, setLevelCap] = useState<number | null>(null)
   const [eligibility, setEligibility] = useState<BattleEligibility | null>(null)
   const [busy, setBusy] = useState(false)
   const [editingMonId, setEditingMonId] = useState<string | null>(null)
   const [editingAdmin, setEditingAdmin] = useState(false)
+  // Opened from the right-click Change Form: the editor scrolls to and highlights its Form changes.
+  const [editingFocusForms, setEditingFocusForms] = useState(false)
   // Bumped to reopen the edit window fresh (after evolving from it).
   const [editorVersion, setEditorVersion] = useState(0)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -509,10 +525,11 @@ function MainMenu({
     setContextMenu({ mon, x: e.clientX, y: e.clientY })
   }
 
-  function openEditor(monId: string, admin: boolean): void {
+  function openEditor(monId: string, admin: boolean, focusForms = false): void {
     setContextMenu(null)
     setEditingMonId(monId)
     setEditingAdmin(admin)
+    setEditingFocusForms(focusForms)
   }
 
   async function evolve(monId: string, targetSpecies: string): Promise<void> {
@@ -528,7 +545,8 @@ function MainMenu({
   // Favorites are kept safe from a bulk sell, and a fused Pokemon has to be unfused first.
   const canBulkSell = (mon: BoxPokemonView): boolean => !mon.favorite && !mon.unfuse
   // Merging takes favorites (the heart carries over), but not a fused Pokemon.
-  const canBulkMerge = (mon: BoxPokemonView): boolean => !mon.unfuse
+  // A 5-star one is done merging - it can be neither the keeper nor merged away.
+  const canBulkMerge = (mon: BoxPokemonView): boolean => !mon.unfuse && (mon.mergeStars ?? 0) < MERGE_MAX_STARS
   const canSelect = boxSelectMode === 'merge' ? canBulkMerge : canBulkSell
 
   function toggleBoxSelected(mon: BoxPokemonView): void {
@@ -668,6 +686,11 @@ function MainMenu({
     try {
       setBoxState(await window.api.changeForm(monId, form))
       setEditorVersion((v) => v + 1)
+      // A cream change is only the look; any other form comes with a new set.
+      notes.show(
+        form.startsWith('Alcremie') ? `Changed into ${form}` : `Changed into ${form} - it has a new set to match`,
+        { x: window.innerWidth / 2, y: window.innerHeight / 3 }
+      )
     } catch (e) {
       notes.show(errorMessage(e), { x: window.innerWidth / 2, y: window.innerHeight / 3 }, 'bad')
     }
@@ -678,21 +701,6 @@ function MainMenu({
     setBusy(true)
     try {
       setBoxState(await window.api.useShinyPatch(monId))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  // A form-change item (Rotom Catalog, Prison Bottle...): a new form, with a Smogon set for it.
-  async function changeForm(monId: string, form: string, at: { x: number; y: number }): Promise<void> {
-    setContextMenu(null)
-    setBusy(true)
-    try {
-      setBoxState(await window.api.changeForm(monId, form))
-      // A cream change is only the look; any other form comes with a new set.
-      notes.show(form.startsWith('Alcremie') ? `Changed into ${form}` : `Changed into ${form} - it has a new set to match`, at)
-    } catch (e) {
-      notes.show(errorMessage(e), at, 'bad')
     } finally {
       setBusy(false)
     }
@@ -801,6 +809,7 @@ function MainMenu({
     if (overId.startsWith(RUN_SLOT_DROP_PREFIX)) return
     if (overId === RUN_STARTER_SLOT_ID) {
       setRunPickId(draggedId)
+      setDockBoxOpen(false)
     } else if (overId === COMPANION_SLOT_ID) {
       handleCompanionDrop(draggedId)
     } else if (overId === 'box-drop-zone') {
@@ -814,10 +823,8 @@ function MainMenu({
   const monsById = new Map((boxState?.mons ?? []).map((m) => [m.id, m]))
   // Favorites first, then the chosen order (arrival order by default).
   const sortDirection = boxSortDescending ? -1 : 1
-  const boxMons = (boxState?.mons ?? [])
+  const sortedBoxMons = (boxState?.mons ?? [])
     .filter((m) => !team.includes(m.id))
-    .filter((m) => matchesBoxSearch(m, boxSearch))
-    .filter((m) => BOX_FILTERS.every((f) => !boxFilters.has(f.key) || f.test(m)))
     .sort(
       (a, b) =>
         Number(!!b.favorite) - Number(!!a.favorite) ||
@@ -826,6 +833,9 @@ function MainMenu({
         (boxSort === 'stars' ? (a.dexNum ?? 0) - (b.dexNum ?? 0) : 0) ||
         (a.arrival ?? 0) - (b.arrival ?? 0)
     )
+  const boxMons = sortedBoxMons
+    .filter((m) => matchesBoxSearch(m, boxSearch))
+    .filter((m) => BOX_FILTERS.every((f) => !boxFilters.has(f.key) || f.test(m)))
   const teamCount = team.filter(Boolean).length
   const teamEmpty = teamCount === 0
   const boxEmpty = (boxState?.mons.length ?? 0) === 0
@@ -846,6 +856,8 @@ function MainMenu({
   } else bossHint = `Ready: ${nextBoss.trainerName}`
   // Every boss beaten: Boss Battle becomes the rematch menu.
   const allBossesDefeated = !!eligibility?.allBossesDefeated
+  // TM searches: a strip along the bottom of each wild area's tile.
+  const tmSearch = useTmSearch((id) => onFight(id))
   if (allBossesDefeated) bossHint = 'Fight any boss again'
 
   // The wild level tile fills what's left of the wild grid's last row (four to a row,
@@ -880,6 +892,21 @@ function MainMenu({
   // a Roguelite run (drag a team member onto the starter slot); it stays loaded elsewhere.
   const dockShown =
     mode === 'home' || mode === 'classic' || mode === 'box' || mode === 'raid' || (mode === 'roguelite' && !runInProgress)
+  const dockBoxShown = dockBoxOpen && dockShown && !dockCollapsed && mode !== 'box'
+  const boxSize = boxState?.mons.length ?? 0
+  useEffect(() => {
+    setDockBoxBuilt(DOCK_BOX_FIRST_CARDS)
+    if (!dockBoxShown) return
+    let built = DOCK_BOX_FIRST_CARDS
+    let frame = 0
+    const grow = (): void => {
+      built += DOCK_BOX_CARDS_PER_FRAME
+      setDockBoxBuilt(built)
+      if (built < boxSize) frame = requestAnimationFrame(grow)
+    }
+    frame = requestAnimationFrame(grow)
+    return () => cancelAnimationFrame(frame)
+  }, [dockBoxShown, boxSize])
   // The dock itself, and the picture that follows the pointer while a Pokemon is dragged.
   const teamDock = (
     <TeamDock
@@ -904,6 +931,9 @@ function MainMenu({
       onManage={() => setLoadoutsOpen(true)}
       manageOpen={loadoutsOpen}
       leadCount={mode === 'raid' ? 2 : 0}
+      // The Box page already shows the whole box, so no PC button there.
+      boxOpen={dockBoxShown}
+      onToggleBox={mode === 'box' ? undefined : () => setDockBoxOpen((open) => !open)}
       collapsed={dockCollapsed}
       onCollapsedChange={collapseDock}
     />
@@ -951,9 +981,11 @@ function MainMenu({
         onOptions={onOptions}
       />
       <div className="menu-content">
-      {/* The open page's name on the left, the player card on the right. */}
+      {/* The open page's name on the left, the music player (while music is on) in the
+          middle, the player card on the right. */}
       <div className="menu-header">
         <h1 className={`menu-page-title menu-page-title-${mode}`}>{PAGE_TITLES[mode]}</h1>
+        <MusicPlayer />
         <div className="menu-nav">
           {/* The player: their trainer, name, title and money. A click anywhere on it opens
               the Trainer Card; hovering it opens a menu with the rarer things. */}
@@ -999,6 +1031,11 @@ function MainMenu({
                   icon: <img className="nav-menu-icon" src="./icons/nav/challenge.png" alt="" />,
                   action: () => setChallengeOpen(true)
                 },
+                {
+                  label: 'Options',
+                  icon: <img className="nav-menu-icon" src="./icons/nav/options.png" alt="" />,
+                  action: onOptions
+                },
                 ...(isAdmin
                   ? [{ label: 'Debug', icon: <span className="nav-menu-icon">🛠</span>, action: () => setDebugOpen(true) }]
                   : [])
@@ -1034,6 +1071,7 @@ function MainMenu({
           bossHint={bossHint}
           run={run}
           bestFloor={bestFloor}
+          boxCount={boxState ? boxState.mons.length : null}
           missions={missions}
           fightBusy={fightBusy}
           onGo={goTo}
@@ -1041,6 +1079,12 @@ function MainMenu({
             refreshMissions()
             setRewardsTab('missions')
           }}
+          rewardsWaiting={claimableMissions + unclaimedAchievements}
+          onBag={() => setBagShopTab('bag')}
+          onShop={() => setBagShopTab('shop')}
+          onPokedex={() => setPokedexOpen(true)}
+          onRewards={openRewards}
+          onOptions={onOptions}
         />
       ) : mode === 'raid' ? (
         <RaidPage
@@ -1181,20 +1225,27 @@ function MainMenu({
           </div>
           <div className="classic-wild-grid">
             {WILD_LOCATIONS.filter((loc) => !loc.requiresAllBosses || allBossesDefeated).map((loc) => (
-              <button
-                key={loc.id}
-                className={`classic-wild-tile classic-wild-${loc.id}${wildLocation === loc.id ? ' classic-wild-tile-last' : ''}`}
-                disabled={fightBusy || teamEmpty}
-                title={wildLocation === loc.id ? `${loc.label} - where you last searched` : `Find a wild Pokémon: ${loc.label}`}
-                style={{ backgroundImage: `url(${backdropUrl(LOCATION_BUTTON_BACKDROP[loc.id])})` }}
-                onClick={() => onFight(loc.id)}
-              >
-                <span className="classic-wild-go">Battle ▸</span>
-                <span className="classic-wild-label">
-                  <img className="classic-wild-icon" src={locationIconUrl(loc.id)} alt="" />
-                  {loc.id === 'all' ? 'Anywhere' : loc.label}
-                </span>
-              </button>
+              <div key={loc.id} className={`classic-wild-cell classic-wild-${loc.id}`}>
+                <button
+                  className={`classic-wild-tile${wildLocation === loc.id ? ' classic-wild-tile-last' : ''}`}
+                  disabled={fightBusy || teamEmpty}
+                  title={wildLocation === loc.id ? `${loc.label} - where you last searched` : `Find a wild Pokémon: ${loc.label}`}
+                  style={{ backgroundImage: `url(${backdropUrl(LOCATION_BUTTON_BACKDROP[loc.id])})` }}
+                  onClick={() => onFight(loc.id)}
+                >
+                  <span className="classic-wild-go">Battle ▸</span>
+                  <span className="classic-wild-label">
+                    <img className="classic-wild-icon" src={locationIconUrl(loc.id)} alt="" />
+                    {loc.id === 'all' ? 'Anywhere' : loc.label}
+                  </span>
+                </button>
+                <TmSearchStrip
+                  location={loc}
+                  state={tmSearch.state}
+                  disabled={fightBusy}
+                  onSearch={() => tmSearch.open(loc)}
+                />
+              </div>
             ))}
             {/* The wild level, in the room left on the last row: the level big, - / + either
                 side (or the mouse wheel over it), quick picks, and a bar along the bottom
@@ -1263,6 +1314,8 @@ function MainMenu({
               />
             </div>
           </div>
+
+          {tmSearch.modal}
 
           {/* Trainers: the next trainer, and the next boss (or a rematch once all are beaten). */}
           <div className="classic-section-head">
@@ -1515,8 +1568,35 @@ function MainMenu({
       {/* The team dock: one, always loaded, floating over the bottom of every page that
           uses the team - it slides away where the team isn't used (Draft, the Game Corner,
           a run in progress) and back again, never reloading. */}
-      <div className={`team-dock-holder${dockShown ? '' : ' team-dock-holder-hidden'}`} aria-hidden={!dockShown}>
+      <div
+        className={`team-dock-holder${dockShown ? '' : ' team-dock-holder-hidden'}${dockBoxShown ? ' team-dock-holder-raised' : ''}`}
+        aria-hidden={!dockShown}
+      >
         {teamDock}
+        {/* The small box pulled up from under the dock, which rises to make room for it. */}
+        {dockBoxShown && (
+          <div className="team-dock-box">
+            <div className="team-dock-box-head">
+              <img className="team-dock-box-icon" src="./icons/nav/box.png" alt="" />
+              <span className="team-dock-box-title">
+                Box <span className="box-count">· {sortedBoxMons.length}</span>
+              </span>
+              <SearchBar
+                className="team-dock-box-search"
+                value={dockBoxSearch}
+                onChange={setDockBoxSearch}
+                placeholder="Search name, type, move…"
+                autoFocus={false}
+              />
+            </div>
+            <BoxGrid
+              mons={sortedBoxMons.filter((m) => matchesBoxSearch(m, dockBoxSearch)).slice(0, dockBoxBuilt)}
+              onEdit={(id) => openEditor(id, false)}
+              onContextMenu={handleContextMenu}
+              emptyHint={dockBoxSearch.trim() ? 'No Pokemon in the box match that search.' : undefined}
+            />
+          </div>
+        )}
       </div>
       {dragOverlay}
       </DndContext>
@@ -1530,7 +1610,9 @@ function MainMenu({
           onClose={() => {
             setEditingMonId(null)
             setEditingAdmin(false)
+            setEditingFocusForms(false)
           }}
+          focusForms={editingFocusForms}
           onSaved={refreshBox}
           favorite={!!monsById.get(editingMonId)?.favorite}
           mergeStars={monsById.get(editingMonId)?.mergeStars ?? 0}
@@ -1668,7 +1750,7 @@ function MainMenu({
           onUseShinyPatch={() => void useShinyPatch(contextMenu.mon.id)}
           shinyPatches={contextMenu.mon.shinyPatches}
           formChanges={contextMenu.mon.formChanges}
-          onChangeForm={(form) => void changeForm(contextMenu.mon.id, form, { x: contextMenu.x, y: contextMenu.y })}
+          onOpenForms={() => openEditor(contextMenu.mon.id, false, true)}
           fusions={contextMenu.mon.fusions}
           onFuse={(partnerId) =>
             void fusionAction(

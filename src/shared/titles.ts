@@ -29,6 +29,14 @@ export type Title =
   | 'Diligent'
   | 'Croupier'
   | 'Grand Drafter'
+  | 'Prospector'
+  | 'Light Sleeper'
+  | 'Walking Disc'
+  | 'Specialist'
+  | 'Steady Hands'
+  | 'Hex Master'
+  | 'Unstoppable'
+  | 'AFK'
 
 // What each title does, for the title pickers.
 export const TITLE_PERKS: Record<Title, string> = {
@@ -48,7 +56,7 @@ export const TITLE_PERKS: Record<Title, string> = {
   'Edge Lord': "Plinko's edge slots pay double and the slots next to them 25% more, at every risk",
   Heartless: 'Pokemon sell for 15% more',
   Broker: 'Grey, blue and purple Pokemon sell for double',
-  '9+10': 'Blackjack pays 4:1 instead of 3:2, and a regular win 2:1 instead of 1:1',
+  '9+10': 'Blackjack pays 4:1 instead of 3:2, and a regular win 3:2 instead of 1:1',
   'Five-Star': 'Gold legendaries turn up twice as often as raid bosses',
   Alchemist: '10% chance to find a random evolution item when selling a Pokémon',
   'Raid Leader': 'Raid bosses are caught with 2 extra copies',
@@ -56,7 +64,15 @@ export const TITLE_PERKS: Record<Title, string> = {
   Starlight: 'Raid bosses are 3× as likely to be shiny (5× with the Shiny Charm)',
   Diligent: 'One extra daily mission reroll',
   Croupier: 'A losing roulette spin has a 10% chance to give every bet back',
-  'Grand Drafter': 'Drafts cost 25% less to enter'
+  'Grand Drafter': 'Drafts cost 25% less to enter',
+  Prospector: 'TM searches find gold TMs twice as often',
+  'Light Sleeper': 'A TM search takes one extra miss before a wild Pokemon wakes',
+  'Walking Disc': 'A TM you already own pays double',
+  Specialist: "A TM search that finds a TM has a 50% chance to give the area's search back",
+  'Steady Hands': "A TM search's Great slice is 50% wider",
+  'Hex Master': 'A TM search needs one less Great to come up a rarity higher',
+  Unstoppable: "The Scanner's quick check is twice as likely to turn up a TM",
+  AFK: "A missed check doesn't knock a TM search back a step"
 }
 
 /** A title's perk, for showing beside it ("" for a title without one). */
@@ -90,9 +106,9 @@ export const BROKER_DOUBLE_TIERS = new Set(['common', 'uncommon', 'rare'])
 // A natural blackjack's payout, to 1: 3:2 normally, 4:1 with 9+10.
 export const BLACKJACK_PAYOUT = 1.5
 export const NINE_PLUS_TEN_BLACKJACK_PAYOUT = 4
-// An ordinary win, to 1: 1:1 normally, 2:1 with 9+10.
+// An ordinary win, to 1: 1:1 normally, 3:2 with 9+10.
 export const BLACKJACK_WIN_PAYOUT = 1
-export const NINE_PLUS_TEN_WIN_PAYOUT = 2
+export const NINE_PLUS_TEN_WIN_PAYOUT = 1.5
 // Max Raid and merging perks.
 export const FIVE_STAR_RESTRICTED_CHANCE = 0.3
 // Alchemist: how often each Pokemon sold turns up a random evolution item.
@@ -105,6 +121,14 @@ export const CROUPIER_REFUND_CHANCE = 0.1
 // Starlight's raid boss shiny multiplier - in place of the Shiny Charm's 3x, not on top of it.
 export const STARLIGHT_RAID_MULTIPLIER = 3
 export const STARLIGHT_RAID_CHARM_MULTIPLIER = 5
+// TM perks (see tm-store.ts).
+export const PROSPECTOR_LEGENDARY_WEIGHT_MULTIPLIER = 2
+export const LIGHT_SLEEPER_EXTRA_MISSES = 1
+export const WALKING_DISC_PAYOUT_MULTIPLIER = 2
+export const SPECIALIST_REFUND_CHANCE = 0.5
+export const STEADY_HANDS_GREAT_MULTIPLIER = 1.5
+export const HEX_MASTER_SPARE_CHECKS = 1
+export const UNSTOPPABLE_QUICK_CHECK_MULTIPLIER = 2
 
 // What the Game Corner's games need to know about the player's title.
 export interface GameCornerPerks {

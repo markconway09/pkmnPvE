@@ -25,6 +25,8 @@ import {
   MINIOR_COLORS,
   COMPANION_ACHIEVEMENT_ID,
   DECORATION_BOX_ITEM_ID,
+  FASHION_CASE_ITEM_ID,
+  PIKACHU_FORMS,
   COMPANION_SIZES,
   autoCompanionSize,
   MERGE_MAX_STARS,
@@ -83,6 +85,7 @@ import { countAchievement, getAchievementProgress, recordAchievementBest } from 
 import { hasTitle, monSellPrice } from './title-perks'
 import { ALCHEMIST_ITEM_CHANCE } from '../../shared/titles'
 import { buildAutoSet, listAutoSets } from './auto-sets'
+import { getTmCatalog, lockedTmMoves } from './tm-store'
 
 interface StoredMon {
   id: string
@@ -278,6 +281,11 @@ export function getPokedex(): PokedexEntry[] {
 // same form, or a pre-evolution into its evolution (Charmander into Charizard, Eevee into
 // Vaporeon - never the other way, see canMergeInto). A fused one can take in a duplicate
 // but can't be merged away (its partner would go with it).
+// At 5 stars (MERGE_MAX_COPIES): never merged into, nor merged away into another.
+function isMergeMaxed(mon: StoredMon): boolean {
+  return (mon.copies ?? 1) >= MERGE_MAX_COPIES
+}
+
 function mergeGroups(mons: StoredMon[]): Map<string, StoredMon[]> {
   const groups = new Map<string, StoredMon[]>()
   for (const mon of mons) {
@@ -290,10 +298,15 @@ function mergeGroups(mons: StoredMon[]): Map<string, StoredMon[]> {
 function mergeCandidatesFor(mon: StoredMon, groups: Map<string, StoredMon[]>): MergeCandidateView[] {
   // Only a fully evolved Pokemon takes merges.
   if (!isFullyEvolved(mon.set.species)) return []
+  // A 5-star one is done: it takes nothing more in and is never merged away, so it
+  // doesn't count as anyone's duplicate either.
+  if (isMergeMaxed(mon)) return []
   const { team: teamSlots, companionId } = getState()
   const team = new Set(teamSlots)
   return (groups.get(mergeLineOf(mon.set.species).root) ?? [])
-    .filter((other) => other.id !== mon.id && !other.fusedWith && canMergeInto(mon.set.species, other.set.species))
+    .filter(
+      (other) => other.id !== mon.id && !other.fusedWith && !isMergeMaxed(other) && canMergeInto(mon.set.species, other.set.species)
+    )
     .map((other) => {
       const evolution = mergeEvolutionFor(other.set, mon.set.species, new Map())
       const used = new Map<string, number>()
@@ -450,6 +463,7 @@ export function boxAchievementStats(): {
   maxFriendship: number
   alcremieForms: number
   miniorColors: number
+  pikachuForms: number
 } {
   const box = getState()
   if (!box.registeredForms || !box.registered || !box.registeredLooks) registerOwnedSpecies()
@@ -475,7 +489,8 @@ export function boxAchievementStats(): {
     dexForms: Math.max(0, box.registeredForms!.length - species),
     maxFriendship: mons.filter(atMaxFriendship).length,
     alcremieForms: box.registeredForms!.filter((f) => ALCREMIE_FORMS.includes(f)).length,
-    miniorColors: (box.registeredLooks ?? []).filter((f) => MINIOR_COLORS.includes(f)).length
+    miniorColors: (box.registeredLooks ?? []).filter((f) => MINIOR_COLORS.includes(f)).length,
+    pikachuForms: new Set(mons.map((m) => dexFormOf(m.set.species)).filter((f) => PIKACHU_FORMS.includes(f))).size
   }
 }
 
@@ -684,6 +699,15 @@ export function updateMon(id: string, input: EditablePokemonSet, admin = false):
   const previousLevel = mon.set.level
   const previousItem = mon.set.item
   const newItem = input.item
+  // A move it learns only by TM needs that TM - unless it already knows it.
+  if (!admin) {
+    const locked = lockedTmMoves(input.species, mon.set.moves)
+    const blocked = input.moves.find((m) => locked.has(toID(m)))
+    if (blocked) {
+      const name = getTmCatalog().find((t) => t.moveId === toID(blocked))?.name ?? blocked
+      throw new Error(`${name} needs its TM - find it first`)
+    }
+  }
   if (!admin && newItem !== previousItem) {
     // Check the new item before touching anything else, so a failed equip
     // (item not actually in the bag) leaves the mon and bag both untouched.
@@ -736,6 +760,7 @@ function mergeInto(keeperId: string, fodderIds: string[]): number {
     throw new Error(`Only another ${species}, or one of its pre-evolutions, can be merged in`)
   }
   if (fodder.some((m) => m.fusedWith)) throw new Error('Unfuse it first - its partner would be merged away with it')
+  if (fodder.some(isMergeMaxed)) throw new Error(`A ${MERGE_MAX_STARS}-star Pokemon can't be merged into another`)
   if (fodder.some((m) => m.id === box.companionId)) {
     throw new Error("Your companion can't be merged into anything - take it out of the companion slot first")
   }
@@ -848,7 +873,7 @@ export function mergeSelectedMons(ids: string[]): { box: BoxState; merged: numbe
 function bestMergeKeeperFor(monId: string): StoredMon | null {
   const box = getState()
   const mon = box.mons.find((m) => m.id === monId)
-  if (!mon || mon.fusedWith) return null
+  if (!mon || mon.fusedWith || isMergeMaxed(mon)) return null
   const keepers = box.mons.filter(
     (k) =>
       k.id !== monId &&
@@ -1128,7 +1153,7 @@ function fusionOptionsFor(mon: StoredMon): Pick<BoxPokemonView, 'fusions' | 'unf
 // A Pokemon taking a new form, with the new form's best Smogon set fitted to its level.
 function withSmogonSet(set: PokemonSet, form: string): PokemonSet {
   const [best] = listAutoSets(form)
-  return formChangedSet(set, form, buildAutoSet(form, set.level, best.id, false))
+  return formChangedSet(set, form, buildAutoSet(form, set.level, best.id, false, set.moves))
 }
 
 /**
@@ -1181,8 +1206,9 @@ export function changeForm(id: string, form: string): BoxState {
   const change = formChangeFor(mon.set.species)
   if (!change || !change.forms.includes(form)) throw new Error(`${mon.set.species} can't change into ${form}`)
   if (!hasItem(change.itemId)) throw new Error(`You don't have the ${itemName(change.itemId)}`)
-  // Alcremie's creams are the same Pokemon otherwise: it keeps its whole set.
-  mon.set = change.itemId === DECORATION_BOX_ITEM_ID ? { ...mon.set, species: form } : withSmogonSet(mon.set, form)
+  // Alcremie's creams and Pikachu's outfits are the same Pokemon otherwise: it keeps its whole set.
+  const lookOnly = change.itemId === DECORATION_BOX_ITEM_ID || change.itemId === FASHION_CASE_ITEM_ID
+  mon.set = lookOnly ? { ...mon.set, species: form } : withSmogonSet(mon.set, form)
   persist()
   return getBoxState()
 }

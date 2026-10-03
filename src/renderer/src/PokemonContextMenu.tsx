@@ -29,8 +29,10 @@ interface Props {
   // How many Shiny Patches the bag holds.
   shinyPatches?: number
   // With a form-change item (Rotom Catalog, Prison Bottle...): the forms it can change into.
+  // One Change Form entry opens the editor at its Form changes section, so a Pokemon
+  // with many forms (Rotom, Alcremie) doesn't stretch the menu.
   formChanges?: BoxPokemonView['formChanges']
-  onChangeForm?: (form: string) => void
+  onOpenForms?: () => void
   // Fusing with a partner from the box, or splitting back up (see BoxPokemonView).
   fusions?: BoxPokemonView['fusions']
   onFuse?: (partnerId: string) => void
@@ -65,7 +67,7 @@ function PokemonContextMenu({
   onUseShinyPatch,
   shinyPatches,
   formChanges,
-  onChangeForm,
+  onOpenForms,
   fusions = [],
   onFuse,
   unfuse,
@@ -155,18 +157,15 @@ function PokemonContextMenu({
                 />
               )
             })}
-          {onChangeForm &&
-            formChanges?.ready &&
-            formChanges.forms.map((form) => (
-              <PokemonMenuAction
-                key={form}
-                tone="form"
-                icon={<ItemSprite spritenum={formChanges.spritenum} />}
-                label={`Change into ${form}`}
-                detail={`Uses the ${formChanges.itemName}`}
-                onClick={() => onChangeForm(form)}
-              />
-            ))}
+          {onOpenForms && formChanges?.ready && formChanges.forms.length > 0 && (
+            <PokemonMenuAction
+              tone="form"
+              icon={<ItemSprite spritenum={formChanges.spritenum} />}
+              label="Change Form"
+              detail={`${formChanges.forms.length} form${formChanges.forms.length === 1 ? '' : 's'}, uses the ${formChanges.itemName}`}
+              onClick={onOpenForms}
+            />
+          )}
           {onFuse &&
             fusions.map((fusion) => (
               <PokemonMenuAction

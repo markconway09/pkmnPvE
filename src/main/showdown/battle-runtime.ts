@@ -5,8 +5,10 @@ import { BattleTextParser } from './vendor/battle-text-parser'
 import {
   BattlePlayer,
   BattleStream,
+  abilityName,
   buildPokemonSummary,
   effectDisplayName,
+  formeAbility,
   findRosterIndex,
   sameBaseSpecies,
   generateRandomSingle,
@@ -41,8 +43,16 @@ import {
 } from './volatile-badges'
 import type { Pokemon as SimPokemon } from 'pokemon-showdown/dist/sim/pokemon.js'
 import type { Battle as SimBattle } from 'pokemon-showdown/dist/sim/battle.js'
-import { RAID_ATTACKS_PER_TURN, RAID_HP_MULTIPLIER, mergeStatMultiplier, raidSoftCappedDamage } from '../../shared/battle-types'
-import type { RaidView } from '../../shared/battle-types'
+import {
+  LEECH_SEED_DRAIN_EVENT,
+  RAID_ATTACKS_PER_TURN,
+  RAID_HP_MULTIPLIER,
+  mergeStatMultiplier,
+  raidSoftCappedDamage
+} from '../../shared/battle-types'
+import type { RaidView, WildLocationId } from '../../shared/battle-types'
+import { armTmQuickCheck, grantRewardTms, unownedRewardTms } from './tm-store'
+import type { TmInfo } from '../../shared/tms'
 import { RAID_PLACEHOLDER_NAME, raidPlaceholderSet } from './raid'
 import { RAID_LEADER_EXTRA_COPIES } from '../../shared/titles'
 import { countAchievement } from './achievement-progress'
@@ -91,6 +101,7 @@ import type {
   ActivePokemonView,
   AiDifficulty,
   BoostStat,
+  StatBlock,
   BattleView,
   BattleRewardsView,
   CatchResult,
@@ -184,6 +195,15 @@ function computeFeedbackEvent(line: string): FeedbackEvent | null {
     const slot = slotKeyFromIdent(parts[1])
     return slot && { slot, label: 'Hurt itself!', tone: 'bad', emphasis: 'confusion' }
   }
+  // A burn or poison (bad poison too - the sim calls both "psn" here) hurting it at the end of the turn.
+  if (cmd === '-damage' && parts.includes('[from] brn')) {
+    const slot = slotKeyFromIdent(parts[1])
+    return slot && { slot, label: 'Hurt by its burn', tone: 'bad', emphasis: 'burn' }
+  }
+  if (cmd === '-damage' && parts.includes('[from] psn')) {
+    const slot = slotKeyFromIdent(parts[1])
+    return slot && { slot, label: 'Hurt by poison', tone: 'bad', emphasis: 'poison' }
+  }
   if (cmd === '-supereffective') {
     const slot = slotKeyFromIdent(parts[1])
     return slot && { slot, label: 'Super-effective', tone: 'bad' }
@@ -203,6 +223,11 @@ function computeFeedbackEvent(line: string): FeedbackEvent | null {
   if (cmd === 'cant') {
     const slot = slotKeyFromIdent(parts[1])
     if (slot && parts[2] === 'flinch') return { slot, label: 'Flinched!', tone: 'bad', emphasis: 'flinch' }
+    // "It's paralyzed! It can't move!"
+    if (slot && parts[2] === 'par') return { slot, label: 'Fully paralyzed!', tone: 'bad', emphasis: 'paralysis' }
+    // "It's fast asleep." / "It's frozen solid!"
+    if (slot && parts[2] === 'slp') return { slot, label: 'Fast asleep', tone: 'bad', emphasis: 'sleep' }
+    if (slot && parts[2] === 'frz') return { slot, label: 'Frozen solid!', tone: 'bad', emphasis: 'freeze' }
   }
   if (cmd === '-activate') {
     const slot = slotKeyFromIdent(parts[1])
@@ -333,6 +358,25 @@ export interface OpponentConfig {
   // A Max Raid: the one opponent is Dynamaxed all battle (Gigantamax if it can) and
   // joins the box when beaten - no Poke Ball needed.
   raid?: { gigantamax: boolean; stars: number }
+  // A Classic wild battle's area: winning it offers a quick check for a TM from there
+  // (with the Scanner).
+  location?: WildLocationId
+  // A trainer's TMs, given on a win (only the ones not owned yet).
+  tmRewards?: string[]
+  // Weather and terrain up from the first turn (a boss's Field setting, or a wild
+  // area's chance of weather) - lasting until a move or ability replaces them.
+  // Trick Room lasts until someone uses Trick Room. Chaos drafts can add side conditions
+  // to either side (Tailwind, screens, hazards - their usual turn counts), and drop a
+  // side's lead's Attack by one stage (0 = the player's side, 1 = the opponent's).
+  startField?: {
+    weather?: string | null
+    terrain?: string | null
+    trickRoom?: boolean
+    sideConditions?: { side: 0 | 1; id: string; layers?: number }[]
+    leadAtkDrop?: (0 | 1)[]
+  }
+  // Chaos drafts: each side's Pokemon's stat multipliers, in team order.
+  statMultipliers?: { p1?: StatBlock[]; p2?: StatBlock[] }
 }
 
 class HumanPlayer extends BattlePlayer {
@@ -402,6 +446,8 @@ export class WildBattle {
   private readonly opponent?: OpponentConfig
   private expGains: ExpGainResult[] = []
   private itemDrops: ItemDropResult[] = []
+  private tmQuickCheck = false
+  private tmRewards: TmInfo[] = []
   private moneyGained = 0
   private caught = false
   // Roguelite: the run Pokemon that fainted in this battle, and so left the run's team.
@@ -448,13 +494,81 @@ export class WildBattle {
     // HP and status can be set before anyone is sent out.
     void this.battleStream.write(`>start ${JSON.stringify(spec)}\n>player p1 ${JSON.stringify(p1spec)}`)
     if (opponent?.run) this.applyRunConditions(opponent.run.conditions)
+    if (opponent?.startField) this.installStartField(opponent.startField)
     this.installMergeBoosts()
     this.applyMergeBoosts(0, this.mergeStars.p1)
+    if (opponent?.statMultipliers) {
+      this.installStatMultipliers()
+      this.applyStatMultipliers(0, opponent.statMultipliers.p1 ?? [])
+    }
     void this.battleStream.write(`>player p2 ${JSON.stringify(p2spec)}`)
+    if (opponent?.statMultipliers) this.applyStatMultipliers(1, opponent.statMultipliers.p2 ?? [])
     // p2's Pokemon only exist once they've joined (and the battle has begun) - at full
     // HP, so a bigger max HP is simply full too.
     this.applyMergeBoosts(1, this.mergeStars.p2)
     if (opponent?.raid) this.setUpRaid(opponent.raid)
+  }
+
+  // Weather and terrain put on the field as the battle starts, before anyone is sent out
+  // (so a lead's Drizzle or Sand Stream can still replace it). Set straight onto the field
+  // rather than through setWeather, which needs a Pokemon as the source: with no turn count
+  // they never run out - only a new weather or terrain ends them. This battle's own copy of
+  // the format runs it, so no other battle is touched.
+  private installStartField(field: NonNullable<OpponentConfig['startField']>): void {
+    const battle = this.battleStream.battle
+    if (!battle) return
+    for (const sideIndex of field.leadAtkDrop ?? []) {
+      // That side's first Pokemon out starts at -1 Attack.
+      let dropped = false
+      const onSwitchIn = function (this: SimBattle, pokemon: SimPokemon): void {
+        if (dropped || pokemon.side !== this.sides[sideIndex]) return
+        dropped = true
+        this.boost({ atk: -1 }, pokemon, null, null)
+      }
+      battle.onEvent('SwitchIn', battle.format, onSwitchIn as never)
+    }
+    if (!field.weather && !field.terrain && !field.trickRoom && !field.sideConditions?.length) return
+    const format = battle.format
+    const ownFormat = Object.create(format) as typeof format
+    ownFormat.onBattleStart = function (this: SimBattle): void {
+      format.onBattleStart?.call(this)
+      if (field.weather) {
+        const weather = this.dex.conditions.get(field.weather)
+        if (weather.exists) {
+          this.field.weather = weather.id
+          this.field.weatherState = this.initEffectState({ id: weather.id })
+          // Its start message ("It started to rain!").
+          this.singleEvent('FieldStart', weather, this.field.weatherState, this.field)
+        }
+      }
+      if (field.terrain) {
+        const terrain = this.dex.conditions.get(field.terrain)
+        if (terrain.exists) {
+          this.field.terrain = terrain.id
+          this.field.terrainState = this.initEffectState({ id: terrain.id })
+          this.singleEvent('FieldStart', terrain, this.field.terrainState, this.field)
+        }
+      }
+      // Trick Room with no turn count, so it never runs out.
+      if (field.trickRoom) {
+        this.field.pseudoWeather['trickroom'] = this.initEffectState({ id: 'trickroom', duration: 0 })
+        this.add('-fieldstart', 'move: Trick Room')
+      }
+      // Side conditions set straight on (they need no Pokemon as their source), with
+      // their usual turn counts.
+      const startSide = (side: (typeof this.sides)[number], id: string, layers?: number): void => {
+        const condition = this.dex.conditions.get(id)
+        if (!condition.exists) return
+        const state = this.initEffectState({ id: condition.id, target: side, duration: condition.duration })
+        if (layers) state.layers = layers
+        side.sideConditions[condition.id] = state
+        this.add('-sidestart', side, `move: ${condition.name}`)
+        // Spikes show once per layer.
+        for (let i = 1; i < (layers ?? 1); i++) this.add('-sidestart', side, `move: ${condition.name}`)
+      }
+      for (const condition of field.sideConditions ?? []) startSide(this.sides[condition.side], condition.id, condition.layers)
+    }
+    ;(battle as { format: typeof format }).format = ownFormat
   }
 
   // A raid's boss Dynamaxes as it's sent out, for the whole battle (Dynamax ends when its
@@ -571,8 +685,45 @@ export class WildBattle {
     }
   }
 
+  // Chaos stat boosts: each stat of the player's Pokemon multiplied by its own amount
+  // (through the same hooks as merge stars), HP by raising max HP.
+  private installStatMultipliers(): void {
+    const battle = this.battleStream.battle
+    if (!battle) return
+    for (const [stat, key] of [['Atk', 'atk'], ['Def', 'def'], ['SpA', 'spa'], ['SpD', 'spd'], ['Spe', 'spe']] as const) {
+      const boost = function (this: SimBattle, _value: number, pokemon: SimPokemon | null): void {
+        const multiplier = (pokemon?.m?.chaosBoost as StatBlock | undefined)?.[key]
+        if (multiplier && multiplier !== 1) this.chainModify([Math.round(multiplier * 4096), 4096])
+      }
+      battle.onEvent(`Modify${stat}`, battle.format, boost as never)
+    }
+  }
+
+  // Marks each of this side's Pokemon with its multipliers (by its place in the team), HP
+  // straight onto its max HP.
+  private applyStatMultipliers(sideIndex: 0 | 1, multipliers: StatBlock[]): void {
+    const side = this.battleStream.battle?.sides[sideIndex]
+    if (!side) return
+    for (const mon of side.pokemon) {
+      const multiplier = multipliers[side.team.indexOf(mon.set)]
+      if (!multiplier) continue
+      mon.m.chaosBoost = multiplier
+      if (multiplier.hp !== 1) {
+        mon.baseMaxhp = Math.floor(mon.baseMaxhp * multiplier.hp)
+        mon.maxhp = Math.floor(mon.maxhp * multiplier.hp)
+        mon.hp = mon.maxhp
+      }
+    }
+  }
+
   // The battle screen's stats for a boosted Pokemon (its tooltip and effective stats).
   private withMergeStats(view: ActivePokemonView, side: 'p1' | 'p2'): ActivePokemonView {
+    const chaos = view.rosterIndex !== undefined ? this.opponent?.statMultipliers?.[side]?.[view.rosterIndex] : undefined
+    if (chaos) {
+      const stats = { ...view.stats }
+      for (const key of Object.keys(stats) as (keyof typeof stats)[]) stats[key] = Math.floor(stats[key] * chaos[key])
+      view.stats = stats
+    }
     const count = view.rosterIndex !== undefined ? (this.mergeStars[side][view.rosterIndex] ?? 0) : 0
     if (!count) return view
     const multiplier = mergeStatMultiplier(count, speciesRarityTier(view.species))
@@ -721,9 +872,11 @@ export class WildBattle {
               // boss - either way plus the level cap as a percentage on top.
               this.moneyGained = this.opponent.noPrizeMoney ? 0 : this.prizeMoney(levelCap)
               if (this.moneyGained > 0) addMoney(this.moneyGained)
+              if (this.opponent.tmRewards?.length) this.tmRewards = grantRewardTms(this.opponent.tmRewards)
             } else if (!this.opponent?.raid) {
               // A Max Raid isn't a wild battle - it has its own mission and achievements.
               countStat('wildDefeated')
+              if (this.opponent?.location) this.tmQuickCheck = armTmQuickCheck(this.opponent.location)
             }
             if (this.opponent?.raid) this.catchRaidBoss(this.opponent.raid)
             const baseExp = this.p2team.reduce((sum, mon) => sum + expYieldFor(mon.species, mon.level), 0)
@@ -898,7 +1051,8 @@ export class WildBattle {
   }
 
   private pushHpDeltaLine(line: string, hpBefore: Record<SlotKey, number | null>): void {
-    if (!line.startsWith('|-damage|') && !line.startsWith('|-heal|')) return
+    // -sethp: HP set outright (Pain Split, for both Pokemon).
+    if (!line.startsWith('|-damage|') && !line.startsWith('|-heal|') && !line.startsWith('|-sethp|')) return
     const parts = line.slice(1).split('|')
     const slotKey = slotKeyFromIdent(parts[1])
     if (!slotKey) return
@@ -923,11 +1077,42 @@ export class WildBattle {
     // snapshot, so they match that log line's boosts, status, item and field.
     const clone = (v: ActivePokemonView | null, side: 'p1' | 'p2'): ActivePokemonView | null =>
       v ? { ...v, boosts: { ...v.boosts }, volatiles: [...v.volatiles], effectiveStats: effectiveStatsFor(v, side, this.effects) } : null
+    const withMatchups = (v: ActivePokemonView | null, side: 0 | 1, i: number): ActivePokemonView | null =>
+      v ? { ...v, moveMatchups: this.moveMatchupsFor(v, side, this.battleStream.battle?.sides[side].active[i] ?? null) } : null
     return {
-      p1: [clone(this.active.p1a, 'p1'), clone(this.active.p1b, 'p1')],
-      p2: [clone(this.active.p2a, 'p2'), clone(this.active.p2b, 'p2')],
+      p1: [withMatchups(clone(this.active.p1a, 'p1'), 0, 0), withMatchups(clone(this.active.p1b, 'p1'), 0, 1)],
+      p2: [withMatchups(clone(this.active.p2a, 'p2'), 1, 0), withMatchups(clone(this.active.p2b, 'p2'), 1, 1)],
       effects: this.effects.map((e) => ({ ...e }))
     }
+  }
+
+  // For a Pokemon's tooltip: how each of its moves' types hit each Pokemon out on the
+  // other side, left to right as on screen (the foe's two are drawn p2b then p2a, the
+  // player's p1a then p1b). The sim can be a little ahead of the log line being shown,
+  // so a slot whose Pokemon isn't the one on screen is left out.
+  private moveMatchupsFor(view: ActivePokemonView, side: 0 | 1, source: SimPokemon | null): ActivePokemonView['moveMatchups'] {
+    const battle = this.battleStream.battle
+    if (!battle || !source || source.fainted || !sameBaseSpecies(source.species.name, view.species)) return undefined
+    const foeSide = side === 0 ? 1 : 0
+    const foeViews = side === 0 ? [this.active.p2b, this.active.p2a] : [this.active.p1a, this.active.p1b]
+    const foeIndexes = side === 0 ? [1, 0] : [0, 1]
+    const foes = foeIndexes.flatMap((index, n) => {
+      const foe = battle.sides[foeSide].active[index]
+      const foeView = foeViews[n]
+      return foe && !foe.fainted && foeView && !foeView.fainted && sameBaseSpecies(foe.species.name, foeView.species)
+        ? [{ foe, name: foeView.species }]
+        : []
+    })
+    if (foes.length === 0) return undefined
+    const matchups: NonNullable<ActivePokemonView['moveMatchups']> = {}
+    for (const moveId of view.moveIds) {
+      const chips = foes.flatMap(({ foe, name }) => {
+        const multiplier = moveTypeEffectiveness(battle, source, foe, moveId)
+        return multiplier === null ? [] : [{ foeName: name, multiplier }]
+      })
+      if (chips.length > 0) matchups[moveId] = chips
+    }
+    return matchups
   }
 
   private buildActiveView(
@@ -979,7 +1164,11 @@ export class WildBattle {
         rosterIndex = findRosterIndex(this.p1team, species)
       }
       const set = rosterIndex >= 0 ? this.p1team[rosterIndex] : null
-      return this.withMergeStats(this.buildActiveView(species, hpPercent, fainted, status, set, 0, rosterIndex), 'p1')
+      const view = this.buildActiveView(species, hpPercent, fainted, status, set, 0, rosterIndex)
+      // The request reports its ability as it is now - a Mega's new one included.
+      if (mon.baseAbility) view.ability = abilityName(mon.baseAbility)
+      view.moveMatchups = this.moveMatchupsFor(view, 0, live ?? null)
+      return this.withMergeStats(view, 'p1')
     })
   }
 
@@ -1160,6 +1349,16 @@ export class WildBattle {
   // else (including a move with no known animation - see moveAnimations.ts on
   // the renderer side, which the id alone lets it look up lazily).
   private computeMoveEvent(line: string, following: string[]): MoveEvent | null {
+    // Leech Seed sapping HP: "-damage|<seeded>|hp|[from] Leech Seed|[of] <seeder>" - the
+    // orbs fly from the seeded Pokemon to whoever's in the seeder's slot.
+    if (line.startsWith('|-damage|') && line.includes('|[from] Leech Seed')) {
+      const parts = line.slice(1).split('|')
+      const seeded = slotKeyFromIdent(parts[1])
+      const of = parts.find((p) => p.startsWith('[of] '))
+      const healer = of ? slotKeyFromIdent(of.slice('[of] '.length)) : null
+      if (!seeded || !healer) return null
+      return { moveId: LEECH_SEED_DRAIN_EVENT, attackerSlot: seeded, targetSlots: [healer], missedSlots: [] }
+    }
     if (!line.startsWith('|move|')) return null
     const parts = line.slice(1).split('|')
     const attackerSlot = slotKeyFromIdent(parts[1])
@@ -1210,6 +1409,7 @@ export class WildBattle {
       '-transform',
       '-damage',
       '-heal',
+      '-sethp',
       'faint',
       '-status',
       '-curestatus',
@@ -1279,6 +1479,9 @@ export class WildBattle {
       current.baseTypes = [...types]
       this.addedType[slotKey] = null
       current.stats = stats
+      // A lasting change (Mega, Primal, Ultra Burst - "detailschange") brings the new
+      // forme's ability with it; a temporary one (Zen Mode, Disguise) keeps the old one.
+      if (cmd === 'detailschange') current.ability = formeAbility(current.species, current.ability)
       this.withMergeStats(current, side)
     } else if (cmd === '-transform') {
       // The target's ident (e.g. "p2a: Ditto"), not a species name - look up what
@@ -1292,7 +1495,7 @@ export class WildBattle {
         this.addedType[slotKey] = null
         current.stats = { ...target.stats, hp: current.stats.hp }
       }
-    } else if (cmd === '-damage' || cmd === '-heal') {
+    } else if (cmd === '-damage' || cmd === '-heal' || cmd === '-sethp') {
       const { hpPercent, fainted, status } = parseCondition(parts[2])
       current.hpPercent = hpPercent
       current.fainted = fainted
@@ -1454,15 +1657,25 @@ export class WildBattle {
     if (FIRST_TURN_ONLY_MOVES.has(moveId) && source.activeMoveActions > 0) {
       return { basePower: null, fixedDamagePercent: null, fails: true }
     }
+    // Last Resort only works once every other move it knows has been used since it
+    // came out (and it needs at least one other move).
+    if (moveId === 'lastresort') {
+      const others = source.moveSlots.filter((m) => m.id !== 'lastresort')
+      if (others.length === 0 || others.some((m) => !m.used)) {
+        return { basePower: null, fixedDamagePercent: null, fails: true }
+      }
+    }
     const foes = battle.sides[0].active.filter((p): p is SimPokemon => !!p && !p.fainted)
     const live = liveMovePower(battle, source, foes, moveId)
+    // Its type as this Pokemon would use it (Judgment's plate, Tera Blast, Pixilate...).
+    const type = liveMoveType(battle, source, foes[0] ?? null, moveId)
     if (live.fixedDamage !== null && foes[0]) {
-      return { basePower: null, fixedDamagePercent: Math.min(100, (live.fixedDamage / foes[0].maxhp) * 100) }
+      return { basePower: null, fixedDamagePercent: Math.min(100, (live.fixedDamage / foes[0].maxhp) * 100), type }
     }
     // A damage rule that can't be worked out ahead of time (Counter, Mirror Coat,
     // Metal Burst) - nothing to count on, same as its printed 0 power.
-    if (live.dynamic && !live.varies && live.basePower === null) return { basePower: 0, fixedDamagePercent: null }
-    return { basePower: live.basePower, fixedDamagePercent: null }
+    if (live.dynamic && !live.varies && live.basePower === null) return { basePower: 0, fixedDamagePercent: null, type }
+    return { basePower: live.basePower, fixedDamagePercent: null, type }
   }
 
   // For the switch list: the best multiplier each team member's own types get against
@@ -1550,6 +1763,8 @@ export class WildBattle {
       winner: this.winner,
       expGains: this.expGains,
       itemDrops: this.itemDrops,
+      tmQuickCheck: this.tmQuickCheck,
+      tmRewards: this.tmRewards,
       moneyGained: this.moneyGained,
       p1: field.p1,
       p2: field.p2,
@@ -1591,7 +1806,8 @@ export class WildBattle {
     return {
       money: opponent?.trainerId && !opponent.noPrizeMoney ? this.prizeMoney(getProgression().levelCap) : null,
       items,
-      randomDropChance: opponent?.randomDropChance ?? 0
+      randomDropChance: opponent?.randomDropChance ?? 0,
+      tms: opponent?.tmRewards?.length ? unownedRewardTms(opponent.tmRewards) : []
     }
   }
 }
