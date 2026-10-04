@@ -1,7 +1,5 @@
-// The menus' little sounds: Kenney's UI Audio and Interface Sounds packs (CC0), every file
-// in public/sfx/ (listed in sfxLibrary.ts). Which file plays for what can be changed in
-// Options - a made-up Web Audio stand-in plays until a file has loaded (or if it's
-// missing). Every button clicks; a button (or anything around it) can pick another
+// The menus' little sounds: files from Kenney's Interface Sounds pack (CC0) in public/sfx/ -
+// a made-up Web Audio stand-in plays until a file has loaded (or if it's missing). Every button clicks; a button (or anything around it) can pick another
 // sound with data-sfx="tab" / "buy" / "close"..., or stay quiet with data-sfx="none".
 // Windows (.modal-overlay) make a sound of their own as they open and close.
 
@@ -9,20 +7,10 @@ import { loadBool, loadNumber, savePref } from './soundPrefs'
 
 export type SfxName = 'click' | 'tab' | 'open' | 'close' | 'buy' | 'error'
 
-export const SFX_NAMES: SfxName[] = ['click', 'tab', 'open', 'close', 'buy', 'error']
+const SFX_NAMES: SfxName[] = ['click', 'tab', 'open', 'close', 'buy', 'error']
 
-export const SFX_LABELS: Record<SfxName, { label: string; hint: string }> = {
-  click: { label: 'Click', hint: 'Any button' },
-  tab: { label: 'Tab', hint: 'Switching tabs and menu pages' },
-  open: { label: 'Open', hint: 'A window opening' },
-  close: { label: 'Close', hint: 'A window closing' },
-  buy: { label: 'Buy', hint: 'Buying or selling' },
-  error: { label: 'Error', hint: 'Pressing a buy button without enough money' }
-}
-
-// What plays for each until the player picks otherwise: a file as "pack/name", or ''
-// for silence.
-export const DEFAULT_SFX_CHOICES: Record<SfxName, string> = {
+// What plays for each: a file as "pack/name", or '' for silence.
+const choices: Record<SfxName, string> = {
   click: 'interface/click_003',
   tab: 'interface/bong_001',
   open: '',
@@ -33,7 +21,6 @@ export const DEFAULT_SFX_CHOICES: Record<SfxName, string> = {
 
 const VOLUME_KEY = 'pkmnpve.sfxVolume'
 const ON_KEY = 'pkmnpve.sfxOn'
-const CHOICES_KEY = 'pkmnpve.sfxChoices'
 // The same sound again this soon is dropped, so a burst of clicks doesn't machine-gun.
 const REPEAT_GAP_MS = 40
 // How loud the files play - they come at full volume, and menu sounds should be subtle.
@@ -41,26 +28,12 @@ const FILE_GAIN = 0.35
 
 let volume = loadNumber(VOLUME_KEY, 0.5)
 let on = loadBool(ON_KEY, true)
-const choices = loadChoices()
 let audio: AudioContext | null = null
 let master: GainNode | null = null
 const lastPlayed: Partial<Record<SfxName, number>> = {}
 // Each file once loaded (or loading), by "pack/name".
 const buffers = new Map<string, AudioBuffer>()
 const loading = new Set<string>()
-
-function loadChoices(): Record<SfxName, string> {
-  const result = { ...DEFAULT_SFX_CHOICES }
-  try {
-    const stored = JSON.parse(localStorage.getItem(CHOICES_KEY) ?? '{}') as Record<string, unknown>
-    for (const name of SFX_NAMES) {
-      if (typeof stored[name] === 'string') result[name] = stored[name]
-    }
-  } catch {
-    // localStorage unavailable or garbled - the defaults stay
-  }
-  return result
-}
 
 /** How loud the menu sounds play, 0 (silent or switched off) to 1 - the Game Corner's ticks follow it too. */
 export function sfxVolume(): number {
@@ -86,21 +59,6 @@ export function setSfxOn(next: boolean): void {
   on = next
   if (master) master.gain.value = sfxVolume()
   savePref(ON_KEY, on)
-}
-
-/** The file ("pack/name", or '' for silence) each menu sound plays. */
-export function sfxChoices(): Record<SfxName, string> {
-  return { ...choices }
-}
-
-export function setSfxChoice(name: SfxName, file: string): void {
-  choices[name] = file
-  if (file && audio) loadFile(audio, file)
-  try {
-    localStorage.setItem(CHOICES_KEY, JSON.stringify(choices))
-  } catch {
-    // ignore - per-viewer convenience only
-  }
 }
 
 function loadFile(ctx: AudioContext, file: string): Promise<AudioBuffer | null> {
@@ -143,13 +101,6 @@ function playBuffer(out: { audio: AudioContext; master: GainNode }, buffer: Audi
   gain.gain.value = FILE_GAIN
   source.connect(gain).connect(out.master)
   source.start()
-}
-
-/** Plays one file from the library as it would sound in the menus - the sound picker's preview. */
-export function previewSfxFile(file: string): void {
-  const out = output()
-  if (!out || sfxVolume() <= 0) return
-  void loadFile(out.audio, file).then((buffer) => buffer && playBuffer(out, buffer, 1))
 }
 
 /** One short note sliding from one pitch to another, fading out fast. */

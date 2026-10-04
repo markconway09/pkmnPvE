@@ -14,7 +14,7 @@ import BetSlider, { maxBet, placedBet, useGameCornerPerks, useSavedBet, betStep 
 import type { GameCornerGameProps } from './GameCornerTabs'
 import CoinIcon from './CoinIcon'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
-import { playClunk, playTick } from './ticks'
+import { playCornerClunk, playCornerTick } from './ticks'
 
 const SPIN_MS = 4200
 const SEGMENT = 360 / WHEEL_ORDER.length
@@ -172,13 +172,13 @@ function RouletteTable({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorn
     let gap = 45
     while (t < SPIN_MS - 250) {
       const at = t
-      timers.current.push(window.setTimeout(() => playTick(audio, 1500, 0.025), at))
+      timers.current.push(window.setTimeout(() => playCornerTick(audio, 1500, 0.025), at))
       t += gap
       gap *= 1.07
     }
     timers.current.push(
       window.setTimeout(() => {
-        playClunk(audio)
+        playCornerClunk(audio)
         window.setTimeout(() => void audio.close(), 400)
       }, SPIN_MS - 100)
     )

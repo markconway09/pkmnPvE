@@ -212,6 +212,7 @@ import {
   getDraftView,
   pickDraftMon,
   rerollDraftPack,
+  swapChaosItem,
   startDraft
 } from './showdown/draft-store'
 import type { ChaosModifierTarget, DraftFormat } from '../shared/draft'
@@ -446,6 +447,12 @@ ipcMain.handle('battle:run', () => {
   activeBattle = null
 })
 
+// Gives up a draft match or a Roguelite fight - it plays out as a loss, end screen and all.
+ipcMain.handle('battle:forfeit', () => {
+  if (!activeBattle) throw new Error('No active battle')
+  return activeBattle.forfeit()
+})
+
 ipcMain.handle('battle:catch', (_event, replaceRunMonId?: string) => {
   if (!activeBattle) throw new Error('No active battle')
   return activeBattle.catchWildPokemon(replaceRunMonId)
@@ -596,6 +603,7 @@ ipcMain.handle('draft:abandon', () => abandonDraft())
 ipcMain.handle('draft:chaosAbilities', () => chaosAbilityChoices())
 ipcMain.handle('draft:reroll', () => rerollDraftPack())
 ipcMain.handle('draft:chaosItems', () => chaosItemChoices())
+ipcMain.handle('draft:chaosItemSwap', (_event, pick: number, item: string) => swapChaosItem(pick, item))
 ipcMain.handle('draft:chaosTutor', (_event, pick: number) => chaosTutorMoves(pick))
 ipcMain.handle('draft:chaosModifier', (_event, index: number, target?: ChaosModifierTarget) =>
   chooseChaosModifier(index, target)
@@ -613,7 +621,8 @@ ipcMain.handle('draft:battle', async (_event, bring: number[]) => {
     draft: true,
     // Chaos: its modifiers' starting field and stat boosts.
     startField: chaos?.field,
-    statMultipliers: chaos ? { p1: chaos.boosts, p2: chaos.foeBoosts } : undefined
+    statMultipliers: chaos ? { p1: chaos.boosts, p2: chaos.foeBoosts } : undefined,
+    chaosModifiers: chaos?.foeModifiers
   })
   return activeBattle.getInitialView()
 })

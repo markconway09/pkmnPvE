@@ -1,4 +1,4 @@
-import type { BattleRewardsView, RosterSlotView } from '../../shared/battle-types'
+import type { BattleRewardsView, OpponentModifiersView, RosterSlotView } from '../../shared/battle-types'
 import { trainerSpriteUrl } from './trainerSprite'
 import { ballStateFor, pokeballStyle } from './pokeballIcon'
 import RewardsTooltipContent from './RewardsTooltipContent'
@@ -21,6 +21,8 @@ interface Props {
   // The opponent's sprite shows what winning pays out when hovered. Undefined means
   // don't show it; null is a friendly match with nothing to win.
   rewards?: BattleRewardsView | null
+  // A chaos draft opponent: their modifiers, shown on hover in place of the rewards.
+  modifiers?: OpponentModifiersView | null
   // The player's companion, standing beside their sprite, at the size they picked.
   companion?: { species: string; shiny: boolean; gmaxLook?: boolean; size: CompanionSize } | null
   // No Poke Balls - the player's own team is on show beside the battle anyway.
@@ -28,6 +30,27 @@ interface Props {
 }
 
 const TEAM_SIZE = 6
+
+// A chaos draft opponent's modifiers - their battle-start ones, then their Pokemon's boosts.
+function ModifiersTooltipContent({ modifiers }: { modifiers: OpponentModifiersView }): React.JSX.Element {
+  return (
+    <div className="tooltip-panel rewards-tooltip">
+      <div className="tooltip-title">Chaos modifiers</div>
+      {modifiers.field.map((line) => (
+        <div key={line} className="rewards-row">
+          <span className="rewards-name">{line}</span>
+        </div>
+      ))}
+      {modifiers.mons.map((mon) => (
+        <div key={mon.species} className="rewards-row">
+          <span className="rewards-name">{mon.species}</span>
+          <span className="rewards-source">{mon.boosts.join(' · ')}</span>
+        </div>
+      ))}
+      {modifiers.field.length === 0 && modifiers.mons.length === 0 && <div className="tooltip-row">No modifiers this battle</div>}
+    </div>
+  )
+}
 const BALL_SCALE = { small: 1, large: 1.8 } as const
 
 // What a pokeball's tooltip says on hover - the Pokemon it stands for, plus
@@ -40,11 +63,14 @@ function ballTitle(slot: RosterSlotView | undefined): string | undefined {
   return slot.species
 }
 
-function TrainerHud({ name, title, spriteId, roster, align, size = 'small', rewards, companion, hideBalls }: Props): React.JSX.Element {
+function TrainerHud({ name, title, spriteId, roster, align, size = 'small', rewards, modifiers, companion, hideBalls }: Props): React.JSX.Element {
   const slots = Array.from({ length: TEAM_SIZE }, (_, i) => roster[i])
   const sprite =
-    rewards !== undefined ? (
-      <Tooltip placement="below" content={<RewardsTooltipContent rewards={rewards} />}>
+    modifiers || rewards !== undefined ? (
+      <Tooltip
+        placement="below"
+        content={modifiers ? <ModifiersTooltipContent modifiers={modifiers} /> : <RewardsTooltipContent rewards={rewards ?? null} />}
+      >
         <img className="trainer-hud-sprite" src={trainerSpriteUrl(spriteId)} alt={name} />
       </Tooltip>
     ) : (

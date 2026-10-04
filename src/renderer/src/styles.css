@@ -20542,7 +20542,7 @@ img.sprite-smooth {
    menus' sound picker button. */
 .options-volume {
   display: grid;
-  grid-template-columns: auto auto 1fr auto auto;
+  grid-template-columns: auto auto 1fr auto;
   align-items: center;
   gap: 10px 12px;
 }
@@ -20564,102 +20564,6 @@ img.sprite-smooth {
   text-align: right;
   font-variant-numeric: tabular-nums;
   opacity: 0.85;
-}
-
-/* The sound picker: a tab per menu sound, every Kenney sound below as numbered chips
-   grouped by kind, the pick lit blue. */
-.sound-picker {
-  width: 680px;
-  max-height: 86vh;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px 16px 16px;
-}
-.sound-picker-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.sound-picker-hint {
-  flex: 1;
-  font-size: 13px;
-  opacity: 0.85;
-}
-.sound-picker-hint b {
-  color: #e8b931;
-  font-weight: 600;
-}
-.sound-picker-bar button {
-  height: 28px;
-  padding: 0 14px;
-  border: 1px solid #2f3746;
-  border-radius: 14px;
-  background: #1a1f28;
-  font-size: 12px;
-}
-.sound-picker-bar button:hover:not(:disabled) {
-  border-color: #4a5468;
-  background: #222935;
-}
-.sound-picker-list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding-right: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.sound-picker-pack {
-  padding: 10px 14px 12px;
-  border: 1px solid #2c3442;
-  border-radius: 14px;
-  background: rgba(10, 13, 18, 0.45);
-}
-.sound-picker-pack-name {
-  margin: 0 0 8px;
-  font-size: 11px;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-  color: #8fb8e8;
-}
-.sound-picker-group {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 3px 0;
-}
-.sound-picker-group-name {
-  width: 84px;
-  flex-shrink: 0;
-  padding-top: 5px;
-  font-size: 12px;
-  text-transform: capitalize;
-  opacity: 0.75;
-}
-.sound-picker-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.sound-picker-chip {
-  min-width: 30px;
-  height: 26px;
-  padding: 0 6px;
-  border: 1px solid #2c3442;
-  border-radius: 8px;
-  background: rgba(10, 13, 18, 0.5);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-.sound-picker-chip:hover {
-  border-color: rgba(107, 176, 255, 0.5);
-}
-.sound-picker .sound-picker-active {
-  border-color: #6bb0ff;
-  background: rgba(107, 176, 255, 0.14);
-  box-shadow: 0 0 10px rgba(107, 176, 255, 0.25);
 }
 
 /* The sound on/off switches in Options: a pill with a knob, gold and knob right when on. */
@@ -22263,4 +22167,163 @@ img.sprite-smooth {
   color: #ffdca6;
   background: rgba(255, 183, 77, 0.18);
   border-color: rgba(255, 183, 77, 0.45);
+}
+
+/* Chaos: a pinned modifier names the Pokemon it is for. */
+.draft-modifier-pin {
+  margin-left: 4px;
+  opacity: 0.75;
+  font-weight: normal;
+}
+
+/* Chaos: the modifier step - "Take 1 of 5" with the free item swap in the corner, then the
+   offer as big cards (icon, name, what it does), the chosen one glowing gold. */
+.draft-modifier-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: min(900px, 100%);
+}
+
+.draft-modifier-heading {
+  font-size: 13px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #b7c0cf;
+}
+
+.draft-item-swap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 8px;
+  border: 1px solid #2c3442;
+  border-radius: 10px;
+  color: inherit;
+  text-align: left;
+  background: rgba(10, 13, 18, 0.5);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.draft-item-swap:hover:not(:disabled):not(.draft-item-swap-on) {
+  border-color: rgba(174, 213, 129, 0.5);
+  background: rgba(174, 213, 129, 0.06);
+}
+
+.draft-item-swap:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.draft-item-swap-on {
+  border-color: #aed581;
+  background: rgba(174, 213, 129, 0.14);
+  box-shadow: 0 0 8px rgba(174, 213, 129, 0.3);
+}
+
+.draft-item-swap-icon {
+  font-size: 20px;
+  line-height: 1;
+  color: #aed581;
+}
+
+.draft-item-swap-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.draft-item-swap-text strong {
+  font-size: 13px;
+}
+
+.draft-item-swap-text span {
+  font-size: 11px;
+  color: #9aa4b5;
+}
+
+.draft-modifier-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  width: min(900px, 100%);
+  transition: opacity 0.15s ease;
+}
+
+.draft-modifier-cards-dim {
+  opacity: 0.45;
+}
+
+.draft-modifier-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-height: 190px;
+  padding: 14px 12px 16px;
+  border: 2px solid #2c3442;
+  border-radius: 14px;
+  color: inherit;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(36, 42, 54, 0.85), rgba(14, 17, 23, 0.9));
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.draft-modifier-card:hover:not(:disabled):not(.draft-modifier-chosen) {
+  transform: translateY(-3px);
+  border-color: rgba(255, 183, 77, 0.5);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+
+.draft-modifier-card.draft-modifier-chosen {
+  transform: translateY(-3px);
+  border-color: #ffb74d;
+  background: linear-gradient(180deg, #5a3f1c, #2a1f12);
+  box-shadow: 0 0 16px rgba(255, 183, 77, 0.4);
+}
+
+.draft-modifier-card-group {
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #7d8799;
+}
+
+.draft-modifier-card .draft-modifier-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  font-size: 30px;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.draft-modifier-card-title {
+  font-size: 15px;
+}
+
+.draft-modifier-card-text {
+  font-size: 12px;
+  line-height: 1.35;
+  color: #b7c0cf;
+}
+
+.draft-modifier-card .draft-modifier-pin {
+  margin: auto 0 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  opacity: 1;
+  color: #ffe0b2;
+  background: rgba(255, 183, 77, 0.14);
 }

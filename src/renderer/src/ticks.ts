@@ -1,6 +1,21 @@
 // Little sounds made on the spot with the Web Audio API - no sound files needed.
-// Both follow the volume set in Options (sfx.ts).
+// Both follow the volume set in Options (sfx.ts). The Game Corner's own copies can also be
+// switched off on their own in Options.
 import { sfxVolume } from './sfx'
+import { loadBool, savePref } from './soundPrefs'
+
+const CORNER_ON_KEY = 'pkmnpve.gameCornerSoundsOn'
+
+let cornerOn = loadBool(CORNER_ON_KEY, true)
+
+export function cornerSoundsOn(): boolean {
+  return cornerOn
+}
+
+export function setCornerSoundsOn(next: boolean): void {
+  cornerOn = next
+  savePref(CORNER_ON_KEY, cornerOn)
+}
 
 /** A short click: a card or a reel symbol passing its marker. */
 export function playTick(audio: AudioContext, frequency = 1400, volume = 0.04): void {
@@ -31,4 +46,14 @@ export function playClunk(audio: AudioContext): void {
   osc.connect(gain).connect(audio.destination)
   osc.start()
   osc.stop(audio.currentTime + 0.15)
+}
+
+/** playTick for the Game Corner's games - silent while its sounds are switched off. */
+export function playCornerTick(audio: AudioContext, frequency?: number, volume?: number): void {
+  if (cornerOn) playTick(audio, frequency, volume)
+}
+
+/** playClunk for the Game Corner's games - silent while its sounds are switched off. */
+export function playCornerClunk(audio: AudioContext): void {
+  if (cornerOn) playClunk(audio)
 }

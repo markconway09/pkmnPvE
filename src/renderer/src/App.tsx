@@ -546,6 +546,21 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
     }
   }
 
+  // Giving up a draft match or a Roguelite fight: the battle ends as a loss and its end
+  // screen shows, just like losing it outright.
+  async function forfeitBattle(): Promise<void> {
+    if (busy) return
+    setBusy(true)
+    try {
+      setView(await window.api.forfeitBattle())
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function choose(choice: string): Promise<void> {
     if (busy) return
     setBusy(true)
@@ -886,6 +901,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
                 align="right"
                 size="large"
                 rewards={view.rewards}
+                modifiers={view.chaosModifiers}
               />
             )}
           </div>
@@ -1005,9 +1021,11 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
               const canGoBack = prevActiveSlot(slotIndex) !== null
               // Free from a wild Pokemon, paid from an ordinary trainer, never from a boss.
               const runCost = view?.runCost ?? null
-              const canRun = !canGoBack && !!view && runCost !== null
-              // A paid run, or walking away from a shiny, asks for a second click.
-              const runNeedsConfirm = (runCost ?? 0) > 0 || !!view?.p2[0]?.shiny
+              // A draft match or a Roguelite fight has Forfeit in Run's place instead.
+              const canForfeit = !canGoBack && !!view?.canForfeit
+              const canRun = (!canGoBack && !!view && runCost !== null) || canForfeit
+              // A paid run, walking away from a shiny, or forfeiting asks for a second click.
+              const runNeedsConfirm = (runCost ?? 0) > 0 || !!view?.p2[0]?.shiny || canForfeit
               return (
                 <div key={slotIndex} className="battle-action-slot">
                   {activeRequest.length > 1 && slotMon && (
@@ -1047,11 +1065,20 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
                               return
                             }
                             if (runNeedsConfirm && !confirmingRun) setConfirmingRun(true)
-                            else void runFromBattle()
+                            else if (canForfeit) {
+                              setConfirmingRun(false)
+                              void forfeitBattle()
+                            } else void runFromBattle()
                           }}
                         >
                           {canGoBack
                             ? 'Cancel'
+                            : canForfeit
+                              ? confirmingRun
+                                ? view?.runBattle
+                                  ? 'End the run? Click again'
+                                  : 'Lose this match? Click again'
+                                : 'Forfeit'
                             : confirmingRun
                               ? (runCost ?? 0) > 0
                                 ? `Pay ₽${(runCost ?? 0).toLocaleString('en-US')} to run? Click again`

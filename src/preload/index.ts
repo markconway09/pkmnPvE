@@ -80,6 +80,7 @@ const api = {
   rerollDraftPack: (): Promise<DraftView> => ipcRenderer.invoke('draft:reroll'),
   getChaosItems: (): Promise<{ id: string; name: string; description: string; spritenum: number }[]> =>
     ipcRenderer.invoke('draft:chaosItems'),
+  swapChaosItem: (pick: number, item: string): Promise<DraftView> => ipcRenderer.invoke('draft:chaosItemSwap', pick, item),
   getChaosTutorMoves: (pick: number): Promise<ChaosTutorMove[]> => ipcRenderer.invoke('draft:chaosTutor', pick),
   getChaosAbilities: (): Promise<{ id: string; name: string; description: string }[]> =>
     ipcRenderer.invoke('draft:chaosAbilities'),
@@ -153,6 +154,8 @@ const api = {
   // Every Pokemon a Max Raid can bring, registered or not (the Max Raid page's carousel).
   getRaidBosses: (): Promise<RaidBossPreview[]> => ipcRenderer.invoke('raid:bosses'),
   runFromBattle: (): Promise<void> => ipcRenderer.invoke('battle:run'),
+  // Gives up a draft match or a Roguelite fight; the view comes back already ended.
+  forfeitBattle: (): Promise<BattleView> => ipcRenderer.invoke('battle:forfeit'),
   getBattleEligibility: (): Promise<BattleEligibility> => ipcRenderer.invoke('battle:eligibility'),
   getMoveInfo: (id: string): Promise<MoveInfo | null> => ipcRenderer.invoke('dex:move', id),
   listBox: (): Promise<BoxState> => ipcRenderer.invoke('box:list'),

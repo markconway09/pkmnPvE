@@ -44,6 +44,8 @@ interface OpponentInfo {
   miracleEye?: boolean
   // Behind a Substitute: status moves aimed at it fail (bar sound moves and the like).
   substitute?: boolean
+  // Counting down from Perish Song (another Perish Song does nothing to it).
+  perish?: boolean
   level: number
   // Its Speed stage (-6 to +6), as the battle has shown it.
   speBoost: number
@@ -156,6 +158,44 @@ const INSTANT_IN_RAIN = new Set(['electroshot'])
 // Everything Misty Terrain protects a grounded Pokemon from.
 const MISTY_BLOCKED_STATUSES = ['slp', 'par', 'brn', 'psn', 'tox', 'frz', 'confusion']
 
+// Entry hazards, by the ids the battle log names them with, and how many layers stack.
+const HAZARD_MAX_LAYERS: Record<string, number> = {
+  stealthrock: 1,
+  spikes: 3,
+  toxicspikes: 2,
+  stickyweb: 1,
+  gmaxsteelsurge: 1
+}
+// Spikes take 1/8, 1/6, 1/4 of a grounded Pokemon's HP for 1, 2, 3 layers (in %).
+const SPIKES_DAMAGE = [0, 12.5, 100 / 6, 25]
+// Stealth Rock (and G-Max Steelsurge) take 1/8 of its HP, times how its types take Rock (Steel).
+const ROCK_DAMAGE = 12.5
+// What being poisoned on the way in (Toxic Spikes, 1 or 2 layers) and Sticky Web's Speed
+// drop are counted as, in % HP.
+const TOXIC_SPIKES_WORTH = [0, 8, 12]
+const STICKY_WEB_WORTH = 6
+// A Pokemon the hazards would knock out as it comes in costs its HP and this much more.
+const HAZARD_KO_EXTRA = 15
+// Clearing (or moving) hazards is worth this share of the HP they'd cost the team, on the
+// same scale as an attack's damage.
+const HAZARD_CLEAR_WEIGHT = 0.8
+// Defog also blows away the foe's screens - worth this much (in % HP) per screen.
+const DEFOG_SCREEN_WORTH = 15
+// The moves that set hazards, and which one - not worth a turn once it's maxed out.
+const HAZARD_SETTERS: Record<string, string> = {
+  stealthrock: 'stealthrock',
+  spikes: 'spikes',
+  toxicspikes: 'toxicspikes',
+  stickyweb: 'stickyweb'
+}
+
+// Counter sends back double a physical hit, Mirror Coat double a special one - but only
+// after taking it (they always go last), so they're worth it against a foe that leans on
+// that kind of attack, while there's HP to survive the hit.
+const REFLECT_MOVES: Record<string, 'atk' | 'spa'> = { counter: 'atk', mirrorcoat: 'spa' }
+// Rough worth of a reflected hit when everything lines up, on the attack scale.
+const REFLECT_POWER = 100
+
 /** A move's real power right now, as the AI scores it. */
 export interface AiMovePower {
   // Its power against the foe(s) out (the lowest, with two); null when it has none to report.
@@ -260,8 +300,20 @@ export class AIPlayer extends BattlePlayer {
   private ownSpeBoost: number[] = [0, 0]
   // All of its active Pokemon's stat stages, by slot - so setup stops once it's set up.
   private ownBoosts: Record<string, number>[] = [{}, {}]
-  // The screens up on the AI's own side.
+  // The screens up on the AI's own side, and on the foe's (Court Change swaps them).
   private ownScreens = new Set<ScreenId>()
+  private foeScreens = new Set<ScreenId>()
+  // Entry hazards on each side (id -> layers): the AI's own, and the foe's.
+  private ownHazards = new Map<string, number>()
+  private foeHazards = new Map<string, number>()
+  // The foe's team size and how many of it have fainted - for how many are still to
+  // come in over the hazards on its side.
+  private foeTeamSize = 6
+  private foeFaints = 0
+  // Its own Pokemon, as the latest request showed them (set by chooseAction).
+  private ownTeam: PokemonSwitchRequestData[] = []
+  // Destiny Bond still up on its own Pokemon, by slot: using it again then fails.
+  private ownDestinyBond: boolean[] = [false, false]
 
   constructor(
     stream: Streams.ObjectReadWriteStream<string>,
@@ -324,18 +376,39 @@ export class AIPlayer extends BattlePlayer {
       for (const o of this.opponents) if (o) o.speBoost = 0
       return
     }
-    // "-sidestart|p2: Blue|Reflect" / "move: Light Screen" - screens on the AI's side.
-    if ((cmd === '-sidestart' || cmd === '-sideend') && parts[1]?.startsWith(`${this.mySide}:`)) {
-      const screen = toID((parts[2] ?? '').replace(/^move: /, ''))
-      if (screen === 'reflect' || screen === 'lightscreen' || screen === 'auroraveil') {
-        if (cmd === '-sidestart') this.ownScreens.add(screen)
-        else this.ownScreens.delete(screen)
+    if (cmd === 'teamsize' && parts[1] === this.opponentIdentPrefix()) {
+      this.foeTeamSize = Number(parts[2]) || this.foeTeamSize
+      return
+    }
+    // "-sidestart|p2: Blue|Reflect" / "move: Light Screen" / "move: Stealth Rock" - screens
+    // and entry hazards, on either side. Each layer of Spikes comes as its own line.
+    if (cmd === '-sidestart' || cmd === '-sideend') {
+      const mine = !!parts[1]?.startsWith(`${this.mySide}:`)
+      const id = toID((parts[2] ?? '').replace(/^move: /, ''))
+      if (id === 'reflect' || id === 'lightscreen' || id === 'auroraveil') {
+        const screens = mine ? this.ownScreens : this.foeScreens
+        if (cmd === '-sidestart') screens.add(id)
+        else screens.delete(id)
+      } else if (id in HAZARD_MAX_LAYERS) {
+        const hazards = mine ? this.ownHazards : this.foeHazards
+        if (cmd === '-sidestart') hazards.set(id, Math.min(HAZARD_MAX_LAYERS[id], (hazards.get(id) ?? 0) + 1))
+        else hazards.delete(id)
       }
+      return
+    }
+    // Court Change: the two sides trade everything on them.
+    if (cmd === '-swapsideconditions') {
+      ;[this.ownHazards, this.foeHazards] = [this.foeHazards, this.ownHazards]
+      ;[this.ownScreens, this.foeScreens] = [this.foeScreens, this.ownScreens]
       return
     }
 
     const ownSlot = this.ownSlotIndex(parts[1])
     if (ownSlot !== null) {
+      // Destiny Bond stays up until its next move (or a turn it can't move); using it
+      // again while it's up fails. A Pokemon coming in starts without it.
+      if (cmd === '-singlemove' && parts[2] === 'Destiny Bond') this.ownDestinyBond[ownSlot] = true
+      else if (cmd === 'move' || cmd === 'cant' || cmd === 'switch' || cmd === 'drag') this.ownDestinyBond[ownSlot] = false
       if (cmd === 'switch' || cmd === 'drag') {
         this.ownSpeBoost[ownSlot] = 0
         this.ownBoosts[ownSlot] = {}
@@ -391,6 +464,7 @@ export class AIPlayer extends BattlePlayer {
     else if (cmd === '-start' && effect === 'Miracle Eye') opponent.miracleEye = true
     else if (cmd === '-start' && effect === 'Substitute') opponent.substitute = true
     else if (cmd === '-end' && effect === 'Substitute') opponent.substitute = false
+    else if (cmd === '-start' && /^perish\d$/.test(effect)) opponent.perish = true
 
     if (cmd === 'replace' || cmd === 'detailschange' || cmd === '-formechange') {
       opponent.species = parts[2].split(',')[0].trim()
@@ -404,6 +478,7 @@ export class AIPlayer extends BattlePlayer {
     } else if (cmd === 'faint') {
       opponent.hpPercent = 0
       opponent.fainted = true
+      this.foeFaints++
     } else if (cmd === '-status') {
       opponent.status = parts[2]
     } else if (cmd === '-curestatus') {
@@ -434,6 +509,110 @@ export class AIPlayer extends BattlePlayer {
     if (foe.foresight && (moveType === 'Normal' || moveType === 'Fighting')) return foe.types.filter((t) => t !== 'Ghost')
     if (foe.miracleEye && moveType === 'Psychic') return foe.types.filter((t) => t !== 'Dark')
     return foe.types
+  }
+
+  /**
+   * What the hazards on a side cost one Pokemon coming in, in % of its HP: `damage` is the
+   * HP it really loses (Stealth Rock by how its types take Rock, G-Max Steelsurge by Steel,
+   * Spikes only on the ground) and `extra` what Toxic Spikes' poison and Sticky Web's Speed
+   * drop are counted as. Heavy-Duty Boots and Magic Guard keep it all off.
+   */
+  private hazardEntryCost(
+    hazards: Map<string, number>,
+    types: string[],
+    grounded: boolean,
+    protectedFromHazards = false,
+    statused = false
+  ): { damage: number; extra: number } {
+    if (protectedFromHazards) return { damage: 0, extra: 0 }
+    let damage = 0
+    let extra = 0
+    if (hazards.has('stealthrock')) damage += ROCK_DAMAGE * getTypeEffectivenessMultiplier('Rock', types)
+    if (hazards.has('gmaxsteelsurge')) damage += ROCK_DAMAGE * getTypeEffectivenessMultiplier('Steel', types)
+    if (grounded) {
+      damage += SPIKES_DAMAGE[hazards.get('spikes') ?? 0]
+      // Poison and Steel types can't be poisoned (a grounded Poison type even soaks them up).
+      if (!statused && !types.includes('Poison') && !types.includes('Steel')) {
+        extra += TOXIC_SPIKES_WORTH[hazards.get('toxicspikes') ?? 0]
+      }
+      if (hazards.has('stickyweb')) extra += STICKY_WEB_WORTH
+    }
+    return { damage, extra }
+  }
+
+  // What the hazards on a side would cost one of the AI's own Pokemon coming in.
+  private ownEntryCost(mon: PokemonSwitchRequestData, hazards: Map<string, number> = this.ownHazards): { damage: number; extra: number } {
+    const types = speciesStatsAndTypes(speciesOf(mon), null).types
+    const ability = toID(mon.ability ?? mon.baseAbility)
+    const grounded = this.gravity || !(types.includes('Flying') || ability === 'levitate' || mon.item === 'airballoon')
+    const { status } = parseCondition(mon.condition)
+    return this.hazardEntryCost(hazards, types, grounded, mon.item === 'heavydutyboots' || ability === 'magicguard', !!status)
+  }
+
+  // Whether one of its own Pokemon would make it in alive over the hazards on its side.
+  private survivesEntry(mon: PokemonSwitchRequestData): boolean {
+    return this.ownEntryCost(mon).damage < parseCondition(mon.condition).hpPercent
+  }
+
+  // What a set of hazards would cost the AI's whole bench (the ones still to come in), in
+  // % HP: each one's entry cost - or its whole HP and then some, if they'd knock it out.
+  private ownBenchHazardCost(hazards: Map<string, number>): number {
+    if (hazards.size === 0) return 0
+    return this.ownTeam
+      .filter((p) => !p.active && !p.condition.endsWith('fnt'))
+      .reduce((sum, mon) => {
+        const { damage, extra } = this.ownEntryCost(mon, hazards)
+        const hp = parseCondition(mon.condition).hpPercent
+        return sum + (damage >= hp ? hp + HAZARD_KO_EXTRA : damage + extra)
+      }, 0)
+  }
+
+  // The same for the foe's bench - unseen, so each one is taken to be grounded, neutral to
+  // Rock and unprotected - times how many it still has to bring in.
+  private foeBenchHazardCost(hazards: Map<string, number>): number {
+    if (hazards.size === 0) return 0
+    const toCome = Math.max(0, this.foeTeamSize - this.foeFaints - this.aliveOpponents().length)
+    const { damage, extra } = this.hazardEntryCost(hazards, [], true)
+    return toCome * (damage + extra)
+  }
+
+  /**
+   * Defog and Court Change, by what they'd do to the hazards: Defog clears both sides (and
+   * the foe's screens), so it's worth what the AI's side would stop costing it minus what
+   * the foe's side would stop costing the foe; Court Change trades the two sides, so it's
+   * worth the difference on both. Neither is worth anything when the foe has as much on
+   * its side as the AI has on its own.
+   */
+  private hazardMoveScore(moveId: 'defog' | 'courtchange'): number {
+    const ownNow = this.ownBenchHazardCost(this.ownHazards)
+    const foeNow = this.foeBenchHazardCost(this.foeHazards)
+    let net: number
+    if (moveId === 'defog') {
+      net = ownNow - foeNow + this.foeScreens.size * DEFOG_SCREEN_WORTH
+    } else {
+      const ownAfter = this.ownBenchHazardCost(this.foeHazards)
+      const foeAfter = this.foeBenchHazardCost(this.ownHazards)
+      net = ownNow - ownAfter + (foeAfter - foeNow)
+    }
+    return net > 0 ? (net * HAZARD_CLEAR_WEIGHT) / DAMAGE_PERCENT_PER_POWER : 0
+  }
+
+  // Counter / Mirror Coat: worth most against foes whose best attacking stat is the one it
+  // sends back (half as much when the two are close, nothing when the other is clearly
+  // better - averaged over the foes out), and only while it has the HP to take the hit.
+  private reflectScore(stat: 'atk' | 'spa', ownHp: number): number {
+    const foes = this.aliveOpponents()
+    if (foes.length === 0) return 0
+    const lean =
+      foes.reduce((sum, foe) => {
+        const { atk, spa } = speciesStatsAndTypes(foe.species, null).stats
+        const reflected = stat === 'atk' ? atk : spa
+        const other = stat === 'atk' ? spa : atk
+        return sum + (reflected >= other * 1.1 ? 1 : reflected >= other * 0.9 ? 0.5 : 0)
+      }, 0) / foes.length
+    if (lean === 0) return 0
+    const survives = ownHp >= 60 ? 1 : ownHp >= 35 ? 0.5 : 0.1
+    return REFLECT_POWER * lean * survives
   }
 
   private aliveOpponents(): OpponentInfo[] {
@@ -661,10 +840,14 @@ export class AIPlayer extends BattlePlayer {
   }
 
   private pickSwitchIn(pokemon: PokemonSwitchRequestData[], exclude: Set<number>): number | null {
-    const available = pokemon
+    const all = pokemon
       .map((p, i) => ({ p, i }))
       .filter(({ p, i }) => !p.active && !p.condition.endsWith('fnt') && !exclude.has(i))
-    if (available.length === 0) return null
+    if (all.length === 0) return null
+    // One the hazards on its side would knock out as it comes in only goes in when
+    // there's nobody else to send.
+    const survivors = this.difficulty === 'easy' ? all : all.filter(({ p }) => this.survivesEntry(p))
+    const available = survivors.length > 0 ? survivors : all
     const opponent = this.primaryOpponent()
     if (this.difficulty === 'easy' || !opponent) return available[0].i
 
@@ -693,6 +876,7 @@ export class AIPlayer extends BattlePlayer {
     if (legalMoves.length === 0) return this.formatMoveChoice(1, active, [], numActive, mySlotIndex)
 
     this.moldBreaker = MOLD_BREAKERS.has(ownActive.ability ?? ownActive.baseAbility)
+    this.ownTeam = pokemon
     const allyMon = numActive >= 2 ? pokemon.filter((p) => p.active)[mySlotIndex === 0 ? 1 : 0] : undefined
     const allyCondition = allyMon ? parseCondition(allyMon.condition) : null
     this.ally = allyCondition && !allyCondition.fainted ? { hpPercent: allyCondition.hpPercent } : null
@@ -978,6 +1162,21 @@ export class AIPlayer extends BattlePlayer {
       const goesThrough =
         combat.flags.includes('bypasssub') || toID(ownActive.ability ?? ownActive.baseAbility) === 'infiltrator'
       if (opponent?.substitute && aimedAtIt && !goesThrough) return 0
+      // Hazard control: worth what it does to the hazards on both sides (see hazardMoveScore).
+      if (moveId === 'defog' || moveId === 'courtchange') return this.hazardMoveScore(moveId)
+      // Setting a hazard the foe's side already has all of does nothing.
+      const setsHazard = HAZARD_SETTERS[moveId]
+      if (setsHazard && (this.foeHazards.get(setsHazard) ?? 0) >= HAZARD_MAX_LAYERS[setsHazard]) return 0
+      // Destiny Bond fails if it's still up from the last time it was used.
+      if (moveId === 'destinybond' && this.ownDestinyBond[mySlotIndex]) return 0
+      // Perish Song does nothing to a Pokemon already counting down (or one with
+      // Soundproof) - once every foe is, using it again only dooms its own user.
+      if (moveId === 'perishsong') {
+        const foesLeft = this.aliveOpponents().filter(
+          (foe) => !foe.perish && this.foeAbilityChance(foe, (a) => a === 'soundproof') !== 'certain'
+        )
+        if (foesLeft.length === 0) return 0
+      }
       // Foresight / Odor Sleuth / Miracle Eye only do anything against a Ghost (Dark)
       // type that isn't already identified - repeating them just wastes turns.
       if (moveId === 'foresight' || moveId === 'odorsleuth') {
@@ -1011,6 +1210,9 @@ export class AIPlayer extends BattlePlayer {
       }
     }
     if (multiplier === 0) return 0
+    // Counter / Mirror Coat: by what the foes are likely to hit it with (see reflectScore).
+    const reflectStat = REFLECT_MOVES[moveId]
+    if (reflectStat) return this.reflectScore(reflectStat, own.hpPercent)
 
     const stab = ownTypes.includes(moveType) ? 1.5 : 1
     const accuracy = this.fieldAccuracy(moveId, info.accuracy, weather) / 100
@@ -1031,6 +1233,10 @@ export class AIPlayer extends BattlePlayer {
         this.fieldPowerMultiplier(moveId, moveType, combat, weather, grounded, opponent)
     }
     if (FIRST_TURN_BONUS_MOVES.has(moveId)) score += FAKE_OUT_FLINCH_BONUS
+    // Rapid Spin and Mortal Spin clear the hazards off its own side when they hit.
+    if (moveId === 'rapidspin' || moveId === 'mortalspin') {
+      score += (this.ownBenchHazardCost(this.ownHazards) * HAZARD_CLEAR_WEIGHT) / DAMAGE_PERCENT_PER_POWER
+    }
 
     if (this.difficulty === 'hard' && opponent) {
       // Coarse damage estimate (no real stat calc) - just enough to notice
@@ -1145,9 +1351,10 @@ export class AIPlayer extends BattlePlayer {
     const { hpPercent } = parseCondition(ownActive.condition)
     if (hpPercent > 35) return null
 
+    // Never switching into a Pokemon the hazards would knock out on the way in.
     const bench = pokemon
       .map((p, i) => ({ p, i }))
-      .filter(({ p }) => !p.active && !p.condition.endsWith('fnt'))
+      .filter(({ p }) => !p.active && !p.condition.endsWith('fnt') && this.survivesEntry(p))
     if (bench.length === 0) return null
 
     const ownTypes = speciesStatsAndTypes(speciesOf(ownActive), null).types

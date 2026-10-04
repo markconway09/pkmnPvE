@@ -1,4 +1,4 @@
-// Draft mode: six Pokemon picked one at a time from packs of three (each with a Smogon
+// Draft mode: six Pokemon picked one at a time from packs of four (each with a Smogon
 // set and its item, all at the same level), then a gauntlet of battles - singles bringing
 // three of the six, or doubles bringing four, after seeing the opponent's whole team. Each
 // format drafts from its own Smogon sets (Gen 9 Ubers to ZU, or Doubles OU). It ends at DRAFT_MAX_WINS
@@ -8,7 +8,7 @@
 import type { PokemonSummary, RarityTier, StatBlock } from './battle-types'
 
 export const DRAFT_ROUNDS = 6
-export const DRAFT_PACK_SIZE = 3
+export const DRAFT_PACK_SIZE = 4
 // Chaos: a just-for-fun singles draft (see CHAOS_* below) - started from its own button,
 // so it isn't in DRAFT_FORMATS.
 export type DraftFormat = 'singles' | 'doubles' | 'chaos'
@@ -50,6 +50,8 @@ export interface DraftMonView extends PokemonSummary {
   // Chaos: its stat modifiers in words ("Attack x2", "Glass Cannon") - the summary's
   // stats already include them.
   chaosTags?: string[]
+  // Chaos: how many Pokemon modifiers it has taken (see CHAOS_MON_MODIFIER_CAP).
+  chaosModifiers?: number
 }
 
 export interface DraftOpponentView {
@@ -77,10 +79,12 @@ export interface DraftView {
   opponent: DraftOpponentView | null
   // Finished: the coins it paid.
   reward: number
-  // Chaos: the picks this drafting stretch ends at (2, 4 or 6), and whether its one pack
-  // reroll is still there to use.
+  // Chaos: the picks this drafting stretch ends at (2, 4 or 6), and whether this step's one
+  // reroll (of the pack, or of the modifier offer) is still there to use.
   pickTarget?: number
   canReroll?: boolean
+  // Chaos: whether this modifier step's one free item swap is still there to use.
+  canSwapItem?: boolean
   // Chaos: the field modifiers taken so far, and the modifiers on offer right now.
   chaosField?: ChaosField
   modifierOffer?: ChaosModifier[]
@@ -96,17 +100,27 @@ export interface DraftBattleResult {
 
 // ---- Chaos mode ----
 // A singles draft just for fun (same tiers, same 7-win / 3-loss gauntlet): draft two, take
-// a modifier, then a hard trainer with as many Pokemon as you. After that it alternates -
-// two more picks before one battle, a modifier before the next - until the team is full,
-// then it's always a modifier. Every step happens whether the battle was won or lost.
-// Every modifier there is is on offer each time (bar the weather / terrain already up, and
-// the battle-start ones already taken), and each drafting stretch can reroll one pack.
+// a modifier, then a hard trainer with as many Pokemon as you. There's a modifier after
+// every battle, and after the 1st, 3rd, 5th... two more picks come before it, until the
+// team is full. Every step happens whether the battle was won or lost.
+// Each modifier step offers a random few (see CHAOS_OFFER_SIZE), some Pokemon ones pinned
+// to one Pokemon, and each Pokemon takes at most CHAOS_MON_MODIFIER_CAP of them - so the
+// whole team gets stronger rather than one unbeatable Pokemon. Each drafting stretch and
+// each modifier step can reroll once, and each modifier step has one free item swap (any
+// held item on any one Pokemon - not a modifier, so it doesn't count toward the cap).
 // Opponents bring modifiers too: half the battle number (rounded down) of them - battle-
 // start ones on their side, or +50% to one of their Pokemon's best stat.
 
 export const CHAOS_PICKS_PER_STAGE = 2
 // A stat boost multiplies the stat by this (boosts on the same stat stack).
 export const CHAOS_STAT_BOOST = 1.5
+// How many modifiers each step offers: at least one battle-start and one Pokemon one while
+// there are any left to give, never two of the same kind.
+export const CHAOS_OFFER_SIZE = 5
+// The chance an offered Pokemon modifier comes pinned to one Pokemon (picked at random).
+export const CHAOS_PINNED_CHANCE = 0.5
+// The most Pokemon modifiers one Pokemon can take (a Wild Card's replacement keeps the count).
+export const CHAOS_MON_MODIFIER_CAP = 2
 
 // Glass Cannon: both attacking stats and Speed times the first, both defending ones times
 // the second. Fortress is the other way round: both attacking stats and Speed times its
@@ -127,17 +141,21 @@ export type ChaosModifier =
   | { kind: 'screens' }
   | { kind: 'hazard'; id: ChaosHazard }
   | { kind: 'intimidate' }
-  // One Pokemon (see CHAOS_MON_MODIFIERS).
-  | { kind: 'ability' }
-  | { kind: 'stat' }
-  | { kind: 'tutor' }
-  | { kind: 'glasscannon' }
-  | { kind: 'fortress' }
-  | { kind: 'wildcard' }
-  | { kind: 'item' }
+  // One Pokemon (see CHAOS_MON_MODIFIERS) - `pick` when it's pinned to that one.
+  | { kind: 'ability'; pick?: number }
+  | { kind: 'stat'; pick?: number }
+  | { kind: 'tutor'; pick?: number }
+  | { kind: 'glasscannon'; pick?: number }
+  | { kind: 'fortress'; pick?: number }
+  | { kind: 'wildcard'; pick?: number }
+
+// The Pokemon a modifier is pinned to (its index in the picks), if it is.
+export function chaosModifierPin(modifier: ChaosModifier): number | undefined {
+  return 'pick' in modifier ? modifier.pick : undefined
+}
 
 // The modifiers that go on one of the player's Pokemon.
-export const CHAOS_MON_MODIFIERS: ChaosModifier['kind'][] = ['ability', 'stat', 'tutor', 'glasscannon', 'fortress', 'wildcard', 'item']
+export const CHAOS_MON_MODIFIERS: ChaosModifier['kind'][] = ['ability', 'stat', 'tutor', 'glasscannon', 'fortress', 'wildcard']
 
 // How every chaos battle starts from now on. Weather and terrain last until a move or
 // ability replaces them, Trick Room until someone uses Trick Room; Tailwind (4 turns) and
@@ -155,13 +173,12 @@ export interface ChaosField {
   intimidate?: boolean
 }
 
-// What a Pokemon modifier needs once picked: which Pokemon, and the ability, stat, item, or
+// What a Pokemon modifier needs once picked: which Pokemon, and the ability, stat, or
 // (Move Tutor) the move slot to replace and the move to learn.
 export interface ChaosModifierTarget {
   pick: number
   ability?: string
   stat?: keyof StatBlock
-  item?: string
   moveSlot?: number
   newMove?: string
 }

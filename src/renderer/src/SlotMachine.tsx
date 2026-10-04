@@ -9,7 +9,7 @@ import type { GameCornerGameProps } from './GameCornerTabs'
 import SpriteImage from './SpriteImage'
 import { toSpriteId } from '../../shared/battle-types'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
-import { playClunk, playTick } from './ticks'
+import { playCornerClunk, playCornerTick } from './ticks'
 
 // One symbol's cell on a reel.
 const CELL = 96
@@ -164,7 +164,7 @@ function SlotMachine({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorner
           const now = performance.now()
           if (now - lastTickAt > 30) {
             lastTickAt = now
-            playTick(sound, 1300 + r * 150, 0.03)
+            playCornerTick(sound, 1300 + r * 150, 0.03)
           }
         }
         lastCell[r] = cell
@@ -172,7 +172,7 @@ function SlotMachine({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorner
       raf = requestAnimationFrame(follow)
     }
     raf = requestAnimationFrame(follow)
-    const landings = REEL_SPIN_MS.map((ms) => setTimeout(() => playClunk(sound), ms))
+    const landings = REEL_SPIN_MS.map((ms) => setTimeout(() => playCornerClunk(sound), ms))
     return () => {
       cancelAnimationFrame(raf)
       landings.forEach(clearTimeout)

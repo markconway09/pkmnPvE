@@ -1,12 +1,22 @@
 import { createRequire } from 'node:module'
 import { readFileSync, writeFileSync } from 'node:fs'
-import { FIELD_START_TERRAINS, FIELD_START_WEATHERS, type AiDifficulty, type StatBlock } from '../../shared/battle-types'
+import {
+  FIELD_START_TERRAINS,
+  FIELD_START_WEATHERS,
+  type AiDifficulty,
+  type OpponentModifiersView,
+  type StatBlock
+} from '../../shared/battle-types'
 import {
   CHAOS_BANNED_ABILITIES,
   CHAOS_FORTRESS,
   CHAOS_GLASS_CANNON,
   CHAOS_MAX_SPIKES,
+  CHAOS_MON_MODIFIER_CAP,
+  CHAOS_MON_MODIFIERS,
+  CHAOS_OFFER_SIZE,
   CHAOS_PICKS_PER_STAGE,
+  CHAOS_PINNED_CHANCE,
   CHAOS_STAT_BOOST,
   CHAOS_STAT_LABELS,
   draftBring,
@@ -17,6 +27,7 @@ import {
   DRAFT_PACK_SIZE,
   DRAFT_ROUNDS,
   draftReward,
+  chaosModifierPin,
   type ChaosField,
   type ChaosModifier,
   type ChaosModifierTarget,
@@ -97,6 +108,8 @@ interface DraftPick {
   boosts?: Partial<Record<keyof StatBlock, number>>
   glassCannon?: number
   fortress?: number
+  // Chaos: how many Pokemon modifiers it has taken (see CHAOS_MON_MODIFIER_CAP).
+  modifiers?: number
 }
 
 interface StoredDraft {
@@ -118,8 +131,10 @@ interface StoredDraft {
   // Chaos: the picks this drafting stretch ends at, and what comes after it.
   pickTarget?: number
   afterDraft?: 'modifier' | 'battling'
-  // Chaos: this drafting stretch's pack reroll has been used.
+  // Chaos: this drafting stretch's pack reroll, or this modifier step's reroll, has been used.
   rerolled?: boolean
+  // Chaos: this modifier step's free item swap has been used.
+  itemSwapped?: boolean
   // Chaos: the field modifiers taken, and the modifiers on offer.
   chaosField?: ChaosField
   modifierOffer?: ChaosModifier[]
@@ -248,6 +263,8 @@ function getDraft(): StoredDraft | null {
     } catch {
       draft = null
     }
+    // The Held Item modifier became the free item swap: drop it from an older save's offer.
+    if (draft?.modifierOffer) draft.modifierOffer = draft.modifierOffer.filter((m) => (m.kind as string) !== 'item')
     if (draft?.inBattle) {
       draft.inBattle = false
       recordResult(draft, false)
@@ -305,15 +322,15 @@ function recordResult(current: StoredDraft, won: boolean): void {
 
 // ---- Chaos (see shared/draft.ts) ----
 
-// After a chaos battle: two more picks after the 1st, 3rd, 5th... battle while the team
-// isn't full, otherwise a modifier.
+// After a chaos battle: always a modifier - with two more picks before it after the 1st,
+// 3rd, 5th... battle while the team isn't full.
 function nextChaosStage(current: StoredDraft): void {
   current.opponent = null
   const played = current.wins + current.losses
   if (played % 2 === 1 && current.picks.length < DRAFT_ROUNDS) {
     current.status = 'drafting'
     current.pickTarget = Math.min(DRAFT_ROUNDS, current.picks.length + CHAOS_PICKS_PER_STAGE)
-    current.afterDraft = 'battling'
+    current.afterDraft = 'modifier'
     current.rerolled = false
     current.pack = offerPack(setFormatsOf(current), current.picks)
   } else {
@@ -321,31 +338,48 @@ function nextChaosStage(current: StoredDraft): void {
   }
 }
 
-// Every modifier, by type: each weather and terrain (not the one already up), the other
-// battle-start ones not taken yet, then the Pokemon ones.
+// On to a modifier step, with a fresh offer, its reroll and its item swap.
 function offerModifiers(current: StoredDraft): void {
-  const field = chaosFieldOf(current)
-  const offer: ChaosModifier[] = [
-    ...FIELD_START_WEATHERS.filter((o) => o.id !== field.weather).map((o) => ({ kind: 'weather' as const, id: o.id })),
-    ...FIELD_START_TERRAINS.filter((o) => o.id !== field.terrain).map((o) => ({ kind: 'terrain' as const, id: o.id })),
-    ...(field.trickRoom ? [] : [{ kind: 'trickroom' as const }]),
-    ...(field.tailwind ? [] : [{ kind: 'tailwind' as const }]),
-    ...(field.screens ? [] : [{ kind: 'screens' as const }]),
-    ...(field.stealthRock ? [] : [{ kind: 'hazard' as const, id: 'stealthrock' as const }]),
-    ...(field.stickyWeb ? [] : [{ kind: 'hazard' as const, id: 'stickyweb' as const }]),
-    ...((field.spikes ?? 0) >= CHAOS_MAX_SPIKES ? [] : [{ kind: 'hazard' as const, id: 'spikes' as const }]),
-    ...(field.intimidate ? [] : [{ kind: 'intimidate' as const }]),
-    { kind: 'ability' },
-    { kind: 'stat' },
-    { kind: 'tutor' },
-    { kind: 'glasscannon' },
-    { kind: 'fortress' },
-    { kind: 'wildcard' },
-    { kind: 'item' }
-  ]
   current.status = 'modifier'
   current.pack = []
-  current.modifierOffer = offer
+  current.rerolled = false
+  current.itemSwapped = false
+  current.modifierOffer = rollModifierOffer(current)
+}
+
+// CHAOS_OFFER_SIZE modifiers at random, never two of a kind: one weather and one terrain at
+// most (not the one already up), the battle-start ones not taken yet, and the Pokemon ones
+// while someone is under CHAOS_MON_MODIFIER_CAP - each of those maybe pinned to one of them.
+// At least one battle-start and one Pokemon modifier while there are any.
+function rollModifierOffer(current: StoredDraft): ChaosModifier[] {
+  const field = chaosFieldOf(current)
+  const weathers = FIELD_START_WEATHERS.filter((o) => o.id !== field.weather)
+  const terrains = FIELD_START_TERRAINS.filter((o) => o.id !== field.terrain)
+  const fieldOptions: (() => ChaosModifier)[] = [
+    ...(weathers.length > 0 ? [() => ({ kind: 'weather' as const, id: pickRandom(weathers).id })] : []),
+    ...(terrains.length > 0 ? [() => ({ kind: 'terrain' as const, id: pickRandom(terrains).id })] : []),
+    ...(field.trickRoom ? [] : [() => ({ kind: 'trickroom' as const })]),
+    ...(field.tailwind ? [] : [() => ({ kind: 'tailwind' as const })]),
+    ...(field.screens ? [] : [() => ({ kind: 'screens' as const })]),
+    ...(field.stealthRock ? [] : [() => ({ kind: 'hazard' as const, id: 'stealthrock' as const })]),
+    ...(field.stickyWeb ? [] : [() => ({ kind: 'hazard' as const, id: 'stickyweb' as const })]),
+    ...((field.spikes ?? 0) >= CHAOS_MAX_SPIKES ? [] : [() => ({ kind: 'hazard' as const, id: 'spikes' as const })]),
+    ...(field.intimidate ? [] : [() => ({ kind: 'intimidate' as const })])
+  ]
+  const open = current.picks.flatMap((pick, i) => ((pick.modifiers ?? 0) < CHAOS_MON_MODIFIER_CAP ? [i] : []))
+  const monOptions: (() => ChaosModifier)[] =
+    open.length === 0
+      ? []
+      : CHAOS_MON_MODIFIERS.map(
+          (kind) => () => ({ kind, ...(Math.random() < CHAOS_PINNED_CHANCE ? { pick: pickRandom(open) } : {}) }) as ChaosModifier
+        )
+  const take = (from: (() => ChaosModifier)[]): ChaosModifier => from.splice(Math.floor(Math.random() * from.length), 1)[0]()
+  const offer: ChaosModifier[] = []
+  if (fieldOptions.length > 0) offer.push(take(fieldOptions))
+  if (monOptions.length > 0) offer.push(take(monOptions))
+  const rest = [...fieldOptions, ...monOptions]
+  while (offer.length < CHAOS_OFFER_SIZE && rest.length > 0) offer.push(take(rest))
+  return offer
 }
 
 // On to the battle: a hard trainer bringing as many Pokemon as the player has.
@@ -469,13 +503,29 @@ function wildCardTier(current: StoredDraft): string {
   return SINGLES_TIERS[Math.max(0, top < 0 ? 1 : top - 1)]
 }
 
-/** Chaos: a fresh pack in place of this one - once per drafting stretch. */
+/** Chaos: a fresh pack, or a fresh modifier offer, in place of this one - once per step. */
 export function rerollDraftPack(): DraftView {
-  const current = activeDraft('drafting')
+  const current = getDraft()
+  if (!current || (current.status !== 'drafting' && current.status !== 'modifier')) throw new Error("There's nothing to reroll right now")
   if (formatOf(current) !== 'chaos') throw new Error('Only chaos drafts can reroll')
-  if (current.rerolled) throw new Error('Already rerolled this draft phase')
+  if (current.rerolled) throw new Error(current.status === 'modifier' ? 'Already rerolled these modifiers' : 'Already rerolled this draft phase')
   current.rerolled = true
-  current.pack = offerPack(setFormatsOf(current), current.picks)
+  if (current.status === 'modifier') current.modifierOffer = rollModifierOffer(current)
+  else current.pack = offerPack(setFormatsOf(current), current.picks)
+  persist()
+  return getDraftView()!
+}
+
+/** Chaos: any useful held item on one of the team - once per modifier step, not a modifier. */
+export function swapChaosItem(pickIndex: number, itemId: string): DraftView {
+  const current = activeDraft('modifier')
+  if (current.itemSwapped) throw new Error('Already swapped an item this round')
+  const pick = current.picks[pickIndex]
+  if (!pick) throw new Error('Pick one of your Pokémon')
+  const item = Dex.items.get(itemId)
+  if (!isUsefulHeldItem(item.id)) throw new Error('Pick an item')
+  pick.set.item = item.name
+  current.itemSwapped = true
   persist()
   return getDraftView()!
 }
@@ -498,6 +548,9 @@ export function chooseChaosModifier(index: number, target?: ChaosModifierTarget)
   else {
     const pick = target ? current.picks[target.pick] : undefined
     if (!pick) throw new Error('Pick one of your Pokémon')
+    const pin = chaosModifierPin(modifier)
+    if (pin !== undefined && target!.pick !== pin) throw new Error('That modifier is for another Pokémon')
+    if ((pick.modifiers ?? 0) >= CHAOS_MON_MODIFIER_CAP) throw new Error(`That Pokémon already has ${CHAOS_MON_MODIFIER_CAP} modifiers`)
     if (modifier.kind === 'ability') {
       const ability = Dex.abilities.get(target?.ability ?? '')
       if (!ability.exists || !chaosAbilityChoices().some((a) => a.id === ability.id)) throw new Error("That ability can't be given")
@@ -510,10 +563,6 @@ export function chooseChaosModifier(index: number, target?: ChaosModifierTarget)
       pick.glassCannon = (pick.glassCannon ?? 0) + 1
     } else if (modifier.kind === 'fortress') {
       pick.fortress = (pick.fortress ?? 0) + 1
-    } else if (modifier.kind === 'item') {
-      const item = Dex.items.get(target?.item ?? '')
-      if (!isUsefulHeldItem(item.id)) throw new Error('Pick an item')
-      pick.set.item = item.name
     } else if (modifier.kind === 'tutor') {
       const slot = target?.moveSlot ?? -1
       const learned = Dex.moves.get(target?.newMove ?? '')
@@ -526,6 +575,7 @@ export function chooseChaosModifier(index: number, target?: ChaosModifierTarget)
       if (!replacement) throw new Error('No Pokémon left to swap in')
       current.picks[target!.pick] = { ...replacement, boosts: pick.boosts, glassCannon: pick.glassCannon, fortress: pick.fortress }
     }
+    current.picks[target!.pick].modifiers = (pick.modifiers ?? 0) + 1
   }
   current.chaosField = field
   startChaosBattleStage(current)
@@ -560,6 +610,32 @@ function chaosTags(pick: DraftPick): string[] | undefined {
   if (pick.glassCannon) tags.push(`Glass Cannon${pick.glassCannon > 1 ? ` x${pick.glassCannon}` : ''}`)
   if (pick.fortress) tags.push(`Fortress${pick.fortress > 1 ? ` x${pick.fortress}` : ''}`)
   return tags.length > 0 ? tags : undefined
+}
+
+// A chaos opponent's modifiers in words, for the tooltip on them in battle: their
+// battle-start ones as the player meets them, and the stat boosts of the Pokemon they bring.
+function opponentModifiersView(mine: ChaosField, theirs: ChaosField | undefined, team: DraftPick[]): OpponentModifiersView {
+  const label = (options: { id: string; label: string }[], id: string): string => options.find((o) => o.id === id)?.label ?? id
+  const field = theirs
+    ? [
+        theirs.weather ? label(FIELD_START_WEATHERS, theirs.weather) : null,
+        theirs.terrain ? `${label(FIELD_START_TERRAINS, theirs.terrain)} Terrain` : null,
+        theirs.trickRoom ? (mine.trickRoom ? 'Trick Room (cancels out yours)' : 'Trick Room') : null,
+        theirs.tailwind ? 'Tailwind on their side (4 turns)' : null,
+        theirs.screens ? 'Reflect + Light Screen on their side (5 turns)' : null,
+        theirs.stealthRock ? 'Stealth Rock on your side' : null,
+        theirs.stickyWeb ? 'Sticky Web on your side' : null,
+        theirs.spikes ? `Spikes on your side${theirs.spikes > 1 ? ` x${theirs.spikes}` : ''}` : null,
+        theirs.intimidate ? 'Your lead starts at -1 Attack' : null
+      ].filter((w): w is string => !!w)
+    : []
+  const mons = team.flatMap((pick) => {
+    const boosts = (Object.entries(pick.boosts ?? {}) as [keyof StatBlock, number][])
+      .filter(([, count]) => count > 0)
+      .map(([stat, count]) => `+${Math.round((CHAOS_STAT_BOOST ** count - 1) * 100)}% ${CHAOS_STAT_LABELS[stat]}`)
+    return boosts.length > 0 ? [{ species: pick.set.species, boosts }] : []
+  })
+  return { field, mons }
 }
 
 // The battle's starting field from the chaos modifiers (see ChaosField).
@@ -609,6 +685,7 @@ function toView(pick: DraftPick): DraftMonView {
   return {
     ...summary,
     chaosTags: chaosTags(pick),
+    chaosModifiers: pick.modifiers,
     setName: pick.setName,
     itemSpritenum: pick.set.item ? getItemSpritenum(pick.set.item) : null,
     moveList: pick.set.moves.map((m) => {
@@ -642,7 +719,8 @@ export function getDraftView(): DraftView | null {
       : null,
     reward: current.reward,
     pickTarget: formatOf(current) === 'chaos' ? current.pickTarget : undefined,
-    canReroll: formatOf(current) === 'chaos' && current.status === 'drafting' && !current.rerolled,
+    canReroll: formatOf(current) === 'chaos' && (current.status === 'drafting' || current.status === 'modifier') && !current.rerolled,
+    canSwapItem: current.status === 'modifier' && !current.itemSwapped,
     chaosField: formatOf(current) === 'chaos' ? chaosFieldOf(current) : undefined,
     modifierOffer: current.status === 'modifier' ? current.modifierOffer : undefined
   }
@@ -740,7 +818,13 @@ export function beginDraftBattle(bring: number[]): {
   p1team: PokemonSet[]
   opponent: { name: string; spriteId: string; team: PokemonSet[]; difficulty: AiDifficulty }
   // Chaos: the starting field, and each side's Pokemon's stat multipliers (in team order).
-  chaos?: { field: ReturnType<typeof chaosStartField>; boosts: StatBlock[]; foeBoosts: StatBlock[] }
+  chaos?: {
+    field: ReturnType<typeof chaosStartField>
+    boosts: StatBlock[]
+    foeBoosts: StatBlock[]
+    // The opponent's modifiers in words, for the tooltip on them.
+    foeModifiers: OpponentModifiersView
+  }
 } {
   const current = activeDraft('battling')
   if (!current.opponent) throw new Error('No opponent lined up')
@@ -771,7 +855,12 @@ export function beginDraftBattle(bring: number[]): {
         ? {
             field: chaosStartField(chaosFieldOf(current), current.opponent.field),
             boosts: bring.map((i) => boostMultipliers(current.picks[i])),
-            foeBoosts: theirPicks.map((i) => boostMultipliers(current.opponent!.team[i]))
+            foeBoosts: theirPicks.map((i) => boostMultipliers(current.opponent!.team[i])),
+            foeModifiers: opponentModifiersView(
+              chaosFieldOf(current),
+              current.opponent.field,
+              theirPicks.map((i) => current.opponent!.team[i])
+            )
           }
         : undefined
   }

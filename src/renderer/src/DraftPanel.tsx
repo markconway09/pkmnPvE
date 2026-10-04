@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { FIELD_START_TERRAINS, FIELD_START_WEATHERS, type BattleView, type BoxPokemonView, type StatBlock } from '../../shared/battle-types'
 import {
+  CHAOS_MON_MODIFIER_CAP,
   CHAOS_MON_MODIFIERS,
+  CHAOS_OFFER_SIZE,
   CHAOS_STAT_LABELS,
+  chaosModifierPin,
   type ChaosField,
   type ChaosModifier,
   type ChaosModifierTarget,
@@ -104,8 +107,6 @@ function modifierText(modifier: ChaosModifier): { icon: string; title: string; t
       return { icon: '✸', title: 'Glass Cannon', text: '+50% Attack, Sp. Atk and Speed, -30% Defense and Sp. Def' }
     case 'wildcard':
       return { icon: '⁇', title: 'Wild Card', text: 'Swap it for a random Pokémon from the tier above (its stat modifiers stay)' }
-    case 'item':
-      return { icon: '◈', title: 'Held Item', text: 'Give one of your Pokémon any item in the game' }
   }
 }
 
@@ -210,6 +211,8 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
   const [modifierMon, setModifierMon] = useState<number | null>(null)
   const [modifierStat, setModifierStat] = useState<keyof StatBlock | null>(null)
   const [modifierAbility, setModifierAbility] = useState<string | null>(null)
+  // Chaos: the free item swap - open instead of a modifier, its Pokemon and its new item.
+  const [swapping, setSwapping] = useState(false)
   const [modifierItem, setModifierItem] = useState<string | null>(null)
   const [tutorSlot, setTutorSlot] = useState<number | null>(null)
   const [tutorMove, setTutorMove] = useState<string | null>(null)
@@ -250,10 +253,11 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
   }
 
   // A fresh modifier offer starts with nothing chosen; the ability and item lists load the first time they're needed.
-  const offerKey = draft?.status === 'modifier' ? `${draft.wins}-${draft.losses}-${draft.picks.length}` : ''
+  const offerKey = draft?.status === 'modifier' ? `${draft.wins}-${draft.losses}-${draft.picks.length}-${JSON.stringify(draft.modifierOffer)}` : ''
   useEffect(() => {
     setModifierIndex(null)
     setModifierMon(null)
+    setSwapping(false)
     resetModifierChoices()
     if (offerKey && chaosAbilities.length === 0) {
       window.api
@@ -409,15 +413,15 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
               <ul className="draft-rules">
                 <li>
                   <span className="draft-rule-icon">1</span>
-                  Draft 2, take a modifier, then battle a hard trainer with as many Pokémon as you
+                  Draft 2, take 1 of {CHAOS_OFFER_SIZE} random modifiers, then battle a hard trainer with as many Pokémon as you
                 </li>
                 <li>
                   <span className="draft-rule-icon">2</span>
-                  Then 2 more picks before one battle, a modifier before the next - win or lose
+                  A modifier after every battle, win or lose - with 2 more picks before it every other battle until the team is full
                 </li>
                 <li>
                   <span className="draft-rule-icon">3</span>
-                  Team full at {DRAFT_ROUNDS}: a modifier before every battle
+                  Each Pokémon takes {CHAOS_MON_MODIFIER_CAP} modifiers at most - plus one free item swap every round
                 </li>
                 <li>
                   <span className="draft-rule-icon">4</span>
@@ -563,32 +567,38 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
     </>
   )
 
-  // ---- Chaos: one of the offered modifiers ----
+  // ---- Chaos: one of the offered modifiers (and the free item swap in the corner) ----
   if (draft.status === 'modifier') {
     const offer = draft.modifierOffer ?? []
-    const chosen = modifierIndex !== null ? offer[modifierIndex] : null
-    const needsMon = !!chosen && CHAOS_MON_MODIFIERS.includes(chosen.kind)
+    const chosen = !swapping && modifierIndex !== null ? offer[modifierIndex] : null
+    const needsMon = swapping || (!!chosen && CHAOS_MON_MODIFIERS.includes(chosen.kind))
+    // A pinned Pokemon modifier can only go on its own Pokemon.
+    const pin = chosen ? chaosModifierPin(chosen) : undefined
     const mon = modifierMon !== null ? draft.picks[modifierMon] : null
-    // What the chosen modifier still needs, or null once it can be taken.
-    const missing = !chosen
-      ? 'Pick a modifier'
-      : !needsMon
-        ? null
-        : !mon
-          ? 'Pick a Pokémon'
-          : chosen.kind === 'ability' && !modifierAbility
-            ? 'Pick an ability'
-            : chosen.kind === 'stat' && !modifierStat
-              ? 'Pick a stat'
-              : chosen.kind === 'item' && !modifierItem
-                ? 'Pick an item'
+    // What the chosen modifier (or the item swap) still needs, or null once it can be done.
+    const missing = swapping
+      ? !mon
+        ? 'Pick a Pokémon'
+        : !modifierItem
+          ? 'Pick an item'
+          : null
+      : !chosen
+        ? 'Pick a modifier'
+        : !needsMon
+          ? null
+          : !mon
+            ? 'Pick a Pokémon'
+            : chosen.kind === 'ability' && !modifierAbility
+              ? 'Pick an ability'
+              : chosen.kind === 'stat' && !modifierStat
+                ? 'Pick a stat'
                 : chosen.kind === 'tutor' && (tutorSlot === null || !tutorMove)
                   ? tutorSlot === null
                     ? 'Pick a move to forget'
                     : 'Pick a move to learn'
                   : null
     const filter = listFilter.trim().toLowerCase()
-    // The searchable list for an Ability or Held Item.
+    // The searchable list for an Ability, item or move.
     const searchList = (
       entries: { id: string; name: string; description: string; spritenum?: number }[],
       value: string | null,
@@ -618,62 +628,107 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
         </div>
       </div>
     )
+    // The offer as cards, grouped in MODIFIER_GROUPS order.
+    const cards = MODIFIER_GROUPS.flatMap((group) =>
+      offer.flatMap((modifier, i) => (group.kinds.includes(modifier.kind) ? [{ modifier, i, group: group.label }] : []))
+    )
     return (
       <div className="run-panel draft-panel">
         <div className="run-status-row">
           <span>Chaos · Pick a modifier</span>
           <TierChips tiers={draft.tiers} />
           <ChaosFieldChips field={draft.chaosField} />
+          {/* One fresh offer per modifier step. */}
+          <button
+            className="run-forfeit-button draft-reroll-button"
+            disabled={disabled || !draft.canReroll}
+            title={draft.canReroll ? 'Swap these modifiers for new ones - once per modifier step' : 'Already rerolled these modifiers'}
+            onClick={() =>
+              void act(async () => {
+                setDraft(await window.api.rerollDraftPack())
+              })
+            }
+          >
+            {draft.canReroll ? 'Reroll modifiers' : 'Rerolled'}
+          </button>
           {recordPips}
           {abandonButton}
         </div>
-        {/* Every modifier as a small chip, a row per type. */}
-        <div className="draft-modifier-groups">
-          {MODIFIER_GROUPS.map((group) => {
-            const items = offer.map((modifier, i) => ({ modifier, i })).filter(({ modifier }) => group.kinds.includes(modifier.kind))
-            if (items.length === 0) return null
+        <div className="draft-modifier-head">
+          <span className="draft-modifier-heading">
+            Take 1 of {offer.length}
+          </span>
+          {/* The free item swap, once a round - not a modifier, so it doesn't count toward the cap. */}
+          <button
+            type="button"
+            className={`draft-item-swap${swapping ? ' draft-item-swap-on' : ''}`}
+            disabled={disabled || !draft.canSwapItem}
+            title={draft.canSwapItem ? 'Give one of your Pokémon any held item - free, once per round' : 'Already swapped an item this round'}
+            onClick={() => {
+              setSwapping(!swapping)
+              setModifierIndex(null)
+              setModifierMon(null)
+              resetModifierChoices()
+            }}
+          >
+            <span className="draft-item-swap-icon" aria-hidden="true">
+              ◈
+            </span>
+            <span className="draft-item-swap-text">
+              <strong>Item swap</strong>
+              <span>{draft.canSwapItem ? (swapping ? 'Cancel' : '1 free this round') : 'Used this round'}</span>
+            </span>
+          </button>
+        </div>
+        {/* The offered modifiers as big cards - a pinned one names its Pokemon. */}
+        <div className={`draft-modifier-cards${swapping ? ' draft-modifier-cards-dim' : ''}`}>
+          {cards.map(({ modifier, i, group }) => {
+            const text = modifierText(modifier)
+            const pinned = chaosModifierPin(modifier)
             return (
-              <div key={group.label} className="draft-modifier-group">
-                <span className="draft-modifier-group-label">{group.label}</span>
-                <div className="draft-modifier-offer">
-                  {items.map(({ modifier, i }) => {
-                    const text = modifierText(modifier)
-                    return (
-                      <button
-                        key={i}
-                        type="button"
-                        className={`draft-modifier-chip draft-modifier-${modifier.kind}${modifierIndex === i ? ' draft-modifier-chosen' : ''}`}
-                        disabled={disabled}
-                        title={text.text}
-                        onClick={() => {
-                          setModifierIndex(i)
-                          setModifierMon(null)
-                          resetModifierChoices()
-                        }}
-                      >
-                        <span className="draft-modifier-icon" aria-hidden="true">
-                          {text.icon}
-                        </span>
-                        {text.title}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
+              <button
+                key={i}
+                type="button"
+                className={`draft-modifier-card draft-modifier-${modifier.kind}${modifierIndex === i && !swapping ? ' draft-modifier-chosen' : ''}`}
+                disabled={disabled}
+                onClick={() => {
+                  setSwapping(false)
+                  setModifierIndex(i)
+                  setModifierMon(pinned ?? null)
+                  resetModifierChoices()
+                }}
+              >
+                <span className="draft-modifier-card-group">{group}</span>
+                <span className="draft-modifier-icon" aria-hidden="true">
+                  {text.icon}
+                </span>
+                <strong className="draft-modifier-card-title">{text.title}</strong>
+                <span className="draft-modifier-card-text">{text.text}</span>
+                {pinned !== undefined && draft.picks[pinned] && <span className="draft-modifier-pin">Only for {draft.picks[pinned].species}</span>}
+              </button>
             )
           })}
         </div>
-        {chosen && <p className="draft-modifier-desc">{modifierText(chosen).text}</p>}
-        {/* The whole team is always on show - clickable when a Pokemon modifier needs one. */}
-        <p className="box-empty-hint">{needsMon ? 'Which Pokémon?' : 'Your team'}</p>
+        {/* The whole team is always on show - clickable when a Pokemon modifier or the item swap needs one. */}
+        <p className="box-empty-hint">
+          {swapping
+            ? 'Which Pokémon gets a new item?'
+            : !needsMon
+              ? 'Your team'
+              : pin !== undefined
+                ? `Only for ${draft.picks[pin]?.species ?? 'one Pokémon'}`
+                : `Which Pokémon? Each takes ${CHAOS_MON_MODIFIER_CAP} Pokémon modifiers at most`}
+        </p>
         <div className="draft-team-row">
-          {draft.picks.map((pick, i) =>
-            needsMon ? (
+          {draft.picks.map((pick, i) => {
+            const full = !swapping && (pick.chaosModifiers ?? 0) >= CHAOS_MON_MODIFIER_CAP
+            return needsMon ? (
               <button
                 key={i}
                 type="button"
                 className={`draft-bring-button${modifierMon === i ? ' draft-bring-chosen' : ''}`}
-                disabled={disabled}
+                disabled={disabled || (pin !== undefined && pin !== i) || full}
+                title={full ? `Already has ${CHAOS_MON_MODIFIER_CAP} modifiers` : undefined}
                 onClick={() => {
                   setModifierMon(i)
                   resetModifierChoices()
@@ -681,7 +736,7 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
               >
                 <DraftMonIcon mon={pick} />
                 {modifierMon === i && (
-                  <span className="draft-bring-order draft-bring-lead">{chosen?.kind === 'item' ? pick.item || 'No item' : pick.ability}</span>
+                  <span className="draft-bring-order draft-bring-lead">{swapping ? pick.item || 'No item' : pick.ability}</span>
                 )}
               </button>
             ) : (
@@ -689,7 +744,7 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
                 <DraftMonIcon mon={pick} />
               </div>
             )
-          )}
+          })}
         </div>
         {chosen?.kind === 'stat' && mon && (
           <div className="trainer-chips draft-modifier-choices">
@@ -707,7 +762,7 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
           </div>
         )}
         {chosen?.kind === 'ability' && mon && searchList(chaosAbilities, modifierAbility, setModifierAbility, 'Search abilities...')}
-        {chosen?.kind === 'item' && mon && searchList(chaosItems, modifierItem, setModifierItem, 'Search items...')}
+        {swapping && mon && searchList(chaosItems, modifierItem, setModifierItem, 'Search items...')}
         {chosen?.kind === 'tutor' && mon && (
           <div className="draft-tutor">
             <div className="trainer-chips draft-modifier-choices">
@@ -738,13 +793,20 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
           disabled={disabled || missing !== null}
           onClick={() =>
             void act(async () => {
+              // The item swap leaves the modifier step open; a modifier moves on to the battle.
+              if (swapping) {
+                setDraft(await window.api.swapChaosItem(modifierMon!, modifierItem!))
+                setSwapping(false)
+                setModifierMon(null)
+                resetModifierChoices()
+                return
+              }
               const target: ChaosModifierTarget | undefined =
                 needsMon && modifierMon !== null
                   ? {
                       pick: modifierMon,
                       ability: modifierAbility ?? undefined,
                       stat: modifierStat ?? undefined,
-                      item: modifierItem ?? undefined,
                       moveSlot: tutorSlot ?? undefined,
                       newMove: tutorMove ?? undefined
                     }
@@ -755,7 +817,7 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
             })
           }
         >
-          {missing ?? 'Take it'}
+          {missing ?? (swapping ? 'Swap item' : 'Take it')}
         </button>
         {error && <p className="editor-error">{error}</p>}
       </div>

@@ -6,7 +6,7 @@ import SpriteImage from './SpriteImage'
 import ItemSprite from './ItemSprite'
 import ShinyIcon from './ShinyIcon'
 import { formatMoney } from './money'
-import { playTick } from './ticks'
+import { playCornerTick } from './ticks'
 import RarityOddsTooltip from './RarityOddsTooltip'
 
 interface Props {
@@ -140,7 +140,7 @@ function CaseOpening({ itemId, itemName, result, onClose, onOpenAnother }: Props
         const x = new DOMMatrixReadOnly(getComputedStyle(strip).transform).m41
         const card = Math.floor((viewport.clientWidth / 2 - x) / CARD_STEP)
         if (card !== lastCard) {
-          if (lastCard !== -1 && audio) playTick(audio)
+          if (lastCard !== -1 && audio) playCornerTick(audio)
           lastCard = card
         }
       }

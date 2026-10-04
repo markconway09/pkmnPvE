@@ -51,7 +51,7 @@ import {
   mergeStatMultiplier,
   raidSoftCappedDamage
 } from '../../shared/battle-types'
-import type { RaidView, WildLocationId } from '../../shared/battle-types'
+import type { OpponentModifiersView, RaidView, WildLocationId } from '../../shared/battle-types'
 import { armTmQuickCheck, grantRewardTms, unownedRewardTms } from './tm-store'
 import type { TmInfo } from '../../shared/tms'
 import { RAID_PLACEHOLDER_NAME, raidPlaceholderSet } from './raid'
@@ -383,6 +383,8 @@ export interface OpponentConfig {
   }
   // Chaos drafts: each side's Pokemon's stat multipliers, in team order.
   statMultipliers?: { p1?: StatBlock[]; p2?: StatBlock[] }
+  // Chaos drafts: the opponent's modifiers in words, for the tooltip on them.
+  chaosModifiers?: OpponentModifiersView
 }
 
 // An Everstone-locked Pokemon counts as fully evolved, so the sim's Eviolite skips any
@@ -1397,6 +1399,22 @@ export class WildBattle {
     if (this.opponent?.dexNavHunt && !this.ended) breakDexNavChain()
   }
 
+  // A draft match or a Roguelite fight can't be run from, but it can be given up: the
+  // player simply loses, so a draft match counts as lost and a run is over.
+  private canForfeit(): boolean {
+    return !!(this.opponent?.run || this.opponent?.draft)
+  }
+
+  /** Gives up the battle: the sim declares the player beaten, and the usual loss follows. */
+  async forfeit(): Promise<BattleView> {
+    if (!this.canForfeit()) throw new Error("You can't forfeit this battle")
+    if (!this.ended) {
+      void this.streams.omniscient.write('>forcelose p1')
+      while (!this.ended) await this.waitForUpdate(this.human.version)
+    }
+    return this.view()
+  }
+
   // Which slot(s) a spread move hits, given who's actually out and alive right
   // now - the protocol's own |move| line only ever names one "chosen" target,
   // even for a move that hits everyone adjacent, so this reads the move's own
@@ -1844,8 +1862,10 @@ export class WildBattle {
       opponentTrainer,
       runCost: this.runCost(),
       canAffordRun: getMoney() >= (this.runCost() ?? 0),
+      canForfeit: this.canForfeit(),
       opponentRoster: this.opponentRoster(),
       rewards: this.rewardsView(),
+      chaosModifiers: this.opponent?.chaosModifiers ?? null,
       runBattle: !!this.opponent?.run,
       runFainted: this.runFainted,
       runItemReward: this.runItemReward,

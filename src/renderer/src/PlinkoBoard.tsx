@@ -5,7 +5,7 @@ import { PLINKO_PAYOUTS, PLINKO_RISKS, PLINKO_RISK_LABELS, PLINKO_ROWS, PLINKO_S
 import BetSlider, { maxBet, placedBet, useGameCornerPerks, useSavedBet, betStep } from './BetSlider'
 import type { GameCornerGameProps } from './GameCornerTabs'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
-import { playClunk, playTick } from './ticks'
+import { playCornerClunk, playCornerTick } from './ticks'
 
 // The board's geometry, in SVG units: the gap between pegs, and between rows.
 const GAP = 34
@@ -126,7 +126,7 @@ function PlinkoBoard({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorner
         if (row > (ticked.current.get(ball.id) ?? -1) && row < PLINKO_ROWS) {
           ticked.current.set(ball.id, row)
           const a = sound()
-          if (a) playTick(a, 900 + row * 60, 0.02)
+          if (a) playCornerTick(a, 900 + row * 60, 0.02)
         }
         if (now - ball.started >= (PLINKO_ROWS + 1) * ROW_MS) landed.push(ball)
       }
@@ -134,7 +134,7 @@ function PlinkoBoard({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorner
         for (const ball of landed) {
           ticked.current.delete(ball.id)
           const a = sound()
-          if (a) playClunk(a)
+          if (a) playCornerClunk(a)
           setLit({ slot: ball.drop.slot, id: ball.id })
           setCoins(ball.drop.coins)
           const net = ball.drop.payout - ball.drop.bet

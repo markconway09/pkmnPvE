@@ -1473,6 +1473,9 @@ export interface BattleView {
   runCost: number | null
   // Whether the player has the money to run (always, when it's free).
   canAffordRun: boolean
+  // A draft match or a Roguelite fight: no running, but it can be forfeited (a lost match
+  // in a draft, the end of the run in a Roguelite).
+  canForfeit: boolean
   opponentRoster: RosterSlotView[]
   // A Roguelite run's battle: catching is free and fills the run's team, and there's
   // no money or items. Set with the Pokemon that fainted - they leave the run's team.
@@ -1489,6 +1492,15 @@ export interface BattleView {
   // What winning this battle can pay out, for the opponent's hover tooltip - null
   // for a friendly match against another player's team, which pays nothing.
   rewards: BattleRewardsView | null
+  // A chaos draft battle: the opponent's modifiers, shown in that same tooltip instead.
+  chaosModifiers?: OpponentModifiersView | null
+}
+
+// A chaos draft opponent's modifiers in words: their battle-start ones ("Stealth Rock on
+// your side"), and each of their Pokemon's stat boosts ("+50% Attack").
+export interface OpponentModifiersView {
+  field: string[]
+  mons: { species: string; boosts: string[] }[]
 }
 
 // ---- Roguelite mode ----

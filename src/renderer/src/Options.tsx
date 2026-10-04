@@ -19,7 +19,7 @@ import {
   type MusicSource
 } from './music'
 import TabStrip from './TabStrip'
-import SoundPicker from './SoundPicker'
+import { cornerSoundsOn, setCornerSoundsOn } from './ticks'
 import { ANIM_SPEEDS, ANIM_SPEED_LABELS, animSpeed, setAnimSpeed, type AnimSpeed } from './animSpeed'
 
 interface Props {
@@ -105,6 +105,34 @@ function MusicSourceSettings(): React.JSX.Element {
   )
 }
 
+/** The on/off switch at the start of each sound row. */
+function SoundSwitch({ label, on, onToggle }: { label: string; on: boolean; onToggle: (on: boolean) => void }): React.JSX.Element {
+  return (
+    <button
+      className={`options-sound-toggle${on ? ' options-sound-toggle-on' : ''}`}
+      role="switch"
+      aria-checked={on}
+      aria-label={`${label} sound`}
+      title={on ? `Turn ${label.toLowerCase()} off` : `Turn ${label.toLowerCase()} on`}
+      onClick={() => onToggle(!on)}
+    >
+      <span className="options-sound-toggle-knob" />
+    </button>
+  )
+}
+
+/** A sound row with just the switch: the Game Corner's sounds, which follow the Menus volume. */
+function SwitchRow({ label, on, onToggle }: { label: string; on: boolean; onToggle: (on: boolean) => void }): React.JSX.Element {
+  return (
+    <>
+      <SoundSwitch label={label} on={on} onToggle={onToggle} />
+      <span className={`options-volume-label${on ? '' : ' options-volume-off'}`}>{label}</span>
+      <span />
+      <span className={`options-volume-value${on ? '' : ' options-volume-off'}`}>{on ? 'On' : 'Off'}</span>
+    </>
+  )
+}
+
 /** One sound's row in Options: an on/off switch, its name, a volume slider and the value. */
 function VolumeRow({
   label,
@@ -123,16 +151,7 @@ function VolumeRow({
 }): React.JSX.Element {
   return (
     <>
-      <button
-        className={`options-sound-toggle${on ? ' options-sound-toggle-on' : ''}`}
-        role="switch"
-        aria-checked={on}
-        aria-label={`${label} sound`}
-        title={on ? `Turn ${label.toLowerCase()} off` : `Turn ${label.toLowerCase()} on`}
-        onClick={() => onToggle(!on)}
-      >
-        <span className="options-sound-toggle-knob" />
-      </button>
+      <SoundSwitch label={label} on={on} onToggle={onToggle} />
       <span className={`options-volume-label${on ? '' : ' options-volume-off'}`}>{label}</span>
       <input
         type="range"
@@ -168,10 +187,10 @@ function Options({
   const [criesOn, setCriesOn] = useState(cryOn)
   const [music, setMusic] = useState(() => Math.round(musicState().volume * 100))
   const [musicOn, setMusicOnState] = useState(() => musicState().on)
-  const [pickingSounds, setPickingSounds] = useState(false)
+  const [cornerOn, setCornerOn] = useState(cornerSoundsOn)
   const [moveAnims, setMoveAnims] = useState<AnimSpeed>(animSpeed)
 
-  // Esc closes it, like clicking outside (the sound picker over it catches Esc first).
+  // Esc closes it, like clicking outside.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') onClose()
@@ -265,7 +284,6 @@ function Options({
                 // A click on letting go, to hear the new volume.
                 onRelease={() => playSfx('click')}
               />
-              <button onClick={() => setPickingSounds(true)}>Choose sounds…</button>
               <VolumeRow
                 label="Cries"
                 on={criesOn}
@@ -294,9 +312,16 @@ function Options({
                   setMusicVolume(next / 100)
                 }}
               />
+              <SwitchRow
+                label="Game Corner"
+                on={cornerOn}
+                onToggle={(next) => {
+                  setCornerOn(next)
+                  setCornerSoundsOn(next)
+                }}
+              />
             </div>
             {musicOn && <MusicSourceSettings />}
-            {pickingSounds && <SoundPicker onClose={() => setPickingSounds(false)} />}
           </section>
 
           <section className="options-section">
