@@ -103,7 +103,9 @@ function modifiersFor(stat: BattleStat, c: Context): number[] {
 export function effectiveStatsFor(
   view: ActivePokemonView,
   side: 'p1' | 'p2',
-  effects: FieldEffectView[]
+  effects: FieldEffectView[],
+  // Everstone-locked: counts as fully evolved, so no Eviolite boost.
+  everstone = false
 ): StatBlock {
   const context: Context = {
     itemId: toID(view.item),
@@ -115,7 +117,7 @@ export function effectiveStatsFor(
     weather: effects.find((e) => e.kind === 'weather')?.id ?? null,
     terrain: effects.find((e) => e.kind === 'terrain')?.id ?? null,
     tailwind: effects.some((e) => e.kind === 'side' && e.side === side && e.id === 'tailwind'),
-    notFullyEvolved: isNotFullyEvolved(view.species)
+    notFullyEvolved: !everstone && isNotFullyEvolved(view.species)
   }
   const result: StatBlock = { ...view.stats }
   for (const stat of BATTLE_STATS) {

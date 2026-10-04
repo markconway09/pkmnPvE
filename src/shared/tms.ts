@@ -83,9 +83,10 @@ export const TM_SCANNER_COINS = 20000
 // from the area. Without it there's no quick check at all.
 export const TM_QUICK_CHECK_CHANCE: Record<SkillCheckResult, number> = { great: 0.15, good: 0.05, miss: 0 }
 
-// A Good or a Great that found no TM still has this chance to turn up one random item
-// instead - picked like a wild Pokemon's random drop.
-export const TM_QUICK_CHECK_ITEM_CHANCE = 0.3
+// A Good or a Great that found no TM may still turn up one random item instead - picked
+// like a wild Pokemon's random drop. Its chance is this many times the result's TM chance
+// (Great 45%, Good 15%).
+export const TM_QUICK_CHECK_ITEM_MULTIPLIER = 3
 
 export type SkillCheckResult = 'great' | 'good' | 'miss'
 

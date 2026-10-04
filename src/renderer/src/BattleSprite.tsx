@@ -52,6 +52,22 @@ type Phase = 'idle' | 'recalling' | 'sending-out'
 
 const RECALL_MS = 350
 const SEND_OUT_MS = 350
+// A shiny's sparkle burst outlasts the send-out itself, so it runs on its own clock.
+const SHINY_BURST_MS = 1700
+
+// The shiny burst, like the main games: a ring of stars shooting out from the
+// Pokemon, a second ring turned half a step behind it, then a few twinkles
+// lingering around the sprite.
+type ShinySpark = { kind: 'ray' | 'twinkle'; a: number; d: number; size: number; delay: number }
+const SHINY_SPARKS: ShinySpark[] = [
+  ...Array.from({ length: 8 }, (_, i) => ({ kind: 'ray' as const, a: i * 45, d: 62, size: 16, delay: 120 })),
+  ...Array.from({ length: 8 }, (_, i) => ({ kind: 'ray' as const, a: i * 45 + 22.5, d: 44, size: 11, delay: 300 })),
+  { kind: 'twinkle', a: -40, d: 30, size: 14, delay: 520 },
+  { kind: 'twinkle', a: 60, d: 38, size: 11, delay: 640 },
+  { kind: 'twinkle', a: 170, d: 26, size: 13, delay: 760 },
+  { kind: 'twinkle', a: 250, d: 40, size: 10, delay: 860 },
+  { kind: 'twinkle', a: 15, d: 12, size: 17, delay: 960 }
+]
 const FEEDBACK_MS = 900
 const GIMMICK_MS = 1100
 const ABILITY_MS = 1600
@@ -103,6 +119,8 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
   const [displayed, setDisplayed] = useState<ActivePokemonView | null>(pokemon)
   const [phase, setPhase] = useState<Phase>('idle')
   const [shake, setShake] = useState(false)
+  // Bumped each time a shiny comes out, so the burst restarts even back to back.
+  const [shinyBurst, setShinyBurst] = useState(0)
   const [shownFeedback, setShownFeedback] = useState<FeedbackEvent | null>(null)
 
   // Its own timer, not the effect's cleanup: the next log line sets feedback back to
@@ -198,6 +216,18 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
       return () => clearTimeout(shakeTimer)
     }
   }, [pokemon])
+
+  useEffect(() => {
+    if (phase !== 'sending-out' || !displayed?.shiny) return
+    setShinyBurst((n) => n + 1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase])
+
+  useEffect(() => {
+    if (!shinyBurst) return
+    const timer = setTimeout(() => setShinyBurst(0), SHINY_BURST_MS)
+    return () => clearTimeout(timer)
+  }, [shinyBurst])
 
   // Gigantamax (a raid boss, or the player's cosmetic look - which never grows or glows):
   // its own picture (e.g. charizardgmax), the usual one if there's none.
@@ -317,10 +347,23 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
               </span>
             </div>
           )}
-          {phase === 'sending-out' && displayed.shiny && (
-            <div className="shiny-sparkle">
-              {Array.from({ length: 7 }).map((_, i) => (
-                <span key={i} className="shiny-spark" />
+          {shinyBurst > 0 && (
+            <div key={shinyBurst} className="shiny-sparkle">
+              <span className="shiny-flash" />
+              <span className="shiny-ring" />
+              {SHINY_SPARKS.map((s, i) => (
+                <span
+                  key={i}
+                  className={`shiny-spark shiny-spark-${s.kind}`}
+                  style={
+                    {
+                      '--a': `${s.a}deg`,
+                      '--d': `${s.d}px`,
+                      fontSize: s.size,
+                      animationDelay: `${s.delay}ms`
+                    } as React.CSSProperties
+                  }
+                />
               ))}
             </div>
           )}

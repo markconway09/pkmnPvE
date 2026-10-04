@@ -6,7 +6,6 @@ import {
   MERGE_MAX_STARS,
   NON_HELD_ITEM_IDS,
   mergeBonusText,
-  mergeGrowthHolding,
   mergeStarsFor,
   mergeStatMultiplier,
   toSpriteId
@@ -73,8 +72,8 @@ interface Props {
   mergeCopies?: number
   // Its rarity - red and gold Pokemon get less from each star.
   rarityTier?: RarityTier
-  // Not fully evolved: how much more each star is worth (see BoxPokemonView.mergeGrowth -
-  // none while it holds an Eviolite), and its Everstone lock, toggled under the portrait.
+  // Not fully evolved: how much more each star is worth (see BoxPokemonView.mergeGrowth),
+  // and its Everstone lock, toggled under the portrait.
   mergeGrowth?: number
   everstone?: BoxPokemonView['everstone']
   onSetEverstone?: (locked: boolean) => void
@@ -222,8 +221,8 @@ function PokemonEditor({
   const [heldItem, setHeldItem] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // Its merge growth as it stands, with the item picked here (an Eviolite cancels it).
-  const growth = mergeGrowthHolding(mergeGrowth, set?.item)
+  // Its merge growth - an Everstone-locked one keeps it whatever it holds.
+  const growth = mergeGrowth ?? 1
 
   // Premade team Pokemon can have a level that follows the player's level cap
   // (see capOffset); this is the cap it's shown against.
@@ -805,9 +804,9 @@ function PokemonEditor({
                             <span className="tooltip-panel editor-everstone-tip">
                               {everstone.locked
                                 ? everstone.canUnlock
-                                  ? 'Locked: it never evolves, but takes merges. Click to take the Everstone off.'
-                                  : 'Locked for good: it has taken merges, so it never evolves.'
-                                : 'Lock it with an Everstone: it never evolves, but it can take merges.'}
+                                  ? 'Locked: it never evolves and counts as fully evolved (an Eviolite does nothing), but takes merges. Click to take the Everstone off.'
+                                  : 'Locked for good: it has taken merges, so it never evolves (and an Eviolite does nothing).'
+                                : 'Lock it with an Everstone: it never evolves and counts as fully evolved (an Eviolite does nothing), but it can take merges.'}
                               <br />
                               Each merge star: <b>{mergeBonusText(1, rarityTier, growth)}</b> to all stats
                               {growth > 1 ? ' (more than an evolved one gets)' : ''}
@@ -1193,14 +1192,22 @@ function PokemonEditor({
               </button>
               {(() => {
                 const currentMoves = set?.moves ?? []
-                return moveResults.map((m) => {
+                // Moves it already knows sit at the top, in slot order; the rest keep their order.
+                const slotOf = (id: string): number => {
+                  const i = currentMoves.indexOf(id)
+                  return i === -1 ? 4 : i
+                }
+                const sorted = [...moveResults].sort((a, b) => slotOf(a.id) - slotOf(b.id))
+                return sorted.map((m) => {
                   const learnedElsewhere = currentMoves.some((id, i) => id === m.id && i !== activeSelector)
+                  // The move in the slot being swapped out.
+                  const swapping = currentMoves[activeSelector] === m.id
                   // Learned only by TM, and the TM isn't owned yet (admin editing ignores it).
                   const tmLocked = !isAdmin && !!m.tmLocked
                   return (
                     <button
                       key={m.id}
-                      className={`selector-row ${learnedElsewhere || tmLocked ? 'selector-row-disabled' : ''}`}
+                      className={`selector-row ${learnedElsewhere || tmLocked ? 'selector-row-disabled' : ''} ${swapping ? 'selector-row-swapping' : ''}`}
                       disabled={learnedElsewhere || tmLocked}
                       title={tmLocked ? `Find or buy the ${m.name} TM to teach it` : undefined}
                       onClick={() => {
@@ -1213,6 +1220,7 @@ function PokemonEditor({
                           {m.name}
                           <span className={`type-badge type-${m.type.toLowerCase()}`}>{m.type}</span>
                           {learnedElsewhere && <span className="learned-badge">Learned</span>}
+                          {swapping && <span className="swapping-badge">Swapping</span>}
                           {tmLocked && (
                             <span className="tm-locked-badge">
                               <TmIcon type={m.type} /> Needs TM

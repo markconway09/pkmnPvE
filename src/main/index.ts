@@ -52,7 +52,9 @@ import {
   mergeSelectedMons,
   autoMergeMon,
   getTeamMergeStars,
+  getTeamEverstones,
   readSavedTeamStarsOf,
+  readSavedTeamEverstonesOf,
   readSavedTeamOf,
   scaleTeamToLevel,
   resetBox,
@@ -184,6 +186,7 @@ import {
 } from './showdown/run-store'
 import { createRunBattle } from './showdown/run-battles'
 import { getWildDropFor, listWildDrops, setWildDrop } from './showdown/wild-drops-store'
+import { getDexNavState, listDexNavCandidates, rollDexNavEncounter, setDexNavTarget } from './showdown/dexnav-store'
 import {
   buyItem,
   listShop,
@@ -312,7 +315,11 @@ ipcMain.handle('battle:start', async (_event, locationId?: WildLocationId, level
   if (location?.requiresAllBosses && !allBossesDefeated()) {
     throw new Error(`${location.label} opens once every boss is beaten`)
   }
-  const wildMon = location?.id === 'lab' ? generateLabWildMon(effectiveLevelCap) : generateRandomWildMon(effectiveLevelCap, location)
+  // The DexNav's hunted Pokemon first, at its chain's chance - otherwise the usual roll.
+  const huntedMon = rollDexNavEncounter(location, effectiveLevelCap)
+  const wildMon =
+    huntedMon ??
+    (location?.id === 'lab' ? generateLabWildMon(effectiveLevelCap) : generateRandomWildMon(effectiveLevelCap, location))
   if (!wildMon) throw new Error('Could not find a wild Pokemon for your current level cap in that location')
   const wildDrop = getWildDropFor(wildMon.species)
   activeBattle = new WildBattle(p1team, 'gen9customgame', 'gen9randombattle', {
@@ -325,8 +332,9 @@ ipcMain.handle('battle:start', async (_event, locationId?: WildLocationId, level
     // Now and then the area's weather is up when the battle starts (never in the Cave or the Lab).
     startField: { weather: rollWildWeather(location?.id ?? 'all') },
     // A TM search that made too much noise: the Pokemon it woke won't let you run.
-    noRun: takeTmAmbush(location?.id ?? 'all')
-  }, { p1: getTeamMergeStars() })
+    noRun: takeTmAmbush(location?.id ?? 'all'),
+    dexNavHunt: !!huntedMon
+  }, { p1: getTeamMergeStars(), everstone: { p1: getTeamEverstones() } })
   return activeBattle.getInitialView()
 })
 
@@ -394,7 +402,7 @@ ipcMain.handle('battle:startTrainer', async (_event, boss: boolean, rematchTrain
     startField: trainer.isBoss
       ? { weather: trainer.fieldWeather, terrain: trainer.fieldTerrain, trickRoom: trainer.fieldTrickRoom }
       : undefined
-  }, { p1: getTeamMergeStars() })
+  }, { p1: getTeamMergeStars(), everstone: { p1: getTeamEverstones() } })
   return activeBattle.getInitialView()
 })
 
@@ -419,7 +427,11 @@ ipcMain.handle('battle:startPlayer', async (_event, username: string, doubles = 
     trainerId: `player:${player.slug}`,
     spriteId: player.trainerSprite ?? 'red',
     noRewards: true
-  }, { p1: getTeamMergeStars(), p2: readSavedTeamStarsOf(player.slug) })
+  }, {
+    p1: getTeamMergeStars(),
+    p2: readSavedTeamStarsOf(player.slug),
+    everstone: { p1: getTeamEverstones(), p2: readSavedTeamEverstonesOf(player.slug) }
+  })
   return activeBattle.getInitialView()
 })
 
@@ -464,7 +476,7 @@ ipcMain.handle('battle:startRaid', async () => {
     'gen9doublescustomgame',
     'gen9randombattle',
     { team: [boss.set], name: 'Wild', difficulty: 'normal', raid: { gigantamax: boss.gigantamax, stars: boss.stars } },
-    { p1: getTeamMergeStars(), p2: [boss.stars] }
+    { p1: getTeamMergeStars(), p2: [boss.stars], everstone: { p1: getTeamEverstones() } }
   )
   removeItem(WISHING_PIECE_ITEM_ID, 1)
   activeBattle = battle
@@ -811,6 +823,9 @@ ipcMain.handle('premadeTeams:setDoubleBattle', (_event, teamId: string, isDouble
   return setPremadeTeamDoubleBattle(teamId, isDoubleBattle)
 })
 
+ipcMain.handle('dexnav:state', () => getDexNavState())
+ipcMain.handle('dexnav:candidates', () => listDexNavCandidates())
+ipcMain.handle('dexnav:setTarget', (_event, species: string | null) => setDexNavTarget(species))
 ipcMain.handle('wildDrops:list', () => listWildDrops())
 ipcMain.handle('wildDrops:set', (_event, species: string, drop: ItemDropConfig) => {
   requireAdmin()

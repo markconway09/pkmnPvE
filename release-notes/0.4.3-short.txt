@@ -1,0 +1,8 @@
+DexNav & the Catch page
+
+- New DexNav key item (Pokédex Scholar reward): hunt one species and build chains for better odds and shinies
+- Catch has its own page; Challenge a player now lives in Classic
+- "Battle again" after wild battles, plus a new shiny animation
+- More wild forms (Vivillon patterns, Pikachu outfits, Wormadam cloaks and more)
+- Bigger merge growth for weak unevolved Pokémon; Everstone-locked ones count as fully evolved
+- Smarter AI around Substitute, TM quick check tweaks, and assorted fixes

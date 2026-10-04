@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react'
 import type { BattleEligibility, RunDifficulty, RunView } from '../../shared/battle-types'
 import type { MissionsState } from '../../shared/missions'
+import type { DexNavState } from '../../shared/dexnav'
+import { DRAFT_ROUNDS, type DraftFormat, type DraftView } from '../../shared/draft'
+import { toSpriteId } from '../../shared/battle-types'
 import type { MenuPage } from './menuMode'
 import CoinIcon from './CoinIcon'
+import SpriteImage from './SpriteImage'
 import { trainerSpriteUrl } from './trainerSprite'
 
 interface Props {
@@ -28,6 +32,14 @@ interface Props {
 }
 
 const DIFFICULTY_LABELS: Record<RunDifficulty, string> = { easy: 'Easy', normal: 'Normal', hard: 'Hard', extreme: 'Extreme' }
+const DRAFT_FORMAT_LABELS: Record<DraftFormat, string> = { singles: 'Singles', doubles: 'Doubles', chaos: 'Chaos' }
+
+// Where a draft in progress stands, for its Continue banner.
+function draftProgress(draft: DraftView): string {
+  if (draft.status === 'drafting') return `drafting pick ${draft.round}/${DRAFT_ROUNDS}`
+  if (draft.status === 'modifier') return 'choosing a modifier'
+  return `${draft.wins}W ${draft.losses}L${draft.opponent ? ` · next: ${draft.opponent.name}` : ''}`
+}
 
 /**
  * Home: the hub the game opens on. One card per mode, each saying where things stand
@@ -59,6 +71,24 @@ function HomeHub({
       .then(setCoins)
       .catch(() => setCoins(null))
   }, [])
+  // The DexNav hunt, so the Catch card can show a chain in progress.
+  const [dexNav, setDexNav] = useState<DexNavState | null>(null)
+  useEffect(() => {
+    window.api
+      .getDexNavState()
+      .then(setDexNav)
+      .catch(() => setDexNav(null))
+  }, [])
+  const dexNavChain = dexNav?.owned && dexNav.target && dexNav.chain > 0 ? dexNav : null
+  // A draft still going (drafting or battling), for its own Continue banner.
+  const [draft, setDraft] = useState<DraftView | null>(null)
+  useEffect(() => {
+    window.api
+      .getDraft()
+      .then(setDraft)
+      .catch(() => setDraft(null))
+  }, [])
+  const draftActive = !!draft && draft.status !== 'finished'
 
   const runActive = run?.status === 'active'
   const nextBoss = eligibility?.nextBoss ?? null
@@ -75,24 +105,41 @@ function HomeHub({
 
   return (
     <div className="home-hub">
-      {runActive && run && (
-        <button className="home-continue" onClick={(e) => onGo('roguelite', e.currentTarget)}>
-          <img className="home-continue-icon" src="./icons/nav/roguelite.png" alt="" />
-          <span className="home-continue-text">
-            <span className="home-continue-title">Continue your run</span>
-            <span className="home-continue-sub">
-              Floor {run.floor} · {run.team.length} Pokémon · next: {run.nextBossLabel}
-            </span>
-          </span>
-          <span className="home-continue-go">Continue ▸</span>
-        </button>
+      {/* A banner per run in progress; with both, they sit side by side. */}
+      {((runActive && run) || (draftActive && draft)) && (
+        <div className="home-continues">
+          {runActive && run && (
+            <button className="home-continue" onClick={(e) => onGo('roguelite', e.currentTarget)}>
+              <img className="home-continue-icon" src="./icons/nav/roguelite.png" alt="" />
+              <span className="home-continue-text">
+                <span className="home-continue-title">Continue your run</span>
+                <span className="home-continue-sub">
+                  Floor {run.floor} · {run.team.length} Pokémon · next: {run.nextBossLabel}
+                </span>
+              </span>
+              <span className="home-continue-go">Continue ▸</span>
+            </button>
+          )}
+          {draftActive && draft && (
+            <button className="home-continue home-continue-draft" onClick={(e) => onGo('draft', e.currentTarget)}>
+              <img className="home-continue-icon" src="./icons/nav/draft.png" alt="" />
+              <span className="home-continue-text">
+                <span className="home-continue-title">Continue your draft</span>
+                <span className="home-continue-sub">
+                  {DRAFT_FORMAT_LABELS[draft.format]} · {draftProgress(draft)}
+                </span>
+              </span>
+              <span className="home-continue-go">Continue ▸</span>
+            </button>
+          )}
+        </div>
       )}
 
       <div className="home-grid">
         <button className="home-card home-card-classic" onClick={(e) => onGo('classic', e.currentTarget)}>
-          <span className="home-card-key">1</span>
+          <span className="home-card-key">3</span>
           <span className="home-card-head">
-            <img className="home-card-icon" src="./icons/nav/classic.png" alt="" />
+            <img className="home-card-icon" src="./icons/nav/challenge.png" alt="" />
             <span className="home-card-title">Classic</span>
           </span>
           <span className="home-classic-body">
@@ -108,7 +155,7 @@ function HomeHub({
         </button>
 
         <button className="home-card home-card-roguelite" onClick={(e) => onGo('roguelite', e.currentTarget)}>
-          <span className="home-card-key">2</span>
+          <span className="home-card-key">4</span>
           <span className="home-card-head">
             <img className="home-card-icon" src="./icons/nav/roguelite.png" alt="" />
             <span className="home-card-title">Roguelite</span>
@@ -124,19 +171,21 @@ function HomeHub({
         </button>
 
         <button className="home-card home-card-draft" onClick={(e) => onGo('draft', e.currentTarget)}>
-          <span className="home-card-key">3</span>
+          <span className="home-card-key">5</span>
           <span className="home-card-head">
             <span className="home-card-icon home-card-icon-tile">
               <img className="home-card-icon-draft" src="./icons/nav/draft.png" alt="" />
             </span>
             <span className="home-card-title">Draft</span>
           </span>
-          <span className="home-card-sub">Build a team from random picks</span>
+          <span className="home-card-sub">
+            {draftActive && draft ? `Draft in progress · ${draftProgress(draft)}` : 'Build a team from random picks'}
+          </span>
           <span className="home-card-go">Open ▸</span>
         </button>
 
         <button className="home-card home-card-raid" onClick={(e) => onGo('raid', e.currentTarget)}>
-          <span className="home-card-key">4</span>
+          <span className="home-card-key">6</span>
           <span className="home-card-head">
             <img className="home-card-icon" src="./sprites/misc/raidcrystal.png" alt="" />
             <span className="home-card-title">{raidsUnlocked ? 'Max Raid' : '🔒 Max Raid'}</span>
@@ -148,7 +197,7 @@ function HomeHub({
         </button>
 
         <button className="home-card home-card-corner" onClick={(e) => onGo('corner', e.currentTarget)}>
-          <span className="home-card-key">5</span>
+          <span className="home-card-key">7</span>
           <span className="home-card-head">
             <img className="home-card-icon" src="./icons/nav/gamecorner.png" alt="" />
             <span className="home-card-title">Game Corner</span>
@@ -159,17 +208,50 @@ function HomeHub({
           <span className="home-card-go">Open ▸</span>
         </button>
 
-        <button className="home-card home-card-box" onClick={(e) => onGo('box', e.currentTarget)}>
-          <span className="home-card-key">6</span>
-          <span className="home-card-head">
-            <img className="home-card-icon" src="./icons/nav/box.png" alt="" />
-            <span className="home-card-title">Box</span>
-          </span>
-          <span className="home-card-sub">
-            {boxCount === null ? 'Your Pokémon and team' : `${boxCount} Pokémon`}
-          </span>
-          <span className="home-card-go">Open ▸</span>
-        </button>
+        <div className="home-pair">
+          <button className="home-card home-card-catch" onClick={(e) => onGo('catch', e.currentTarget)}>
+            <span className="home-card-key">1</span>
+            <span className="home-card-head">
+              <img className="home-card-icon" src="./icons/nav/classic.png" alt="" />
+              <span className="home-card-title">Catch</span>
+            </span>
+            {dexNavChain?.target ? (
+              <span className="home-dexnav" title={`DexNav: hunting ${dexNavChain.target.species}`}>
+                <SpriteImage
+                  style="3d-static"
+                  className="home-dexnav-sprite"
+                  spriteId={toSpriteId(dexNavChain.target.species)}
+                  alt={dexNavChain.target.species}
+                />
+                <span className="home-dexnav-info">
+                  <span className="home-dexnav-name">{dexNavChain.target.species}</span>
+                  <span className="home-card-sub">
+                    Chain {dexNavChain.chain}
+                    {dexNavChain.chain >= dexNavChain.maxChain && ' · MAX'}
+                  </span>
+                  <span className="dexnav-chain-bar home-dexnav-bar">
+                    <span style={{ width: `${(Math.min(dexNavChain.chain, dexNavChain.maxChain) / dexNavChain.maxChain) * 100}%` }} />
+                  </span>
+                </span>
+              </span>
+            ) : (
+              <span className="home-card-sub">Find and catch wild Pokémon</span>
+            )}
+            <span className="home-card-go">Open ▸</span>
+          </button>
+
+          <button className="home-card home-card-box" onClick={(e) => onGo('box', e.currentTarget)}>
+            <span className="home-card-key">2</span>
+            <span className="home-card-head">
+              <img className="home-card-icon" src="./icons/nav/box.png" alt="" />
+              <span className="home-card-title">Box</span>
+            </span>
+            <span className="home-card-sub">
+              {boxCount === null ? 'Your Pokémon and team' : `${boxCount} Pokémon`}
+            </span>
+            <span className="home-card-go">Open ▸</span>
+          </button>
+        </div>
 
         {missions && (
           <button className="home-missions" onClick={onOpenMissions}>

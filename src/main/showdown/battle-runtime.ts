@@ -76,6 +76,7 @@ import {
   type RunBattleOutcome
 } from './run-store'
 import { finishDraftBattle } from './draft-store'
+import { breakDexNavChain, extendDexNavChain } from './dexnav-store'
 import type { DraftBattleResult } from '../../shared/draft'
 import {
   CATCHING_CHARM_FREE_CHANCE,
@@ -348,6 +349,8 @@ export interface OpponentConfig {
   randomDropChance?: number
   // A wild Pokemon woken by a noisy TM search: no running from it.
   noRun?: boolean
+  // The DexNav's hunted Pokemon: beating it grows the chain, running or losing breaks it.
+  dexNavHunt?: boolean
   // A friendly match (another player's saved team): winning gives no exp, money,
   // friendship, item drops or boss progress.
   noRewards?: boolean
@@ -380,6 +383,26 @@ export interface OpponentConfig {
   }
   // Chaos drafts: each side's Pokemon's stat multipliers, in team order.
   statMultipliers?: { p1?: StatBlock[]; p2?: StatBlock[] }
+}
+
+// An Everstone-locked Pokemon counts as fully evolved, so the sim's Eviolite skips any
+// Pokemon marked with m.everstone (see applyEverstones). The Dex's items are frozen, so a
+// wrapped copy goes into its item cache in place of the original - once per Dex.
+const wrappedEviolites = new WeakSet<object>()
+function wrapEviolite(battle: SimBattle): void {
+  const items = battle.dex.items as unknown as { itemCache: Map<string, object>; get(name: string): object }
+  if (wrappedEviolites.has(items)) return
+  wrappedEviolites.add(items)
+  const original = items.get('eviolite') as Record<string, unknown>
+  const wrapped = Object.assign(Object.create(Object.getPrototypeOf(original)), original) as Record<string, unknown>
+  for (const key of ['onModifyDef', 'onModifySpD']) {
+    const handler = original[key]
+    if (typeof handler !== 'function') continue
+    wrapped[key] = function (this: SimBattle, value: number, pokemon: SimPokemon | null, ...rest: unknown[]): unknown {
+      return pokemon?.m?.everstone ? undefined : handler.call(this, value, pokemon, ...rest)
+    }
+  }
+  items.itemCache.set('eviolite', wrapped)
 }
 
 class HumanPlayer extends BattlePlayer {
@@ -466,12 +489,14 @@ export class WildBattle {
     generationFormat = 'gen9randombattle',
     opponent?: OpponentConfig,
     // Each team member's merge stars, in team order (classic battles and friendly
-    // matches only): +10% to all its stats per star.
-    mergeStars: { p1?: number[]; p2?: number[] } = {}
+    // matches only): +10% to all its stats per star. "everstone": which are Everstone-locked
+    // (they count as fully evolved, so an Eviolite does nothing for them).
+    mergeStars: { p1?: number[]; p2?: number[]; everstone?: { p1?: boolean[]; p2?: boolean[] } } = {}
   ) {
     if (p1team.length === 0) throw new Error('Cannot start a battle with an empty team')
     this.opponent = opponent
     this.mergeStars = { p1: mergeStars.p1 ?? [], p2: mergeStars.p2 ?? [] }
+    this.everstone = { p1: mergeStars.everstone?.p1 ?? [], p2: mergeStars.everstone?.p2 ?? [] }
     this.human = new HumanPlayer(this.streams.p1, () => this.wake())
     this.ai = new AIPlayer(this.streams.p2, 'p2', opponent?.difficulty ?? 'easy', (slot, moveId) =>
       this.aiMovePower(slot, moveId)
@@ -498,6 +523,7 @@ export class WildBattle {
     void this.battleStream.write(`>start ${JSON.stringify(spec)}\n>player p1 ${JSON.stringify(p1spec)}`)
     if (opponent?.run) this.applyRunConditions(opponent.run.conditions)
     if (opponent?.startField) this.installStartField(opponent.startField)
+    this.applyEverstones(0, this.everstone.p1)
     this.installMergeBoosts()
     this.applyMergeBoosts(0, this.mergeStars.p1)
     if (opponent?.statMultipliers) {
@@ -508,6 +534,7 @@ export class WildBattle {
     if (opponent?.statMultipliers) this.applyStatMultipliers(1, opponent.statMultipliers.p2 ?? [])
     // p2's Pokemon only exist once they've joined (and the battle has begun) - at full
     // HP, so a bigger max HP is simply full too.
+    this.applyEverstones(1, this.everstone.p2)
     this.applyMergeBoosts(1, this.mergeStars.p2)
     if (opponent?.raid) this.setUpRaid(opponent.raid)
   }
@@ -673,6 +700,18 @@ export class WildBattle {
     for (const stat of ['Atk', 'Def', 'SpA', 'SpD', 'Spe']) battle.onEvent(`Modify${stat}`, battle.format, boost as never)
   }
 
+  private readonly everstone: { p1: boolean[]; p2: boolean[] }
+
+  // Marks each Everstone-locked Pokemon on this side (by its place in the team): it counts as
+  // fully evolved, so the sim's Eviolite skips it (see wrapEviolite).
+  private applyEverstones(sideIndex: 0 | 1, locked: boolean[]): void {
+    const battle = this.battleStream.battle
+    const side = battle?.sides[sideIndex]
+    if (!battle || !side || !locked.some(Boolean)) return
+    wrapEviolite(battle)
+    for (const mon of side.pokemon) if (locked[side.team.indexOf(mon.set)]) mon.m.everstone = true
+  }
+
   // Marks each boosted Pokemon on this side (by its place in the team, which the sim keeps
   // on its set) and raises its max HP the same way.
   private applyMergeBoosts(sideIndex: 0 | 1, stars: number[]): void {
@@ -681,7 +720,9 @@ export class WildBattle {
     for (const mon of side.pokemon) {
       const count = stars[side.team.indexOf(mon.set)] ?? 0
       if (!count) continue
-      const multiplier = mergeStatMultiplier(count, speciesRarityTier(mon.species.name), mergeGrowthFor(mon.species.name, mon.set.item))
+      // An Everstone-locked one keeps its growth whatever it holds (its Eviolite does nothing).
+      const growth = mergeGrowthFor(mon.species.name, mon.m.everstone ? undefined : mon.set.item)
+      const multiplier = mergeStatMultiplier(count, speciesRarityTier(mon.species.name), growth)
       this.mergeMultipliers[sideIndex === 0 ? 'p1' : 'p2'][side.team.indexOf(mon.set)] = multiplier
       const ratio = mon.maxhp > 0 ? mon.hp / mon.maxhp : 1
       mon.m.mergeBoost = multiplier
@@ -697,8 +738,23 @@ export class WildBattle {
     const battle = this.battleStream.battle
     if (!battle) return
     for (const [stat, key] of [['Atk', 'atk'], ['Def', 'def'], ['SpA', 'spa'], ['SpD', 'spd'], ['Spe', 'spe']] as const) {
-      const boost = function (this: SimBattle, _value: number, pokemon: SimPokemon | null): void {
-        const multiplier = (pokemon?.m?.chaosBoost as StatBlock | undefined)?.[key]
+      const boost = function (
+        this: SimBattle,
+        _value: number,
+        pokemon: SimPokemon | null,
+        target: SimPokemon | null,
+        move: { overrideOffensiveStat?: string; overrideOffensivePokemon?: string } | null
+      ): void {
+        // The sim runs a move's attack through the Attack/Sp. Atk hook even when it hits with
+        // another stat (Body Press uses Defense, Foul Play the target's Attack), so take the
+        // multiplier of the stat (and Pokemon) the move really uses.
+        let owner = pokemon
+        let used: keyof StatBlock = key
+        if ((key === 'atk' || key === 'spa') && move) {
+          if (move.overrideOffensivePokemon === 'target') owner = target
+          if (move.overrideOffensiveStat) used = move.overrideOffensiveStat as keyof StatBlock
+        }
+        const multiplier = (owner?.m?.chaosBoost as StatBlock | undefined)?.[used]
         if (multiplier && multiplier !== 1) this.chainModify([Math.round(multiplier * 4096), 4096])
       }
       battle.onEvent(`Modify${stat}`, battle.format, boost as never)
@@ -858,6 +914,7 @@ export class WildBattle {
         if (line.startsWith('|win|')) {
           this.ended = true
           this.winner = line.slice('|win|'.length)
+          if (this.opponent?.dexNavHunt && this.winner !== 'You') breakDexNavChain()
           if (this.opponent?.run) {
             this.finishRunBattle()
           } else if (this.opponent?.draft) {
@@ -882,6 +939,7 @@ export class WildBattle {
               // A Max Raid isn't a wild battle - it has its own mission and achievements.
               countStat('wildDefeated')
               if (this.opponent?.location) this.tmQuickCheck = armTmQuickCheck(this.opponent.location)
+              if (this.opponent?.dexNavHunt) extendDexNavChain()
             }
             if (this.opponent?.raid) this.catchRaidBoss(this.opponent.raid)
             const baseExp = this.p2team.reduce((sum, mon) => sum + expYieldFor(mon.species, mon.level), 0)
@@ -903,6 +961,7 @@ export class WildBattle {
         } else if (line === '|tie') {
           this.ended = true
           this.winner = null
+          if (this.opponent?.dexNavHunt) breakDexNavChain()
           // Both sides down at once: the run's whole team is gone too.
           if (this.opponent?.run) this.finishRunBattle()
           // A tie counts as a loss for a draft.
@@ -1081,7 +1140,7 @@ export class WildBattle {
     // Each Pokemon's current stats are worked out here, at the moment of the
     // snapshot, so they match that log line's boosts, status, item and field.
     const clone = (v: ActivePokemonView | null, side: 'p1' | 'p2'): ActivePokemonView | null =>
-      v ? { ...v, boosts: { ...v.boosts }, volatiles: [...v.volatiles], effectiveStats: effectiveStatsFor(v, side, this.effects) } : null
+      v ? { ...v, boosts: { ...v.boosts }, volatiles: [...v.volatiles], effectiveStats: effectiveStatsFor(v, side, this.effects, !!this.everstone[side][v.rosterIndex ?? -1]) } : null
     const withMatchups = (v: ActivePokemonView | null, side: 0 | 1, i: number): ActivePokemonView | null =>
       v ? { ...v, moveMatchups: this.moveMatchupsFor(v, side, this.battleStream.battle?.sides[side].active[i] ?? null) } : null
     return {
@@ -1334,6 +1393,8 @@ export class WildBattle {
       throw new Error(`Running from a trainer costs ₽${cost.toLocaleString('en-US')} - you don't have enough`)
     }
     if (this.opponent?.run && !this.ended) finishRunBattleFled(this.p1Outcome())
+    // Fleeing the DexNav's hunted Pokemon loses the chain.
+    if (this.opponent?.dexNavHunt && !this.ended) breakDexNavChain()
   }
 
   // Which slot(s) a spread move hits, given who's actually out and alive right

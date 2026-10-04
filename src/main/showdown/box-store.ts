@@ -944,6 +944,13 @@ export function getTeamMergeStars(): number[] {
     .team.flatMap((id) => (id !== null && byId.has(id) ? [mergeStarsFor(byId.get(id)!.copies)] : []))
 }
 
+/** Which team members are Everstone-locked, in the same order as getTeamPokemonSets. */
+export function getTeamEverstones(): boolean[] {
+  const byId = new Map(getState().mons.map((m) => [m.id, m]))
+  return getState()
+    .team.flatMap((id) => (id !== null && byId.has(id) ? [!!byId.get(id)!.everstone] : []))
+}
+
 export function getTeamPokemonSets(): PokemonSet[] {
   const byId = new Map(getState().mons.map((m) => [m.id, m.set]))
   const sets: PokemonSet[] = []
@@ -967,6 +974,11 @@ export function readSavedTeamOf(playerSlug: string): PokemonSet[] {
 /** That player's team members' merge stars, in the same order as readSavedTeamOf. */
 export function readSavedTeamStarsOf(playerSlug: string): number[] {
   return readSavedTeamMons(playerSlug).map((m) => mergeStarsFor(m.copies))
+}
+
+/** Which of that player's team members are Everstone-locked, in the same order as readSavedTeamOf. */
+export function readSavedTeamEverstonesOf(playerSlug: string): boolean[] {
+  return readSavedTeamMons(playerSlug).map((m) => !!m.everstone)
 }
 
 function readSavedTeamMons(playerSlug: string): StoredMon[] {

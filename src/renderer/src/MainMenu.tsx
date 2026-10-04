@@ -21,7 +21,7 @@ import type {
 } from '../../shared/battle-types'
 import TeamDock from './TeamDock'
 import CompanionSlot, { COMPANION_SLOT_ID } from './CompanionSlot'
-import type { CompanionSizeChoice, RunDifficulty } from '../../shared/battle-types'
+import type { CompanionSizeChoice, MergeCandidateView, RunDifficulty } from '../../shared/battle-types'
 import BoxGrid from './BoxGrid'
 import PokemonEditor from './PokemonEditor'
 import PokemonIconVisual from './PokemonIconVisual'
@@ -29,7 +29,7 @@ import DebugMenu from './DebugMenu'
 import DebugAddMon from './DebugAddMon'
 import PlayerTrainerModal from './PlayerTrainerModal'
 import PokedexModal from './PokedexModal'
-import ChallengeModal from './ChallengeModal'
+import ChallengeSection from './ChallengeSection'
 import StarterPicker from './StarterPicker'
 import PokemonContextMenu from './PokemonContextMenu'
 import MergeModal from './MergeModal'
@@ -57,6 +57,7 @@ import SearchBar from './SearchBar'
 import type { AchievementsState } from '../../shared/achievements'
 import { LOCATION_BUTTON_BACKDROP, backdropUrl, locationIconUrl } from './battleScenery'
 import { TmSearchStrip, useTmSearch } from './TmSearch'
+import DexNavPanel from './DexNavPanel'
 import { formatMoney } from './money'
 import ShinyIcon from './ShinyIcon'
 import MusicPlayer from './MusicPlayer'
@@ -112,11 +113,17 @@ function alchemistText(found: string[]): string {
 
 // The expanded box's filter chips: each one on narrows the box to Pokemon that pass it.
 type BoxFilterKey = 'favorite' | 'shiny' | 'stars' | 'duplicates'
-const BOX_FILTERS: { key: BoxFilterKey; icon: React.ReactNode; title: string; test: (m: BoxPokemonView) => boolean }[] = [
+// `candidateIds`: every Pokemon that could go into another (pre-evolutions included).
+const BOX_FILTERS: {
+  key: BoxFilterKey
+  icon: React.ReactNode
+  title: string
+  test: (m: BoxPokemonView, candidateIds: Set<string>) => boolean
+}[] = [
   { key: 'favorite', icon: '❤️', title: 'Favorites only', test: (m) => !!m.favorite },
   { key: 'shiny', icon: <ShinyIcon />, title: 'Shinies only', test: (m) => !!m.shiny },
   { key: 'stars', icon: '★', title: 'Merged (starred) only', test: (m) => (m.mergeStars ?? 0) > 0 },
-  { key: 'duplicates', icon: '⧉', title: 'Duplicates only - Pokémon with another of their species (or a pre-evolution of theirs) to merge in', test: (m) => (m.mergeCandidates?.length ?? 0) > 0 }
+  { key: 'duplicates', icon: '⧉', title: 'Duplicates only - Pokémon with another of their species (or a pre-evolution of theirs) to merge in, and the ones that would go in', test: (m, candidateIds) => (m.mergeCandidates?.length ?? 0) > 0 || candidateIds.has(m.id) }
 ]
 
 // Ascending order for a sort key (the caller flips it for descending).
@@ -145,6 +152,7 @@ function matchesBoxSearch(mon: BoxPokemonView, search: string): boolean {
 const MODE_COLORS: Record<MenuPage, string> = {
   home: '#9fb3c8',
   classic: '#6bb0ff',
+  catch: '#7fd08c',
   box: '#5fd4b0',
   roguelite: '#b48cff',
   draft: '#ffb74d',
@@ -156,6 +164,7 @@ const MODE_COLORS: Record<MenuPage, string> = {
 const PAGE_TITLES: Record<MenuPage, string> = {
   home: 'Home',
   classic: 'Classic',
+  catch: 'Catch',
   box: 'Box',
   roguelite: 'Roguelite',
   draft: 'Draft',
@@ -166,12 +175,13 @@ const PAGE_TITLES: Record<MenuPage, string> = {
 // The number keys open the pages, in the sidebar's order (Home is 0).
 const PAGE_KEYS: Record<string, MenuPage> = {
   '0': 'home',
-  '1': 'classic',
-  '2': 'roguelite',
-  '3': 'draft',
-  '4': 'raid',
-  '5': 'corner',
-  '6': 'box'
+  '1': 'catch',
+  '2': 'box',
+  '3': 'classic',
+  '4': 'roguelite',
+  '5': 'draft',
+  '6': 'raid',
+  '7': 'corner'
 }
 
 // The dock's small box builds its cards a few rows at a time (see dockBoxBuilt).
@@ -276,6 +286,8 @@ function MainMenu({
   const [boxSelection, setBoxSelection] = useState<Set<string> | null>(null)
   // The expanded box's filter chips, and whether its Select menu is open.
   const [boxFilters, setBoxFilters] = useState<Set<BoxFilterKey>>(new Set())
+  // Whether "Select all duplicates" also picks pre-evolutions that use up an evolution item.
+  const [mergeWithItems, setMergeWithItems] = useState(false)
   const [selectMenuOpen, setSelectMenuOpen] = useState(false)
   // The sort order's menu (the same kind as Select's).
   const [sortMenuOpen, setSortMenuOpen] = useState(false)
@@ -292,7 +304,6 @@ function MainMenu({
   const [boxSortDescending, setBoxSortDescending] = useState(true)
   const [playerTrainerOpen, setPlayerTrainerOpen] = useState(false)
   const [pokedexOpen, setPokedexOpen] = useState(false)
-  const [challengeOpen, setChallengeOpen] = useState(false)
   const [starterOpen, setStarterOpen] = useState(false)
   // The Bag | Shop window, open on one of its tabs.
   const [bagShopTab, setBagShopTab] = useState<BagShopTab | null>(null)
@@ -584,9 +595,20 @@ function MainMenu({
   function selectAllDuplicates(): void {
     setConfirmingBoxSell(false)
     // Each fully evolved keeper with something to take in, and every one ready to go into it.
+    // Pre-evolutions that need an evolution item only go in with the tick on, and only as
+    // many as the bag holds items for.
     const ids = new Set<string>()
+    const stock = new Map<string, number>()
+    const fits = (c: MergeCandidateView): boolean => {
+      const items = c.evolveItems ?? []
+      if (items.length === 0) return true
+      if (!mergeWithItems) return false
+      if (items.some((i) => (stock.get(i.itemId) ?? i.owned) < 1)) return false
+      for (const i of items) stock.set(i.itemId, (stock.get(i.itemId) ?? i.owned) - 1)
+      return true
+    }
     for (const m of boxMons) {
-      const ready = (m.mergeCandidates ?? []).filter((c) => !c.notReady)
+      const ready = (m.mergeCandidates ?? []).filter((c) => !c.notReady && !ids.has(c.id) && fits(c))
       // The companion is left out - picking it would only ever make it the keeper.
       if (!canBulkMerge(m) || m.companion || ready.length === 0) continue
       ids.add(m.id)
@@ -848,9 +870,10 @@ function MainMenu({
         (boxSort === 'stars' ? (a.dexNum ?? 0) - (b.dexNum ?? 0) : 0) ||
         (a.arrival ?? 0) - (b.arrival ?? 0)
     )
+  const mergeCandidateIds = new Set((boxState?.mons ?? []).flatMap((m) => (m.mergeCandidates ?? []).map((c) => c.id)))
   const boxMons = sortedBoxMons
     .filter((m) => matchesBoxSearch(m, boxSearch))
-    .filter((m) => BOX_FILTERS.every((f) => !boxFilters.has(f.key) || f.test(m)))
+    .filter((m) => BOX_FILTERS.every((f) => !boxFilters.has(f.key) || f.test(m, mergeCandidateIds)))
   const teamCount = team.filter(Boolean).length
   const teamEmpty = teamCount === 0
   const boxEmpty = (boxState?.mons.length ?? 0) === 0
@@ -903,10 +926,15 @@ function MainMenu({
       // Not remembered - it only decides whether the dock opens hidden.
     }
   }
-  // The team dock shows on Home, Classic, the Box and Max Raid pages and while setting up
-  // a Roguelite run (drag a team member onto the starter slot); it stays loaded elsewhere.
+  // The team dock shows on Home, Classic, Catch, the Box and Max Raid pages and while setting
+  // up a Roguelite run (drag a team member onto the starter slot); it stays loaded elsewhere.
   const dockShown =
-    mode === 'home' || mode === 'classic' || mode === 'box' || mode === 'raid' || (mode === 'roguelite' && !runInProgress)
+    mode === 'home' ||
+    mode === 'classic' ||
+    mode === 'catch' ||
+    mode === 'box' ||
+    mode === 'raid' ||
+    (mode === 'roguelite' && !runInProgress)
   const dockBoxShown = dockBoxOpen && dockShown && !dockCollapsed && mode !== 'box'
   const boxSize = boxState?.mons.length ?? 0
   useEffect(() => {
@@ -1040,11 +1068,6 @@ function MainMenu({
                   label: 'Trainer Card',
                   icon: <img className="nav-menu-icon" src="./icons/nav/trainercard.png" alt="" />,
                   action: () => setPlayerTrainerOpen(true)
-                },
-                {
-                  label: 'Challenge a player',
-                  icon: <img className="nav-menu-icon" src="./icons/nav/challenge.png" alt="" />,
-                  action: () => setChallengeOpen(true)
                 },
                 {
                   label: 'Options',
@@ -1223,13 +1246,17 @@ function MainMenu({
           </div>
         ) : (
         <div className="battle-section-inner">
-          {/* One framed card like the Roguelite and Draft setups, in Classic's blue. */}
+          {/* One framed card like the Roguelite and Draft setups, in Classic's blue: the
+              trainer and boss battles on the Classic page, the wild ones on Catch. */}
           <div className="run-panel classic-panel">
           <div className="classic-card">
           <div className="run-setup-header">
             <span className="run-hud-label">Battle</span>
             {levelCap !== null && <span className="classic-level-cap">Level Cap {levelCap}</span>}
           </div>
+
+          {mode !== 'classic' ? (
+          <>
 
           {/* Wild Pokemon: every area is its own battle button - click one to find a wild
               Pokemon there straight away (it's remembered as the last area fought in). */}
@@ -1332,9 +1359,14 @@ function MainMenu({
 
           {tmSearch.modal}
 
+          {/* The DexNav (once owned): the Pokemon being hunted, its chain, and where to look. */}
+          <DexNavPanel wildLevel={effectiveWildLevelCap} disabled={fightBusy || teamEmpty} onHunt={(id) => onFight(id)} />
+          </>
+          ) : (
+          <>
           {/* Trainers: the next trainer, and the next boss (or a rematch once all are beaten). */}
           <div className="classic-section-head">
-            <img className="classic-section-icon" src="./icons/nav/classic.png" alt="" />
+            <img className="classic-section-icon" src="./icons/nav/trainercard.png" alt="" />
             <span className="run-hud-label">Trainer battles</span>
           </div>
           <div className="classic-trainer-row">
@@ -1370,6 +1402,11 @@ function MainMenu({
               <span className="classic-wild-go">{allBossesDefeated ? 'Pick ▸' : 'Battle ▸'}</span>
             </button>
           </div>
+
+          {/* A friendly fight against another player's saved team. */}
+          <ChallengeSection onChallengePlayer={onChallengePlayer} disabled={fightBusy || teamEmpty} />
+          </>
+          )}
           </div>
           </div>
         </div>
@@ -1432,9 +1469,15 @@ function MainMenu({
                 : "Favorites can't be picked"}
             </span>
             {boxSelectMode === 'merge' && (
-              <button disabled={busy} onClick={selectAllDuplicates} title="Pick every Pokémon shown that has another of its species">
-                Select all duplicates
-              </button>
+              <>
+                <label className="box-merge-items-toggle" title="Also pick pre-evolutions that use up an evolution item to go in (as many as your bag has items for)">
+                  <input type="checkbox" checked={mergeWithItems} onChange={(e) => setMergeWithItems(e.target.checked)} />
+                  <span>Use evo items</span>
+                </label>
+                <button disabled={busy} onClick={selectAllDuplicates} title="Pick every Pokémon shown that has another of its species">
+                  Select all duplicates
+                </button>
+              </>
             )}
             {boxSelectMode === 'merge' ? (
               <button
@@ -1748,7 +1791,6 @@ function MainMenu({
 
       {pokedexOpen && <PokedexModal onClose={() => setPokedexOpen(false)} />}
 
-      {challengeOpen && <ChallengeModal onChallengePlayer={onChallengePlayer} onClose={() => setChallengeOpen(false)} />}
 
       {starterOpen && (
         <StarterPicker

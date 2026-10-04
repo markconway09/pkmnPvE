@@ -37,6 +37,8 @@ interface Props {
   tmQuickCheck?: boolean
   // TMs a beaten trainer gave.
   tmRewards?: TmInfo[]
+  // A Classic wild battle: fight another wild Pokemon from the same area straight away.
+  onRebattle?: () => Promise<void>
   onClose: () => void
 }
 
@@ -58,9 +60,12 @@ function BattleResultModal({
   draftResult = null,
   tmQuickCheck = false,
   tmRewards = [],
+  onRebattle,
   onClose
 }: Props): React.JSX.Element {
-  const [confirmingLeave, setConfirmingLeave] = useState(false)
+  // Which way out is waiting on a second click (leaving a shiny uncaught).
+  const [confirmingLeave, setConfirmingLeave] = useState<'menu' | 'rebattle' | null>(null)
+  const [rebattling, setRebattling] = useState(false)
   const [pokeballs, setPokeballs] = useState<number | null>(null)
   const [money, setMoney] = useState<number | null>(null)
   const [pokeballPrice, setPokeballPrice] = useState(POKEBALL_PRICE)
@@ -270,15 +275,32 @@ function BattleResultModal({
           </div>
         )}
         {tmQuickCheck && <TmQuickCheck />}
-        <div className="editor-actions">
+        <div className="editor-actions battle-result-actions">
+          {onRebattle && (
+            <button
+              className={leaveNeedsConfirm && confirmingLeave === 'rebattle' ? 'confirm-button' : undefined}
+              disabled={busy || rebattling}
+              onClick={() => {
+                if (leaveNeedsConfirm && confirmingLeave !== 'rebattle') {
+                  setConfirmingLeave('rebattle')
+                  return
+                }
+                setRebattling(true)
+                void onRebattle().finally(() => setRebattling(false))
+              }}
+            >
+              {leaveNeedsConfirm && confirmingLeave === 'rebattle' ? 'Leave the shiny uncaught? Click again' : 'Battle again'}
+            </button>
+          )}
           <button
-            className={leaveNeedsConfirm && confirmingLeave ? 'confirm-button' : undefined}
+            className={leaveNeedsConfirm && confirmingLeave === 'menu' ? 'confirm-button' : undefined}
+            disabled={rebattling}
             onClick={() => {
-              if (leaveNeedsConfirm && !confirmingLeave) setConfirmingLeave(true)
+              if (leaveNeedsConfirm && confirmingLeave !== 'menu') setConfirmingLeave('menu')
               else onClose()
             }}
           >
-            {leaveNeedsConfirm && confirmingLeave ? 'Leave the shiny uncaught? Click again' : 'Back to menu'}
+            {leaveNeedsConfirm && confirmingLeave === 'menu' ? 'Leave the shiny uncaught? Click again' : 'Back to menu'}
           </button>
         </div>
       </div>

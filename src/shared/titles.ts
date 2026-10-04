@@ -46,7 +46,7 @@ export const TITLE_PERKS: Record<Title, string> = {
   'Badge Collector': '50% chance of a bonus Rare Candy after any battle won',
   Champion: 'Running from trainers is free',
   Collector: '25% chance a catch is free',
-  Professor: "Pokemon you haven't registered turn up more often in the wild",
+  Professor: "Pokemon you haven't registered turn up more often in the wild, and the DexNav chain maxes out at 20 instead of 30",
   'Shiny Hunter': 'Wild shiny odds 1 in 384 instead of 1 in 512 (not raid bosses)',
   'Legend Keeper': 'Random Legendary is likelier to give a box legendary',
   Tycoon: '25% off when buying 5 or more of an item at once in the Shop',

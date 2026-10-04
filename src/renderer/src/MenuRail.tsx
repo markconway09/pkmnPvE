@@ -69,11 +69,13 @@ function MenuRail({
   })
   const pages: { id: MenuPage; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'home', label: 'Home', icon: <HomeIcon /> },
-    { id: 'classic', label: 'Classic', icon: <img className="menu-rail-icon" src="./icons/nav/classic.png" alt="" /> },
+    { id: 'catch', label: 'Catch', icon: <img className="menu-rail-icon" src="./icons/nav/classic.png" alt="" /> },
+    { id: 'box', label: 'Box', icon: <img className="menu-rail-icon" src="./icons/nav/box.png" alt="" /> },
+    { id: 'classic', label: 'Classic', icon: <img className="menu-rail-icon menu-rail-icon-pixel" src="./icons/nav/challenge.png" alt="" /> },
     {
       id: 'roguelite',
       label: 'Roguelite',
-      icon: <img className="menu-rail-icon" src="./icons/nav/roguelite.png" alt="" />,
+      icon: <img className="menu-rail-icon menu-rail-icon-pixel" src="./icons/nav/roguelite.png" alt="" />,
       badge: runFloor !== null ? `F${runFloor}` : undefined
     },
     { id: 'draft', label: 'Draft', icon: <img className="menu-rail-icon menu-rail-icon-draft" src="./icons/nav/draft.png" alt="" /> },
@@ -83,8 +85,7 @@ function MenuRail({
       icon: <img className="menu-rail-icon" src="./sprites/misc/raidcrystal.png" alt="" />,
       badge: raidCrystals ? `×${raidCrystals}` : undefined
     },
-    { id: 'corner', label: 'Game Corner', icon: <img className="menu-rail-icon" src="./icons/nav/coin.png" alt="" /> },
-    { id: 'box', label: 'Box', icon: <img className="menu-rail-icon" src="./icons/nav/box.png" alt="" /> }
+    { id: 'corner', label: 'Game Corner', icon: <img className="menu-rail-icon" src="./icons/nav/coin.png" alt="" /> }
   ]
   const tools: { label: string; icon: React.ReactNode; action: () => void; badge?: number }[] = [
     { label: 'Bag', icon: <img className="menu-rail-icon" src="./icons/nav/bag.png" alt="" />, action: onBag },

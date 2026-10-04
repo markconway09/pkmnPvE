@@ -88,7 +88,10 @@ export function TmQuickCheck(): React.JSX.Element {
     <div className="tm-quick-check">
       {runKey === 0 ? (
         <button className="tm-quick-check-start" onClick={() => setRunKey(1)}>
-          🔍 Search the area
+          <strong className="tm-quick-check-label">
+            <ItemSprite spritenum={537} />
+            Search the area
+          </strong>
           <span>One skill check - a Good or a Great might turn up a TM</span>
         </button>
       ) : (

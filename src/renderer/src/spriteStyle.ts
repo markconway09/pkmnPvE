@@ -46,12 +46,17 @@ const SHINY_CDN_DIR: Record<SpriteStyle, { front: string; back: string }> = {
   '3d-animated': { front: 'ani-shiny', back: 'ani-back-shiny' }
 }
 
+// Forms that look just like another (Dusk Rockruff is an ordinary Rockruff to look at)
+// and lack most of their own art: they show that one's pictures in every style.
+const SAME_LOOK_SPRITES: Record<string, string> = { rockruffdusk: 'rockruff' }
+
 export function spriteUrl(
   style: SpriteStyle,
   facing: 'front' | 'back',
-  spriteId: string,
+  rawSpriteId: string,
   shiny = false
 ): string {
+  const spriteId = SAME_LOOK_SPRITES[rawSpriteId] ?? rawSpriteId
   const ext = style === '2d-static' || style === '3d-static' ? 'png' : 'gif'
   // Pokemon HOME art (3D static) has no official back view, so the front
   // render is used for both slots.

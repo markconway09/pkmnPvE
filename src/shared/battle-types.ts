@@ -75,6 +75,8 @@ export const DECORATION_BOX_ITEM_ID = 'decorationbox'
 export const FASHION_CASE_ITEM_ID = 'fashioncase'
 // The one key item bought instead (in the Coin Shop): it opens the TM quick check after wild wins.
 export const SCANNER_ITEM_ID = 'scanner'
+// The DexNav hunts one registered species in the wild (see dexnav.ts).
+export const DEXNAV_ITEM_ID = 'dexnav'
 
 // Pikachu's forms the Fashion Case changes between: plain Pikachu, the caps, the Cosplay
 // outfits, Partner and World. Owning three different ones at once unlocks it.
@@ -136,7 +138,8 @@ export const KEY_ITEM_IDS = new Set([
   ZYGARDE_CUBE_ITEM_ID,
   DECORATION_BOX_ITEM_ID,
   FASHION_CASE_ITEM_ID,
-  SCANNER_ITEM_ID
+  SCANNER_ITEM_ID,
+  DEXNAV_ITEM_ID
 ])
 
 // The form-change key items: with one in the bag, a Pokemon in its group can be changed
@@ -538,8 +541,8 @@ export interface BoxPokemonView extends PokemonSummary {
   copies?: number
   mergeStars?: number
   // Locked with an Everstone: it never evolves, but takes merges while not fully evolved,
-  // each star worth more (mergeGrowth, held item aside - see MERGE_GROWTH_MAX and
-  // mergeGrowthHolding). The lock can only come off
+  // each star worth more (mergeGrowth - see mergeGrowthFor), and counts as fully evolved,
+  // so an Eviolite does nothing for it. The lock can only come off
   // before anything's been merged in. Undefined: fully evolved, so there's nothing to lock.
   everstone?: { locked: boolean; canUnlock: boolean }
   mergeGrowth?: number
@@ -1243,17 +1246,18 @@ export const MERGE_MAX_COPIES = 2 ** MERGE_MAX_STARS
 export const MERGE_STAT_BONUS_PER_STAR = 0.1
 export const MERGE_STAT_BONUS_BY_TIER: Partial<Record<RarityTier, number>> = { epic: 0.075, legendary: 0.05 }
 // A Pokemon that isn't fully evolved (only an Everstone-locked one takes merges - see
-// BoxPokemonView.everstone) grows more with each star: its bonus times how far its stats are from its strongest final
-// evolution's (Pichu's 205 against Raichu's 485: x2.37), up to this - so a 5-star one gets
-// close to its evolution without passing it. Not while it holds an Eviolite.
-export const MERGE_GROWTH_MAX = 3
+// BoxPokemonView.everstone) grows more with each star - by its stat gap to its strongest
+// final evolution (Murkrow x1.25 for Honchkrow), or, when that's more, enough that at 5 stars
+// its stats match that evolution's at 2 stars (Pichu, 205, reaches a 2-star Raichu's
+// 485 x1.2). Never less than a normal star. An Everstone-locked one counts as fully evolved,
+// so an Eviolite does nothing for it.
 
-/** Its growth (BoxPokemonView.mergeGrowth) as it stands holding this item: none with an Eviolite. */
+/** Its growth as it stands holding this item: none with an Eviolite (one that isn't Everstone-locked - a raid boss). */
 export function mergeGrowthHolding(growth: number | undefined, item: string | undefined): number {
   return item && item.toLowerCase().replace(/[^a-z0-9]/g, '') === 'eviolite' ? 1 : (growth ?? 1)
 }
 
-/** What one star adds to all its stats, for a Pokemon of this rarity (and growth, see MERGE_GROWTH_MAX). */
+/** What one star adds to all its stats, for a Pokemon of this rarity (and growth, see BoxPokemonView.mergeGrowth). */
 export function mergeBonusPerStar(tier: RarityTier | undefined, growth = 1): number {
   return ((tier && MERGE_STAT_BONUS_BY_TIER[tier]) ?? MERGE_STAT_BONUS_PER_STAR) * growth
 }

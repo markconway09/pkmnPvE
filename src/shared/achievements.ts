@@ -292,7 +292,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     category: 'Collection',
     stat: 'dexSpecies',
     goal: 400,
-    reward: { items: [item('shinypatch')] }
+    reward: { items: [item('shinypatch')], keyItems: ['dexnav'] }
   },
   {
     id: 'dex800',

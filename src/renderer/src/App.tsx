@@ -277,6 +277,9 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
   // screen !== 'menu', which would otherwise reset it back to 'all'/100 every time.
   const [wildLocation, setWildLocation] = useState<WildLocationId>('all')
   const [wildLevelCap, setWildLevelCap] = useState<number>(100)
+  // The area and level cap of the Classic wild battle on screen, for its "Battle again"
+  // button - null for any other kind of fight.
+  const [wildRebattle, setWildRebattle] = useState<{ location?: WildLocationId; levelCap?: number } | null>(null)
 
   // One entry per active slot (length 1 in singles, up to 2 in doubles) -
   // filled in as the player picks a move/switch for each, and once every
@@ -456,6 +459,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
       const initial = await skipTeamPreview(await window.api.startBattle(location, levelCap))
       setBackdrop(randomBackdropId(location))
       setView(initial)
+      setWildRebattle({ location, levelCap })
       setRevealedCount(0)
       setScreen('battle')
     } catch (err) {
@@ -472,6 +476,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
       const initial = await skipTeamPreview(await window.api.startRaidBattle())
       setBackdrop(battleBackdropId(initial))
       setView(initial)
+      setWildRebattle(null)
       setRevealedCount(0)
       setScreen('battle')
     } catch (err) {
@@ -488,6 +493,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
       const initial = await skipTeamPreview(await window.api.startTrainerBattle(boss, rematchTrainerId))
       setBackdrop(battleBackdropId(initial))
       setView(initial)
+      setWildRebattle(null)
       setRevealedCount(0)
       setScreen('battle')
     } catch (err) {
@@ -506,6 +512,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
     const initial = await skipTeamPreview(started)
     setBackdrop(battleBackdropId(initial, location))
     setView(initial)
+    setWildRebattle(null)
     setRevealedCount(0)
     setScreen('battle')
   }
@@ -516,6 +523,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
       const initial = await skipTeamPreview(await window.api.startPlayerBattle(name, doubles))
       setBackdrop(randomBackdropId())
       setView(initial)
+      setWildRebattle(null)
       setRevealedCount(0)
       setError(null)
       setScreen('battle')
@@ -960,6 +968,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
             draftResult={view.draftResult}
             tmQuickCheck={!!view.tmQuickCheck}
             tmRewards={view.tmRewards ?? []}
+            onRebattle={wildRebattle ? () => startBattle(wildRebattle.location, wildRebattle.levelCap) : undefined}
             onClose={() => setScreen('menu')}
           />
         )}

@@ -6,7 +6,6 @@ import {
   MERGE_MAX_COPIES,
   MERGE_MAX_STARS,
   mergeBonusText,
-  mergeGrowthHolding,
   mergeStarsFor,
   planMerge,
   toSpriteId
@@ -47,7 +46,7 @@ function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
   const [error, setError] = useState<string | null>(null)
 
   // Its bonus at so many stars - red and gold Pokemon get less from each one.
-  const bonusText = (stars: number): string => `${mergeBonusText(stars, keeper.rarityTier, mergeGrowthHolding(keeper.mergeGrowth, keeper.item))} to all stats`
+  const bonusText = (stars: number): string => `${mergeBonusText(stars, keeper.rarityTier, keeper.mergeGrowth)} to all stats`
   const candidates = keeper.mergeCandidates ?? []
   const chosen = candidates.filter((c) => picked.has(c.id))
   const copiesNow = keeper.copies ?? 1

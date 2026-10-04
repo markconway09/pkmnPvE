@@ -9,7 +9,8 @@ import {
   EXP_CANDY_EXP,
   LINK_CABLE_ITEM_ID,
   MAX_HAPPINESS,
-  MERGE_GROWTH_MAX,
+  MERGE_MAX_STARS,
+  mergeBonusPerStar,
   mergeGrowthHolding,
   OPENABLE_ITEM_IDS,
   PEAT_BLOCK_ITEM_ID,
@@ -39,13 +40,15 @@ import {
   DECORATION_BOX_ITEM_ID,
   FASHION_CASE_ITEM_ID,
   SCANNER_ITEM_ID,
+  DEXNAV_ITEM_ID,
   PRISON_BOTTLE_ITEM_ID,
   REVEAL_GLASS_ITEM_ID,
   GRACIDEA_ITEM_ID,
   METEORITE_ITEM_ID,
   QUICK_SELL_KEPT_BERRY_IDS,
   SELL_ONLY_ITEM_IDS,
-  WILD_LOCATIONS
+  WILD_LOCATIONS,
+  PIKACHU_FORMS
 } from '../../shared/battle-types'
 import type {
   AutoSetResult,
@@ -60,7 +63,8 @@ import type {
   ShopItemEntry,
   SpeciesEditInfo,
   StatBlock,
-  WildLocationConfig
+  WildLocationConfig,
+  WildLocationId
 } from '../../shared/battle-types'
 
 import { getShopPriceOverrides } from './shop-price-store'
@@ -94,6 +98,9 @@ const { BattlePlayer } = require('pokemon-showdown/dist/sim/battle-stream.js') a
   const pokedex = Dex.data.Pokedex as unknown as Record<string, Record<string, unknown>>
   pokedex.meltan = { ...pokedex.meltan, evos: ['Melmetal'] }
   pokedex.melmetal = { ...pokedex.melmetal, prevo: 'Meltan', evoType: 'levelFriendship' }
+  // AZ's Eternal Floette counts as a mythical here (see MYTHICAL_FORMES): never met in the
+  // wild, found where the other mythicals are.
+  pokedex.floetteeternal = { ...pokedex.floetteeternal, tags: ['Mythical'] }
   ;(Dex.species as unknown as { speciesCache: Map<string, unknown> }).speciesCache.clear()
 }
 
@@ -484,7 +491,7 @@ const WILD_SHINY_ODDS = 512
  * Shiny Charm. Shiny Hunter shortens the odds for wild Pokemon only; Starlight raises a
  * raid boss's chances instead (3x, or 5x with the charm).
  */
-export function rollWildShiny(raid = false): boolean {
+export function rollWildShiny(raid = false, extraMultiplier = 1): boolean {
   const charm = hasItem(SHINY_CHARM_ITEM_ID)
   let boost = charm ? SHINY_CHARM_MULTIPLIER : 1
   let odds = WILD_SHINY_ODDS
@@ -493,7 +500,8 @@ export function rollWildShiny(raid = false): boolean {
   } else if (hasTitle('Shiny Hunter')) {
     odds = SHINY_HUNTER_ODDS
   }
-  return Math.random() < boost / odds
+  // On top of the rest: a DexNav chain's bonus for the Pokemon it hunted.
+  return Math.random() < (boost * extraMultiplier) / odds
 }
 
 // The Professor title: species not in the Pokedex yet are likelier in the wild.
@@ -726,6 +734,44 @@ function withRandomCosmeticForm(speciesName: string): string {
   return forms[Math.floor(Math.random() * forms.length)]
 }
 
+// Lines with alternate forms that the random sets and the extras bring up only some of: a
+// wild one rolls among all of them evenly - a Wormadam cloak, a Pumpkaboo/Gourgeist size,
+// a Toxtricity, a Tatsugiri, any Pikachu outfit (the set generator alone only does caps),
+// a Spiky-eared Pichu, a Dusk Rockruff, a Roaming Gimmighoul, any Vivillon pattern. (It
+// already rolls Maushold, Dudunsparce, Polteageist, Sinistcha and Basculin itself.) Only
+// Totems (boss-only) and Eternal Floette are never met in the wild.
+const WILD_FORM_CHOICES: Record<string, string[]> = {
+  Wormadam: ['Wormadam', 'Wormadam-Sandy', 'Wormadam-Trash'],
+  Pumpkaboo: ['Pumpkaboo', 'Pumpkaboo-Small', 'Pumpkaboo-Large', 'Pumpkaboo-Super'],
+  Gourgeist: ['Gourgeist', 'Gourgeist-Small', 'Gourgeist-Large', 'Gourgeist-Super'],
+  Toxtricity: ['Toxtricity', 'Toxtricity-Low-Key'],
+  Tatsugiri: ['Tatsugiri', 'Tatsugiri-Droopy', 'Tatsugiri-Stretchy'],
+  Pikachu: [...PIKACHU_FORMS],
+  Pichu: ['Pichu', 'Pichu-Spiky-eared'],
+  Rockruff: ['Rockruff', 'Rockruff-Dusk'],
+  Gimmighoul: ['Gimmighoul', 'Gimmighoul-Roaming'],
+  Vivillon: ['Vivillon', ...(Dex.species.get('Vivillon').cosmeticFormes ?? []), 'Vivillon-Fancy', 'Vivillon-Pokeball']
+}
+
+function withRandomWildForm(speciesName: string): string {
+  const choices = WILD_FORM_CHOICES[Dex.species.get(speciesName).baseSpecies]
+  return choices ? choices[Math.floor(Math.random() * choices.length)] : speciesName
+}
+
+// A generated set moved to another form of its Pokemon: kept, with the ability in the
+// same slot, as long as the new form can learn every move - otherwise a fresh basic set.
+function setInForm(set: PokemonSet, form: string, level: number): PokemonSet {
+  const from = Dex.species.get(set.species)
+  const to = Dex.species.get(form)
+  if (from.baseSpecies !== to.baseSpecies) return buildBasicSet(form, level)
+  const learnable = new Set(learnableMoveIds(to.id, 100))
+  if (!set.moves.every((m) => learnable.has(toID(m)))) return buildBasicSet(form, level)
+  const slot = (Object.keys(from.abilities) as (keyof typeof from.abilities)[]).find((k) => from.abilities[k] === set.ability)
+  const ability = (slot && to.abilities[slot]) || to.abilities[0]
+  // A one-gender form (Pikachu's caps are male, its Cosplay outfits female) sets the gender.
+  return { ...set, name: to.name, species: to.name, ability, level, gender: to.gender || set.gender }
+}
+
 export function generateRandomWildMon(
   levelCap: number,
   location?: WildLocationConfig | null,
@@ -765,7 +811,7 @@ export function generateRandomWildMon(
       // Dropped outright rather than down-weighted: at a low cap a roll often has
       // only one or two candidates left, where a lower weight would change nothing.
       if (isStarterLine(dexSpecies.id) && Math.random() >= WILD_STARTER_CHANCE) continue
-      const finalSpecies = keepCosmeticForm(mon.species, deevolveWild(mon.species, level))
+      const finalSpecies = withRandomWildForm(keepCosmeticForm(mon.species, deevolveWild(mon.species, level)))
       if (minLevelForSpecies(finalSpecies) > levelCap) continue
       if (bstOf(finalSpecies) > maxBST) continue
       if (allowedTypes || allowedEggGroups) {
@@ -776,7 +822,7 @@ export function generateRandomWildMon(
         if (!isException && !typeMatch && !eggGroupMatch) continue
       }
       candidates.push(
-        finalSpecies === mon.species ? { ...mon, level } : buildBasicSet(finalSpecies, level)
+        finalSpecies === mon.species ? { ...mon, level } : setInForm(mon, finalSpecies, level)
       )
     }
     if (candidates.length > 0) {
@@ -1076,6 +1122,15 @@ const SCANNER_ITEM: ItemOptionEntry = {
   spritenum: -29
 }
 
+// The DexNav: a key item from the Pokedex Scholar achievement (see dexnav.ts). -30 maps to its own image (see ItemSprite).
+const DEXNAV_ITEM: ItemOptionEntry = {
+  id: DEXNAV_ITEM_ID,
+  name: 'DexNav',
+  description:
+    'Hunt a Pokémon you have registered: it turns up more often the longer your chain of them runs (up to 75%), and at a full chain is twice as likely to be shiny.',
+  spritenum: -30
+}
+
 const ROTOM_CATALOG_ITEM: ItemOptionEntry = {
   id: ROTOM_CATALOG_ITEM_ID,
   name: 'Rotom Catalog',
@@ -1151,6 +1206,7 @@ export function getEditorOptions(): EditorOptions {
       ...FORM_CHANGE_ITEMS,
       ...FUSION_ITEMS,
       SCANNER_ITEM,
+      DEXNAV_ITEM,
       ...EXP_CANDY_ITEMS
     ])
     .sort(byName)
@@ -1562,7 +1618,19 @@ const EXTRA_LEARNABLE: Record<string, string[]> = {
   zamazenta: ['behemothbash']
 }
 
+// Smeargle Sketches anything, so here it simply learns every move in the game, from
+// level 1 and with no TM needed.
+let smeargleMoves: string[] | null = null
+function everyMoveId(): string[] {
+  smeargleMoves ??= Dex.moves
+    .all()
+    .filter((m) => m.exists && !m.isZ && !m.isMax && m.id !== 'struggle' && m.isNonstandard !== 'CAP' && m.isNonstandard !== 'Custom')
+    .map((m) => m.id)
+  return smeargleMoves
+}
+
 export function learnableMoveIds(speciesId: string, level: number, anyGeneration = true): string[] {
+  if (speciesId === 'smeargle') return everyMoveId()
   const merged = new Map<string, string[]>()
   for (const moveId of EXTRA_LEARNABLE[speciesId] ?? []) merged.set(moveId, ['9L1'])
   // Species dropped from the current regional dex ("isNonstandard: Past",
@@ -1616,7 +1684,12 @@ export function getSpeciesEditInfo(speciesName: string, level: number, knownMove
   const listed = new Set(info.moves.map((m) => m.id))
   const extra = [...new Set(knownMoves.map((m) => toID(m)))]
     .filter((id) => id && !listed.has(id))
-    .map((id) => getMoveInfo(id))
+    // Keep the id it's saved under: Showdown files every Hidden Power type under
+    // "hiddenpower", which would clash with the plain Hidden Power row.
+    .map((id) => {
+      const info = getMoveInfo(id)
+      return info && { ...info, id }
+    })
     .filter((m): m is MoveInfo => !!m)
   return extra.length > 0 ? { ...info, moves: [...info.moves, ...extra] } : info
 }
@@ -1744,10 +1817,13 @@ export function buildBasicSet(speciesName: string, level: number): PokemonSet {
 // swamp the odds, so only the base forme counts - plus regional variants, which
 // are genuinely different Pokemon.
 const REGIONAL_FORMES = ['Alola', 'Galar', 'Hisui', 'Paldea']
+// Formes that are a mythical in their own right, so they get their own entry too.
+const MYTHICAL_FORMES = new Set(['Floette-Eternal'])
 
 function isPlainSpecies(species: ReturnType<typeof Dex.species.get>): boolean {
   // Not a Totem (Alolan Totem Raticate): a boss-only size, and there's no sprite for it.
   if (species.forme.includes('Totem')) return false
+  if (MYTHICAL_FORMES.has(species.name)) return true
   return !species.forme || REGIONAL_FORMES.some((region) => species.forme.startsWith(region))
 }
 
@@ -2132,20 +2208,30 @@ export function isFullyEvolved(speciesName: string): boolean {
 }
 
 /**
- * How much more a merge star is worth to a Pokemon that isn't fully evolved (see
- * MERGE_GROWTH_MAX): its strongest final evolution's base stat total against its own.
- * 1 when fully evolved, or while it holds an Eviolite (that's its boost instead).
+ * How much more a merge star is worth to a Pokemon that isn't fully evolved: its strongest
+ * final evolution's base stat total against its own, or - when that's more - enough that at
+ * 5 stars it matches that evolution's at 2 stars. Same stats (Scyther, Scizor) is a plain star.
+ * 1 when fully evolved, or while it holds a working Eviolite (left out for an Everstone-locked
+ * one, which the Eviolite does nothing for).
  */
 export function mergeGrowthFor(speciesName: string, item?: string): number {
   if (mergeGrowthHolding(2, item) === 1) return 1
   const own = Dex.species.get(dexFormOf(speciesName))
   if (!own.exists) return 1
-  const finalBst = (species: typeof own): number => {
+  const finalOf = (species: typeof own): typeof own => {
     const evos = species.evos.map((e) => Dex.species.get(e)).filter((e) => e.exists && !isBattleOnlyForme(e))
-    return evos.length === 0 ? bstOf(species.name) : Math.max(...evos.map(finalBst))
+    if (evos.length === 0) return species
+    return evos.map(finalOf).reduce((best, e) => (bstOf(e.name) > bstOf(best.name) ? e : best))
   }
-  const ratio = finalBst(own) / Math.max(1, bstOf(own.name))
-  return Math.round(Math.min(MERGE_GROWTH_MAX, Math.max(1, ratio)) * 100) / 100
+  const final = finalOf(own)
+  if (final.name === own.name) return 1
+  // At least its stat gap to the evolution (Murkrow's 405 against Honchkrow's 505: x1.25)...
+  const ratio = bstOf(final.name) / Math.max(1, bstOf(own.name))
+  // ...or, if that's more, enough that its 5-star multiplier (1 + 5 x bonus x growth)
+  // reaches the evolution's 2-star stats - the big boost for the weakest ones.
+  const target = ratio * (1 + 2 * mergeBonusPerStar(speciesRarityTier(final.name)))
+  const growth = (target - 1) / (MERGE_MAX_STARS * mergeBonusPerStar(speciesRarityTier(own.name)))
+  return Math.round(Math.max(1, ratio, growth) * 100) / 100
 }
 
 /**
@@ -2218,6 +2304,59 @@ function wildLineIds(): Set<string> {
   return cachedWildLineIds
 }
 
+// The wild areas (not Anywhere, nor the Lab) whose type or egg-group filters - or
+// exceptions - let a species through, the same ones generateRandomWildMon checks.
+function wildAreasFor(species: ReturnType<typeof Dex.species.get>): WildLocationConfig[] {
+  const root = evolutionRootId(species.id)
+  return WILD_LOCATIONS.filter((location) => {
+    if (!location.types) return false
+    const isException = location.exceptionBaseSpecies.some((s) => toID(s) === root)
+    const typeMatch = species.types.some((t) => location.types!.includes(t))
+    const eggGroupMatch = species.eggGroups.some((g) => location.eggGroups?.includes(g))
+    return isException || typeMatch || eggGroupMatch
+  })
+}
+
+/**
+ * Whether the DexNav can hunt a species, and if so where and from what wild level: only
+ * Pokemon a wild roll could bring up (no legendaries, Paradox, fossils or battle-only
+ * forms). Its lowest level is where its evolution stage is reached, raised until the wild
+ * level's BST limit (see generateRandomWildMon) lets it through.
+ */
+export function dexNavHuntInfo(speciesName: string): { locations: WildLocationId[]; minLevel: number } | null {
+  const species = Dex.species.get(speciesName)
+  if (!species.exists || isLegendaryClass(species) || species.tags.some((tag) => LEGENDARY_TAGS.has(tag))) return null
+  if (isBattleOnlyForme(species) || isParadoxSpecies(species) || isFossilLine(species.id)) return null
+  if (!wildLineIds().has(species.id)) return null
+  const bstLevel = Math.ceil((bstOf(species.name) - 300) / 4)
+  const minLevel = Math.max(1, minLevelForSpecies(species.name), stageReachLevel(species), bstLevel)
+  return { locations: wildAreasFor(species).map((l) => l.id), minLevel }
+}
+
+/**
+ * The DexNav's hunted Pokemon, met at a usual wild level for this cap - or, when its
+ * evolution stage needs more, the lowest level it could be reached at (never past the
+ * cap). Null when it can't turn up at this cap at all. Its shiny roll gets the chain's
+ * multiplier on top of everything else.
+ */
+export function generateHuntedMon(speciesName: string, levelCap: number, shinyMultiplier: number): PokemonSet | null {
+  const info = dexNavHuntInfo(speciesName)
+  if (!info || info.minLevel > levelCap) return null
+  const min = Math.max(1, levelCap - 14)
+  const max = Math.max(min, levelCap - 4)
+  const rolled = min + Math.floor(Math.random() * (max - min + 1))
+  const level = Math.min(levelCap, Math.max(rolled, info.minLevel))
+  // Hunting a Pokemon by name meets any of its wild forms (a Wormadam cloak, a Burmy
+  // cloak...) - a form hunted by name stays that form.
+  const named = Dex.species.get(speciesName)
+  const species = named.forme ? named.name : withRandomCosmeticForm(withRandomWildForm(named.name))
+  return {
+    ...buildBasicSet(species, level),
+    shiny: rollWildShiny(false, shinyMultiplier),
+    nature: randomNatureName()
+  }
+}
+
 /**
  * Where to look for a Pokedex entry, as short hints: the wild locations whose type or
  * egg-group filters let it through (the same ones generateRandomWildMon uses), the Lab,
@@ -2236,15 +2375,8 @@ export function pokedexLocationHints(speciesName: string): PokedexHint[] {
     [...pools.paradox, ...pools.ultraBeasts, ...pools.mythicals].includes(species.name)
   if (inLab) hints.push({ icon: '🧪', label: 'Lab' })
   if (!legendary && !isBattleOnlyForme(species) && wildLineIds().has(species.id)) {
-    const root = evolutionRootId(species.id)
-    for (const location of WILD_LOCATIONS) {
-      if (!location.types) continue
-      const isException = location.exceptionBaseSpecies.some((s) => toID(s) === root)
-      const typeMatch = species.types.some((t) => location.types!.includes(t))
-      const eggGroupMatch = species.eggGroups.some((g) => location.eggGroups?.includes(g))
-      if (isException || typeMatch || eggGroupMatch) {
-        hints.push({ icon: location.icon, label: starter ? `${location.label} (rare)` : location.label })
-      }
+    for (const location of wildAreasFor(species)) {
+      hints.push({ icon: location.icon, label: starter ? `${location.label} (rare)` : location.label })
     }
   }
   if (legendary && species.evos.length === 0 && isPlainSpecies(species)) {

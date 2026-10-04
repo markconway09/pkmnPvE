@@ -197,6 +197,8 @@ interface TokenResponse {
   expires_in?: number
   refresh_token?: string
   id_token?: string
+  // The permissions actually granted, space-separated.
+  scope?: string
   error?: string
   error_description?: string
 }
@@ -223,6 +225,14 @@ export async function connectCloud(): Promise<CloudStatus> {
   })
   if (!tokens.refresh_token || !tokens.access_token) {
     throw new Error(`Google didn't grant access${tokens.error_description ? `: ${tokens.error_description}` : ''}`)
+  }
+  // Google's sign-in lets each permission be unticked; without the Drive one every
+  // request is refused, so it's caught here rather than on the first export.
+  if (tokens.scope && !tokens.scope.split(' ').includes('https://www.googleapis.com/auth/drive.appdata')) {
+    await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(tokens.refresh_token)}`, {
+      method: 'POST'
+    }).catch(() => {})
+    throw new Error("Google Drive access wasn't granted - tick the box that lets pkmnPvE use its own Drive folder")
   }
   saveConnection(slug, tokens.refresh_token, emailFromIdToken(tokens.id_token))
   accessTokens.set(slug, { token: tokens.access_token, expiresAt: Date.now() + (tokens.expires_in ?? 3600) * 1000 })
@@ -271,9 +281,33 @@ async function drive(slug: string, url: string, init: RequestInit = {}): Promise
   if (!res.ok) {
     const detail = await res.text().catch(() => '')
     console.error('[cloud] Drive request failed:', res.status, detail)
-    throw new Error(`Google Drive refused that (${res.status})`)
+    throw new Error(driveRefusal(slug, res.status, detail))
   }
   return res
+}
+
+// What a refused Drive request means for the player. The two usual 403s: the Drive API
+// isn't switched on in the game's Google Cloud project, or the player left the "see its
+// own Drive folder" box unticked when signing in (that connection is then forgotten, so
+// connecting again asks for it).
+function driveRefusal(slug: string, status: number, detail: string): string {
+  let reason = ''
+  let message = ''
+  try {
+    const error = (JSON.parse(detail) as { error?: { message?: string; errors?: { reason?: string }[]; details?: { reason?: string }[] } }).error
+    reason = [...(error?.errors ?? []), ...(error?.details ?? [])].map((e) => e.reason ?? '').join(' ')
+    message = error?.message ?? ''
+  } catch {
+    // Not JSON - fall back to the bare status.
+  }
+  if (/accessNotConfigured|SERVICE_DISABLED/.test(reason)) {
+    return "The Google Drive API isn't turned on for this game's Google Cloud project"
+  }
+  if (/insufficientPermissions|ACCESS_TOKEN_SCOPE_INSUFFICIENT/.test(reason)) {
+    forgetConnection(slug)
+    return 'Google Drive access wasn\'t granted - connect again and tick the box that lets pkmnPvE use its own Drive folder'
+  }
+  return `Google Drive refused that (${status}${message ? `: ${message}` : ''})`
 }
 
 interface DriveFile {

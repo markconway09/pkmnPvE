@@ -81,6 +81,10 @@ export function applyScript(pid: number, newDir: string, appDir: string, version
   ].join('\r\n')
 }
 
+// A release's notes hold a short version for the update box, then this marker, then the
+// full notes (see scripts/release.mjs). Older releases without it show whole.
+const FULL_NOTES_MARKER = '<!-- full notes -->'
+
 export async function checkForUpdate(): Promise<UpdateCheckResult> {
   const current = app.getVersion()
   if (!REPO) throw new Error('No update repo is set (updateRepo in package.json)')
@@ -99,7 +103,7 @@ export async function checkForUpdate(): Promise<UpdateCheckResult> {
     current,
     latest,
     available,
-    notes: release.body ?? '',
+    notes: (release.body ?? '').split(FULL_NOTES_MARKER)[0].trim(),
     sizeBytes: asset?.size ?? 0,
     // Only the packaged game replaces itself - a dev copy updates with git.
     canInstall: app.isPackaged

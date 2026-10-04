@@ -42,6 +42,8 @@ interface OpponentInfo {
   foresight?: boolean
   // Miracle Eye: Psychic moves now hit it through a Dark type.
   miracleEye?: boolean
+  // Behind a Substitute: status moves aimed at it fail (bar sound moves and the like).
+  substitute?: boolean
   level: number
   // Its Speed stage (-6 to +6), as the battle has shown it.
   speBoost: number
@@ -387,6 +389,8 @@ export class AIPlayer extends BattlePlayer {
     else if (cmd === '-start' && effect === 'Smack Down') opponent.smackedDown = true
     else if (cmd === '-start' && (effect === 'Foresight' || effect === 'Odor Sleuth')) opponent.foresight = true
     else if (cmd === '-start' && effect === 'Miracle Eye') opponent.miracleEye = true
+    else if (cmd === '-start' && effect === 'Substitute') opponent.substitute = true
+    else if (cmd === '-end' && effect === 'Substitute') opponent.substitute = false
 
     if (cmd === 'replace' || cmd === 'detailschange' || cmd === '-formechange') {
       opponent.species = parts[2].split(',')[0].trim()
@@ -968,6 +972,12 @@ export class AIPlayer extends BattlePlayer {
 
     const opponent = target
     if (info.category === 'Status') {
+      // A Substitute blocks every status move aimed at it - Toxic, Leech Seed, stat drops,
+      // Taunt... - except the ones that go through it (sound moves, Infiltrator).
+      const aimedAtIt = ['normal', 'any', 'adjacentFoe', 'allAdjacentFoes', 'allAdjacent', 'randomNormal'].includes(combat.target)
+      const goesThrough =
+        combat.flags.includes('bypasssub') || toID(ownActive.ability ?? ownActive.baseAbility) === 'infiltrator'
+      if (opponent?.substitute && aimedAtIt && !goesThrough) return 0
       // Foresight / Odor Sleuth / Miracle Eye only do anything against a Ghost (Dark)
       // type that isn't already identified - repeating them just wastes turns.
       if (moveId === 'foresight' || moveId === 'odorsleuth') {

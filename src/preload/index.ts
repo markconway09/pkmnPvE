@@ -8,6 +8,7 @@ import type { AchievementClaimResult, AchievementsState } from '../shared/achiev
 import type { CloudSave, CloudStatus } from '../shared/cloud'
 import type { RouletteSpin } from '../shared/roulette'
 import type { GameCornerPerks } from '../shared/titles'
+import type { DexNavCandidate, DexNavState } from '../shared/dexnav'
 import type { PlinkoDrop, PlinkoRisk } from '../shared/plinko'
 import type { ChaosModifierTarget, ChaosTutorMove, DraftFormat, DraftView } from '../shared/draft'
 import type { SkillCheckResult, TmInfo, TmQuickCheckResult, TmSearchProgress, TmSearchStart, TmShopView, TmState } from '../shared/tms'
@@ -302,6 +303,10 @@ const api = {
   getSpeciesInfo: (species: string, level: number, knownMoves?: string[]): Promise<SpeciesEditInfo> =>
     ipcRenderer.invoke('dex:speciesInfo', species, level, knownMoves),
 
+  // The DexNav: the hunt and its chain, what can be hunted, and picking (or clearing) the target.
+  getDexNavState: (): Promise<DexNavState> => ipcRenderer.invoke('dexnav:state'),
+  listDexNavCandidates: (): Promise<DexNavCandidate[]> => ipcRenderer.invoke('dexnav:candidates'),
+  setDexNavTarget: (species: string | null): Promise<DexNavState> => ipcRenderer.invoke('dexnav:setTarget', species),
   listWildDrops: (): Promise<WildDropEntry[]> => ipcRenderer.invoke('wildDrops:list'),
   setWildDrop: (species: string, drop: ItemDropConfig): Promise<WildDropEntry[]> =>
     ipcRenderer.invoke('wildDrops:set', species, drop),

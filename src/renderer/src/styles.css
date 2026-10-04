@@ -4,7 +4,18 @@
   font-family: 'Pokemon Classic';
   src: url('./assets/fonts/PokemonClassic.ttf') format('truetype');
   size-adjust: 75%;
+  /* The font puts more room above its letters than below, so text sat low in buttons and badges.
+     These even it out around the capitals while keeping the same overall line height. */
+  ascent-override: 125%;
+  descent-override: 37.5%;
   font-display: block;
+}
+
+/* Every letter carries its spacing on its right side, so centred words sat a little left.
+   Indenting by that one gap puts them back in the middle. */
+button,
+.eff-chip {
+  text-indent: 0.1875em;
 }
 
 :root {
@@ -1582,82 +1593,167 @@ textarea,
   }
 }
 
+/* A shiny's entrance: a gold flash and an expanding ring at the sprite's
+   middle, a ring of stars shooting outwards (a second, smaller ring turned
+   half a step a moment later), then a few twinkles lingering on the sprite. */
 .shiny-sparkle {
   position: absolute;
   inset: 0;
   pointer-events: none;
   overflow: visible;
+  z-index: 3;
+}
+
+.shiny-flash {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 140%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 240, 0.85) 0%,
+    rgba(255, 228, 110, 0.45) 30%,
+    rgba(255, 200, 60, 0) 65%
+  );
+  mix-blend-mode: screen;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.3);
+  animation: shiny-flash 700ms ease-out 80ms forwards;
+}
+
+@keyframes shiny-flash {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+  25% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+}
+
+.shiny-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 24px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 2px solid #fff6b0;
+  box-shadow:
+    0 0 6px #ffd83d,
+    inset 0 0 6px #ffd83d;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.2);
+  animation: shiny-ring 650ms ease-out 120ms forwards;
+}
+
+@keyframes shiny-ring {
+  0% {
+    opacity: 0.9;
+    transform: translate(-50%, -50%) scale(0.2);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(5.5);
+  }
 }
 
 .shiny-spark {
   position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1em;
+  height: 1em;
+  margin: -0.5em 0 0 -0.5em;
+  line-height: 1;
+  text-align: center;
   color: #fff6b0;
   text-shadow:
-    0 0 4px #fff6b0,
-    0 0 8px #ffd83d;
+    0 0 3px #fff,
+    0 0 6px #ffe36b,
+    0 0 12px #ffb300;
   opacity: 0;
-  animation: shiny-spark-pop 750ms ease-out forwards;
+  animation-fill-mode: forwards;
 }
 
 .shiny-spark::before {
   content: '✦';
+  display: block;
 }
 
-.shiny-spark:nth-child(1) {
-  top: 8%;
-  left: 15%;
-  font-size: 12px;
-  animation-delay: 0ms;
-}
-.shiny-spark:nth-child(2) {
-  top: 18%;
-  left: 72%;
-  font-size: 16px;
-  animation-delay: 60ms;
-}
-.shiny-spark:nth-child(3) {
-  top: 55%;
-  left: 5%;
-  font-size: 10px;
-  animation-delay: 130ms;
-}
-.shiny-spark:nth-child(4) {
-  top: 62%;
-  left: 82%;
-  font-size: 14px;
-  animation-delay: 190ms;
-}
-.shiny-spark:nth-child(5) {
-  top: 35%;
-  left: 45%;
-  font-size: 18px;
-  animation-delay: 100ms;
-}
-.shiny-spark:nth-child(6) {
-  top: 78%;
-  left: 38%;
-  font-size: 11px;
-  animation-delay: 160ms;
-}
-.shiny-spark:nth-child(7) {
-  top: 2%;
-  left: 50%;
-  font-size: 13px;
-  animation-delay: 230ms;
+/* A ray flies straight out along its angle, spinning, and shrinks away. */
+.shiny-spark-ray {
+  animation-name: shiny-ray;
+  animation-duration: 650ms;
+  animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1);
 }
 
-@keyframes shiny-spark-pop {
+.shiny-spark-ray::before {
+  animation: shiny-spin 650ms linear;
+  animation-delay: inherit;
+}
+
+@keyframes shiny-ray {
   0% {
     opacity: 0;
-    transform: scale(0.2) rotate(0deg);
+    transform: rotate(var(--a)) translateY(0) rotate(calc(-1 * var(--a))) scale(0.2);
   }
-  35% {
+  15% {
     opacity: 1;
-    transform: scale(1.15) rotate(20deg);
+    transform: rotate(var(--a)) translateY(calc(var(--d) * -0.3)) rotate(calc(-1 * var(--a))) scale(1.2);
+  }
+  70% {
+    opacity: 1;
   }
   100% {
     opacity: 0;
-    transform: scale(0.6) rotate(40deg);
+    transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) rotate(calc(-1 * var(--a))) scale(0.4);
+  }
+}
+
+@keyframes shiny-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(180deg);
+  }
+}
+
+/* A twinkle sits in place on the sprite and blinks twice. */
+.shiny-spark-twinkle {
+  animation-name: shiny-twinkle;
+  animation-duration: 600ms;
+  animation-timing-function: ease-in-out;
+}
+
+@keyframes shiny-twinkle {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) rotate(calc(-1 * var(--a))) scale(0.1);
+  }
+  25% {
+    opacity: 1;
+    transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) rotate(calc(-1 * var(--a))) scale(1.1);
+  }
+  45% {
+    opacity: 0.5;
+    transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) rotate(calc(-1 * var(--a))) scale(0.5);
+  }
+  70% {
+    opacity: 1;
+    transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) rotate(calc(-1 * var(--a))) scale(0.9);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) rotate(calc(-1 * var(--a))) scale(0.1);
   }
 }
 
@@ -3868,10 +3964,6 @@ button:disabled {
 }
 
 /* Trainer profile → Pokédex */
-.challenge-modal {
-  width: 480px;
-}
-
 .pokedex-modal {
   width: 900px;
   display: flex;
@@ -13733,14 +13825,24 @@ img.sprite-smooth {
   --card-color: 255, 215, 107;
 }
 
-/* The last row: the Box under Classic, today's missions across the other two
-   columns (the Box takes the whole row when there are no missions). */
+/* The last row: the Box and Catch side by side under Classic, today's missions
+   across the other two columns (the pair takes the whole row when there are no missions). */
 .home-grid .home-missions {
   grid-column: 2 / -1;
 }
 
-.home-card-box:last-child {
+.home-pair:last-child {
   grid-column: 1 / -1;
+}
+
+.home-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.home-card-catch {
+  --card-color: 255, 140, 120;
 }
 
 .home-grid .home-mission {
@@ -16900,104 +17002,6 @@ img.sprite-smooth {
   background: rgba(107, 176, 255, 0.08);
 }
 
-/* ---- Challenge a player, in the floating-card look: the rules as a quiet note, the
-   name, Double battle and Fight on one sunken bar (a rounded field, a pill toggle, a
-   red Fight pill), and a pill Close ---- */
-.modal-panel.challenge-modal {
-  width: 500px;
-  background:
-    radial-gradient(ellipse at 50% -20%, rgba(224, 69, 59, 0.1), transparent 55%),
-    linear-gradient(180deg, #1f2530, #151a21);
-}
-
-.challenge-modal > h2 {
-  margin: 0 0 10px;
-  font-size: 20px;
-}
-
-.challenge-modal > .editor-hint {
-  margin: 0;
-  padding: 10px 14px;
-  border-radius: 12px;
-  background: rgba(143, 184, 232, 0.06);
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.challenge-modal .trainer-add-row.challenge-row {
-  align-items: center;
-  max-width: none;
-  margin-top: 12px;
-  padding: 6px;
-  border: 1px solid #2c3442;
-  border-radius: 14px;
-  background: rgba(10, 13, 18, 0.5);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35);
-}
-
-.challenge-modal .challenge-row input[type='text'] {
-  height: 34px;
-  padding: 0 14px;
-  box-sizing: border-box;
-  border: 1px solid #2c3442;
-  border-radius: 17px;
-  background: rgba(10, 13, 18, 0.7);
-}
-
-.challenge-modal .challenge-row input[type='text']:focus {
-  outline: none;
-  border-color: #6bb0ff;
-  box-shadow: 0 0 0 3px rgba(107, 176, 255, 0.16);
-}
-
-/* Double battle: a pill that lights blue while ticked. */
-.challenge-modal .challenge-doubles {
-  height: 34px;
-  padding: 0 12px;
-  box-sizing: border-box;
-  border: 1px solid #2f3746;
-  border-radius: 17px;
-  background: #1a1f28;
-  cursor: pointer;
-}
-
-.challenge-modal .challenge-doubles:has(input:checked) {
-  border-color: rgba(107, 176, 255, 0.6);
-  background: rgba(107, 176, 255, 0.14);
-  color: #d6e9ff;
-}
-
-.challenge-modal .challenge-row button,
-.challenge-modal > .editor-actions button {
-  height: 34px;
-  padding: 0 20px;
-  border: 1px solid #2f3746;
-  border-radius: 17px;
-  background: #1a1f28;
-}
-
-.challenge-modal > .editor-actions button:hover:not(:disabled) {
-  border-color: #4a5468;
-  background: #222935;
-}
-
-/* Fight: red, the window's one strong action. */
-.challenge-modal .challenge-row button:not(:disabled) {
-  border-color: #ff8a80;
-  background: linear-gradient(180deg, #d9473c, #a8302a);
-  color: #fff;
-  font-weight: bold;
-}
-
-.challenge-modal .challenge-row button:not(:disabled):hover {
-  background: linear-gradient(180deg, #e65449, #b8372f);
-  box-shadow: 0 0 10px rgba(224, 69, 59, 0.4);
-}
-
-.challenge-modal > .editor-actions {
-  margin-top: 12px;
-}
-
 /* ---- Battle result, in the floating-card look: the card tinted by how it went (green
    won, red lost), the heading centred, the catch as a big gold pill, each reward line
    a rounded row on a sunken tile, the raid catch on a gold tile, and a pill to leave ---- */
@@ -18656,8 +18660,12 @@ img.sprite-smooth {
   color: #ffd76b;
 }
 
+/* The pixel font's digits are wide, so the bet is set a little smaller in a slightly
+   wider box. */
 .game-corner-page .slots-bet-input {
+  width: 72px;
   height: 32px;
+  font-size: 14px;
   border: 1px solid #2c3442;
   border-radius: 10px;
   background: rgba(10, 13, 18, 0.7);
@@ -21835,4 +21843,424 @@ img.sprite-smooth {
 
 .editor-everstone-tip b {
   color: #f0c050;
+}
+
+/* The box's merge bar: the "Use evo items" tick beside Select all duplicates. */
+.box-merge-items-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* Battle result: "Battle again" stacked above "Back to menu". */
+.battle-result-modal > .battle-result-actions {
+  flex-direction: column;
+}
+
+/* The Battle page's DexNav: the hunted Pokemon's card, its chain (with how often it turns
+   up and its shiny boost), a Hunt button per area it lives in, and Change / Stop. */
+.dexnav-panel {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #2c3442;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #1c232e, #151a22);
+}
+
+.dexnav-target {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 0 92px;
+  padding: 4px 2px;
+}
+
+.dexnav-target-sprite {
+  max-width: 64px;
+  max-height: 56px;
+}
+
+.dexnav-target-name {
+  width: 100%;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.dexnav-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.dexnav-chain-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: #c9d3e0;
+}
+
+.dexnav-chain-label strong {
+  color: #ffd76b;
+  font-size: 15px;
+}
+
+.dexnav-chain-max {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 215, 107, 0.18);
+  color: #ffd76b;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.dexnav-stat strong {
+  color: #fff;
+}
+
+.dexnav-chain-bar {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.dexnav-chain-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #5fd3e8, #ffd76b);
+  transition: width 0.3s ease;
+}
+
+.dexnav-areas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dexnav-area {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px 0 5px;
+  border: 1px solid #2c3442;
+  border-radius: 999px;
+  background: #232a36;
+  color: #c9d3e0;
+  font-size: 11px;
+  font-weight: 600;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.dexnav-area:hover:not(:disabled) {
+  border-color: #ffd76b;
+  color: #fff;
+}
+
+.dexnav-area:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.dexnav-area-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.dexnav-area-go {
+  color: #ffd76b;
+}
+
+.dexnav-warning {
+  font-size: 11px;
+  color: #ff9a8a;
+}
+
+.dexnav-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
+.dexnav-pick {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 1;
+  height: 44px;
+  font-weight: 700;
+}
+
+.dexnav-pick img {
+  width: 28px;
+  height: 28px;
+}
+
+.dexnav-error {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: #ff9a8a;
+}
+
+/* The DexNav's picker: the Pokedex's grid of registered Pokemon it can hunt. */
+.dexnav-picker {
+  width: 900px;
+  display: flex;
+  flex-direction: column;
+}
+
+.dexnav-picker-note {
+  flex: 1;
+  font-size: 12px;
+  color: #8a94a6;
+}
+
+.dexnav-cell {
+  position: relative;
+  cursor: pointer;
+}
+
+.dexnav-cell-current {
+  outline: 2px solid #ffd76b;
+  outline-offset: -2px;
+}
+
+.dexnav-cell-level {
+  position: absolute;
+  top: 3px;
+  left: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  color: #8a94a6;
+}
+
+.dexnav-cell-areas {
+  display: flex;
+  gap: 2px;
+  height: 14px;
+}
+
+.dexnav-cell-areas img {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
+
+/* ---- Catch: the wild battles' page (Classic is now the trainer and boss battles), in
+   its own green, centred like the other landing pages ---- */
+.menu-rail-catch,
+.menu-page-title-catch {
+  --page-color: 127, 208, 140;
+}
+
+.mode-pulse-catch {
+  --mode-color: 127, 208, 140;
+}
+
+.menu-page-catch > :first-child {
+  margin-top: auto;
+}
+
+.menu-page-catch > :last-child {
+  margin-bottom: auto;
+}
+
+/* ---- Challenge a player, a small section under Classic's trainer battles: the name,
+   Double battle and Fight on one sunken bar, like the old challenge window ---- */
+.classic-challenge {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.classic-challenge .trainer-add-row.challenge-row {
+  align-items: center;
+  max-width: none;
+  margin: 0;
+  padding: 6px;
+  border: 1px solid #2c3442;
+  border-radius: 14px;
+  background: rgba(10, 13, 18, 0.5);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.classic-challenge .challenge-row input[type='text'] {
+  flex: 1;
+  height: 34px;
+  padding: 0 14px;
+  box-sizing: border-box;
+  border: 1px solid #2c3442;
+  border-radius: 17px;
+  background: rgba(10, 13, 18, 0.7);
+}
+
+.classic-challenge .challenge-row input[type='text']:focus {
+  outline: none;
+  border-color: #6bb0ff;
+  box-shadow: 0 0 0 3px rgba(107, 176, 255, 0.16);
+}
+
+/* Double battle: a pill that lights blue while ticked. */
+.classic-challenge .challenge-doubles {
+  height: 34px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  border: 1px solid #2f3746;
+  border-radius: 17px;
+  background: #1a1f28;
+  cursor: pointer;
+}
+
+.classic-challenge .challenge-doubles:has(input:checked) {
+  border-color: rgba(107, 176, 255, 0.6);
+  background: rgba(107, 176, 255, 0.14);
+  color: #d6e9ff;
+}
+
+.classic-challenge .challenge-row button {
+  height: 34px;
+  padding: 0 20px;
+  border: 1px solid #2f3746;
+  border-radius: 17px;
+  background: #1a1f28;
+}
+
+/* Fight: red, the section's one strong action. */
+.classic-challenge .challenge-row button:not(:disabled) {
+  border-color: #ff8a80;
+  background: linear-gradient(180deg, #d9473c, #a8302a);
+  color: #fff;
+  font-weight: bold;
+}
+
+.classic-challenge .challenge-row button:not(:disabled):hover {
+  background: linear-gradient(180deg, #e65449, #b8372f);
+  box-shadow: 0 0 10px rgba(224, 69, 59, 0.4);
+}
+
+.classic-challenge .editor-error {
+  margin: 0;
+}
+
+/* Small pixel-art sidebar icons (Classic, Roguelite) kept crisp rather than
+   smoothed as they're scaled up. */
+.menu-rail-icon.menu-rail-icon-pixel {
+  image-rendering: pixelated;
+}
+
+/* Move picker: the move currently in the slot being swapped */
+.selector-row.selector-row-swapping {
+  background: rgba(255, 204, 51, 0.12);
+  box-shadow: inset 3px 0 0 #ffcc33;
+}
+
+.swapping-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: bold;
+  color: #10141a;
+  background: #ffcc33;
+}
+
+/* The quick search button's Wide Lens beside its label. */
+.tm-quick-check-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The Home Catch card's DexNav hunt: the target's sprite, its chain and a bar to the max. */
+.home-dexnav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding-right: 40px;
+  box-sizing: border-box;
+}
+
+.home-dexnav-sprite {
+  width: 56px;
+  height: 56px;
+  flex: none;
+  object-fit: contain;
+}
+
+.home-dexnav-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.home-dexnav-name {
+  font-size: 14px;
+  font-weight: bold;
+  color: #e6e6e6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-dexnav-bar {
+  width: 100%;
+}
+
+/* The Continue banners: run and draft side by side when both are in progress. */
+.home-continues {
+  display: flex;
+  gap: 14px;
+}
+
+.home-continues > .home-continue {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The draft's banner wears the Draft card's amber. */
+.home-continue.home-continue-draft {
+  --card-color: 255, 183, 77;
+  background:
+    linear-gradient(90deg, rgba(255, 183, 77, 0.16), transparent 70%),
+    linear-gradient(180deg, rgba(34, 41, 54, 0.92), rgba(20, 24, 31, 0.94));
+}
+
+.home-continue-draft .home-continue-icon {
+  background: rgba(255, 183, 77, 0.16);
+}
+
+.home-continue-draft .home-continue-title {
+  color: #ffe2b3;
+}
+
+.home-continue-draft .home-continue-sub {
+  color: #dcc092;
+}
+
+.home-continue-draft .home-continue-go {
+  color: #ffdca6;
+  background: rgba(255, 183, 77, 0.18);
+  border-color: rgba(255, 183, 77, 0.45);
 }

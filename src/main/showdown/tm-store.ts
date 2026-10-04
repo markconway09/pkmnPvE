@@ -8,7 +8,7 @@ import {
   TM_LAB_TIER_WEIGHTS,
   TM_PITY_SEARCHES,
   TM_QUICK_CHECK_CHANCE,
-  TM_QUICK_CHECK_ITEM_CHANCE,
+  TM_QUICK_CHECK_ITEM_MULTIPLIER,
   TM_SCANNER_COINS,
   TM_SEARCH_CHARGES_PER_DAY,
   TM_SEARCH_DIFFICULTY,
@@ -456,7 +456,8 @@ export function takeTmQuickCheck(result: SkillCheckResult, timedOut = false): Tm
   const chance = TM_QUICK_CHECK_CHANCE[result] * (hasTitle('Unstoppable') ? UNSTOPPABLE_QUICK_CHECK_MULTIPLIER : 1)
   if (Math.random() >= chance) {
     // A Good or a Great that found no TM may still turn up a random item.
-    if (result === 'miss' || Math.random() >= TM_QUICK_CHECK_ITEM_CHANCE) return { find: null }
+    const itemChance = TM_QUICK_CHECK_CHANCE[result] * TM_QUICK_CHECK_ITEM_MULTIPLIER
+    if (Math.random() >= itemChance) return { find: null }
     const pool = getWildDropPool()
     const item = pool[Math.floor(Math.random() * pool.length)]
     if (!item) return { find: null }

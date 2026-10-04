@@ -41,7 +41,8 @@ const SYNTHETIC_SPRITES: Record<number, string> = {
   '-26': './sprites/misc/raidcrystal.png', // Raid Crystal (Serebii's Crystal Cluster)
   '-27': './sprites/misc/decorationbox.png', // Decoration Box (Serebii's Apricorn Box)
   '-28': './sprites/misc/fashioncase.png', // Fashion Case (Serebii)
-  '-29': './sprites/misc/scanner.png' // Scanner
+  '-29': './sprites/misc/scanner.png', // Scanner
+  '-30': './sprites/misc/dexnav.png' // DexNav (Bulbagarden Archives)
 }
 
 function ItemSprite({ spritenum, className }: Props): React.JSX.Element {
