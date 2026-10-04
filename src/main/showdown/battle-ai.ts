@@ -112,6 +112,10 @@ const TWO_TO_FIVE_AVERAGE_HITS = 3.1
 const ESCALATING_MULTIHIT = new Set(['tripleaxel', 'triplekick'])
 // Rough worth of making the foe flinch with Fake Out on the turn it can be used.
 const FAKE_OUT_FLINCH_BONUS = 40
+// The moves that only work on a Pokemon's first turn out (they fail after that, see
+// AiMovePower.fails): worth taking on that turn, since it's now or never - Fake Out for
+// its flinch, First Impression for a strong priority hit it can't use later.
+const FIRST_TURN_BONUS_MOVES = new Set(['fakeout', 'firstimpression'])
 
 // Weather, by the ids the battle log uses (lowercased).
 const RAIN = new Set(['raindance', 'primordialsea'])
@@ -1016,7 +1020,7 @@ export class AIPlayer extends BattlePlayer {
         stab *
         this.fieldPowerMultiplier(moveId, moveType, combat, weather, grounded, opponent)
     }
-    if (moveId === 'fakeout') score += FAKE_OUT_FLINCH_BONUS
+    if (FIRST_TURN_BONUS_MOVES.has(moveId)) score += FAKE_OUT_FLINCH_BONUS
 
     if (this.difficulty === 'hard' && opponent) {
       // Coarse damage estimate (no real stat calc) - just enough to notice

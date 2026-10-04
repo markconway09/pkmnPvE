@@ -21,8 +21,9 @@ interface Props {
 export const TITLE_CHANGED_EVENT = 'pkmnpve:title-changed'
 
 /**
- * What the player's title changes in the Game Corner - the bet cap (High Roller) and
- * Plinko's edge slots (Edge Lord). The usual rules until it's loaded.
+ * What the player's titles change in the Game Corner - the bet cap (High Roller),
+ * Plinko's edge slots (Edge Lord), blackjack's payouts (9+10). The usual rules until
+ * it's loaded.
  */
 export function useGameCornerPerks(): GameCornerPerks {
   const [perks, setPerks] = useState<GameCornerPerks>({

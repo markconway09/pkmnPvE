@@ -537,6 +537,12 @@ export interface BoxPokemonView extends PokemonSummary {
   // How many copies have been merged into it (1 = none), and the stars that makes.
   copies?: number
   mergeStars?: number
+  // Locked with an Everstone: it never evolves, but takes merges while not fully evolved,
+  // each star worth more (mergeGrowth, held item aside - see MERGE_GROWTH_MAX and
+  // mergeGrowthHolding). The lock can only come off
+  // before anything's been merged in. Undefined: fully evolved, so there's nothing to lock.
+  everstone?: { locked: boolean; canUnlock: boolean }
+  mergeGrowth?: number
   // The same species elsewhere in the box, that could be merged into this one.
   mergeCandidates?: MergeCandidateView[]
   // Its colour on the Random Pokemon roulette (see speciesRarityTier) - the box and
@@ -1236,15 +1242,25 @@ export const MERGE_MAX_STARS = 5
 export const MERGE_MAX_COPIES = 2 ** MERGE_MAX_STARS
 export const MERGE_STAT_BONUS_PER_STAR = 0.1
 export const MERGE_STAT_BONUS_BY_TIER: Partial<Record<RarityTier, number>> = { epic: 0.075, legendary: 0.05 }
+// A Pokemon that isn't fully evolved (only an Everstone-locked one takes merges - see
+// BoxPokemonView.everstone) grows more with each star: its bonus times how far its stats are from its strongest final
+// evolution's (Pichu's 205 against Raichu's 485: x2.37), up to this - so a 5-star one gets
+// close to its evolution without passing it. Not while it holds an Eviolite.
+export const MERGE_GROWTH_MAX = 3
 
-/** What one star adds to all its stats, for a Pokemon of this rarity. */
-export function mergeBonusPerStar(tier: RarityTier | undefined): number {
-  return (tier && MERGE_STAT_BONUS_BY_TIER[tier]) ?? MERGE_STAT_BONUS_PER_STAR
+/** Its growth (BoxPokemonView.mergeGrowth) as it stands holding this item: none with an Eviolite. */
+export function mergeGrowthHolding(growth: number | undefined, item: string | undefined): number {
+  return item && item.toLowerCase().replace(/[^a-z0-9]/g, '') === 'eviolite' ? 1 : (growth ?? 1)
+}
+
+/** What one star adds to all its stats, for a Pokemon of this rarity (and growth, see MERGE_GROWTH_MAX). */
+export function mergeBonusPerStar(tier: RarityTier | undefined, growth = 1): number {
+  return ((tier && MERGE_STAT_BONUS_BY_TIER[tier]) ?? MERGE_STAT_BONUS_PER_STAR) * growth
 }
 
 /** "+37.5%" - its whole bonus at this many stars. */
-export function mergeBonusText(stars: number, tier: RarityTier | undefined): string {
-  return `+${Math.round(stars * mergeBonusPerStar(tier) * 1000) / 10}%`
+export function mergeBonusText(stars: number, tier: RarityTier | undefined, growth = 1): string {
+  return `+${Math.round(stars * mergeBonusPerStar(tier, growth) * 1000) / 10}%`
 }
 
 export function mergeStarsFor(copies: number | undefined): number {
@@ -1285,8 +1301,8 @@ export function planMerge(keeperCopies: number, others: { id: string; copies: nu
   return plan
 }
 
-export function mergeStatMultiplier(stars: number, tier: RarityTier | undefined): number {
-  return 1 + mergeBonusPerStar(tier) * stars
+export function mergeStatMultiplier(stars: number, tier: RarityTier | undefined, growth = 1): number {
+  return 1 + mergeBonusPerStar(tier, growth) * stars
 }
 
 // A duplicate that could be merged into a Pokemon (see BoxPokemonView.mergeCandidates).

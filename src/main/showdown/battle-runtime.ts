@@ -28,6 +28,7 @@ import {
   pokeballPrice,
   speciesStatsAndTypes,
   speciesRarityTier,
+  mergeGrowthFor,
   toID,
   type PokemonSet
 } from './sim-access'
@@ -345,6 +346,8 @@ export interface OpponentConfig {
   noPrizeMoney?: boolean
   // Percent chance of one extra drop picked at random from the whole item pool.
   randomDropChance?: number
+  // A wild Pokemon woken by a noisy TM search: no running from it.
+  noRun?: boolean
   // A friendly match (another player's saved team): winning gives no exp, money,
   // friendship, item drops or boss progress.
   noRewards?: boolean
@@ -654,6 +657,8 @@ export class WildBattle {
   private textWeather: string | null = null
 
   private readonly mergeStars: { p1: number[]; p2: number[] }
+  // Each boosted Pokemon's multiplier (by its place in the team), as set at the start.
+  private readonly mergeMultipliers: { p1: number[]; p2: number[] } = { p1: [], p2: [] }
 
   // Merge stars: every Attack, Defense, Sp. Atk, Sp. Def and Speed the sim works out goes
   // through these (the same hooks items and abilities use, so it lasts through Mega
@@ -676,7 +681,8 @@ export class WildBattle {
     for (const mon of side.pokemon) {
       const count = stars[side.team.indexOf(mon.set)] ?? 0
       if (!count) continue
-      const multiplier = mergeStatMultiplier(count, speciesRarityTier(mon.species.name))
+      const multiplier = mergeStatMultiplier(count, speciesRarityTier(mon.species.name), mergeGrowthFor(mon.species.name, mon.set.item))
+      this.mergeMultipliers[sideIndex === 0 ? 'p1' : 'p2'][side.team.indexOf(mon.set)] = multiplier
       const ratio = mon.maxhp > 0 ? mon.hp / mon.maxhp : 1
       mon.m.mergeBoost = multiplier
       mon.baseMaxhp = Math.floor(mon.baseMaxhp * multiplier)
@@ -724,9 +730,8 @@ export class WildBattle {
       for (const key of Object.keys(stats) as (keyof typeof stats)[]) stats[key] = Math.floor(stats[key] * chaos[key])
       view.stats = stats
     }
-    const count = view.rosterIndex !== undefined ? (this.mergeStars[side][view.rosterIndex] ?? 0) : 0
-    if (!count) return view
-    const multiplier = mergeStatMultiplier(count, speciesRarityTier(view.species))
+    const multiplier = view.rosterIndex !== undefined ? this.mergeMultipliers[side][view.rosterIndex] : undefined
+    if (!multiplier) return view
     const stats = { ...view.stats }
     for (const key of Object.keys(stats) as (keyof typeof stats)[]) stats[key] = Math.floor(stats[key] * multiplier)
     view.stats = stats
@@ -1299,8 +1304,10 @@ export class WildBattle {
   // What running costs here, or null if it isn't allowed: a wild encounter is free, an
   // ordinary trainer battle costs TRAINER_RUN_COST, and there's no running from a boss
   // or from a Roguelite run's trainers. There's no reward, exp or catch for a battle
-  // you walked away from - it's simply abandoned.
+  // you walked away from - it's simply abandoned. A wild Pokemon an ambush woke can't
+  // be run from either.
   private runCost(): number | null {
+    if (this.opponent?.noRun) return null
     if (!this.opponent?.trainerId) return 0
     if (this.opponent.isBoss || this.opponent.run || this.opponent.draft) return null
     // A friendly match (another player's team) has nothing riding on it, and the

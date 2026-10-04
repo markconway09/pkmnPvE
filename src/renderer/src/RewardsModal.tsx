@@ -17,6 +17,9 @@ interface Props {
   // A reward was claimed - the money, box and bag may have changed.
   onClaimed: (money: number) => void
   onClose: () => void
+  // An achievement to scroll to and flash (a clicked pop-up), cleared once shown.
+  focus?: string | null
+  onFocused?: () => void
 }
 
 /**
@@ -31,7 +34,9 @@ function RewardsModal({
   onMissionsChange,
   onAchievementsChange,
   onClaimed,
-  onClose
+  onClose,
+  focus,
+  onFocused
 }: Props): React.JSX.Element {
   // Rewards waiting: finished missions not yet claimed (and the bonus), unlocked achievements.
   const missionsWaiting = missions
@@ -73,7 +78,13 @@ function RewardsModal({
           missions && <MissionsPanel state={missions} onChange={onMissionsChange} onClaimed={onClaimed} />
         ) : (
           achievements && (
-            <AchievementsPanel state={achievements} onChange={onAchievementsChange} onClaimed={onClaimed} />
+            <AchievementsPanel
+              state={achievements}
+              onChange={onAchievementsChange}
+              onClaimed={onClaimed}
+              focus={focus}
+              onFocused={onFocused}
+            />
           )
         )}
       </div>

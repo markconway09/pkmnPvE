@@ -2,6 +2,8 @@ import type { MissionStat } from '../../shared/missions'
 import { recordMission } from './mission-store'
 import { readFileSync, writeFileSync } from 'node:fs'
 import type { AchievementStat } from '../../shared/achievements'
+import { ACHIEVEMENTS } from '../../shared/achievements'
+import { startingDisabledTitles } from '../../shared/titles'
 import { playerPathFor } from './save-paths'
 import { onPlayerChange } from './player-session'
 
@@ -16,6 +18,8 @@ export interface StoredAchievements {
   unlocked: string[]
   claimed: string[]
   title: string | null
+  // The claimed titles turned off - every other claimed title's perk works.
+  disabledTitles: string[]
   // False until the first check: what an older save already had then unlocks quietly.
   seeded: boolean
 }
@@ -35,13 +39,21 @@ export function getAchievementProgress(): StoredAchievements {
         unlocked: parsed.unlocked ?? [],
         claimed: parsed.claimed ?? [],
         title: parsed.title ?? null,
+        disabledTitles:
+          parsed.disabledTitles ?? startingDisabledTitles(claimedTitlesOf(parsed.claimed ?? []), parsed.title ?? null),
         seeded: parsed.seeded ?? false
       }
     } catch {
-      state = { counters: {}, unlocked: [], claimed: [], title: null, seeded: false }
+      state = { counters: {}, unlocked: [], claimed: [], title: null, disabledTitles: [], seeded: false }
     }
   }
   return state
+}
+
+/** The titles from these claimed achievements. */
+export function claimedTitlesOf(claimed: string[]): string[] {
+  const ids = new Set(claimed)
+  return ACHIEVEMENTS.filter((a) => ids.has(a.id) && a.reward.title).map((a) => a.reward.title!)
 }
 
 export function persistAchievementProgress(): void {

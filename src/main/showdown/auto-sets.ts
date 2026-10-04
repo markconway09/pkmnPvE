@@ -166,7 +166,8 @@ function bestAttacks(pool: string[], count: number, types: string[], physical: b
  * Builds the chosen set for a Pokemon at a level. `admin` lifts the game's limits
  * (any move it can ever learn, any item) - otherwise moves must be learnable at
  * its level and not need a TM the player doesn't own (knownMoves: the ones it already
- * has, which it keeps either way), and an item it doesn't have in the bag is left off.
+ * has, which it keeps either way), and an item it neither holds (heldItem) nor has in
+ * the bag is left off.
  * What had to change to fit comes back in `notes`.
  */
 export function buildAutoSet(
@@ -174,7 +175,8 @@ export function buildAutoSet(
   level: number,
   optionId: string,
   admin: boolean,
-  knownMoves: string[] = []
+  knownMoves: string[] = [],
+  heldItem = ''
 ): AutoSetResult {
   const species = Dex.species.get(speciesName)
   const types = [...species.types]
@@ -267,10 +269,14 @@ export function buildAutoSet(
   if (!ability && abilityChoices.length > 0) notes.push(`It can't have ${abilityChoices[0]} - kept its current ability`)
 
   // Admin editing can hand out any item; otherwise the set's item only goes on if
-  // it's in the bag (any one of its options will do).
+  // it's already held or in the bag (any one of its options will do; the held one first).
   let item: string | null = null
   if (itemChoices.length > 0) {
-    const owned = admin ? itemChoices[0] : itemChoices.find((name) => hasItem(toID(name)))
+    const held = toID(heldItem)
+    const owned = admin
+      ? itemChoices[0]
+      : (itemChoices.find((name) => held !== '' && toID(name) === held) ??
+        itemChoices.find((name) => hasItem(toID(name))))
     if (owned) item = Dex.items.get(owned).name
     else notes.push(`The set uses ${itemChoices.join(' or ')} - not in your bag, so its current item stays`)
   }

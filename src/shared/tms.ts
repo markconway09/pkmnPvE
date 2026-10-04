@@ -1,4 +1,4 @@
-import type { RarityTier, WildLocationId } from './battle-types'
+import type { ItemDropResult, RarityTier, WildLocationId } from './battle-types'
 
 /**
  * TMs: one for every move any Pokemon learns by TM (in any generation), kept forever
@@ -83,6 +83,10 @@ export const TM_SCANNER_COINS = 20000
 // from the area. Without it there's no quick check at all.
 export const TM_QUICK_CHECK_CHANCE: Record<SkillCheckResult, number> = { great: 0.15, good: 0.05, miss: 0 }
 
+// A Good or a Great that found no TM still has this chance to turn up one random item
+// instead - picked like a wild Pokemon's random drop.
+export const TM_QUICK_CHECK_ITEM_CHANCE = 0.3
+
 export type SkillCheckResult = 'great' | 'good' | 'miss'
 
 export interface TmState {
@@ -129,6 +133,8 @@ export interface TmSearchProgress {
 
 export interface TmQuickCheckResult {
   find: TmFind | null
+  // The random item found when no TM turned up, with its colour as in the Bag.
+  item?: (ItemDropResult & { tier: RarityTier }) | null
 }
 
 export interface TmShopOffer {

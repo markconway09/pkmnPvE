@@ -25,7 +25,9 @@ interface Point {
 // - beam: a solid line from x/y, `length` long at `angle` degrees
 // - wave: a ring spreading out from x/y to `size` across
 // - bolt: a jagged lightning bolt from the top of the field down to x/y
-type FxVariant = 'fly' | 'pop' | 'beam' | 'wave' | 'bolt'
+// - tide: a curtain of water `size` thick and `length` long, tilted to `angle`,
+//   sweeping its middle from x/y to toX/toY
+type FxVariant = 'fly' | 'pop' | 'beam' | 'wave' | 'bolt' | 'tide'
 
 interface Fx extends Point {
   id: number
@@ -51,7 +53,7 @@ interface Fx extends Point {
   rotation?: number
   // A stat arrow instead of the type icon.
   arrow?: 'up' | 'down'
-  // beam: its length and angle; wave: how wide it ends up; bolt: its zig-zag points.
+  // beam: its length and angle; wave: how wide it ends up; tide: how wide it is; bolt: its zig-zag points.
   length?: number
   angle?: number
   size?: number
@@ -169,6 +171,13 @@ const WAVE_REACH = 1.35
 const WAVE_MIN_RADIUS_PX = 200
 const WAVE_ICONS = 8
 const WAVE_SECOND_RING_MS = 130
+// An explosion's blast on the user grows to this size as its wave goes out.
+const EXPLOSION_BLAST_PX = 220
+// A tide: a curtain of water this thick (most of it the fading tail), sweeping in from
+// one corner of the field until all of it has left by the opposite one.
+const TIDE_WIDTH_PX = 320
+// Its color - blue whatever the move's type (Muddy Water too).
+const TIDE_COLOR = '#2f6fd6'
 // A stat move's arrows: this many side by side, rising or falling over the Pokemon.
 const ARROW_COUNT = 3
 const ARROW_SPREAD_PX = 30
@@ -365,7 +374,9 @@ function AnimationLayer({ fieldRef, trigger, onDone }: Props): React.JSX.Element
       }
       // The whole field's flash (and shake, for a big hit) at the first landed hit.
       const fieldFlash = (): void => {
-        if (Number.isFinite(firstLandingMs)) fieldImpactAt(recipe.type, firstLandingMs, recipe.bigHit && recipe.kind !== 'quake')
+        // A quake or an explosion already rumbles the field the whole way through.
+        const shake = recipe.bigHit && recipe.kind !== 'quake' && !recipe.explosion
+        if (Number.isFinite(firstLandingMs)) fieldImpactAt(recipe.type, firstLandingMs, shake)
       }
 
       switch (recipe.kind) {
@@ -490,6 +501,15 @@ function AnimationLayer({ fieldRef, trigger, onDone }: Props): React.JSX.Element
             return Math.hypot(c.x - from.x, c.y - from.y)
           })
           const radius = Math.max(WAVE_MIN_RADIUS_PX, Math.max(0, ...reaches) * WAVE_REACH)
+          if (recipe.explosion) {
+            // Explosion & co: a fireball blooms on the user as the wave goes
+            // out, and the whole field rumbles for as long as it spreads.
+            spawn({ variant: 'wave', type: color, x: from.x, y: from.y, size: EXPLOSION_BLAST_PX, delayMs: 0, durationMs: Math.round(recipe.durationMs * 0.7), className: 'anim-blast' })
+            field.style.setProperty('--quake-ms', `${recipe.durationMs}ms`)
+            field.classList.add(FIELD_QUAKE_CLASS)
+            fieldFxRef.current = field
+            after(recipe.durationMs, () => field.classList.remove(FIELD_QUAKE_CLASS))
+          }
           for (let i = 0; i < recipe.reps; i++) {
             const delay = i * stagger
             spawn({ variant: 'wave', type: color, x: from.x, y: from.y, size: radius * 2, delayMs: delay, durationMs: recipe.durationMs })
@@ -513,6 +533,55 @@ function AnimationLayer({ fieldRef, trigger, onDone }: Props): React.JSX.Element
               if (target.missed) return
               landed(target.el, delay + Math.round((reaches[n] / radius) * recipe.durationMs))
             })
+          }
+          fieldFlash()
+          break
+        }
+
+        case 'tide': {
+          // A see-through curtain of water sweeps diagonally across the field
+          // from behind the user, hitting each target as its front passes.
+          const aimX = targets.reduce((sum, target) => sum + centerOf(target.el, field).x, 0) / (targets.length || 1)
+          const dir = aimX < from.x ? -1 : 1
+          // It sweeps corner to corner: bottom left to top right, or the reverse
+          // when the foes are on the left. Distances below are measured along that line.
+          const fieldW = field.clientWidth
+          const fieldH = field.clientHeight
+          const diag = Math.hypot(fieldW, fieldH) || 1
+          const dx = (dir * fieldW) / diag
+          const dy = (-dir * fieldH) / diag
+          const along = (x: number, y: number): number => x * dx + y * dy
+          const corners = [along(0, 0), along(fieldW, 0), along(0, fieldH), along(fieldW, fieldH)]
+          const startFront = Math.min(...corners)
+          const endFront = Math.max(...corners) + TIDE_WIDTH_PX
+          const travel = endFront - startFront
+          // The curtain's middle point when its front is `front` along the line.
+          const middleAt = (front: number): Point => ({ x: dx * (front - TIDE_WIDTH_PX / 2), y: dy * (front - TIDE_WIDTH_PX / 2) })
+          const start = middleAt(startFront)
+          const end = middleAt(endFront)
+          for (let i = 0; i < recipe.reps; i++) {
+            const delay = i * stagger
+            spawn({
+              variant: 'tide',
+              type: color,
+              x: start.x,
+              y: start.y,
+              toX: end.x,
+              toY: end.y,
+              size: TIDE_WIDTH_PX,
+              // Long enough to span the whole field across its path.
+              length: diag * 2,
+              angle: (Math.atan2(dy, dx) * 180) / Math.PI,
+              delayMs: delay,
+              durationMs: recipe.durationMs
+            })
+            for (const target of targets) {
+              if (target.missed) continue
+              const c = centerOf(target.el, field)
+              const hitMs = delay + Math.round(((along(c.x, c.y) - startFront) / travel) * recipe.durationMs)
+              landed(target.el, hitMs)
+              pop(color, c, hitMs)
+            }
           }
           fieldFlash()
           break
@@ -684,6 +753,30 @@ function renderFx(p: Fx): React.JSX.Element {
           style={{ ...timing, left: p.x, top: p.y, color, '--wave-size': `${p.size ?? 0}px` } as React.CSSProperties}
         />
       )
+    case 'tide': {
+      // Placed by its top-left corner, so shift by half its size to center it on the path.
+      const width = p.size ?? 0
+      const height = p.length ?? 0
+      return (
+        <span
+          key={p.id}
+          className={`anim-tide${extra}`}
+          style={
+            {
+              ...timing,
+              width,
+              height,
+              color: TIDE_COLOR,
+              '--from-x': `${p.x - width / 2}px`,
+              '--from-y': `${p.y - height / 2}px`,
+              '--to-x': `${(p.toX ?? 0) - width / 2}px`,
+              '--to-y': `${(p.toY ?? 0) - height / 2}px`,
+              '--tide-angle': `${p.angle ?? 0}deg`
+            } as React.CSSProperties
+          }
+        />
+      )
+    }
     case 'bolt':
       return (
         <span

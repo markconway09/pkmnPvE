@@ -2,12 +2,15 @@ import { createRequire } from 'node:module'
 import type { PokemonSet as ShowdownPokemonSet } from 'pokemon-showdown/dist/sim/teams.js'
 import type { Battle } from 'pokemon-showdown/dist/sim/battle.js'
 import type { Pokemon } from 'pokemon-showdown/dist/sim/pokemon.js'
+import { certainRarity, mixRarityOdds, type RarityOdds } from '../../shared/rarity'
 import {
   BLACK_AUGURITE_ITEM_ID,
   DEFAULT_POKEBALL_ID,
   EXP_CANDY_EXP,
   LINK_CABLE_ITEM_ID,
   MAX_HAPPINESS,
+  MERGE_GROWTH_MAX,
+  mergeGrowthHolding,
   OPENABLE_ITEM_IDS,
   PEAT_BLOCK_ITEM_ID,
   POKEBALL_PRICE,
@@ -1485,7 +1488,7 @@ let randbatsSets: Record<string, RandbatsEntry> | null = null
 function getRandbatsSets(): Record<string, RandbatsEntry> {
   if (!randbatsSets) {
     try {
-      randbatsSets = require('pokemon-showdown/data/random-battles/gen9/sets.json') as Record<string, RandbatsEntry>
+      randbatsSets = require('pokemon-showdown/dist/data/random-battles/gen9/sets.json') as Record<string, RandbatsEntry>
     } catch (e) {
       console.error('[sim-access] could not load random-battle set data, moves stay alphabetical:', e)
       randbatsSets = {}
@@ -1917,6 +1920,44 @@ export function pickRandomLegendarySpecies(): string {
   return pickFrom(unevolvedSpecies().filter(isLegendaryClass))
 }
 
+// The share of each rarity colour among these species, any one as likely as the next.
+function speciesRarityShares(species: ReturnType<typeof Dex.species.get>[]): RarityOdds {
+  const odds: RarityOdds = { common: 0, uncommon: 0, rare: 0, epic: 0, legendary: 0 }
+  for (const s of species) odds[speciesRarityTier(s.name)] += 1 / species.length
+  return odds
+}
+
+/** A Random Pokemon's odds of each rarity colour (see pickRandomUnevolvedAnySpecies). */
+export function randomPokemonRarityOdds(): RarityOdds {
+  const all = unevolvedSpecies()
+  return mixRarityOdds([
+    [RANDOM_POKEMON_LEGENDARY_CHANCE, speciesRarityShares(all.filter(isLegendaryClass))],
+    [1 - RANDOM_POKEMON_LEGENDARY_CHANCE, speciesRarityShares(all.filter((s) => !isLegendaryClass(s)))]
+  ])
+}
+
+/**
+ * A Random Legendary's odds of each rarity colour (see pickRandomLegendarySpecies) - with
+ * restrictedChance of it being drawn from the gold box legendaries alone instead.
+ */
+export function randomLegendaryRarityOdds(restrictedChance: number): RarityOdds {
+  return mixRarityOdds([
+    [restrictedChance, certainRarity('legendary')],
+    [1 - restrictedChance, speciesRarityShares(unevolvedSpecies().filter(isLegendaryClass))]
+  ])
+}
+
+/** A Max Raid boss's odds of each rarity colour, at these chances (see pickRaidSpecies). */
+export function raidRarityOdds(chances: { gigantamax: number; restricted: number }): RarityOdds {
+  const gmax = raidSpeciesPool().filter((s) => !!s.canGigantamax)
+  const gmaxChance = gmax.length > 0 ? chances.gigantamax : 0
+  return mixRarityOdds([
+    [gmaxChance, speciesRarityShares(gmax)],
+    [(1 - gmaxChance) * chances.restricted, certainRarity('legendary')],
+    [(1 - gmaxChance) * (1 - chances.restricted), certainRarity('epic')]
+  ])
+}
+
 export function pickRandomUnevolvedSpecies(): string {
   const candidates = Dex.species
     .all()
@@ -2088,6 +2129,23 @@ export function isFullyEvolved(speciesName: string): boolean {
     const evo = Dex.species.get(e)
     return !evo.exists || isBattleOnlyForme(evo)
   })
+}
+
+/**
+ * How much more a merge star is worth to a Pokemon that isn't fully evolved (see
+ * MERGE_GROWTH_MAX): its strongest final evolution's base stat total against its own.
+ * 1 when fully evolved, or while it holds an Eviolite (that's its boost instead).
+ */
+export function mergeGrowthFor(speciesName: string, item?: string): number {
+  if (mergeGrowthHolding(2, item) === 1) return 1
+  const own = Dex.species.get(dexFormOf(speciesName))
+  if (!own.exists) return 1
+  const finalBst = (species: typeof own): number => {
+    const evos = species.evos.map((e) => Dex.species.get(e)).filter((e) => e.exists && !isBattleOnlyForme(e))
+    return evos.length === 0 ? bstOf(species.name) : Math.max(...evos.map(finalBst))
+  }
+  const ratio = finalBst(own) / Math.max(1, bstOf(own.name))
+  return Math.round(Math.min(MERGE_GROWTH_MAX, Math.max(1, ratio)) * 100) / 100
 }
 
 /**

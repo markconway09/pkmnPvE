@@ -34,6 +34,7 @@ import StarterPicker from './StarterPicker'
 import PokemonContextMenu from './PokemonContextMenu'
 import MergeModal from './MergeModal'
 import RewardsModal, { type RewardsTab } from './RewardsModal'
+import { onRewardsFocus } from './AchievementToasts'
 import type { MissionsState } from '../../shared/missions'
 import BagShopModal from './BagShopModal'
 import type { BagShopTab } from './BagShopTabs'
@@ -303,6 +304,8 @@ function MainMenu({
   const [achievements, setAchievements] = useState<AchievementsState | null>(null)
   // The Daily Missions | Achievements window, open on one of its tabs.
   const [rewardsTab, setRewardsTab] = useState<RewardsTab | null>(null)
+  // The achievement a clicked pop-up wants scrolled to, until the list has shown it.
+  const [achievementFocus, setAchievementFocus] = useState<string | null>(null)
   // The player card's menu (profile, options, debug), placed under the card.
   const [playerMenu, setPlayerMenu] = useState<{ right: number; top: number } | null>(null)
   // The player menu opens on hover and closes a moment after the pointer leaves both the
@@ -493,6 +496,18 @@ function MainMenu({
     refreshAchievements()
     setRewardsTab(claimableMissions > 0 && unclaimedAchievements === 0 ? 'missions' : 'achievements')
   }
+
+  // A clicked pop-up opens its tab - on an achievement, scrolled to that one.
+  useEffect(
+    () =>
+      onRewardsFocus((focus) => {
+        refreshMissions()
+        refreshAchievements()
+        setAchievementFocus(focus.tab === 'achievements' ? focus.name : null)
+        setRewardsTab(focus.tab)
+      }),
+    []
+  )
 
   function refreshAll(): void {
     refreshAchievements()
@@ -1369,7 +1384,12 @@ function MainMenu({
 
         {!fullPanel && (
         <>
-        {mode === 'box' && boxState && (
+        {/* The box, on the Box page only: its toolbar - or, while picking Pokemon to sell or
+            merge, the selection bar in its place - and the box itself. */}
+        {mode === 'box' && (
+        <>
+        {/* The box's counts, just above the toolbar. */}
+        {boxState && (
           <div className="box-summary">
             {[
               { label: 'Pokémon', value: boxState.mons.length },
@@ -1385,11 +1405,6 @@ function MainMenu({
             ))}
           </div>
         )}
-
-        {/* The box, on the Box page only: its toolbar - or, while picking Pokemon to sell or
-            merge, the selection bar in its place - and the box itself. */}
-        {mode === 'box' && (
-        <>
         {boxSelection ? (
           <div className="box-toolbar box-toolbar-attached box-selection-bar">
             <button className="box-selection-cancel" disabled={busy} title="Stop selecting" onClick={stopBoxSelection}>
@@ -1618,6 +1633,14 @@ function MainMenu({
           mergeStars={monsById.get(editingMonId)?.mergeStars ?? 0}
           mergeCopies={monsById.get(editingMonId)?.copies}
           rarityTier={monsById.get(editingMonId)?.rarityTier}
+          mergeGrowth={monsById.get(editingMonId)?.mergeGrowth}
+          everstone={monsById.get(editingMonId)?.everstone}
+          onSetEverstone={(locked) =>
+            void window.api
+              .setEverstone(editingMonId, locked)
+              .then(setBoxState)
+              .catch((err: unknown) => notes.show(errorMessage(err), { x: window.innerWidth / 2, y: window.innerHeight / 2 }, 'bad'))
+          }
           onToggleFavorite={() => void toggleFavorite(editingMonId)}
           canUseRareCandy={!!monsById.get(editingMonId)?.canLevelUpWithCandy}
           evolutionPaths={monsById.get(editingMonId)?.evolutionPaths}
@@ -1816,7 +1839,12 @@ function MainMenu({
             // A reward can be Raid Crystals - the Max Raid button counts them.
             refreshEligibility()
           }}
-          onClose={() => setRewardsTab(null)}
+          onClose={() => {
+            setRewardsTab(null)
+            setAchievementFocus(null)
+          }}
+          focus={achievementFocus}
+          onFocused={() => setAchievementFocus(null)}
         />
       )}
 

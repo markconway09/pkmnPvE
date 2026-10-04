@@ -36,7 +36,6 @@ function ShopPanel({ onMoneyChange }: Props): React.JSX.Element {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   // A bulk button under the mouse: its item's buy button shows that many's total meanwhile.
-  const [bulkHover, setBulkHover] = useState<{ itemId: string; n: number } | null>(null)
   const notes = useFloatingNotes()
 
   useEffect(() => {
@@ -89,9 +88,7 @@ function ShopPanel({ onMoneyChange }: Props): React.JSX.Element {
                     item={item}
                     money={money}
                     busy={busyId !== null}
-                    previewing={bulkHover?.itemId === item.id ? bulkHover.n : null}
                     onBuy={(e, count) => void buy(item, count, pointOf(e))}
-                    onBulkHover={(n) => setBulkHover(n === null ? null : { itemId: item.id, n })}
                   />
                 ))}
               </div>
@@ -108,15 +105,12 @@ interface ShopCardProps {
   item: ShopItemEntry
   money: number | null
   busy: boolean
-  // A hovered bulk button's count: the buy button shows that many's total meanwhile.
-  previewing: number | null
   onBuy: (e: React.MouseEvent, count: number) => void
-  onBulkHover: (n: number | null) => void
 }
 
 // One item for sale: a RarityCard in its price's colour, the item in its glow, its name,
 // then a buy bar - one for its price, with x5 and x10 joined on (like the Coin Shop's prizes).
-function ShopCard({ item, money, busy, previewing, onBuy, onBulkHover }: ShopCardProps): React.JSX.Element {
+function ShopCard({ item, money, busy, onBuy }: ShopCardProps): React.JSX.Element {
   return (
     <RarityCard tier={priceRarityTier(item.price)} lift className="shop-card" title={item.description}>
       {/* Tycoon's bulk discount, from 5 at once. */}
@@ -127,11 +121,10 @@ function ShopCard({ item, money, busy, previewing, onBuy, onBulkHover }: ShopCar
       <span className="item-card-name">{item.name}</span>
       <BuyButtonGroup>
         <BuyButton
-          price={shopTotal(item, previewing ?? 1)}
+          price={shopTotal(item, 1)}
           currency="money"
           held={money}
           busy={busy}
-          previewing={previewing !== null}
           title={`Buy one for ${formatMoney(item.price)}`}
           onBuy={(e) => onBuy(e, 1)}
         />
@@ -146,8 +139,6 @@ function ShopCard({ item, money, busy, previewing, onBuy, onBulkHover }: ShopCar
             label={`×${n}`}
             title={`Buy ${n} for ${formatMoney(shopTotal(item, n))}`}
             onBuy={(e) => onBuy(e, n)}
-            onMouseEnter={() => onBulkHover(n)}
-            onMouseLeave={() => onBulkHover(null)}
           />
         ))}
       </BuyButtonGroup>

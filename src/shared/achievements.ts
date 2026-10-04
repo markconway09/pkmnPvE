@@ -450,7 +450,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'pikachu',
     name: 'Dress-Up Party',
-    description: 'Own 3 different Pikachu forms at once',
+    description: 'Own 3 different Pikachu forms at once (a plain Pikachu counts as one)',
     category: 'Collection',
     stat: 'pikachuForms',
     goal: 3,
@@ -1028,8 +1028,10 @@ export interface AchievementView extends AchievementDef {
 
 export interface AchievementsState {
   achievements: AchievementView[]
-  // The title shown beside the player's name, if they've picked one.
+  // The title shown beside the player's name, if they've picked one - just for show.
   title: string | null
+  // The claimed titles turned off - every other claimed title's perk works.
+  disabled: string[]
   // Every title they've claimed.
   titles: string[]
 }

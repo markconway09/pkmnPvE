@@ -1,7 +1,8 @@
-// Title perks: each achievement title carries a small bonus, active only while it's the
-// title being shown (so which one to wear is a choice). They stack with the charms. The
-// main process applies them where each thing happens (see title-perks.ts); the renderer
-// only shows what they do.
+// Title perks: each achievement title carries a small bonus, working for good once it's
+// claimed - the player can turn any of them off. A few clash (see TITLE_CLASHES), and
+// turning one of those on turns its rivals off. The title shown beside the player's name
+// is just for show. They stack with the charms. The main process applies them where each
+// thing happens (see title-perks.ts); the renderer only shows what they do.
 
 export type Title =
   | 'Veteran'
@@ -50,7 +51,7 @@ export const TITLE_PERKS: Record<Title, string> = {
   'Legend Keeper': 'Random Legendary is likelier to give a box legendary',
   Tycoon: '25% off when buying 5 or more of an item at once in the Shop',
   Survivor: 'Roguelite runs start with a free item pick',
-  Daredevil: 'Roguelite runs start with a free item, move and ability pick',
+  Daredevil: 'Roguelite runs start with a free move and ability pick',
   'Golden Touch': 'The slots jackpot pays ×75 instead of ×50, and every slots win 10% more',
   'High Roller': 'Bet up to 10,000 coins in the Game Corner',
   'Edge Lord': "Plinko's edge slots pay double and the slots next to them 25% more, at every risk",
@@ -73,6 +74,40 @@ export const TITLE_PERKS: Record<Title, string> = {
   'Hex Master': 'A TM search needs one less Great to come up a rarity higher',
   Unstoppable: "The Scanner's quick check is twice as likely to turn up a TM",
   AFK: "A missed check doesn't knock a TM search back a step"
+}
+
+/**
+ * Titles that pull against each other: the lead and its rivals are never on together.
+ * Turning the lead on turns the rivals off, and turning it off turns them back on; turning
+ * a rival on turns the lead off, and once every rival is off the lead comes back on.
+ * - High Roller's big bets against the Game Corner's payout perks.
+ * - Five-Star against Gigantamax Hunter: a Gigantamax boss is never a gold one, so the
+ *   two undercut each other.
+ */
+export const TITLE_CLASHES: { lead: Title; rivals: Title[] }[] = [
+  { lead: 'High Roller', rivals: ['Golden Touch', '9+10', 'Croupier', 'Edge Lord'] },
+  { lead: 'Five-Star', rivals: ['Gigantamax Hunter'] }
+]
+
+/** The clash a title is part of, if any. */
+export function titleClash(title: string): { lead: Title; rivals: Title[] } | undefined {
+  return TITLE_CLASHES.find((c) => c.lead === title || c.rivals.includes(title as Title))
+}
+
+/**
+ * The titles to turn off for a save from before titles worked for good: in each clash
+ * where the lead and a rival are both claimed, the lead goes off - unless it's the title
+ * the player was showing (the one whose perk was working), then the rivals do.
+ */
+export function startingDisabledTitles(claimed: string[], shown: string | null): string[] {
+  const off: string[] = []
+  for (const { lead, rivals } of TITLE_CLASHES) {
+    const claimedRivals = rivals.filter((r) => claimed.includes(r))
+    if (!claimed.includes(lead) || claimedRivals.length === 0) continue
+    if (shown === lead) off.push(...claimedRivals)
+    else off.push(lead)
+  }
+  return off
 }
 
 /** A title's perk, for showing beside it ("" for a title without one). */

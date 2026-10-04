@@ -861,7 +861,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
         {view && (
           <div className="battle-huds-large">
             <TrainerHud
-              name="You"
+              name={username}
               title={playerTitle}
               spriteId={trainerSprite}
               companion={playerCompanion}
@@ -1013,7 +1013,8 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
                           title={gimmickTaken ? 'Your other Pokemon is already using this this turn' : undefined}
                           onClick={() => togglePendingGimmick(slotIndex)}
                         >
-                          {gimmickOn ? '☑' : '☐'} {gimmick.label}
+                          <span className="gimmick-toggle-check" aria-hidden="true" />
+                          {gimmick.label}
                           {gimmick.typeForBadge && (
                             <span className={`type-badge type-${gimmick.typeForBadge.toLowerCase()}`}>
                               {gimmick.typeForBadge}
@@ -1023,7 +1024,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
                       )}
                       {(canGoBack || canRun) && (
                         <button
-                          className={`run-cancel-button ${confirmingRun && canRun ? 'confirm-button' : ''}`}
+                          className={`run-cancel-button${canGoBack ? ' run-cancel-back' : ''}${confirmingRun && canRun ? ' confirm-button' : ''}`}
                           // Running from a trainer costs money - greyed out without enough of it.
                           disabled={busy || (!canGoBack && view?.canAffordRun === false)}
                           title={

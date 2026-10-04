@@ -13,6 +13,11 @@ interface Props {
   draggable?: boolean
 }
 
+// Which picture in a candidate list actually loaded (or the list's length if none did),
+// remembered for the whole session - so reopening the box goes straight to the working
+// sprite instead of failing the same missing ones again every time.
+const resolvedStep = new Map<string, number>()
+
 /**
  * A Pokemon's picture that never leaves a hole: if the sprite for its form is missing
  * it tries the next best (see spriteCandidates - the shiny still, the ordinary still,
@@ -20,11 +25,12 @@ interface Props {
  */
 function SpriteImage({ style, spriteId, facing = 'front', shiny = false, gmax = false, className, alt = '', draggable }: Props): React.JSX.Element | null {
   const candidates = (gmax ? gmaxSpriteCandidates : spriteCandidates)(style, facing, spriteId, shiny)
-  const [step, setStep] = useState(0)
+  const key = candidates.join('|')
+  const [step, setStep] = useState(() => resolvedStep.get(key) ?? 0)
 
   useEffect(() => {
-    setStep(0)
-  }, [style, facing, spriteId, shiny, gmax])
+    setStep(resolvedStep.get(key) ?? 0)
+  }, [key])
 
   if (step >= candidates.length) return null
   // The 3D stills (HOME art) are big smooth renders, not pixel art - drawn smoothly
@@ -37,7 +43,11 @@ function SpriteImage({ style, spriteId, facing = 'front', shiny = false, gmax = 
       src={src}
       alt={alt}
       draggable={draggable}
-      onError={() => setStep((s) => s + 1)}
+      onLoad={() => resolvedStep.set(key, step)}
+      onError={() => {
+        if (step + 1 >= candidates.length) resolvedStep.set(key, candidates.length)
+        setStep(step + 1)
+      }}
     />
   )
 }

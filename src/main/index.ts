@@ -39,6 +39,7 @@ import {
   getTeamPokemonSets,
   highestLevelOf,
   levelUpMon,
+  setEverstone,
   toggleFavorite,
   setCompanion,
   returnCompanion,
@@ -62,7 +63,7 @@ import {
   getRaidBossPreviews
 } from './showdown/box-store'
 import { getBagState, getItemQuantity, hasItem, removeItem, resetBag } from './showdown/bag-store'
-import { generateRaidBoss } from './showdown/raid'
+import { generateRaidBoss, raidBossRarityOdds } from './showdown/raid'
 import { claimMission, claimMissionBonus, getMissions, rerollMission } from './showdown/mission-store'
 import { applyLoadout, deleteLoadout, listLoadouts, renameLoadout, saveLoadout, updateLoadout } from './showdown/loadout-store'
 import {
@@ -112,8 +113,10 @@ import {
   getTmState,
   reportTmSearchCheck,
   startTmSearch,
+  takeTmAmbush,
   takeTmQuickCheck,
-  withTmLocks
+  withTmLocks,
+  tmSearchRarityOdds
 } from './showdown/tm-store'
 import type { SkillCheckResult } from '../shared/tms'
 import {
@@ -128,7 +131,7 @@ import { getRouletteHistory, spinRoulette } from './showdown/roulette-store'
 import { dropPlinko } from './showdown/plinko-store'
 import { getGameCornerPerks } from './showdown/title-perks'
 import type { PlinkoRisk } from '../shared/plinko'
-import { checkAchievements, claimAchievement, getAchievements, setAchievementTitle } from './showdown/achievement-store'
+import { checkAchievements, claimAchievement, getAchievements, setAchievementTitle, setTitleActive } from './showdown/achievement-store'
 import { getTrainerProfile } from './showdown/trainer-profile'
 import { buildAutoSet, listAutoSets } from './showdown/auto-sets'
 import { checkForUpdate, installUpdate } from './updater'
@@ -192,7 +195,8 @@ import {
   setShopPrice
 } from './showdown/shop-store'
 import { getGalarFossilPartners, restoreFossil } from './showdown/fossil-store'
-import { openBagItem } from './showdown/open-item-store'
+import { openBagItem, openItemRarityOdds } from './showdown/open-item-store'
+import type { RarityOddsSource } from '../shared/rarity'
 import { eligibleRandomTrainers, isRocketEventActive } from './showdown/trainer-selection'
 import {
   abandonDraft,
@@ -319,7 +323,9 @@ ipcMain.handle('battle:start', async (_event, locationId?: WildLocationId, level
     randomDropChance: WILD_RANDOM_DROP_CHANCE,
     location: location?.id ?? 'all',
     // Now and then the area's weather is up when the battle starts (never in the Cave or the Lab).
-    startField: { weather: rollWildWeather(location?.id ?? 'all') }
+    startField: { weather: rollWildWeather(location?.id ?? 'all') },
+    // A TM search that made too much noise: the Pokemon it woke won't let you run.
+    noRun: takeTmAmbush(location?.id ?? 'all')
   }, { p1: getTeamMergeStars() })
   return activeBattle.getInitialView()
 })
@@ -638,6 +644,7 @@ ipcMain.handle('box:updateMon', (_event, id: string, set: EditablePokemonSet, ad
 ipcMain.handle('box:addStarter', (_event, species: string) => addStarter(species))
 ipcMain.handle('box:evolve', (_event, id: string, targetSpecies: string) => evolveMon(id, targetSpecies))
 ipcMain.handle('box:levelUp', (_event, id: string) => levelUpMon(id))
+ipcMain.handle('box:setEverstone', (_event, id: string, locked: boolean) => setEverstone(id, locked))
 ipcMain.handle('box:toggleFavorite', (_event, id: string) => toggleFavorite(id))
 ipcMain.handle('box:setCompanion', (_event, id: string) => setCompanion(id))
 ipcMain.handle('box:returnCompanion', () => returnCompanion())
@@ -672,6 +679,7 @@ ipcMain.handle('cloud:export', () => exportToCloud())
 ipcMain.handle('cloud:import', (_event, fileId: string) => importFromCloud(fileId))
 ipcMain.handle('achievements:claim', (_event, id: string) => claimAchievement(id))
 ipcMain.handle('achievements:setTitle', (_event, title: string | null) => setAchievementTitle(title))
+ipcMain.handle('achievements:setTitleActive', (_event, title: string, active: boolean) => setTitleActive(title, active))
 ipcMain.handle('coins:buy', (_event, amount: number) => buyCoins(amount))
 ipcMain.handle('coins:prize', (_event, itemId: string, quantity?: number) => buyCoinPrize(itemId, quantity))
 ipcMain.handle('coins:dailyOffer', () => getDailyCoinOffer())
@@ -719,6 +727,12 @@ ipcMain.handle('bag:sell', (_event, itemId: string) => sellItem(itemId))
 ipcMain.handle('bag:sellMany', (_event, entries: ItemQuantity[]) => sellItems(entries))
 ipcMain.handle('bag:quickSellSelection', () => quickSellSelection())
 ipcMain.handle('bag:open', (_event, itemId: string) => openBagItem(itemId))
+// The odds of each rarity colour, for a raid / case / TM search button's tooltip.
+ipcMain.handle('rarity:odds', (_event, source: RarityOddsSource) => {
+  if (source.kind === 'raid') return raidBossRarityOdds()
+  if (source.kind === 'tm') return tmSearchRarityOdds(source.location)
+  return openItemRarityOdds(source.itemId)
+})
 ipcMain.handle('fossil:galarPartners', (_event, itemId: string) => getGalarFossilPartners(itemId))
 ipcMain.handle('fossil:restore', (_event, itemId: string, secondItemId?: string) =>
   restoreFossil(itemId, secondItemId)
@@ -854,8 +868,10 @@ ipcMain.handle('update:install', (event) => installUpdate(event.sender))
 
 ipcMain.handle('autoSets:list', (_event, species: string) => listAutoSets(species))
 // Admin editing lifts the move/item limits - only honoured for an actual admin.
-ipcMain.handle('autoSets:build', (_event, species: string, level: number, optionId: string, admin: boolean) =>
-  buildAutoSet(species, level, optionId, admin && isAdmin())
+ipcMain.handle(
+  'autoSets:build',
+  (_event, species: string, level: number, optionId: string, admin: boolean, heldItem?: string) =>
+    buildAutoSet(species, level, optionId, admin && isAdmin(), [], heldItem ?? '')
 )
 
 void app.whenReady().then(() => {

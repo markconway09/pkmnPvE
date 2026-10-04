@@ -61,7 +61,9 @@ function slashPath(offset: number): string {
   return `M${o(4)} ${o(18)} Q${o(8.6)} ${o(8.6)} ${o(19)} ${o(4)} Q${o(13.4)} ${o(13.4)} ${o(4)} ${o(18)} Z`
 }
 
-const NORMAL_STAR = starPoints(8, 11.5, 5)
+// A classic five-pointed star, nudged down a little so it sits centred (its
+// bottom points don't reach as far as its top one).
+const NORMAL_STAR = starPoints(5, 11.5, 4.6, 12, 13)
 const ELECTRIC_BOLT = '15,1 4,14 11,14 8,23 20,9 13,9 17,1'
 const ROCK_CHUNK = '12,1 20,5 23,13 18,21 8,22 2,15 4,6'
 const STEEL_GEAR = gearPoints(8, 8.2, 11.5)

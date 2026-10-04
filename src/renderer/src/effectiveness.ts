@@ -10,9 +10,9 @@ export interface EffectivenessChip {
 
 const MULTIPLIER_TEXT: Record<string, string> = {
   '0': '0×',
-  '0.25': '¼×',
-  '0.5': '½×',
-  '0.75': '¾×',
+  '0.25': '1/4×',
+  '0.5': '1/2×',
+  '0.75': '3/4×',
   '1': '1×',
   '2': '2×',
   '4': '4×'
@@ -32,6 +32,7 @@ export function effectivenessWords(multiplier: number): string {
 export function effectivenessClass(multiplier: number): string {
   if (multiplier === 0) return 'eff-immune'
   if (multiplier > 1) return 'eff-super'
+  if (multiplier <= 0.25) return 'eff-resisted eff-strong'
   if (multiplier < 1) return 'eff-resisted'
   return 'eff-neutral'
 }
@@ -40,6 +41,7 @@ export function effectivenessClass(multiplier: number): string {
 // low is good, and an immunity is best of all.
 export function defensiveClass(multiplier: number): string {
   if (multiplier === 0) return 'eff-def-immune'
+  if (multiplier >= 4) return 'eff-resisted eff-strong'
   if (multiplier > 1) return 'eff-resisted'
   if (multiplier < 1) return 'eff-super'
   return 'eff-neutral'

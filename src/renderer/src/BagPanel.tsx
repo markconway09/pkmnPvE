@@ -7,9 +7,10 @@ import { BuyButtonGroup, SellButton } from './BuyButton'
 import SearchBar from './SearchBar'
 import GalarFossilPrompt from './GalarFossilPrompt'
 import CaseOpening from './CaseOpening'
-import { formatMoney, formatMoneyShort } from './money'
+import { formatMoney, formatShort } from './money'
 import { errorMessage, pointOf, useFloatingNotes, type NotePoint } from './FloatingNotes'
 import ModalSpinner from './ModalSpinner'
+import RarityOddsTooltip from './RarityOddsTooltip'
 
 interface Props {
   // Selling or restoring changes the wallet and (for a restore) the box, both
@@ -37,7 +38,7 @@ function BagPanel({ onChanged }: Props): React.JSX.Element {
   // Results float up from whatever was last clicked (an item, or a sell button).
   // A sell button under the mouse: its item's "Sell ×1" shows what one pays, or (on All)
   // what the whole stack pays.
-  const [sellHover, setSellHover] = useState<{ itemId: string; all: boolean } | null>(null)
+  const [sellHover, setSellHover] = useState<string | null>(null)
   const notes = useFloatingNotes()
   const lastPoint = useRef<NotePoint>({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
   const say = (text: string): void => notes.show(text, lastPoint.current)
@@ -249,7 +250,11 @@ function BagPanel({ onChanged }: Props): React.JSX.Element {
           })}
         </span>
       ) : item.opens ? (
-        <span className="item-card-bar">{button('Open', () => void openItem(item), { kind: 'use' })}</span>
+        <span className="item-card-bar">
+          <RarityOddsTooltip source={{ kind: 'item', itemId: item.id }}>
+            {button('Open', () => void openItem(item), { kind: 'use' })}
+          </RarityOddsTooltip>
+        </span>
       ) : item.fossil === 'single' ? (
         <span className="item-card-bar">
           {button(`Restore ${formatMoney(FOSSIL_RESTORE_COST)}`, () => void restoreSingle(item), {
@@ -275,18 +280,13 @@ function BagPanel({ onChanged }: Props): React.JSX.Element {
         </span>
       ) : (
         // Sell one, or the whole stack, joined into one bar in the buy buttons' look. It reads
-        // "Sell ×1" until hovered - then what one pays, or (hovering All) what the stack pays.
+        // "Sell ×1" until hovered - then what one pays.
         <BuyButtonGroup>
           <SellButton
-            label={
-              sellHover?.itemId === item.id
-                ? `+${formatMoneyShort(sellPrice * (sellHover.all ? item.quantity : 1))}`
-                : 'Sell ×1'
-            }
-            previewing={sellHover?.itemId === item.id && sellHover.all}
+            label={sellHover === item.id ? `+₽ ${formatShort(sellPrice)}` : 'Sell ×1'}
             busy={busy}
             title={`Sell one for ${formatMoney(sellPrice)}`}
-            onMouseEnter={() => setSellHover({ itemId: item.id, all: false })}
+            onMouseEnter={() => setSellHover(item.id)}
             onMouseLeave={() => setSellHover(null)}
             onSell={(e) => {
               lastPoint.current = pointOf(e)
@@ -299,8 +299,6 @@ function BagPanel({ onChanged }: Props): React.JSX.Element {
               label="All"
               busy={busy}
               title={`Sell all ×${item.quantity} for ${formatMoney(sellPrice * item.quantity)}`}
-              onMouseEnter={() => setSellHover({ itemId: item.id, all: true })}
-              onMouseLeave={() => setSellHover(null)}
               onSell={(e) => {
                 lastPoint.current = pointOf(e)
                 void sell(item, item.quantity)
@@ -402,6 +400,7 @@ function BagPanel({ onChanged }: Props): React.JSX.Element {
       {opening && (
         <CaseOpening
           key={opening.seq}
+          itemId={opening.item.id}
           itemName={opening.item.name}
           result={opening.result}
           onClose={(soldFor) => {

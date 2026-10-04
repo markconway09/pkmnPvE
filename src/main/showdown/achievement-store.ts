@@ -7,7 +7,8 @@ import type {
   AchievementView
 } from '../../shared/achievements'
 import { ACHIEVEMENTS } from '../../shared/achievements'
-import { getAchievementProgress, persistAchievementProgress } from './achievement-progress'
+import { titleClash } from '../../shared/titles'
+import { claimedTitlesOf, getAchievementProgress, persistAchievementProgress } from './achievement-progress'
 import { addItem, hasItem } from './bag-store'
 import { boxAchievementStats } from './box-store'
 import { changeCoins } from './game-corner-store'
@@ -144,12 +145,11 @@ export function getAchievements(): AchievementsState {
     unlocked: unlocked.has(a.id),
     claimed: claimed.has(a.id)
   }))
-  return { achievements, title: progress.title, titles: claimedTitles() }
+  return { achievements, title: progress.title, disabled: progress.disabledTitles, titles: claimedTitles() }
 }
 
 function claimedTitles(): string[] {
-  const claimed = new Set(getAchievementProgress().claimed)
-  return ACHIEVEMENTS.filter((a) => claimed.has(a.id) && a.reward.title).map((a) => a.reward.title!)
+  return claimedTitlesOf(getAchievementProgress().claimed)
 }
 
 function rewardText(def: AchievementDef): string {
@@ -170,7 +170,12 @@ export function claimAchievement(id: string): AchievementClaimResult {
   const progress = getAchievementProgress()
   if (!progress.unlocked.includes(id)) throw new Error(`${def.name} isn't unlocked yet`)
   if (progress.claimed.includes(id)) throw new Error(`${def.name}'s reward has already been claimed`)
+  // A new title starts on - unless it clashes with one that's already on.
+  const title = def.reward.title
+  const clash = title ? titleClash(title) : undefined
+  const startsOff = !!clash && (title === clash.lead ? clash.rivals.some(titleOn) : titleOn(clash.lead))
   progress.claimed.push(id)
+  if (title && startsOff) progress.disabledTitles.push(title)
   persistAchievementProgress()
   for (const { itemId, count } of def.reward.items ?? []) addItem(itemId, count)
   // A key item is kept for good - one is all anyone needs.
@@ -180,7 +185,42 @@ export function claimAchievement(id: string): AchievementClaimResult {
   return { state: getAchievements(), rewardText: rewardText(def), money: getMoney() }
 }
 
-/** Shows one of the claimed titles beside the player's name (null: none). */
+// Whether a title is claimed and not turned off.
+function titleOn(title: string): boolean {
+  return claimedTitles().includes(title) && !getAchievementProgress().disabledTitles.includes(title)
+}
+
+/**
+ * Turns a claimed title's perk on or off. A title in a clash (see TITLE_CLASHES) moves its
+ * rivals too: the lead on turns the rivals off and off turns them back on; a rival on
+ * turns the lead off, and the last rival going off turns the lead back on.
+ */
+export function setTitleActive(title: string, active: boolean): AchievementsState {
+  const claimed = claimedTitles()
+  if (!claimed.includes(title)) throw new Error("You haven't earned that title")
+  const progress = getAchievementProgress()
+  const off = new Set(progress.disabledTitles)
+  const set = (t: string, on: boolean): void => {
+    if (on) off.delete(t)
+    else if (claimed.includes(t)) off.add(t)
+  }
+  set(title, active)
+  const clash = titleClash(title)
+  if (clash) {
+    if (title === clash.lead) {
+      for (const rival of clash.rivals) set(rival, !active)
+    } else if (active) {
+      set(clash.lead, false)
+    } else if (!clash.rivals.some((r) => claimed.includes(r) && !off.has(r))) {
+      set(clash.lead, true)
+    }
+  }
+  progress.disabledTitles = [...off]
+  persistAchievementProgress()
+  return getAchievements()
+}
+
+/** Shows one of the claimed titles beside the player's name (null: none) - just for show. */
 export function setAchievementTitle(title: string | null): AchievementsState {
   if (title !== null && !claimedTitles().includes(title)) throw new Error("You haven't earned that title")
   getAchievementProgress().title = title

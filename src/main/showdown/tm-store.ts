@@ -8,6 +8,7 @@ import {
   TM_LAB_TIER_WEIGHTS,
   TM_PITY_SEARCHES,
   TM_QUICK_CHECK_CHANCE,
+  TM_QUICK_CHECK_ITEM_CHANCE,
   TM_SCANNER_COINS,
   TM_SEARCH_CHARGES_PER_DAY,
   TM_SEARCH_DIFFICULTY,
@@ -25,13 +26,14 @@ import {
 } from '../../shared/tms'
 import { playerPathFor } from './save-paths'
 import { getSessionInfo, onPlayerChange } from './player-session'
-import { tmMoveList, tmOnlyMoveIds } from './sim-access'
+import { getWildDropPool, tmMoveList, tmOnlyMoveIds } from './sim-access'
 import { addMoney } from './money-store'
 import { changeCoins, getCoins } from './game-corner-store'
 import { recordMission } from './mission-store'
-import { addItem, hasItem } from './bag-store'
+import { addItem, bagItemRarity, hasItem } from './bag-store'
 import { countAchievement, recordAchievementBest } from './achievement-progress'
 import { hasTitle } from './title-perks'
+import type { RarityOdds } from '../../shared/rarity'
 import {
   HEX_MASTER_SPARE_CHECKS,
   LIGHT_SLEEPER_EXTRA_MISSES,
@@ -55,6 +57,9 @@ interface StoredTms {
   pity: Partial<Record<WildLocationId, number>>
   // Greats in a row right now, across every skill check (for On a Roll).
   greatStreak: number
+  // The Coin Shop's TMs for `offersDay`, rolled once that day.
+  offers?: string[]
+  offersDay?: string
 }
 
 interface ActiveSearch {
@@ -73,6 +78,16 @@ let state: StoredTms | null = null
 let search: ActiveSearch | null = null
 // The area of the wild battle just won, until its quick check is taken.
 let quickCheckLocation: WildLocationId | null = null
+// The area of a search that ended in an ambush, until that wild battle starts - the
+// Pokemon it woke can't be run from.
+let ambushLocation: WildLocationId | null = null
+
+/** Takes the pending ambush if it's in this area: true means the battle can't be run from. */
+export function takeTmAmbush(location: WildLocationId | null): boolean {
+  const pending = ambushLocation
+  ambushLocation = null
+  return pending !== null && pending === location
+}
 
 onPlayerChange(() => {
   state = null
@@ -100,7 +115,9 @@ function load(): StoredTms {
       day: typeof parsed.day === 'string' ? parsed.day : today(),
       used: parsed.used ?? {},
       pity: parsed.pity ?? {},
-      greatStreak: parsed.greatStreak ?? 0
+      greatStreak: parsed.greatStreak ?? 0,
+      offers: Array.isArray(parsed.offers) ? parsed.offers : undefined,
+      offersDay: typeof parsed.offersDay === 'string' ? parsed.offersDay : undefined
     }
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== 'ENOENT') console.error('[tm-store] failed to load tms.json:', e)
@@ -253,19 +270,33 @@ export function getTmState(): TmState {
   return { owned: [...s.owned], charges, pity }
 }
 
-function rollTier(baseWeights: Record<RarityTier, number>, minTier: RarityTier = 'common'): RarityTier {
-  // Prospector makes gold likelier.
+// Each rarity's chance in a roll: nothing under minTier (the pity), and Prospector makes
+// gold likelier.
+function tierOdds(baseWeights: Record<RarityTier, number>, minTier: RarityTier = 'common'): RarityOdds {
   const weights = hasTitle('Prospector')
     ? { ...baseWeights, legendary: baseWeights.legendary * PROSPECTOR_LEGENDARY_WEIGHT_MULTIPLIER }
     : baseWeights
   const tiers = TM_TIERS.slice(TM_TIERS.indexOf(minTier))
   const total = tiers.reduce((sum, t) => sum + weights[t], 0)
-  let roll = Math.random() * total
-  for (const t of tiers) {
-    roll -= weights[t]
+  const odds: RarityOdds = { common: 0, uncommon: 0, rare: 0, epic: 0, legendary: 0 }
+  for (const t of tiers) odds[t] = weights[t] / total
+  return odds
+}
+
+function rollTier(baseWeights: Record<RarityTier, number>, minTier: RarityTier = 'common'): RarityTier {
+  const odds = tierOdds(baseWeights, minTier)
+  let roll = Math.random()
+  for (const t of TM_TIERS) {
+    roll -= odds[t]
     if (roll < 0) return t
   }
-  return tiers[tiers.length - 1]
+  return 'legendary'
+}
+
+/** The next search in an area's odds of each rarity, pity included - for the search button's tooltip. */
+export function tmSearchRarityOdds(location: WildLocationId): RarityOdds {
+  const pityTriggered = (getState().pity[location] ?? 0) >= TM_PITY_SEARCHES
+  return tierOdds(location === 'lab' ? TM_LAB_TIER_WEIGHTS : TM_TIER_WEIGHTS, pityTriggered ? 'rare' : 'common')
 }
 
 // A TM of this rarity from the area - or, if it has none of that rarity, the nearest one
@@ -357,6 +388,7 @@ export function reportTmSearchCheck(result: SkillCheckResult, timedOut = false):
     search = null
     settlePity(active.location, null)
     countAchievement('tmAmbushes')
+    ambushLocation = active.location
     return { ...base, done: true, find: null, ambush: true, refunded: false, state: getTmState() }
   }
   if (active.progress < active.needed) return { ...base, done: false, find: null, ambush: false, refunded: false, state: getTmState() }
@@ -422,7 +454,15 @@ export function takeTmQuickCheck(result: SkillCheckResult, timedOut = false): Tm
   recordSkillCheck(result, timedOut)
   // Unstoppable doubles the chance.
   const chance = TM_QUICK_CHECK_CHANCE[result] * (hasTitle('Unstoppable') ? UNSTOPPABLE_QUICK_CHECK_MULTIPLIER : 1)
-  if (Math.random() >= chance) return { find: null }
+  if (Math.random() >= chance) {
+    // A Good or a Great that found no TM may still turn up a random item.
+    if (result === 'miss' || Math.random() >= TM_QUICK_CHECK_ITEM_CHANCE) return { find: null }
+    const pool = getWildDropPool()
+    const item = pool[Math.floor(Math.random() * pool.length)]
+    if (!item) return { find: null }
+    addItem(item.id, 1)
+    return { find: null, item: { itemId: item.id, itemName: item.name, spritenum: item.spritenum, tier: bagItemRarity(item.id) } }
+  }
   const weights = location === 'lab' ? TM_LAB_TIER_WEIGHTS : TM_TIER_WEIGHTS
   const find = grantTm(pickTm(location, rollTier(weights)), false)
   // A TM found this way counts as found by searching, like a full search's.
@@ -432,16 +472,27 @@ export function takeTmQuickCheck(result: SkillCheckResult, timedOut = false): Tm
   return { find }
 }
 
-// Today's Coin Shop TMs - the same TM_DAILY_COIN_OFFERS for the whole day, from the
-// player's name and the date.
+// Today's Coin Shop TMs - TM_DAILY_COIN_OFFERS of the ones the player doesn't own yet,
+// rolled at the day's first look and kept for the whole day (one bought stays on the
+// shelf as Owned until tomorrow's roll).
 function todaysOffers(): TmInfo[] {
-  const random = seededRandom(`${getSessionInfo().username ?? ''}|tms|${today()}`)
-  const pool = getTmCatalog().filter((t) => t.coinOnly)
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1))
-    ;[pool[i], pool[j]] = [pool[j], pool[i]]
+  const s = getState()
+  const catalog = getTmCatalog()
+  if (s.offersDay !== today() || !s.offers) {
+    const random = seededRandom(`${getSessionInfo().username ?? ''}|tms|${today()}`)
+    const pool = catalog.filter((t) => t.coinOnly && !s.owned.includes(t.moveId))
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1))
+      ;[pool[i], pool[j]] = [pool[j], pool[i]]
+    }
+    s.offers = pool.slice(0, TM_DAILY_COIN_OFFERS).map((t) => t.moveId)
+    s.offersDay = today()
+    persist()
   }
-  return pool.slice(0, TM_DAILY_COIN_OFFERS).sort((a, b) => TM_TIERS.indexOf(a.tier) - TM_TIERS.indexOf(b.tier) || a.name.localeCompare(b.name))
+  const offers = new Set(s.offers)
+  return catalog
+    .filter((t) => offers.has(t.moveId))
+    .sort((a, b) => TM_TIERS.indexOf(a.tier) - TM_TIERS.indexOf(b.tier) || a.name.localeCompare(b.name))
 }
 
 export function getTmShop(): TmShopView {

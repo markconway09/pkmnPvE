@@ -29,9 +29,10 @@ function layerStyle(id: string): React.CSSProperties | null {
 function FieldEffectsOverlay({ effects }: Props): React.JSX.Element {
   const weather = effects.find((e) => e.kind === 'weather')
   // Showdown paints a terrain and a room-style effect (Trick Room, Gravity...)
-  // in the same layer, so only one shows at a time and terrain wins.
-  const terrainLayer =
-    effects.find((e) => e.kind === 'terrain') ?? [...effects].reverse().find((e) => e.kind === 'field' && OVERLAY_STYLES[e.id])
+  // in the same layer, so only one shows at a time - whichever started last.
+  const terrainLayer = [...effects]
+    .reverse()
+    .find((e) => (e.kind === 'terrain' || e.kind === 'field') && OVERLAY_STYLES[e.id])
   const badges = KIND_ORDER.flatMap((kind) => effects.filter((e) => e.kind === kind))
 
   const terrainStyle = terrainLayer ? layerStyle(terrainLayer.id) : null

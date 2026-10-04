@@ -1,4 +1,4 @@
-import type { RarityTier } from './battle-types'
+import type { RarityTier, WildLocationId } from './battle-types'
 
 /**
  * An item's rarity colour by what the Shop charges for it: grey, then blue from 1,000,
@@ -19,4 +19,25 @@ export function coinPrizeRarityTier(coins: number): RarityTier {
   if (coins >= 5000) return 'epic'
   if (coins >= 1000) return 'rare'
   return 'uncommon'
+}
+
+/** The rarity colours from grey up to gold. */
+export const RARITY_TIERS: RarityTier[] = ['common', 'uncommon', 'rare', 'epic', 'legendary']
+
+/** The chance (0-1) of each rarity colour coming out of something random - a case, a raid, a search. */
+export type RarityOdds = Record<RarityTier, number>
+
+/** What a rarity-odds tooltip is for: a Max Raid's boss, an openable bag item, or a TM search in an area. */
+export type RarityOddsSource = { kind: 'raid' } | { kind: 'item'; itemId: string } | { kind: 'tm'; location: WildLocationId }
+
+/** Several outcomes' odds put together, each counted at its own chance of happening. */
+export function mixRarityOdds(parts: [chance: number, odds: RarityOdds][]): RarityOdds {
+  const mixed: RarityOdds = { common: 0, uncommon: 0, rare: 0, epic: 0, legendary: 0 }
+  for (const [chance, odds] of parts) for (const tier of RARITY_TIERS) mixed[tier] += chance * odds[tier]
+  return mixed
+}
+
+/** A sure thing: this colour every time. */
+export function certainRarity(tier: RarityTier): RarityOdds {
+  return { common: 0, uncommon: 0, rare: 0, epic: 0, legendary: 0, [tier]: 1 }
 }

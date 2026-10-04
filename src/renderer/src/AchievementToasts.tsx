@@ -10,10 +10,39 @@ interface Toast {
 
 const TOAST_MS = 5000
 
+// A clicked toast asks the main menu to open that achievement (or the daily missions).
+// Clicked away from the menu (in a battle, say), it waits until the menu is back.
+export interface RewardsFocus {
+  tab: 'missions' | 'achievements'
+  name: string
+}
+const FOCUS_EVENT = 'rewards-focus'
+let pendingFocus: RewardsFocus | null = null
+
+/** The main menu listens here: `listener` gets any click still waiting, then each new one. */
+export function onRewardsFocus(listener: (focus: RewardsFocus) => void): () => void {
+  if (pendingFocus) {
+    listener(pendingFocus)
+    pendingFocus = null
+  }
+  const handler = (e: Event): void => {
+    pendingFocus = null
+    listener((e as CustomEvent<RewardsFocus>).detail)
+  }
+  window.addEventListener(FOCUS_EVENT, handler)
+  return () => window.removeEventListener(FOCUS_EVENT, handler)
+}
+
+function requestFocus(focus: RewardsFocus): void {
+  // Kept until the menu takes it - the event clears it straight away when the menu is up.
+  pendingFocus = focus
+  window.dispatchEvent(new CustomEvent(FOCUS_EVENT, { detail: focus }))
+}
+
 /**
  * "Achievement unlocked" pop-ups at the top of the window, wherever the player is (a
- * battle included) - the main process says when one unlocks. Claiming is done from the
- * Achievements list.
+ * battle included) - the main process says when one unlocks. Clicking one opens the
+ * Achievements list at it; claiming is done from there.
  */
 function AchievementToasts(): React.JSX.Element {
   const [toasts, setToasts] = useState<Toast[]>([])
@@ -33,7 +62,16 @@ function AchievementToasts(): React.JSX.Element {
   return createPortal(
     <div className="achievement-toasts">
       {toasts.map((toast) => (
-        <div key={toast.id} className="achievement-toast" style={{ animationDuration: `${TOAST_MS}ms` }}>
+        <div
+          key={toast.id}
+          className="achievement-toast"
+          style={{ animationDuration: `${TOAST_MS}ms` }}
+          title={toast.mission ? 'Open the daily missions' : 'Open the achievement'}
+          onClick={() => {
+            requestFocus({ tab: toast.mission ? 'missions' : 'achievements', name: toast.name })
+            setToasts((all) => all.filter((t) => t.id !== toast.id))
+          }}
+        >
           <span className="achievement-toast-icon">{toast.mission ? '📋' : '🏆'}</span>
           <div>
             <div className="achievement-toast-label">{toast.mission ? 'Daily mission complete!' : 'Achievement unlocked!'}</div>

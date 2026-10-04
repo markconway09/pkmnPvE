@@ -650,7 +650,7 @@ function RoguelitePanel({
               </div>
               {/* Where the bosses come from: any generation, or one with a full set of bosses. */}
               <div className="run-generation-row">
-                <span className="run-hud-label">Bosses from</span>
+                <span className="run-hud-label">Generation:</span>
                 <div className="run-generation-chips">
                   <button
                     className={`run-generation-chip run-generation-any${generation === null ? ' run-generation-chosen' : ''}`}

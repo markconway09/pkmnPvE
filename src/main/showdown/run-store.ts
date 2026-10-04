@@ -685,10 +685,13 @@ export function startRun(
     fainted: []
   }
   run.choices = rollChoices(run)
-  // A title's free picks before the first floor: Daredevil an item, a move and an
-  // ability; Survivor an item.
-  if (hasTitle('Daredevil')) run.bonusPicks = ['item', 'move', 'ability']
-  else if (hasTitle('Survivor')) run.bonusPicks = ['item']
+  // The titles' free picks before the first floor: Survivor an item, Daredevil a move and
+  // an ability (both together give all three).
+  const bonusPicks: ('item' | 'move' | 'ability')[] = [
+    ...(hasTitle('Survivor') ? (['item'] as const) : []),
+    ...(hasTitle('Daredevil') ? (['move', 'ability'] as const) : [])
+  ]
+  if (bonusPicks.length > 0) run.bonusPicks = bonusPicks
   serveBonusPick(run)
   persist()
   return getRunView()!

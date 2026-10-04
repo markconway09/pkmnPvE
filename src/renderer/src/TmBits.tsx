@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import type { TmFind, TmInfo } from '../../shared/tms'
+import type { TmFind, TmInfo, TmQuickCheckResult } from '../../shared/tms'
 import { DEFAULT_SKILL_CHECK } from '../../shared/tms'
 import RarityCard, { RarityGlow } from './RarityCard'
 import { SkillCheckRing, type SkillCheckResult } from './SkillCheck'
 import { formatMoney } from './money'
-
+import ItemSprite from './ItemSprite'
 /** A TM's disc in its move's type colour (PokéSprite's TM icons). */
 export function tmIconUrl(type: string): string {
   return `./sprites/tms/${type.toLowerCase()}.png`
@@ -54,19 +54,33 @@ export function TmFindCard({ find }: { find: TmFind }): React.JSX.Element {
   )
 }
 
+/** A quick check's random item, shown on the same framed card a found TM gets. */
+export function ItemFindCard({ item }: { item: NonNullable<TmQuickCheckResult['item']> }): React.JSX.Element {
+  return (
+    <RarityCard tier={item.tier} framed className="tm-card tm-find-card">
+      <RarityGlow size={48} className="tm-card-art">
+        <ItemSprite spritenum={item.spritenum} />
+      </RarityGlow>
+      <span className="tm-card-name">{item.itemName}</span>
+      <span className="tm-card-sub">Item</span>
+      <span className="tm-find-note">No TM, but found an item!</span>
+    </RarityCard>
+  )
+}
+
 /**
  * The quick check on a wild win's result screen (once the Scanner is bought): one skill
  * check, and a Good or a Great has a small chance to turn up a TM from the area.
  */
 export function TmQuickCheck(): React.JSX.Element {
   const [runKey, setRunKey] = useState(0)
-  const [outcome, setOutcome] = useState<{ result: SkillCheckResult; find: TmFind | null } | null>(null)
+  const [outcome, setOutcome] = useState<{ result: SkillCheckResult; find: TmFind | null; item: TmQuickCheckResult['item'] } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   function onDone(result: SkillCheckResult, timedOut: boolean): void {
     window.api
       .takeTmQuickCheck(result, timedOut)
-      .then((r) => setOutcome({ result, find: r.find }))
+      .then((r) => setOutcome({ result, find: r.find, item: r.item ?? null }))
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
   }
 
@@ -82,6 +96,8 @@ export function TmQuickCheck(): React.JSX.Element {
           <SkillCheckRing runKey={runKey} settings={DEFAULT_SKILL_CHECK} onDone={onDone} />
           {outcome?.find ? (
             <TmFindCard find={outcome.find} />
+          ) : outcome?.item ? (
+            <ItemFindCard item={outcome.item} />
           ) : outcome ? (
             <span className="tm-quick-check-note">
               {outcome.result === 'miss' ? 'Nothing turned up.' : `A ${outcome.result === 'great' ? 'Great' : 'Good'} - but nothing turned up this time.`}

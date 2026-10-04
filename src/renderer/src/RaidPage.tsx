@@ -12,6 +12,7 @@ import {
 } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
 import { RarityGlow } from './RarityCard'
+import RarityOddsTooltip from './RarityOddsTooltip'
 
 interface Props {
   eligibility: BattleEligibility | null
@@ -120,9 +121,11 @@ function RaidPage({
           <img src="./sprites/misc/raidcrystal.png" alt="" />×{crystals}
           <span>Raid Crystal{crystals === 1 ? '' : 's'}</span>
         </div>
-        <button className="raid-start" disabled={!canStart} onClick={onStart}>
-          Start Max Raid
-        </button>
+        <RarityOddsTooltip source={{ kind: 'raid' }}>
+          <button className="raid-start" disabled={!canStart} onClick={onStart}>
+            Start Max Raid
+          </button>
+        </RarityOddsTooltip>
         {hint && <div className="raid-hero-hint">{hint}</div>}
         <div className="raid-get">
           <span>Get crystals:</span>

@@ -3,9 +3,9 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { FIELD_START_TERRAINS, FIELD_START_WEATHERS, type AiDifficulty, type StatBlock } from '../../shared/battle-types'
 import {
   CHAOS_BANNED_ABILITIES,
+  CHAOS_FORTRESS,
   CHAOS_GLASS_CANNON,
   CHAOS_MAX_SPIKES,
-  CHAOS_TUTOR_CHOICES,
   CHAOS_PICKS_PER_STAGE,
   CHAOS_STAT_BOOST,
   CHAOS_STAT_LABELS,
@@ -32,7 +32,6 @@ import {
   buildPokemonSummary,
   getEditorOptions,
   getItemSpritenum,
-  learnableMoveIds,
   moveDescription,
   speciesRarityTier,
   type PokemonSet
@@ -97,6 +96,7 @@ interface DraftPick {
   // Chaos: how many +50% boosts each stat has had, and how many Glass Cannons.
   boosts?: Partial<Record<keyof StatBlock, number>>
   glassCannon?: number
+  fortress?: number
 }
 
 interface StoredDraft {
@@ -123,9 +123,6 @@ interface StoredDraft {
   // Chaos: the field modifiers taken, and the modifiers on offer.
   chaosField?: ChaosField
   modifierOffer?: ChaosModifier[]
-  // Chaos: the Move Tutor's moves rolled for each Pokemon this modifier offer (by pick
-  // index) - kept, so asking again shows the same three.
-  tutorOffers?: Record<string, string[]>
 }
 
 function list<T>(value: T | T[] | undefined): T[] {
@@ -335,19 +332,20 @@ function offerModifiers(current: StoredDraft): void {
     ...(field.tailwind ? [] : [{ kind: 'tailwind' as const }]),
     ...(field.screens ? [] : [{ kind: 'screens' as const }]),
     ...(field.stealthRock ? [] : [{ kind: 'hazard' as const, id: 'stealthrock' as const }]),
+    ...(field.stickyWeb ? [] : [{ kind: 'hazard' as const, id: 'stickyweb' as const }]),
     ...((field.spikes ?? 0) >= CHAOS_MAX_SPIKES ? [] : [{ kind: 'hazard' as const, id: 'spikes' as const }]),
     ...(field.intimidate ? [] : [{ kind: 'intimidate' as const }]),
     { kind: 'ability' },
     { kind: 'stat' },
     { kind: 'tutor' },
     { kind: 'glasscannon' },
+    { kind: 'fortress' },
     { kind: 'wildcard' },
     { kind: 'item' }
   ]
   current.status = 'modifier'
   current.pack = []
   current.modifierOffer = offer
-  current.tutorOffers = {}
 }
 
 // On to the battle: a hard trainer bringing as many Pokemon as the player has.
@@ -355,7 +353,6 @@ function startChaosBattleStage(current: StoredDraft): void {
   current.status = 'battling'
   current.pack = []
   current.modifierOffer = []
-  current.tutorOffers = {}
   current.opponent = rollOpponent(setFormatsOf(current), current.picks.length)
   giveOpponentModifiers(current, current.opponent)
 }
@@ -382,6 +379,7 @@ function giveOpponentModifiers(current: StoredDraft, opponent: NonNullable<Store
     if (!theirs.tailwind) options.push(() => (theirs.tailwind = true))
     if (!theirs.screens) options.push(() => (theirs.screens = true))
     if (!theirs.stealthRock) options.push(() => (theirs.stealthRock = true))
+    if (!theirs.stickyWeb) options.push(() => (theirs.stickyWeb = true))
     if ((theirs.spikes ?? 0) < CHAOS_MAX_SPIKES) options.push(() => (theirs.spikes = (theirs.spikes ?? 0) + 1))
     if (!theirs.intimidate) options.push(() => (theirs.intimidate = true))
     pickRandom(options)()
@@ -437,31 +435,32 @@ export function chaosItemChoices(): { id: string; name: string; description: str
   return getEditorOptions().items.filter((i) => isUsefulHeldItem(i.id))
 }
 
-/** The Move Tutor's three moves for this Pokemon - rolled once per modifier offer. */
+// A move the Move Tutor can teach: any real move but Z-Moves, Max Moves and Struggle.
+function isTutorMove(id: string): boolean {
+  const move = Dex.moves.get(id)
+  return (
+    move.exists &&
+    move.num > 0 &&
+    !move.isZ &&
+    !move.isMax &&
+    move.id !== 'struggle' &&
+    move.isNonstandard !== 'CAP' &&
+    move.isNonstandard !== 'LGPE' &&
+    move.isNonstandard !== 'Gigantamax'
+  )
+}
+
+/** Every move the Move Tutor can teach this Pokemon (any move in the game it doesn't know). */
 export function chaosTutorMoves(pickIndex: number): ChaosTutorMove[] {
   const current = activeDraft('modifier')
   const pick = current.picks[pickIndex]
   if (!pick) throw new Error("That Pokémon isn't on your team")
-  current.tutorOffers ??= {}
-  let offer = current.tutorOffers[pickIndex]
-  if (!offer) {
-    const species = Dex.species.get(pick.set.species)
-    const known = new Set(pick.set.moves.map((m) => Dex.moves.get(m).id))
-    const options = [...new Set([...learnableMoveIds(species.id, 100), ...learnableMoveIds(Dex.species.get(species.baseSpecies).id, 100)])].filter((id) => {
-      const move = Dex.moves.get(id)
-      return move.exists && !move.isZ && !move.isMax && !known.has(move.id) && move.isNonstandard !== 'CAP'
-    })
-    offer = []
-    while (offer.length < CHAOS_TUTOR_CHOICES && options.length > 0) {
-      offer.push(options.splice(Math.floor(Math.random() * options.length), 1)[0])
-    }
-    current.tutorOffers[pickIndex] = offer
-    persist()
-  }
-  return offer.map((id) => {
-    const move = Dex.moves.get(id)
-    return { id: move.id, name: move.name, type: move.type, category: move.category, description: moveDescription(move) }
-  })
+  const known = new Set(pick.set.moves.map((m) => Dex.moves.get(m).id))
+  return Dex.moves
+    .all()
+    .filter((move) => isTutorMove(move.id) && !known.has(move.id))
+    .map((move) => ({ id: move.id, name: move.name, type: move.type, category: move.category, description: moveDescription(move) }))
+    .sort((a, b) => a.name.localeCompare(b.name))
 }
 
 // Wild Card: a random Pokemon from the tier above this draft's strongest (Ubers stays Ubers).
@@ -494,6 +493,7 @@ export function chooseChaosModifier(index: number, target?: ChaosModifierTarget)
   else if (modifier.kind === 'screens') field.screens = true
   else if (modifier.kind === 'intimidate') field.intimidate = true
   else if (modifier.kind === 'hazard' && modifier.id === 'stealthrock') field.stealthRock = true
+  else if (modifier.kind === 'hazard' && modifier.id === 'stickyweb') field.stickyWeb = true
   else if (modifier.kind === 'hazard') field.spikes = Math.min(CHAOS_MAX_SPIKES, (field.spikes ?? 0) + 1)
   else {
     const pick = target ? current.picks[target.pick] : undefined
@@ -508,6 +508,8 @@ export function chooseChaosModifier(index: number, target?: ChaosModifierTarget)
       pick.boosts = { ...pick.boosts, [stat]: (pick.boosts?.[stat] ?? 0) + 1 }
     } else if (modifier.kind === 'glasscannon') {
       pick.glassCannon = (pick.glassCannon ?? 0) + 1
+    } else if (modifier.kind === 'fortress') {
+      pick.fortress = (pick.fortress ?? 0) + 1
     } else if (modifier.kind === 'item') {
       const item = Dex.items.get(target?.item ?? '')
       if (!isUsefulHeldItem(item.id)) throw new Error('Pick an item')
@@ -516,13 +518,13 @@ export function chooseChaosModifier(index: number, target?: ChaosModifierTarget)
       const slot = target?.moveSlot ?? -1
       const learned = Dex.moves.get(target?.newMove ?? '')
       if (!pick.set.moves[slot]) throw new Error('Pick a move to forget')
-      if (!learned.exists || !current.tutorOffers?.[target!.pick]?.includes(learned.id)) throw new Error('Pick one of the offered moves')
+      if (!isTutorMove(learned.id) || pick.set.moves.some((m) => Dex.moves.get(m).id === learned.id)) throw new Error('Pick a move it can learn')
       pick.set.moves = pick.set.moves.map((m, i) => (i === slot ? learned.name : m))
     } else if (modifier.kind === 'wildcard') {
       // A new Pokemon in its place - the stat modifiers on that spot stay.
       const [replacement] = rollMons([wildCardTier(current)], 1, current.picks)
       if (!replacement) throw new Error('No Pokémon left to swap in')
-      current.picks[target!.pick] = { ...replacement, boosts: pick.boosts, glassCannon: pick.glassCannon }
+      current.picks[target!.pick] = { ...replacement, boosts: pick.boosts, glassCannon: pick.glassCannon, fortress: pick.fortress }
     }
   }
   current.chaosField = field
@@ -539,8 +541,13 @@ function boostMultipliers(pick: DraftPick): StatBlock {
   }
   const cannons = pick.glassCannon ?? 0
   if (cannons > 0) {
-    for (const stat of ['atk', 'spa'] as const) block[stat] *= CHAOS_GLASS_CANNON.attack ** cannons
+    for (const stat of ['atk', 'spa', 'spe'] as const) block[stat] *= CHAOS_GLASS_CANNON.attack ** cannons
     for (const stat of ['def', 'spd'] as const) block[stat] *= CHAOS_GLASS_CANNON.defense ** cannons
+  }
+  const fortresses = pick.fortress ?? 0
+  if (fortresses > 0) {
+    for (const stat of ['hp', 'def', 'spd'] as const) block[stat] *= CHAOS_FORTRESS.defense ** fortresses
+    for (const stat of ['atk', 'spa', 'spe'] as const) block[stat] *= CHAOS_FORTRESS.attack ** fortresses
   }
   return block
 }
@@ -551,6 +558,7 @@ function chaosTags(pick: DraftPick): string[] | undefined {
     ([stat, count]) => `${CHAOS_STAT_LABELS[stat]}${count > 1 ? ` x${count}` : ''}`
   )
   if (pick.glassCannon) tags.push(`Glass Cannon${pick.glassCannon > 1 ? ` x${pick.glassCannon}` : ''}`)
+  if (pick.fortress) tags.push(`Fortress${pick.fortress > 1 ? ` x${pick.fortress}` : ''}`)
   return tags.length > 0 ? tags : undefined
 }
 
@@ -577,6 +585,7 @@ function chaosStartField(
     if (field.tailwind) sideConditions.push({ side: own, id: 'tailwind' })
     if (field.screens) sideConditions.push({ side: own, id: 'reflect' }, { side: own, id: 'lightscreen' })
     if (field.stealthRock) sideConditions.push({ side: other, id: 'stealthrock' })
+    if (field.stickyWeb) sideConditions.push({ side: other, id: 'stickyweb' })
     if (field.spikes) sideConditions.push({ side: other, id: 'spikes', layers: field.spikes })
     if (field.intimidate) leadAtkDrop.push(other)
   })
@@ -591,7 +600,7 @@ function chaosStartField(
 
 function toView(pick: DraftPick): DraftMonView {
   const summary = buildPokemonSummary(pick.set.species, pick.set)
-  if (pick.boosts || pick.glassCannon) {
+  if (pick.boosts || pick.glassCannon || pick.fortress) {
     const multipliers = boostMultipliers(pick)
     const stats = { ...summary.stats }
     for (const key of Object.keys(stats) as (keyof StatBlock)[]) stats[key] = Math.floor(stats[key] * multipliers[key])

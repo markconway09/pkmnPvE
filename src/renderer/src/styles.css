@@ -1,6 +1,15 @@
+/* The Game Boy Pokemon Red/Blue text font ("Pokemon Classic" by TheLouster115, dafont, 100% free).
+   Its letters are a full em wide, so it is scaled down to stay close to Courier's width and keep layouts fitting. */
+@font-face {
+  font-family: 'Pokemon Classic';
+  src: url('./assets/fonts/PokemonClassic.ttf') format('truetype');
+  size-adjust: 75%;
+  font-display: block;
+}
+
 :root {
   color-scheme: dark;
-  font-family: 'Courier New', monospace;
+  font-family: 'Pokemon Classic', 'Courier New', monospace;
 }
 
 body {
@@ -1395,6 +1404,19 @@ textarea,
 @keyframes field-overlay-in {
   from {
     opacity: 0;
+  }
+}
+
+/* Terrain and rooms (Trick Room, Gravity...) rise up from below the scene as
+   they start, the way Showdown slides its terrain layer in. */
+.field-overlay-terrain {
+  animation: field-overlay-rise 0.4s ease-out;
+}
+
+@keyframes field-overlay-rise {
+  from {
+    opacity: 0;
+    clip-path: inset(100% 0 0 0);
   }
 }
 
@@ -4739,12 +4761,12 @@ button:disabled {
 }
 
 .ability-popup-left {
-  left: -40px;
+  left: 0;
   --ability-from: -24px;
 }
 
 .ability-popup-right {
-  right: -40px;
+  right: 0;
   --ability-from: 24px;
 }
 
@@ -6339,6 +6361,14 @@ img.wild-location-icon {
   color: #ffd76b;
 }
 
+/* The small "the" before the title ("Ash the Champion"). */
+.trainer-hud-title-the {
+  margin-right: 4px;
+  font-size: 0.75em;
+  font-weight: normal;
+  color: #c9c3b0;
+}
+
 /* The edit window's evolutions: every one there is, greyed out (with what it takes)
    until it's ready. */
 .editor-evolutions {
@@ -6405,8 +6435,8 @@ button.editor-evolution:disabled.editor-evolution-locked {
 }
 
 .roulette-wheel {
-  width: 250px;
-  height: 250px;
+  width: 290px;
+  height: 290px;
   display: block;
 }
 
@@ -11836,6 +11866,11 @@ button.trainer-danger {
   gap: 6px;
   width: 100%;
   padding: 7px 10px;
+  /* Well under the usual button text, so prices fit in the wider pixel font. */
+  font-size: 10px;
+  /* A fixed line height, so a "₽" (drawn from a fallback font) doesn't make the button
+     taller when a price swaps in. */
+  line-height: 12px;
   font-weight: bold;
   color: #ffd76b;
   background: rgba(255, 215, 107, 0.08);
@@ -12442,14 +12477,6 @@ button.trainer-danger {
   padding: 7px 12px;
 }
 
-/* Previewing another amount's total (a hovered bulk button's), in orange so it reads as
-   a preview rather than its own price. */
-.buy-button.buy-button-preview {
-  color: #ffb070;
-  background: rgba(255, 154, 60, 0.1);
-  border-color: rgba(255, 154, 60, 0.6);
-}
-
 /* The favorite heart on a Pokemon's card: a touch smaller, and without the screen's text shadow. */
 .box-icon-badges .box-icon-favorite {
   font-size: 10px;
@@ -13016,7 +13043,7 @@ button.trainer-danger {
 .shop-card .buy-button,
 .bag-card .buy-button {
   padding: 5px 6px;
-  font-size: 12px;
+  font-size: 10px;
   white-space: nowrap;
 }
 
@@ -13424,6 +13451,7 @@ img.sprite-smooth {
   font-size: 13px;
   color: #ffd76b;
   letter-spacing: 0.5px;
+  line-height: 1.15;
 }
 
 .menu-rail-spacer {
@@ -17984,18 +18012,15 @@ img.sprite-smooth {
   overflow: hidden;
 }
 
-/* ---- Box page, floating like the rest: the box's counts float in the top row between
-   the page name and the player card, the toolbar floats just under that row, and the
-   box itself is a floating card filling the rest (the dock floats over its bottom) ---- */
+/* ---- Box page, floating like the rest: the toolbar floats just under the top row, and
+   the box itself is a floating card filling the rest (the dock floats over its bottom),
+   its counts just above the toolbar ---- */
 .menu-page-box .box-summary {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  z-index: 26;
-  transform: translateX(-50%);
+  align-self: center;
   flex-wrap: nowrap;
   gap: 6px;
-  margin: 0;
+  width: fit-content;
+  margin: 64px auto 10px;
   padding: 5px 6px;
   border: 1px solid rgba(95, 212, 176, 0.24);
   border-radius: 16px;
@@ -18017,9 +18042,14 @@ img.sprite-smooth {
   font-size: 15px;
 }
 
-/* The toolbar (or the selection bar in its place) just under the top row. */
+/* The toolbar (or the selection bar in its place) just under the top row - or under the
+   counts once they're showing. */
 .menu-page-box .box-toolbar {
   margin-top: 64px;
+}
+
+.menu-page-box .box-summary + .box-toolbar {
+  margin-top: 0;
 }
 
 /* The box: a floating card. */
@@ -20470,6 +20500,7 @@ img.sprite-smooth {
 }
 
 .draft-modifier-glasscannon .draft-modifier-icon,
+.draft-modifier-fortress .draft-modifier-icon,
 .draft-modifier-wildcard .draft-modifier-icon {
   color: #f48fb1;
 }
@@ -20497,10 +20528,6 @@ img.sprite-smooth {
   align-items: center;
 }
 
-.draft-tutor-type {
-  font-size: 10px;
-  opacity: 0.7;
-}
 
 /* Options: the sound volume slider */
 /* One row per sound (menus, cries, music): on/off switch, name, slider, value, and the
@@ -21191,4 +21218,621 @@ img.sprite-smooth {
 /* Options: the move animation speed tabs. */
 .options-anim-tabs {
   max-width: 320px;
+}
+
+/* A double resist (1/4x) - or, from the receiving end, a 4x weakness - in a darker red
+   than a plain 1/2x, so the two read apart at a glance. */
+.eff-resisted.eff-strong {
+  background: #6b2014;
+}
+
+/* ---- Rarity chances: the tooltip over a case, raid or TM search button ---- */
+.rarity-odds-trigger {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.item-card-bar > .rarity-odds-trigger {
+  flex: 1;
+}
+
+.rarity-odds-panel {
+  width: 230px;
+}
+
+.rarity-odds-heading {
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #2f3746;
+  color: #c9d3e0;
+}
+
+.rarity-odds-note {
+  color: #8a93a3;
+}
+
+.rarity-odds-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 0;
+}
+
+.rarity-odds-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--tier);
+  box-shadow: 0 0 4px var(--tier);
+}
+
+.rarity-odds-name {
+  width: 66px;
+  flex: none;
+  color: var(--tier);
+  font-weight: bold;
+}
+
+.rarity-odds-bar {
+  flex: 1;
+  height: 5px;
+  border-radius: 3px;
+  background: #0f141b;
+  overflow: hidden;
+}
+
+.rarity-odds-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--tier);
+}
+
+.rarity-odds-chance {
+  min-width: 42px;
+  text-align: right;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A pop-up can be clicked to open that achievement or the daily missions. */
+.achievement-toast {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.achievement-toast:hover {
+  border-color: #f5d36b;
+}
+
+/* Surf / Muddy Water: a see-through curtain of water sweeping corner to corner. Its
+   front edge is the strongest, fading away to nothing behind so it has no back edge. */
+.anim-tide {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: linear-gradient(
+    to right,
+    rgba(47, 111, 214, 0) 0%,
+    rgba(47, 111, 214, 0.25) 45%,
+    rgba(56, 128, 230, 0.55) 88%,
+    rgba(150, 200, 255, 0.7) 97%,
+    rgba(220, 240, 255, 0.75) 100%
+  );
+  animation-name: anim-tide-kf;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+
+@keyframes anim-tide-kf {
+  0% {
+    transform: translate(var(--from-x), var(--from-y)) rotate(var(--tide-angle));
+  }
+  100% {
+    transform: translate(var(--to-x), var(--to-y)) rotate(var(--tide-angle));
+  }
+}
+
+
+.trainer-card-perk-hint {
+  font-size: 11px;
+  color: #8a94a6;
+  letter-spacing: 0;
+}
+
+/* The title dropdown's button: the picked title in gold, a caret that turns when open. */
+.title-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 34px;
+  padding: 0 10px 0 12px;
+  border: 1px solid #2f3746;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #212835, #191e27);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.3);
+  color: #ffd76b;
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 0;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.title-picker:hover:not(:disabled) {
+  border-color: #4a5468;
+}
+
+.title-picker-open {
+  border-color: #c9a64a;
+  box-shadow: 0 0 0 3px rgba(255, 215, 107, 0.12);
+}
+
+.title-picker-empty {
+  color: #7d889b;
+  font-weight: normal;
+}
+
+.title-picker:disabled {
+  color: #566073;
+  font-weight: normal;
+  cursor: default;
+  opacity: 0.7;
+}
+
+.title-picker-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.title-picker-caret {
+  font-size: 11px;
+  color: #8a94a6;
+  transition: transform 0.15s;
+}
+
+.title-picker-open .title-picker-caret {
+  transform: rotate(180deg);
+  color: #ffd76b;
+}
+
+/* The open list, floating over the card. */
+.title-picker-list {
+  position: fixed;
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px;
+  overflow-y: auto;
+  border: 1px solid #3a4354;
+  border-radius: 12px;
+  background: #161a22;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+  animation: title-picker-in 0.12s ease-out;
+}
+
+@keyframes title-picker-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.title-picker-option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.title-picker-option:hover {
+  background: #222936;
+}
+
+/* The one picked now: gold-tinted with a gold bar down its side. */
+.title-picker-option-picked {
+  border-color: rgba(255, 215, 107, 0.3);
+  background: rgba(255, 215, 107, 0.08);
+  box-shadow: inset 3px 0 0 #ffd76b;
+}
+
+.title-picker-option-picked:hover {
+  background: rgba(255, 215, 107, 0.12);
+}
+
+.title-picker-option-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.title-picker-option-name {
+  flex: 1;
+  color: #ffd76b;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.title-picker-option-empty .title-picker-option-name {
+  color: #8a94a6;
+  font-weight: normal;
+  font-style: italic;
+}
+
+/* "in Slots" - where High Roller sits now. */
+.title-picker-option-note {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: #2a3140;
+  color: #9aa6b8;
+  font-size: 10px;
+}
+
+.title-picker-option-perk {
+  color: #7fd08c;
+  font-size: 11px;
+  line-height: 14px;
+}
+
+/* Trainer Card: the Title Perks header, a full-width button that folds the list open. */
+.title-perks-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 2px 0;
+  border: none;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.title-perks-toggle:disabled {
+  cursor: default;
+}
+
+.title-perks-toggle-name {
+  font-size: 14px;
+  font-weight: bold;
+  color: #e6e6e6;
+}
+
+.title-perks-toggle-count {
+  flex: 1;
+  font-size: 11px;
+  color: #8a94a6;
+}
+
+.title-perks-toggle-action {
+  font-size: 11px;
+  color: #ffd76b;
+}
+
+.title-perks-toggle:hover:not(:disabled) .title-perks-toggle-action {
+  text-decoration: underline;
+}
+
+.title-perks-toggle-open .title-picker-caret {
+  transform: rotate(180deg);
+}
+
+/* The earned titles: a row each - name, perk and any clash - with its switch. */
+.title-perks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 320px;
+  margin-top: 10px;
+  padding-right: 4px;
+  overflow-y: auto;
+  animation: title-picker-in 0.15s ease-out;
+}
+
+.title-perk-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 215, 107, 0.25);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(255, 215, 107, 0.05), rgba(10, 13, 18, 0.35));
+  cursor: pointer;
+  transition: opacity 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.title-perk-row-off {
+  border-color: #2c3442;
+  background: rgba(10, 13, 18, 0.35);
+}
+
+.title-perk-row-off .title-perk-text {
+  opacity: 0.5;
+}
+
+.title-perk-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.title-perk-name {
+  color: #ffd76b;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.title-perk-desc {
+  color: #7fd08c;
+  font-size: 11px;
+  line-height: 14px;
+}
+
+.title-perk-clash {
+  color: #c99a5b;
+  font-size: 10px;
+  font-style: italic;
+}
+
+/* A small sliding switch: grey when off, gold when on. */
+.title-perk-switch {
+  appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 36px;
+  height: 20px;
+  margin: 0;
+  border: 1px solid #3a4354;
+  border-radius: 10px;
+  background: #1a1f28;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.title-perk-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #6b7588;
+  transition: transform 0.15s, background 0.15s;
+}
+
+.title-perk-switch:checked {
+  border-color: #c9a64a;
+  background: rgba(255, 215, 107, 0.25);
+}
+
+.title-perk-switch:checked::after {
+  transform: translateX(16px);
+  background: #ffd76b;
+}
+
+/* ---- Battle actions, in the floating-card look: the gimmick toggle a pill that lights
+   blue while on, Run a soft red pill (filled red while it asks for the second click,
+   Cancel a plain grey one), and the moves rounded tiles in their type's colour with a
+   soft sheen that lift and glow on hover ---- */
+.battle-action-slot-header {
+  min-height: 32px;
+}
+
+.battle-action-slot .gimmick-toggle,
+.battle-action-slot .run-cancel-button {
+  height: 32px;
+  padding: 0 14px;
+  box-sizing: border-box;
+  border: 1px solid #2f3746;
+  border-radius: 16px;
+  background: #1a1f28;
+  font-size: 13px;
+  font-weight: bold;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.battle-action-slot .gimmick-toggle:hover:not(:disabled) {
+  border-color: rgba(107, 176, 255, 0.5);
+  background: #222935;
+}
+
+/* The tick: an empty ring, filled blue with a check once on. */
+.gimmick-toggle-check {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  border: 1.5px solid #6b7588;
+  border-radius: 50%;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.battle-action-slot .gimmick-toggle-on {
+  border-color: rgba(107, 176, 255, 0.7);
+  background: rgba(107, 176, 255, 0.16);
+  color: #d6e9ff;
+  box-shadow: 0 0 10px rgba(107, 176, 255, 0.3);
+}
+
+.battle-action-slot .gimmick-toggle-on:hover:not(:disabled) {
+  border-color: #8cc4ff;
+  background: rgba(107, 176, 255, 0.22);
+}
+
+.gimmick-toggle-on .gimmick-toggle-check {
+  border-color: #6bb0ff;
+  background: #6bb0ff;
+}
+
+.gimmick-toggle-on .gimmick-toggle-check::after {
+  content: '';
+  position: absolute;
+  left: 3.5px;
+  top: 1px;
+  width: 3px;
+  height: 6px;
+  border: solid #10141a;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.battle-action-slot .gimmick-toggle .type-badge {
+  border-radius: 8px;
+}
+
+.battle-action-slot .run-cancel-button {
+  border-color: rgba(255, 107, 107, 0.45);
+  color: #ff8a80;
+}
+
+.battle-action-slot .run-cancel-button:hover:not(:disabled) {
+  border-color: #ff8a80;
+  background: rgba(224, 69, 59, 0.12);
+}
+
+.battle-action-slot .run-cancel-button.confirm-button {
+  border-color: #e0453b;
+  background: rgba(224, 69, 59, 0.25);
+  color: #ffd9d6;
+  box-shadow: 0 0 10px rgba(224, 69, 59, 0.35);
+}
+
+.battle-action-slot .run-cancel-button.run-cancel-back {
+  border-color: #2f3746;
+  color: #c9d1de;
+}
+
+.battle-action-slot .run-cancel-button.run-cancel-back:hover:not(:disabled) {
+  border-color: #4a5468;
+  background: #222935;
+}
+
+.battle-action-slot .menu-panel {
+  gap: 10px;
+}
+
+/* Same specificity as the type colours and later, so the sheen sits over them. */
+.battle-action-slot .move-button {
+  border-width: 1px;
+  border-radius: 14px;
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 45%, rgba(0, 0, 0, 0.16));
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    filter 0.15s ease;
+}
+
+.battle-action-slot .move-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.06);
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.45),
+    0 0 12px rgba(255, 255, 255, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.battle-action-slot .move-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.battle-action-slot .move-button:disabled {
+  filter: saturate(0.45);
+  box-shadow: none;
+}
+
+.battle-action-slot .move-button .eff-chip {
+  border-radius: 8px;
+}
+
+/* Explosion / Self-Destruct / Misty Explosion: a fireball blooming on the user
+   (white-hot core, the move's colour around it) under its blast wave. */
+.anim-wave.anim-blast {
+  border: none;
+  background: radial-gradient(circle, #fff 0%, #fff6c8 18%, currentcolor 45%, transparent 70%);
+  box-shadow: 0 0 40px currentcolor;
+  animation-name: anim-blast-kf;
+  animation-timing-function: ease-out;
+}
+
+@keyframes anim-blast-kf {
+  0% {
+    width: 10px;
+    height: 10px;
+    opacity: 1;
+  }
+  35% {
+    width: calc(var(--wave-size) * 0.8);
+    height: calc(var(--wave-size) * 0.8);
+    opacity: 1;
+  }
+  100% {
+    width: var(--wave-size);
+    height: var(--wave-size);
+    opacity: 0;
+  }
+}
+
+/* The editor's Everstone lock, under the Evolutions title - title and button stacked in
+   the strip's own height. Grey when off, stone-blue when locked. */
+.editor-evolutions-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.editor-everstone {
+  padding: 1px 8px;
+  border: 1px solid #4a5263;
+  border-radius: 10px;
+  background: #222834;
+  color: #b7c0cf;
+  font-size: 10px;
+  line-height: 16px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.editor-everstone:hover:not(:disabled) {
+  border-color: #8a9bb8;
+}
+
+.editor-everstone-on {
+  border-color: #7d93b8;
+  background: #2e3a50;
+  color: #dfe7f5;
+}
+
+.editor-everstone:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.editor-everstone-tip b {
+  color: #f0c050;
 }

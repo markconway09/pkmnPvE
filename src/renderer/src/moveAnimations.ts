@@ -12,6 +12,7 @@ import type { MoveInfo } from '../../shared/battle-types'
 // - quake: nothing flies - the field shakes hard and dust kicks up under the target
 // - eruption: the type's icons burst up from under the target (Earth Power)
 // - wave: a ring spreads out from the user across the field (Discharge, Hyper Voice)
+// - tide: a solid blue wave rises behind the user and rolls across over the foes (Surf, Muddy Water)
 // - melee: the user dashes in, with a slash, fist, kick or bite mark on the target
 // - burst / arrows: a status move - a ring of icons, or stat arrows rising or falling
 export type MoveAnimKind =
@@ -22,6 +23,7 @@ export type MoveAnimKind =
   | 'quake'
   | 'eruption'
   | 'wave'
+  | 'tide'
   | 'burst'
   | 'arrows'
   | 'melee'
@@ -55,6 +57,9 @@ export interface MoveAnimRecipe {
   arrows?: { dir: 'up' | 'down'; onSelf: boolean }
   // How many icons a stream pours out - more for a stronger move.
   streamCount?: number
+  // A self-destructing move (Explosion...): its wave bursts out of a blast on
+  // the user and the whole field rumbles while it spreads.
+  explosion?: boolean
 }
 
 const BASE_DURATION_MS = 600
@@ -64,6 +69,7 @@ const STRIKE_DURATION_MS = 520
 const QUAKE_DURATION_MS = 700
 const BEAM_DURATION_MS = 620
 const WAVE_DURATION_MS = 640
+const TIDE_DURATION_MS = 820
 const STREAM_DURATION_MS = 460
 const ERUPTION_DURATION_MS = 600
 const ARROWS_DURATION_MS = 700
@@ -131,6 +137,9 @@ const MOVE_KINDS: Record<string, MoveAnimKind> = {
   petalblizzard: 'wave',
   waterspout: 'wave',
   eruption: 'wave',
+  // A wall of water rolling over the foes.
+  surf: 'tide',
+  muddywater: 'tide',
   // Pours, not single shots.
   leafstorm: 'stream',
   bubblebeam: 'stream',
@@ -146,8 +155,15 @@ const MOVE_KINDS: Record<string, MoveAnimKind> = {
   electroball: 'projectile',
   voltswitch: 'projectile',
   chargebeam: 'beam',
-  electroweb: 'wave'
+  electroweb: 'wave',
+  // The user blows itself up - a blast wave out from it (see SELF_DESTRUCT_MOVES).
+  selfdestruct: 'wave',
+  explosion: 'wave',
+  mistyexplosion: 'wave'
 }
+
+// Moves where the user faints blowing itself up: their wave gets a blast and a field rumble.
+const SELF_DESTRUCT_MOVES = new Set(['selfdestruct', 'explosion', 'mistyexplosion'])
 
 // A priority move (Quick Attack, Extreme Speed, Sucker Punch...) plays this much faster.
 const PRIORITY_SPEED = 0.55
@@ -195,6 +211,7 @@ const KIND_DURATIONS: Record<MoveAnimKind, number> = {
   quake: QUAKE_DURATION_MS,
   eruption: ERUPTION_DURATION_MS,
   wave: WAVE_DURATION_MS,
+  tide: TIDE_DURATION_MS,
   burst: BURST_DURATION_MS,
   arrows: ARROWS_DURATION_MS,
   melee: MELEE_DURATION_MS
@@ -231,6 +248,10 @@ function baseAnimationFor(info: MoveInfo): MoveAnimRecipe {
     bigHit: bigHit || kind === 'quake'
   }
   if (kind === 'melee') recipe.mark = meleeMarkFor(info)
+  if (SELF_DESTRUCT_MOVES.has(info.id)) {
+    recipe.explosion = true
+    recipe.bigHit = true
+  }
   if (kind === 'stream') recipe.streamCount = Math.round(clampedLerp(info.basePower, 40, 120, 5, 9))
   return recipe
 }

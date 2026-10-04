@@ -7,10 +7,13 @@ import ItemSprite from './ItemSprite'
 import ShinyIcon from './ShinyIcon'
 import { formatMoney } from './money'
 import { playTick } from './ticks'
+import RarityOddsTooltip from './RarityOddsTooltip'
 
 interface Props {
   // What the Random Pokemon / Random Legendary was, and what it gave.
   itemName: string
+  // Its bag id, for the Open another button's odds.
+  itemId: string
   result: OpenItemResult
   // soldFor: the item won was sold right from the result, for this much.
   onClose: (soldFor?: number) => void
@@ -40,7 +43,7 @@ const TIER_LABELS: Record<RarityTier, string> = {
  * stop on the one won
  * (the game has already picked it - this only shows it). Click to skip to the end.
  */
-function CaseOpening({ itemName, result, onClose, onOpenAnother }: Props): React.JSX.Element {
+function CaseOpening({ itemId, itemName, result, onClose, onOpenAnother }: Props): React.JSX.Element {
   const viewportRef = useRef<HTMLDivElement>(null)
   const stripRef = useRef<HTMLDivElement>(null)
   const [offset, setOffset] = useState(0)
@@ -260,15 +263,17 @@ function CaseOpening({ itemName, result, onClose, onOpenAnother }: Props): React
               >
                 Auto merge
               </button>
-              <button
-                disabled={selling || result.remaining <= 0}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpenAnother(soldFor ?? undefined)
-                }}
-              >
-                Open another ({result.remaining} left)
-              </button>
+              <RarityOddsTooltip source={{ kind: 'item', itemId }}>
+                <button
+                  disabled={selling || result.remaining <= 0}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onOpenAnother(soldFor ?? undefined)
+                  }}
+                >
+                  Open another ({result.remaining} left)
+                </button>
+              </RarityOddsTooltip>
               <button
                 onClick={(e) => {
                   e.stopPropagation()

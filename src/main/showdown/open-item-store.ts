@@ -1,13 +1,15 @@
 import type { OpenItemResult, RarityTier, ReelEntry, ShopItemEntry } from '../../shared/battle-types'
 import { LOCK_CAPSULE_ITEM_ID, RANDOM_LEGENDARY_ITEM_ID, RANDOM_POKEMON_ITEM_ID } from '../../shared/battle-types'
 import { LEGEND_KEEPER_RESTRICTED_CHANCE } from '../../shared/titles'
-import { priceRarityTier } from '../../shared/rarity'
+import { certainRarity, mixRarityOdds, priceRarityTier, type RarityOdds } from '../../shared/rarity'
 import { hasTitle, monSellPrice } from './title-perks'
 import {
   buildBasicSet,
   pickRandomLegendarySpecies,
   pickRandomSwapSpecies,
   pickRandomUnevolvedAnySpecies,
+  randomLegendaryRarityOdds,
+  randomPokemonRarityOdds,
   randomNatureName,
   rollGiftShiny,
   sellPriceFor,
@@ -109,10 +111,40 @@ function pickCapsuleItem(pool: ShopItemEntry[]): ShopItemEntry {
   return rest[rest.length - 1]
 }
 
+// What a Lock Capsule can give: the shop at its own prices (not a title's discount), so
+// the odds and colours stay put.
+function capsulePool(): ShopItemEntry[] {
+  return listShop(false).filter((item) => item.id !== LOCK_CAPSULE_ITEM_ID && item.price > 0)
+}
+
+// A Lock Capsule's odds of each rarity colour, worked out the way pickCapsuleItem picks.
+function lockCapsuleRarityOdds(): RarityOdds {
+  const pool = capsulePool()
+  const parts: [number, RarityOdds][] = []
+  let jackpotChance = 0
+  for (const [itemId, chance] of CAPSULE_JACKPOTS) {
+    const jackpot = pool.find((item) => item.id === itemId)
+    if (!jackpot) continue
+    jackpotChance += chance
+    parts.push([chance, certainRarity(priceRarityTier(jackpot.price))])
+  }
+  const rest = pool.filter((item) => !CAPSULE_JACKPOTS.some(([id]) => id === item.id))
+  const total = rest.reduce((sum, item) => sum + 1 / item.price, 0)
+  for (const item of rest) parts.push([((1 - jackpotChance) * (1 / item.price)) / total, certainRarity(priceRarityTier(item.price))])
+  return mixRarityOdds(parts)
+}
+
+/** An openable bag item's odds of each rarity colour, for its Open button's tooltip (null if it isn't one). */
+export function openItemRarityOdds(itemId: string): RarityOdds | null {
+  if (itemId === LOCK_CAPSULE_ITEM_ID) return lockCapsuleRarityOdds()
+  if (itemId === RANDOM_POKEMON_ITEM_ID) return randomPokemonRarityOdds()
+  if (itemId === RANDOM_LEGENDARY_ITEM_ID) return randomLegendaryRarityOdds(hasTitle('Legend Keeper') ? LEGEND_KEEPER_RESTRICTED_CHANCE : 0)
+  return null
+}
+
 function openLockCapsule(): OpenItemResult {
   if (getItemQuantity(LOCK_CAPSULE_ITEM_ID) < 1) throw new Error("You don't have that item")
-  // At the Shop's own prices (not a title's discount), so the odds and colours stay put.
-  const pool = listShop(false).filter((item) => item.id !== LOCK_CAPSULE_ITEM_ID && item.price > 0)
+  const pool = capsulePool()
   if (pool.length === 0) throw new Error('The shop has nothing to give')
   const item = pickCapsuleItem(pool)
   const isNew = getItemQuantity(item.id) === 0

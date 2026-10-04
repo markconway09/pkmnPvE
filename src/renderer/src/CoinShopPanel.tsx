@@ -58,7 +58,6 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange }: Props): React.JSX.Eleme
   const [dailyMon, setDailyMon] = useState<DailyCoinMon | null>(null)
   const dailyMonRef = useRef<HTMLDivElement>(null)
   // A bulk button under the mouse: its prize's main button shows that many's total meanwhile.
-  const [bulkHover, setBulkHover] = useState<{ itemId: string; n: number } | null>(null)
   const notes = useFloatingNotes()
   // Today's TMs (a set only ever sold here) and the Scanner key item.
   const [tmShop, setTmShop] = useState<TmShopView | null>(null)
@@ -245,8 +244,6 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange }: Props): React.JSX.Eleme
         {PRIZES_BY_COST.map((prize) => {
           const item = items.get(prize.itemId)
           const locked = (prize.itemId === WISHING_PIECE_ITEM_ID || prize.itemId === SHINY_PATCH_ITEM_ID) && !raidLock?.unlocked
-          // The total shown on the main button: one's price, or a hovered bulk button's.
-          const previewing = bulkHover?.itemId === prize.itemId ? bulkHover.n : null
           return (
             <RarityCard
               key={prize.itemId}
@@ -266,11 +263,10 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange }: Props): React.JSX.Eleme
                 // One for its price, or five / ten at once beside it.
                 <BuyButtonGroup>
                   <BuyButton
-                    price={prize.coins * (previewing ?? 1)}
+                    price={prize.coins}
                     currency="coins"
                     held={coins}
                     busy={busy}
-                    previewing={previewing !== null}
                     onBuy={(e) => buyPrize(e, prize.itemId, 1)}
                   />
                   {BULK_AMOUNTS.map((n) => (
@@ -284,8 +280,6 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange }: Props): React.JSX.Eleme
                       label={`×${n}`}
                       title={`Trade ${n} for ${(prize.coins * n).toLocaleString('en-US')} coins`}
                       onBuy={(e) => buyPrize(e, prize.itemId, n)}
-                      onMouseEnter={() => setBulkHover({ itemId: prize.itemId, n })}
-                      onMouseLeave={() => setBulkHover(null)}
                     />
                   ))}
                 </BuyButtonGroup>

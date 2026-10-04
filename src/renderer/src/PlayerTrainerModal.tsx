@@ -3,9 +3,10 @@ import { createPortal } from 'react-dom'
 import type { LeagueMilestone, TrainerProfile } from '../../shared/battle-types'
 import { runDifficultyInfo } from '../../shared/battle-types'
 import type { AchievementsState } from '../../shared/achievements'
-import { titlePerk } from '../../shared/titles'
+import { titleClash, titlePerk } from '../../shared/titles'
 import { TITLE_CHANGED_EVENT } from './BetSlider'
 import { trainerSpriteUrl } from './trainerSprite'
+import TitlePicker from './TitlePicker'
 import TrainerSpritePicker from './TrainerSpritePicker'
 
 interface Props {
@@ -29,11 +30,13 @@ function PlayerTrainerModal({
   onClose
 }: Props): React.JSX.Element {
   const [pickerOpen, setPickerOpen] = useState(false)
+  // The title perks list, folded away until asked for.
+  const [perksOpen, setPerksOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const [profile, setProfile] = useState<TrainerProfile | null>(null)
-  // The titles earned from achievements, and the one shown.
-  const [titles, setTitles] = useState<Pick<AchievementsState, 'title' | 'titles'> | null>(null)
+  // The titles earned from achievements, the one shown and the ones turned off.
+  const [titles, setTitles] = useState<Pick<AchievementsState, 'title' | 'titles' | 'disabled'> | null>(null)
 
   useEffect(() => {
     window.api
@@ -56,6 +59,27 @@ function PlayerTrainerModal({
     }
   }
 
+  async function toggleTitle(title: string, active: boolean): Promise<void> {
+    try {
+      setTitles(await window.api.setTitleActive(title, active))
+      window.dispatchEvent(new Event(TITLE_CHANGED_EVENT))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  const earned = titles?.titles ?? []
+  const isOn = (title: string): boolean => !titles?.disabled.includes(title)
+  const onCount = earned.filter(isOn).length
+
+  // What a clashing title turns off when it goes on.
+  function clashNote(title: string): string | undefined {
+    const clash = titleClash(title)
+    if (!clash) return undefined
+    if (title === clash.lead) return `Turns off ${clash.rivals.join(', ')}`
+    return `Turns off ${clash.lead}`
+  }
+
   const league = profile?.league ?? []
   const countBeaten = (group: LeagueMilestone['group']): number =>
     league.filter((m) => m.group === group && m.defeated).length
@@ -73,28 +97,62 @@ function PlayerTrainerModal({
               <span className="trainer-sprite-change-hint">Click to change</span>
             </div>
           </button>
-          {/* The title shown beside the name - earned from achievements. */}
-          <label className="trainer-card-title">
+          {/* The title shown beside the name - earned from achievements, just for show. */}
+          <div className="trainer-card-title">
             <span>Title</span>
-            <select
-              value={titles?.title ?? ''}
-              disabled={!titles || titles.titles.length === 0}
-              onChange={(e) => void chooseTitle(e.target.value || null)}
-            >
-              <option value="">{titles && titles.titles.length === 0 ? 'None earned yet' : 'No title'}</option>
-              {titles?.titles.map((title) => (
-                <option key={title} value={title}>
-                  {title}
-                </option>
-              ))}
-            </select>
-            {/* What the shown title does - only that one's perk is active. */}
-            <span className="trainer-card-perk">
-              {titles?.title ? titlePerk(titles.title) : 'Earned from achievements - each one has a perk'}
-            </span>
-          </label>
+            <TitlePicker
+              value={titles?.title ?? null}
+              options={titles?.titles.map((title) => ({ title })) ?? []}
+              emptyLabel="No title"
+              noneLabel="None earned yet"
+              onChange={(title) => void chooseTitle(title)}
+            />
+            <span className="trainer-card-perk-hint">Shown beside your name - just for show</span>
+          </div>
         </div>
         {error && <p className="editor-error">{error}</p>}
+
+        {/* Every earned title's perk works for good - each can be turned off here. */}
+        <div className="editor-section title-perks-section">
+          <button
+            type="button"
+            className={`title-perks-toggle${perksOpen ? ' title-perks-toggle-open' : ''}`}
+            disabled={earned.length === 0}
+            onClick={() => setPerksOpen((o) => !o)}
+          >
+            <span className="title-perks-toggle-name">Title Perks</span>
+            <span className="title-perks-toggle-count">
+              {earned.length === 0 ? 'Earned from achievements' : `${onCount} of ${earned.length} on`}
+            </span>
+            {earned.length > 0 && <span className="title-perks-toggle-action">{perksOpen ? 'Hide' : 'Show'}</span>}
+            <span className="title-picker-caret" aria-hidden>
+              ▾
+            </span>
+          </button>
+          {perksOpen && (
+            <div className="title-perks-list">
+              {earned.map((title) => {
+                const on = isOn(title)
+                const note = clashNote(title)
+                return (
+                  <label key={title} className={`title-perk-row${on ? '' : ' title-perk-row-off'}`}>
+                    <span className="title-perk-text">
+                      <span className="title-perk-name">{title}</span>
+                      <span className="title-perk-desc">{titlePerk(title)}</span>
+                      {note && <span className="title-perk-clash">{note}</span>}
+                    </span>
+                    <input
+                      type="checkbox"
+                      className="title-perk-switch"
+                      checked={on}
+                      onChange={(e) => void toggleTitle(title, e.target.checked)}
+                    />
+                  </label>
+                )
+              })}
+            </div>
+          )}
+        </div>
 
         {profile && (
           <div className="editor-section">

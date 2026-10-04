@@ -14,18 +14,19 @@ import {
   TYCOON_BULK_MULTIPLIER
 } from '../../shared/titles'
 import { MAX_BET } from '../../shared/slots'
-import { getAchievementProgress } from './achievement-progress'
+import { claimedTitlesOf, getAchievementProgress } from './achievement-progress'
 
 /**
- * Title perks (see shared/titles): whether the logged-in player is showing a title, and
+ * Title perks (see shared/titles): whether the logged-in player has a title's perk on, and
  * the few perks that change a number used in more than one place. The rest are applied
  * right where they happen (a battle's exp, a catch, a run's start...).
  */
 
-/** Whether the player is showing this title right now - only the shown title's perk works. */
+/** Whether the player has claimed this title and not turned it off - its perk works. */
 export function hasTitle(title: Title): boolean {
   try {
-    return getAchievementProgress().title === title
+    const progress = getAchievementProgress()
+    return !progress.disabledTitles.includes(title) && claimedTitlesOf(progress.claimed).includes(title)
   } catch {
     // Nobody logged in.
     return false

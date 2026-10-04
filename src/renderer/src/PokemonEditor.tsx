@@ -2,12 +2,21 @@ import { useEffect, useRef, useState } from 'react'
 import { loadSpriteStyle } from './spriteStyle'
 import { createPortal } from 'react-dom'
 import type { AutoSetOption, EditablePokemonSet, EditorOptions, SpeciesEditInfo, StatBlock, BoxPokemonView } from '../../shared/battle-types'
-import { MERGE_MAX_STARS, NON_HELD_ITEM_IDS, mergeBonusText, mergeStarsFor, mergeStatMultiplier, toSpriteId } from '../../shared/battle-types'
+import {
+  MERGE_MAX_STARS,
+  NON_HELD_ITEM_IDS,
+  mergeBonusText,
+  mergeGrowthHolding,
+  mergeStarsFor,
+  mergeStatMultiplier,
+  toSpriteId
+} from '../../shared/battle-types'
 import type { RarityTier } from '../../shared/battle-types'
 import { starRow } from './MergeModal'
 import type { NatureOptionEntry } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
 import ItemSprite from './ItemSprite'
+import Tooltip from './Tooltip'
 import ShinyIcon from './ShinyIcon'
 import { itemIconStyle } from './itemIcon'
 import { TYPE_COLORS } from './moveAnimations'
@@ -64,6 +73,11 @@ interface Props {
   mergeCopies?: number
   // Its rarity - red and gold Pokemon get less from each star.
   rarityTier?: RarityTier
+  // Not fully evolved: how much more each star is worth (see BoxPokemonView.mergeGrowth -
+  // none while it holds an Eviolite), and its Everstone lock, toggled under the portrait.
+  mergeGrowth?: number
+  everstone?: BoxPokemonView['everstone']
+  onSetEverstone?: (locked: boolean) => void
 }
 
 // A sideways-scrolling strip (the evolutions and form changes): the mouse wheel scrolls it
@@ -85,14 +99,14 @@ function wheelScrollsSideways(strip: HTMLDivElement | null): void {
 }
 
 // A box Pokemon's stars and how far it is to the next one (stars at 2, 4, 8, 16, 32 copies).
-function MergeProgress({ copies, tier }: { copies: number; tier: RarityTier | undefined }): React.JSX.Element {
+function MergeProgress({ copies, tier, growth }: { copies: number; tier: RarityTier | undefined; growth: number }): React.JSX.Element {
   const stars = mergeStarsFor(copies)
   const maxed = stars >= MERGE_MAX_STARS
   const from = 2 ** stars
   const to = 2 ** (stars + 1)
   const percent = maxed ? 100 : ((copies - from) / (to - from)) * 100
   return (
-    <div className="editor-merge" title={stars > 0 ? `${mergeBonusText(stars, tier)} to all stats in classic battles` : 'Merge duplicates in to earn stars'}>
+    <div className="editor-merge" title={stars > 0 ? `${mergeBonusText(stars, tier, growth)} to all stats in classic battles` : 'Merge duplicates in to earn stars'}>
       <span className="merge-stars">{starRow(stars)}</span>
       <div className="editor-merge-bar">
         <div className="editor-merge-fill" style={{ width: `${percent}%` }} />
@@ -183,7 +197,10 @@ function PokemonEditor({
   focusForms = false,
   mergeStars,
   rarityTier,
-  mergeCopies
+  mergeCopies,
+  mergeGrowth,
+  everstone,
+  onSetEverstone
 }: Props): React.JSX.Element {
   // Premade team rosters are admin/debug tooling, not the player's own
   // Pokemon - they keep every option (no bag restriction, no level-gated
@@ -200,8 +217,13 @@ function PokemonEditor({
   const [loadedSet, setLoadedSet] = useState<string | null>(null)
   // The moves it knew when the editor opened: it keeps them at any level.
   const knownMovesRef = useRef<string[]>([])
+  // The item it held when the editor opened: still its own (not in the bag until saved),
+  // so it can be put back after taking it off, and counts as owned for an auto-filled set.
+  const [heldItem, setHeldItem] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Its merge growth as it stands, with the item picked here (an Eviolite cancels it).
+  const growth = mergeGrowthHolding(mergeGrowth, set?.item)
 
   // Premade team Pokemon can have a level that follows the player's level cap
   // (see capOffset); this is the cap it's shown against.
@@ -261,7 +283,7 @@ function PokemonEditor({
     if (!set || !autoSetId) return
     setAutoBusy(true)
     try {
-      const result = await window.api.buildAutoSet(set.species, set.level, autoSetId, isAdmin)
+      const result = await window.api.buildAutoSet(set.species, set.level, autoSetId, isAdmin, heldItem)
       setSet((prev) =>
         prev
           ? {
@@ -298,6 +320,7 @@ function PokemonEditor({
         setBagItemIds(bag ? new Set(bag.map((i) => i.id)) : null)
         setSet(mon)
         setLoadedSet(JSON.stringify(mon))
+        setHeldItem(mon.item ?? '')
         knownMovesRef.current = mon.moves.filter(Boolean)
         const info = await window.api.getSpeciesInfo(mon.species, isAdmin ? 100 : mon.level, knownMovesRef.current)
         if (cancelled) return
@@ -528,7 +551,7 @@ function PokemonEditor({
       ? options.items.filter(
           (i) =>
             !NON_HELD_ITEM_IDS.has(i.id) &&
-            (isAdmin || bagItemIds!.has(i.id)) &&
+            (isAdmin || bagItemIds!.has(i.id) || (heldItem !== '' && i.name === heldItem)) &&
             i.name.toLowerCase().includes(itemQuery.toLowerCase())
         )
       : []
@@ -594,7 +617,7 @@ function PokemonEditor({
                       )}
                     </span>
                   </div>
-                  {mergeCopies !== undefined && <MergeProgress copies={mergeCopies} tier={rarityTier} />}
+                  {mergeCopies !== undefined && <MergeProgress copies={mergeCopies} tier={rarityTier} growth={growth} />}
                 </div>
 
                 <div className="pokemon-editor-details">
@@ -771,7 +794,37 @@ function PokemonEditor({
               <div className="editor-previews-row">
                 {onEvolve && evolutionPaths && evolutionPaths.length > 0 && (
                   <div className="editor-section">
-                    <h3>Evolutions</h3>
+                    {/* Not fully evolved: an Everstone lock under the title - it stops evolving but takes
+                        merges, for good once it has. */}
+                    <div className="editor-evolutions-heading">
+                      <h3>Evolutions</h3>
+                      {everstone && onSetEverstone && (
+                        <Tooltip
+                          placement="below"
+                          content={
+                            <span className="tooltip-panel editor-everstone-tip">
+                              {everstone.locked
+                                ? everstone.canUnlock
+                                  ? 'Locked: it never evolves, but takes merges. Click to take the Everstone off.'
+                                  : 'Locked for good: it has taken merges, so it never evolves.'
+                                : 'Lock it with an Everstone: it never evolves, but it can take merges.'}
+                              <br />
+                              Each merge star: <b>{mergeBonusText(1, rarityTier, growth)}</b> to all stats
+                              {growth > 1 ? ' (more than an evolved one gets)' : ''}
+                            </span>
+                          }
+                        >
+                          <button
+                            type="button"
+                            className={`editor-everstone${everstone.locked ? ' editor-everstone-on' : ''}`}
+                            disabled={everstone.locked && !everstone.canUnlock}
+                            onClick={() => onSetEverstone(!everstone.locked)}
+                          >
+                            {everstone.locked ? 'Everstone locked' : 'Lock with Everstone'}
+                          </button>
+                        </Tooltip>
+                      )}
+                    </div>
                     <div className="editor-evolutions" ref={wheelScrollsSideways}>
                       {evolutionPaths.map((evo) => (
                         <button
@@ -779,7 +832,13 @@ function PokemonEditor({
                           type="button"
                           className={`editor-evolution${evo.ready ? '' : ' editor-evolution-locked'}`}
                           disabled={!evo.ready}
-                          title={evo.ready ? `Evolve into ${evo.species}` : `Not yet: ${evo.method}`}
+                          title={
+                            everstone?.locked
+                              ? 'Locked with an Everstone - it never evolves'
+                              : evo.ready
+                                ? `Evolve into ${evo.species}`
+                                : `Not yet: ${evo.method}`
+                          }
                           onClick={() => onEvolve(evo.species)}
                         >
                           <SpriteImage
@@ -918,9 +977,9 @@ function PokemonEditor({
                     {!!mergeStars && (
                       <span
                         className="merge-stat-badge"
-                        title={`Merged ★${mergeStars}: ${mergeBonusText(mergeStars, rarityTier)} to all stats in classic battles - shown in gold beside each stat`}
+                        title={`Merged ★${mergeStars}: ${mergeBonusText(mergeStars, rarityTier, growth)} to all stats in classic battles - shown in gold beside each stat`}
                       >
-                        ★{mergeStars} {mergeBonusText(mergeStars, rarityTier)}
+                        ★{mergeStars} {mergeBonusText(mergeStars, rarityTier, growth)}
                       </span>
                     )}
                   </h3>
@@ -993,7 +1052,7 @@ function PokemonEditor({
                           <span className="editor-ev-stat-merged" title={`With the ★${mergeStars} merge bonus`}>
                             {Math.floor(
                               finalStat(key, baseStats[key], set.level, set.ivs[key], set.evs[key], nature) *
-                                mergeStatMultiplier(mergeStars, rarityTier)
+                                mergeStatMultiplier(mergeStars, rarityTier, growth)
                             )}
                           </span>
                         )}

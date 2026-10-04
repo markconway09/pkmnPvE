@@ -19,6 +19,9 @@ import packageJson from '../../package.json'
 // "owner/name" of the public GitHub repo whose Releases hold the builds.
 const REPO: string = (packageJson as { updateRepo?: string }).updateRepo ?? ''
 const ZIP_ASSET = /-win\.zip$/i
+// A dropped download resumes up to this many times; a connection silent this long counts as dropped.
+const DOWNLOAD_TRIES = 5
+const STALL_MS = 30_000
 
 // "0.2.10" > "0.2.9": compares dotted version numbers part by part.
 function isNewer(latest: string, current: string): boolean {
@@ -140,26 +143,59 @@ export async function installUpdate(sender: WebContents): Promise<void> {
   // Download, reporting how far along it is. Each chunk is copied before it's
   // written: the buffers fetch hands out can be reused for the next chunk, which
   // silently corrupted the file when they were written straight from the stream.
+  // GitHub's file server sometimes drops a long download partway through, so a
+  // dropped (or silent for STALL_MS) connection picks up where it stopped with an
+  // HTTP Range request, a few times, before giving up.
   const zipPath = join(work, asset.name)
-  const res = await fetch(asset.browser_download_url, { headers: { 'User-Agent': 'pkmnPvE-updater' } })
-  if (!res.ok || !res.body) throw new Error(`Download failed (${res.status})`)
   const file = await open(zipPath, 'w')
-  const hash = createHash('sha256')
+  let hash = createHash('sha256')
   let received = 0
   let lastReported = 0
+  let failures = 0
   try {
-    const reader = res.body.getReader()
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
-      const chunk = Buffer.from(value)
-      hash.update(chunk)
-      await file.write(chunk)
-      received += chunk.length
-      if (received - lastReported > 2_000_000) {
-        lastReported = received
-        sender.send('update:progress', { phase: 'downloading', received, total: asset.size })
+    while (received < asset.size) {
+      const controller = new AbortController()
+      let stall: NodeJS.Timeout | undefined
+      const resetStall = (): void => {
+        clearTimeout(stall)
+        stall = setTimeout(() => controller.abort(), STALL_MS)
       }
+      try {
+        resetStall()
+        const headers: Record<string, string> = { 'User-Agent': 'pkmnPvE-updater' }
+        if (received > 0) headers.Range = `bytes=${received}-`
+        const res = await fetch(asset.browser_download_url, { headers, signal: controller.signal })
+        if (!res.ok || !res.body) throw new Error(`Download failed (${res.status})`)
+        // The server ignored the Range and sent the whole file - start over cleanly.
+        if (received > 0 && res.status !== 206) {
+          await file.truncate(0)
+          hash = createHash('sha256')
+          received = 0
+        }
+        const reader = res.body.getReader()
+        for (;;) {
+          const { done, value } = await reader.read()
+          if (done) break
+          resetStall()
+          const chunk = Buffer.from(value)
+          hash.update(chunk)
+          await file.write(chunk, 0, chunk.length, received)
+          received += chunk.length
+          if (received - lastReported > 2_000_000) {
+            lastReported = received
+            sender.send('update:progress', { phase: 'downloading', received, total: asset.size })
+          }
+        }
+      } catch {
+        // Dropped or stalled - retried below.
+      } finally {
+        clearTimeout(stall)
+      }
+      if (received >= asset.size) break
+      if (++failures >= DOWNLOAD_TRIES) {
+        throw new Error('The download kept dropping out - check your connection and try again')
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2000 * failures))
     }
   } finally {
     await file.close()

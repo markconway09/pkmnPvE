@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import CoinIcon from './CoinIcon'
-import { formatMoney, formatMoneyShort, formatShort } from './money'
+import { formatMoney, formatShort } from './money'
 
 interface Props {
   // What it costs, in coins or Poke Dollars.
@@ -16,14 +16,10 @@ interface Props {
   soldOut?: boolean
   // In place of the price (a bulk button's "×5").
   label?: ReactNode
-  // Showing another amount's total for now (a hovered bulk button's) - drawn in orange.
-  previewing?: boolean
   // Narrow, beside a wider one in a BuyButtonGroup.
   compact?: boolean
   // Its tooltip - while it can't be afforded, how much more is needed shows instead.
   title?: string
-  onMouseEnter?: () => void
-  onMouseLeave?: () => void
 }
 
 /**
@@ -40,11 +36,8 @@ function BuyButton({
   busy,
   soldOut,
   label,
-  previewing,
   compact,
-  title,
-  onMouseEnter,
-  onMouseLeave
+  title
 }: Props): React.JSX.Element {
   const short = !soldOut && held !== null && held < price
   const missing = held === null ? 0 : price - held
@@ -53,25 +46,23 @@ function BuyButton({
       ? `${missing.toLocaleString('en-US')} more coins needed`
       : `${formatMoney(missing)} more needed`
     : undefined
-  // The price with its thousands as k ("₽1.5k", "25k") - the exact amount on hover.
+  // The price with its thousands as k ("₽ 1.5k", "25k") - the exact amount on hover.
   const priceLabel =
     currency === 'coins' ? (
       <>
         <CoinIcon /> {formatShort(price)}
       </>
     ) : (
-      formatMoneyShort(price)
+      `₽ ${formatShort(price)}`
     )
   const exactPrice = currency === 'coins' ? `${price.toLocaleString('en-US')} coins` : formatMoney(price)
   return (
     <button
-      className={`buy-button${compact ? ' buy-button-compact' : ''}${short ? ' buy-button-short' : ''}${previewing ? ' buy-button-preview' : ''}`}
+      className={`buy-button${compact ? ' buy-button-compact' : ''}${short ? ' buy-button-short' : ''}`}
       data-sfx="buy"
       disabled={busy || soldOut || held === null || held < price}
       title={shortTitle ?? title ?? exactPrice}
       onClick={onBuy}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
     >
       {soldOut ? 'Sold out' : (label ?? priceLabel)}
     </button>
@@ -85,8 +76,6 @@ interface SellProps {
   busy?: boolean
   // Narrow, beside a wider one in a BuyButtonGroup.
   compact?: boolean
-  // Showing another amount for now (what selling the whole stack pays) - drawn in orange.
-  previewing?: boolean
   title?: string
   onMouseEnter?: () => void
   onMouseLeave?: () => void
@@ -98,14 +87,13 @@ export function SellButton({
   onSell,
   busy,
   compact,
-  previewing,
   title,
   onMouseEnter,
   onMouseLeave
 }: SellProps): React.JSX.Element {
   return (
     <button
-      className={`buy-button${compact ? ' buy-button-compact' : ''}${previewing ? ' buy-button-preview' : ''}`}
+      className={`buy-button${compact ? ' buy-button-compact' : ''}`}
       data-sfx="buy"
       disabled={busy}
       title={title}

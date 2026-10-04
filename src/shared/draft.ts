@@ -108,14 +108,15 @@ export const CHAOS_PICKS_PER_STAGE = 2
 // A stat boost multiplies the stat by this (boosts on the same stat stack).
 export const CHAOS_STAT_BOOST = 1.5
 
-// Glass Cannon: both attacking stats times the first, both defending ones times the second.
+// Glass Cannon: both attacking stats and Speed times the first, both defending ones times
+// the second. Fortress is the other way round: both attacking stats and Speed times its
+// second, HP and both defending stats times its first.
 export const CHAOS_GLASS_CANNON = { attack: 1.5, defense: 0.7 }
-// Move Tutor: how many moves it offers to learn.
-export const CHAOS_TUTOR_CHOICES = 3
+export const CHAOS_FORTRESS = { defense: 1.5, attack: 0.7 }
 // Spikes stack up to three layers.
 export const CHAOS_MAX_SPIKES = 3
 
-export type ChaosHazard = 'stealthrock' | 'spikes'
+export type ChaosHazard = 'stealthrock' | 'spikes' | 'stickyweb'
 
 export type ChaosModifier =
   // Battle start: the field every battle begins with.
@@ -131,11 +132,12 @@ export type ChaosModifier =
   | { kind: 'stat' }
   | { kind: 'tutor' }
   | { kind: 'glasscannon' }
+  | { kind: 'fortress' }
   | { kind: 'wildcard' }
   | { kind: 'item' }
 
 // The modifiers that go on one of the player's Pokemon.
-export const CHAOS_MON_MODIFIERS: ChaosModifier['kind'][] = ['ability', 'stat', 'tutor', 'glasscannon', 'wildcard', 'item']
+export const CHAOS_MON_MODIFIERS: ChaosModifier['kind'][] = ['ability', 'stat', 'tutor', 'glasscannon', 'fortress', 'wildcard', 'item']
 
 // How every chaos battle starts from now on. Weather and terrain last until a move or
 // ability replaces them, Trick Room until someone uses Trick Room; Tailwind (4 turns) and
@@ -148,6 +150,7 @@ export interface ChaosField {
   tailwind?: boolean
   screens?: boolean
   stealthRock?: boolean
+  stickyWeb?: boolean
   spikes?: number
   intimidate?: boolean
 }
@@ -163,7 +166,7 @@ export interface ChaosModifierTarget {
   newMove?: string
 }
 
-// A move the Move Tutor offers.
+// A move the Move Tutor can teach (any move in the game).
 export interface ChaosTutorMove {
   id: string
   name: string

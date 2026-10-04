@@ -4,6 +4,7 @@ import { TM_PITY_SEARCHES, TM_SEARCH_CHARGES_PER_DAY, type TmState } from '../..
 import TmSearchModal from './TmSearchModal'
 import ItemSprite from './ItemSprite'
 import { TR_SPRITENUM } from './itemIcon'
+import RarityOddsTooltip from './RarityOddsTooltip'
 
 /**
  * Classic's TM search: the searches left in each area today, and the search window while
@@ -56,23 +57,27 @@ export function TmSearchStrip({ location, state, disabled, onSearch }: StripProp
   const left = state?.charges[location.id] ?? 0
   const pity = state?.pity[location.id] ?? 0
   return (
-    <button
-      className={`tm-search-strip${left === 0 ? ' tm-search-strip-empty' : ''}`}
-      disabled={disabled || !state || left === 0}
-      title={
+    <RarityOddsTooltip
+      source={{ kind: 'tm', location: location.id }}
+      heading={
         left > 0
           ? `Search ${location.label} for a TM - ${left} left today · ${Math.max(0, TM_PITY_SEARCHES - pity)} more without a purple and the next is sure to be one`
           : 'No searches left here today - back tomorrow'
       }
-      onClick={onSearch}
     >
-      <span className="tm-search-strip-icon">
-        <ItemSprite spritenum={TR_SPRITENUM} />
-      </span>
-      <span className="tm-search-strip-label">TM search</span>
-      <span className="tm-search-strip-left">
-        {left}/{TM_SEARCH_CHARGES_PER_DAY}
-      </span>
-    </button>
+      <button
+        className={`tm-search-strip${left === 0 ? ' tm-search-strip-empty' : ''}`}
+        disabled={disabled || !state || left === 0}
+        onClick={onSearch}
+      >
+        <span className="tm-search-strip-icon">
+          <ItemSprite spritenum={TR_SPRITENUM} />
+        </span>
+        <span className="tm-search-strip-label">TM search</span>
+        <span className="tm-search-strip-left">
+          {left}/{TM_SEARCH_CHARGES_PER_DAY}
+        </span>
+      </button>
+    </RarityOddsTooltip>
   )
 }

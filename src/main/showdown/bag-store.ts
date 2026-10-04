@@ -56,7 +56,7 @@ function retireItems(bag: StoredBag): boolean {
  * Coin Shop price for a coin prize; key items are gold, Mega Stones red, evolution items
  * purple, and anything else grey.
  */
-function bagItemRarity(itemId: string): RarityTier {
+export function bagItemRarity(itemId: string): RarityTier {
   const price = shopPriceFor(itemId)
   if (price !== null) return priceRarityTier(price)
   const prize = COIN_PRIZES.find((p) => p.itemId === itemId)

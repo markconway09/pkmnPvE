@@ -87,7 +87,9 @@ function modifierText(modifier: ChaosModifier): { icon: string; title: string; t
     case 'hazard':
       return modifier.id === 'stealthrock'
         ? { icon: '◆', title: 'Stealth Rock', text: "Stealth Rock on the opponent's side from the start of every battle" }
-        : { icon: '⋀', title: 'Spikes', text: "A layer of Spikes on the opponent's side from the start of every battle (up to 3)" }
+        : modifier.id === 'stickyweb'
+          ? { icon: '✱', title: 'Sticky Web', text: "Sticky Web on the opponent's side from the start of every battle (-1 Speed on switch-in)" }
+          : { icon: '⋀', title: 'Spikes', text: "A layer of Spikes on the opponent's side from the start of every battle (up to 3)" }
     case 'intimidate':
       return { icon: '☠', title: 'Intimidating Aura', text: "The opponent's lead starts every battle at -1 Attack" }
     case 'ability':
@@ -95,9 +97,11 @@ function modifierText(modifier: ChaosModifier): { icon: string; title: string; t
     case 'stat':
       return { icon: '▲', title: 'Stat Boost', text: '+50% to one stat of one of your Pokémon, for good' }
     case 'tutor':
-      return { icon: '✎', title: 'Move Tutor', text: 'Swap one of its moves for one of 3 random moves it can learn' }
+      return { icon: '✎', title: 'Move Tutor', text: 'Swap one of its moves for any move in the game' }
+    case 'fortress':
+      return { icon: '⛨', title: 'Fortress', text: '+50% HP, Defense and Sp. Def, -30% Attack, Sp. Atk and Speed' }
     case 'glasscannon':
-      return { icon: '✸', title: 'Glass Cannon', text: '+50% Attack and Sp. Atk, -30% Defense and Sp. Def' }
+      return { icon: '✸', title: 'Glass Cannon', text: '+50% Attack, Sp. Atk and Speed, -30% Defense and Sp. Def' }
     case 'wildcard':
       return { icon: '⁇', title: 'Wild Card', text: 'Swap it for a random Pokémon from the tier above (its stat modifiers stay)' }
     case 'item':
@@ -123,6 +127,7 @@ function ChaosFieldChips({ field }: { field?: ChaosField }): React.JSX.Element |
     field.tailwind ? 'Tailwind' : null,
     field.screens ? 'Screens' : null,
     field.stealthRock ? 'Stealth Rock' : null,
+    field.stickyWeb ? 'Sticky Web' : null,
     field.spikes ? `Spikes${field.spikes > 1 ? ` x${field.spikes}` : ''}` : null,
     field.intimidate ? 'Intimidating Aura' : null
   ].filter((c): c is string => !!c)
@@ -265,7 +270,7 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offerKey])
 
-  // Move Tutor: its three moves for the chosen Pokemon.
+  // Move Tutor: every move the chosen Pokemon can be taught.
   const tutorFor = draft?.status === 'modifier' && modifierIndex !== null && draft.modifierOffer?.[modifierIndex]?.kind === 'tutor' ? modifierMon : null
   useEffect(() => {
     if (tutorFor === null) return
@@ -719,21 +724,13 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
                 </button>
               ))}
             </div>
-            <div className="trainer-chips draft-modifier-choices">
-              <span className="draft-modifier-group-label">Learn</span>
-              {tutorMoves.map((move) => (
-                <button
-                  key={move.id}
-                  type="button"
-                  className={`trainer-chip${tutorMove === move.id ? ' trainer-chip-on' : ''}`}
-                  disabled={disabled}
-                  title={`${move.type} · ${move.category} - ${move.description}`}
-                  onClick={() => setTutorMove(move.id)}
-                >
-                  {move.name} <span className="draft-tutor-type">{move.type}</span>
-                </button>
-              ))}
-            </div>
+            <span className="draft-modifier-group-label">Learn</span>
+            {searchList(
+              tutorMoves.map((move) => ({ id: move.id, name: move.name, description: `${move.type} · ${move.category} - ${move.description}` })),
+              tutorMove,
+              setTutorMove,
+              'Search moves...'
+            )}
           </div>
         )}
         <button

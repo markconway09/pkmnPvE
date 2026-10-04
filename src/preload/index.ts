@@ -1,4 +1,5 @@
 import type { MissionClaimResult, MissionsState } from '../shared/missions'
+import type { RarityOdds, RarityOddsSource } from '../shared/rarity'
 import { contextBridge, ipcRenderer } from 'electron'
 import type { LocalMusicFile } from '../shared/music'
 import type { CoinBalance, DailyCoinMon, DailyCoinMonPurchase, DailyCoinOffer, SlotRules, SlotSpinResult } from '../shared/slots'
@@ -165,6 +166,7 @@ const api = {
     ipcRenderer.invoke('box:updateMon', id, set, admin),
   evolveMon: (id: string, targetSpecies: string): Promise<BoxState> => ipcRenderer.invoke('box:evolve', id, targetSpecies),
   levelUpMon: (id: string): Promise<BoxState> => ipcRenderer.invoke('box:levelUp', id),
+  setEverstone: (id: string, locked: boolean): Promise<BoxState> => ipcRenderer.invoke('box:setEverstone', id, locked),
   toggleFavorite: (id: string): Promise<BoxState> => ipcRenderer.invoke('box:toggleFavorite', id),
   // The companion beside the team: a max-friendship Pokemon out of the box, and back again.
   setCompanion: (id: string): Promise<BoxState> => ipcRenderer.invoke('box:setCompanion', id),
@@ -211,6 +213,9 @@ const api = {
   claimAchievement: (id: string): Promise<AchievementClaimResult> => ipcRenderer.invoke('achievements:claim', id),
   setAchievementTitle: (title: string | null): Promise<AchievementsState> =>
     ipcRenderer.invoke('achievements:setTitle', title),
+  // Turns a claimed title's perk on or off (clashing titles move with it).
+  setTitleActive: (title: string, active: boolean): Promise<AchievementsState> =>
+    ipcRenderer.invoke('achievements:setTitleActive', title, active),
   // Achievements just unlocked (their names); returns a function to stop listening.
   onAchievementsUnlocked: (listener: (names: string[]) => void): (() => void) => {
     const handler = (_event: unknown, names: string[]): void => listener(names)
@@ -244,7 +249,7 @@ const api = {
   hitBlackjack: (): Promise<BlackjackView> => ipcRenderer.invoke('blackjack:hit'),
   standBlackjack: (): Promise<BlackjackView> => ipcRenderer.invoke('blackjack:stand'),
   doubleBlackjack: (): Promise<BlackjackView> => ipcRenderer.invoke('blackjack:double'),
-  // What the player's title changes in the Game Corner (the bet cap, Plinko's edges).
+  // What the player's titles change in the Game Corner (the bet cap, Plinko's edges).
   getGameCornerPerks: (): Promise<GameCornerPerks> => ipcRenderer.invoke('gamecorner:perks'),
   getRouletteHistory: (): Promise<number[]> => ipcRenderer.invoke('roulette:history'),
   // The bets on the board: bet key ('n:17', 'red', 'dozen:2'...) -> coins on it.
@@ -265,8 +270,13 @@ const api = {
     return () => ipcRenderer.removeListener('update:progress', handler)
   },
   listAutoSets: (species: string): Promise<AutoSetOption[]> => ipcRenderer.invoke('autoSets:list', species),
-  buildAutoSet: (species: string, level: number, optionId: string, admin: boolean): Promise<AutoSetResult> =>
-    ipcRenderer.invoke('autoSets:build', species, level, optionId, admin),
+  buildAutoSet: (
+    species: string,
+    level: number,
+    optionId: string,
+    admin: boolean,
+    heldItem?: string
+  ): Promise<AutoSetResult> => ipcRenderer.invoke('autoSets:build', species, level, optionId, admin, heldItem),
   // Debug menu (admins only): sets the money and coins outright.
   debugSetWallet: (money: number, coins: number): Promise<{ money: number; coins: number }> =>
     ipcRenderer.invoke('debug:setWallet', money, coins),
@@ -282,6 +292,7 @@ const api = {
   sellItems: (entries: ItemQuantity[]): Promise<SellResult> => ipcRenderer.invoke('bag:sellMany', entries),
   quickSellSelection: (): Promise<ItemQuantity[]> => ipcRenderer.invoke('bag:quickSellSelection'),
   openBagItem: (itemId: string): Promise<OpenItemResult> => ipcRenderer.invoke('bag:open', itemId),
+  getRarityOdds: (source: RarityOddsSource): Promise<RarityOdds | null> => ipcRenderer.invoke('rarity:odds', source),
   getGalarFossilPartners: (itemId: string): Promise<GalarFossilPartner[]> =>
     ipcRenderer.invoke('fossil:galarPartners', itemId),
   restoreFossil: (itemId: string, secondItemId?: string): Promise<RestoreFossilResult> =>

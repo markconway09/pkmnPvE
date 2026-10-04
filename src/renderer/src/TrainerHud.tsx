@@ -69,7 +69,12 @@ function TrainerHud({ name, title, spriteId, roster, align, size = 'small', rewa
   const nameRow = (
     <div className="trainer-hud-name">
       {name}
-      {title && <span className="trainer-hud-title">{title}</span>}
+      {title && (
+        <span className="trainer-hud-title">
+          <span className="trainer-hud-title-the">the</span>
+          {title}
+        </span>
+      )}
     </div>
   )
   // The player (no Poke Balls): the name along the top, the sprites centred under it.

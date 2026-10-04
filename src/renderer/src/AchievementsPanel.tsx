@@ -15,10 +15,13 @@ interface Props {
   onChange: (state: AchievementsState) => void
   // A reward was claimed - the money and box may have changed.
   onClaimed: (money: number) => void
+  // An achievement (by name) to scroll to and flash - from a clicked pop-up.
+  focus?: string | null
+  onFocused?: () => void
 }
 
 /** The Achievements tab: progress on each, and a Claim button for every one unlocked. */
-function AchievementsPanel({ state, onChange, onClaimed }: Props): React.JSX.Element {
+function AchievementsPanel({ state, onChange, onClaimed, focus, onFocused }: Props): React.JSX.Element {
   const [items, setItems] = useState<Map<string, ItemOptionEntry>>(new Map())
   const [busy, setBusy] = useState(false)
   const [show, setShow] = useState<Show>('all')
@@ -115,22 +118,32 @@ function AchievementsPanel({ state, onChange, onClaimed }: Props): React.JSX.Ele
   useEffect(onScroll, [state, show])
 
   // Scroll to the first reward waiting to be claimed (showing locked ones too if needed), and flash it.
-  const [flashPending, setFlashPending] = useState(false)
+  // The card to flash next, as a selector - set, then scrolled to once it's on the page.
+  const [flashTarget, setFlashTarget] = useState<string | null>(null)
   function goToFirstClaimable(): void {
     if (unclaimed === 0) return
     if (show === 'locked') setShow('all')
-    setFlashPending(true)
+    setFlashTarget('.achievement-claimable')
   }
+  // A clicked pop-up: go to that achievement, showing all if the filter hides it.
   useEffect(() => {
-    if (!flashPending) return
-    setFlashPending(false)
-    const el = panelRef.current?.querySelector<HTMLElement>('.achievement-claimable')
+    if (!focus) return
+    const target = state.achievements.find((a) => a.name === focus)
+    if (!target) return
+    onFocused?.()
+    if (show !== 'all' && (show === 'unlocked') !== target.unlocked) setShow('all')
+    setFlashTarget(`[data-achievement="${CSS.escape(target.id)}"]`)
+  }, [focus, state])
+  useEffect(() => {
+    if (!flashTarget) return
+    setFlashTarget(null)
+    const el = panelRef.current?.querySelector<HTMLElement>(flashTarget)
     if (!el) return
     el.scrollIntoView({ behavior: 'smooth', block: 'center' })
     el.classList.remove('achievement-flash')
     void el.offsetWidth
     el.classList.add('achievement-flash')
-  }, [flashPending])
+  }, [flashTarget])
 
   function renderCard(a: AchievementView): React.JSX.Element {
     // A secret achievement says nothing about itself until it's unlocked.
@@ -139,6 +152,7 @@ function AchievementsPanel({ state, onChange, onClaimed }: Props): React.JSX.Ele
     return (
       <div
         key={a.id}
+        data-achievement={a.id}
         className={`achievement${a.unlocked ? ' achievement-unlocked' : ' achievement-locked'}${a.claimed ? ' achievement-claimed' : ''}${claimable ? ' achievement-claimable' : ''}`}
       >
         <div className="achievement-head">
@@ -207,7 +221,7 @@ function AchievementsPanel({ state, onChange, onClaimed }: Props): React.JSX.Ele
               {a.reward.title && (
                 <li
                   className="achievement-reward-title-line"
-                  title={`A title to show beside your name - while it's shown: ${titlePerk(a.reward.title)}`}
+                  title={titlePerk(a.reward.title)}
                 >
                   <span className="mission-reward-icon">“”</span>
                   <span className="mission-reward-name">“{a.reward.title}”</span>

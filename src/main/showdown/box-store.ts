@@ -46,6 +46,7 @@ import {
   dexFormOf,
   canMergeInto,
   isFullyEvolved,
+  mergeGrowthFor,
   randomEvolutionItemId,
   cosmeticLookOf,
   mergeLineOf,
@@ -96,6 +97,8 @@ interface StoredMon {
   fusedWith?: StoredMon
   // Copies merged into it, itself included (see mergeStarsFor) - 1 when left out.
   copies?: number
+  // Locked with an Everstone (see setEverstone): never evolves, takes merges unevolved.
+  everstone?: boolean
 }
 
 interface StoredBox {
@@ -286,6 +289,19 @@ function isMergeMaxed(mon: StoredMon): boolean {
   return (mon.copies ?? 1) >= MERGE_MAX_COPIES
 }
 
+// Takes merges: fully evolved, or locked with an Everstone so it never evolves (a merged
+// Sinistea evolving would turn every copy in it into a Polteageist for one Teapot).
+function takesMerges(mon: StoredMon): boolean {
+  return mon.everstone === true || isFullyEvolved(mon.set.species)
+}
+
+// Whether that one can go into this keeper: its own form or a pre-evolution of it (see
+// canMergeInto) - but an Everstone-locked one can't evolve on its way in, so only its own form.
+function mergesInto(keeper: StoredMon, other: StoredMon): boolean {
+  if (!canMergeInto(keeper.set.species, other.set.species)) return false
+  return !other.everstone || dexFormOf(other.set.species) === dexFormOf(keeper.set.species)
+}
+
 function mergeGroups(mons: StoredMon[]): Map<string, StoredMon[]> {
   const groups = new Map<string, StoredMon[]>()
   for (const mon of mons) {
@@ -296,8 +312,8 @@ function mergeGroups(mons: StoredMon[]): Map<string, StoredMon[]> {
 }
 
 function mergeCandidatesFor(mon: StoredMon, groups: Map<string, StoredMon[]>): MergeCandidateView[] {
-  // Only a fully evolved Pokemon takes merges.
-  if (!isFullyEvolved(mon.set.species)) return []
+  // Only a fully evolved (or Everstone-locked) Pokemon takes merges.
+  if (!takesMerges(mon)) return []
   // A 5-star one is done: it takes nothing more in and is never merged away, so it
   // doesn't count as anyone's duplicate either.
   if (isMergeMaxed(mon)) return []
@@ -305,7 +321,7 @@ function mergeCandidatesFor(mon: StoredMon, groups: Map<string, StoredMon[]>): M
   const team = new Set(teamSlots)
   return (groups.get(mergeLineOf(mon.set.species).root) ?? [])
     .filter(
-      (other) => other.id !== mon.id && !other.fusedWith && !isMergeMaxed(other) && canMergeInto(mon.set.species, other.set.species)
+      (other) => other.id !== mon.id && !other.fusedWith && !isMergeMaxed(other) && mergesInto(mon, other)
     )
     .map((other) => {
       const evolution = mergeEvolutionFor(other.set, mon.set.species, new Map())
@@ -380,7 +396,10 @@ function mergeEvolutionFor(
 
 function toView(mon: StoredMon, arrival: number, groups?: Map<string, StoredMon[]>): BoxPokemonView {
   const { percent } = expProgressForLevel(mon.set.species, mon.set.level, mon.exp)
-  const usable = evolutionOptionsFor(mon.set).filter((o) => o.requiredItems === null || o.requiredItems.some(hasItem))
+  // An Everstone-locked one never evolves.
+  const usable = mon.everstone
+    ? []
+    : evolutionOptionsFor(mon.set).filter((o) => o.requiredItems === null || o.requiredItems.some(hasItem))
   const eligibleEvolutions = usable.map((o) => o.species)
   // The same item evolveMon spends: the first accepted one the bag has.
   const evolutionItems: Record<string, EvolutionItemUse> = {}
@@ -427,6 +446,8 @@ function toView(mon: StoredMon, arrival: number, groups?: Map<string, StoredMon[
     companion: getState().companionId === mon.id || undefined,
     copies: mon.copies ?? 1,
     mergeStars: mergeStarsFor(mon.copies),
+    everstone: isFullyEvolved(mon.set.species) ? undefined : { locked: !!mon.everstone, canUnlock: (mon.copies ?? 1) <= 1 },
+    mergeGrowth: mergeGrowthFor(mon.set.species),
     gigantamax: !!mon.set.gigantamax,
     gmaxLook: gmaxLookOf(mon.set) || undefined,
     mergeCandidates: groups ? mergeCandidatesFor(mon, groups) : undefined,
@@ -759,13 +780,18 @@ function mergeInto(keeperId: string, fodderIds: string[]): number {
   if (fodder.some((m) => !canMergeInto(keeper.set.species, m.set.species))) {
     throw new Error(`Only another ${species}, or one of its pre-evolutions, can be merged in`)
   }
+  if (fodder.some((m) => !mergesInto(keeper, m))) {
+    throw new Error("An Everstone-locked Pokemon can't evolve - it only merges into its own form")
+  }
   if (fodder.some((m) => m.fusedWith)) throw new Error('Unfuse it first - its partner would be merged away with it')
   if (fodder.some(isMergeMaxed)) throw new Error(`A ${MERGE_MAX_STARS}-star Pokemon can't be merged into another`)
   if (fodder.some((m) => m.id === box.companionId)) {
     throw new Error("Your companion can't be merged into anything - take it out of the companion slot first")
   }
   if ((keeper.copies ?? 1) >= MERGE_MAX_COPIES) throw new Error(`${keeper.set.species} is already at ${MERGE_MAX_STARS} stars`)
-  if (!isFullyEvolved(keeper.set.species)) throw new Error(`${keeper.set.species} has to be fully evolved to take merges`)
+  if (!takesMerges(keeper)) {
+    throw new Error(`${keeper.set.species} has to be fully evolved (or locked with an Everstone) to take merges`)
+  }
   // A pre-evolution evolves on its way in - everything it needs for that, with the bag's
   // items shared out among them in turn.
   const stock = new Map<string, number>()
@@ -833,10 +859,12 @@ export function mergeSelectedMons(ids: string[]): { box: BoxState; merged: numbe
   let merged = 0
   for (const group of groups.values()) {
     if (group.length < 2) continue
-    // The keeper is fully evolved (only that takes merges) - the most copies first...
+    // The keeper takes merges (fully evolved or Everstone-locked), the most evolved first -
+    // then the most copies...
     // (the companion before the rest, as it can't go into another)...
     const ranked = [...group].sort(
       (a, b) =>
+        Number(takesMerges(b)) - Number(takesMerges(a)) ||
         Number(isFullyEvolved(b.set.species)) - Number(isFullyEvolved(a.set.species)) ||
         Number(b.id === box.companionId) - Number(a.id === box.companionId) ||
         (b.copies ?? 1) - (a.copies ?? 1) ||
@@ -845,7 +873,7 @@ export function mergeSelectedMons(ids: string[]): { box: BoxState; merged: numbe
         Number(!!b.favorite) - Number(!!a.favorite)
     )
     const [keeper, ...rest] = ranked
-    if (!isFullyEvolved(keeper.set.species)) continue
+    if (!takesMerges(keeper)) continue
     // Only its own form and the pre-evolutions that can evolve into it now (the bag's items
     // shared out in turn) - a sibling branch (Jolteon beside a Vaporeon keeper), or one
     // not ready, is left for another time.
@@ -853,7 +881,7 @@ export function mergeSelectedMons(ids: string[]): { box: BoxState; merged: numbe
     const fodder = rest.filter(
       (m) =>
         m.id !== box.companionId &&
-        canMergeInto(keeper.set.species, m.set.species) &&
+        mergesInto(keeper, m) &&
         mergeEvolutionFor(m.set, keeper.set.species, stock).ready
     )
     if (fodder.length === 0) continue
@@ -878,8 +906,8 @@ function bestMergeKeeperFor(monId: string): StoredMon | null {
     (k) =>
       k.id !== monId &&
       (k.copies ?? 1) < MERGE_MAX_COPIES &&
-      isFullyEvolved(k.set.species) &&
-      canMergeInto(k.set.species, mon.set.species) &&
+      takesMerges(k) &&
+      mergesInto(k, mon) &&
       mergeEvolutionFor(mon.set, k.set.species, new Map()).ready
   )
   keepers.sort(
@@ -1084,6 +1112,7 @@ export function awardFriendshipToTeam(baseAmount = FRIENDSHIP_PER_BATTLE): void 
 export function evolveMon(id: string, targetSpecies: string): BoxState {
   const mon = getState().mons.find((m) => m.id === id)
   if (!mon) throw new Error(`Unknown Pokemon id: ${id}`)
+  if (mon.everstone) throw new Error(`${mon.set.species} is locked with an Everstone - it never evolves`)
   const chosen = evolutionOptionsFor(mon.set).find((o) => o.species === targetSpecies)
   if (!chosen) throw new Error(`${mon.set.species} cannot evolve into ${targetSpecies} right now`)
   if (chosen.requiredItems) {
@@ -1098,6 +1127,22 @@ export function evolveMon(id: string, targetSpecies: string): BoxState {
   mon.set = evolveSet(mon.set, rollMilceryCream(targetSpecies))
   persist()
   countAchievement('evolutions')
+  return getBoxState()
+}
+
+/**
+ * Locks (or unlocks) a Pokemon that isn't fully evolved with an Everstone: locked, it never
+ * evolves but takes merges, each star worth more the weaker it is (see mergeGrowthFor).
+ * One way once it's taken a merge - the lock can only come off while it's a single copy.
+ */
+export function setEverstone(id: string, locked: boolean): BoxState {
+  const mon = getState().mons.find((m) => m.id === id)
+  if (!mon) throw new Error(`Unknown Pokemon id: ${id}`)
+  if (locked && isFullyEvolved(mon.set.species)) throw new Error(`${mon.set.species} is fully evolved - there's nothing to lock`)
+  if (!locked && (mon.copies ?? 1) > 1) throw new Error(`${mon.set.species} has taken merges - its Everstone stays for good`)
+  if (locked) mon.everstone = true
+  else delete mon.everstone
+  persist()
   return getBoxState()
 }
 
@@ -1153,7 +1198,7 @@ function fusionOptionsFor(mon: StoredMon): Pick<BoxPokemonView, 'fusions' | 'unf
 // A Pokemon taking a new form, with the new form's best Smogon set fitted to its level.
 function withSmogonSet(set: PokemonSet, form: string): PokemonSet {
   const [best] = listAutoSets(form)
-  return formChangedSet(set, form, buildAutoSet(form, set.level, best.id, false, set.moves))
+  return formChangedSet(set, form, buildAutoSet(form, set.level, best.id, false, set.moves, set.item))
 }
 
 /**

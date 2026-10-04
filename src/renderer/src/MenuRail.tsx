@@ -101,7 +101,11 @@ function MenuRail({
 
   return (
     <nav className="menu-rail">
-      <div className="menu-rail-logo">pkmnPvE</div>
+      <div className="menu-rail-logo">
+        pkmn
+        <br />
+        PvE
+      </div>
       {pages.map((p) => {
         const blocked = locked && page !== p.id
         return (
