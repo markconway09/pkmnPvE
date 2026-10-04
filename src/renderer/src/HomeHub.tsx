@@ -140,7 +140,7 @@ function HomeHub({
           <span className="home-card-key">3</span>
           <span className="home-card-head">
             <img className="home-card-icon" src="./icons/nav/challenge.png" alt="" />
-            <span className="home-card-title">Classic</span>
+            <span className="home-card-title">Battles</span>
           </span>
           <span className="home-classic-body">
             <span className="home-card-lines">

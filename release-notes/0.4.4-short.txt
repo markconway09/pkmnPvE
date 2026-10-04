@@ -1,0 +1,7 @@
+Online battles & Chaos Draft rework
+
+- Online battles: host a room, share the code, and battle a friend on another computer (replaces Challenge a player)
+- The Classic page is now called Battles
+- Draft: packs of 4, forfeit a match, and reworked Chaos modifiers with a free item swap each step
+- Smarter AI: entry hazards, hazard removal, Counter/Mirror Coat, Destiny Bond and Perish Song
+- Menu sounds tidied up; Game Corner sounds can be switched off on their own

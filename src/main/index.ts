@@ -26,6 +26,8 @@ import {
   usernameProblem
 } from '../shared/battle-types'
 import { WildBattle, getMoveInfo } from './showdown/battle-runtime'
+import type { OnlinePlayer, OnlineSelf, OnlineTeam, OnlineViews } from '../shared/online'
+import type { PokemonSet } from './showdown/sim-access'
 import {
   addRandomMon,
   addMonOfSpecies,
@@ -456,6 +458,107 @@ ipcMain.handle('battle:forfeit', () => {
 ipcMain.handle('battle:catch', (_event, replaceRunMonId?: string) => {
   if (!activeBattle) throw new Error('No active battle')
   return activeBattle.catchWildPokemon(replaceRunMonId)
+})
+
+// ---- Online battles with a friend (the connection itself lives in the renderer, see online.ts) ----
+
+// This player as the friend sees them, and their current team.
+ipcMain.handle('online:self', (): OnlineSelf => {
+  const session = getSessionInfo()
+  if (!session.username) throw new Error('Log in first')
+  return {
+    player: { name: session.username, spriteId: session.trainerSprite ?? 'red', version: app.getVersion() },
+    team: { team: getTeamPokemonSets(), mergeStars: getTeamMergeStars(), everstone: getTeamEverstones() }
+  }
+})
+
+// The friend's team as their copy sent it - checked over, since it came over the network.
+function readOnlineTeam(input: OnlineTeam): { team: PokemonSet[]; mergeStars: number[]; everstone: boolean[] } {
+  const sets = Array.isArray(input?.team) ? input.team.slice(0, 6) : []
+  const team = sets.filter(
+    (set): set is PokemonSet =>
+      !!set && typeof set === 'object' && typeof (set as PokemonSet).species === 'string' && Array.isArray((set as PokemonSet).moves)
+  )
+  if (team.length === 0) throw new Error("Your friend's team is empty")
+  const stars = Array.isArray(input.mergeStars) ? input.mergeStars : []
+  const everstone = Array.isArray(input.everstone) ? input.everstone : []
+  return {
+    team: team.map((set) => ({ ...set, level: Math.max(1, Math.min(100, Math.floor(Number(set.level) || 100))) })),
+    mergeStars: team.map((_, i) => Math.max(0, Math.min(20, Math.floor(Number(stars[i]) || 0)))),
+    everstone: team.map((_, i) => everstone[i] === true)
+  }
+}
+
+let onlineBattle: WildBattle | null = null
+
+function onlineViews(battle: WildBattle): OnlineViews {
+  return { host: battle.onlineView(0), guest: battle.onlineView(1) }
+}
+
+// The host starting a battle with the friend: both teams set to the level of the
+// higher-level one's best Pokemon, and nothing paid out (like a friendly match). Both
+// screens are sent to the renderer each time the battle moves on.
+ipcMain.handle('online:start', async (event, friend: OnlinePlayer, friendTeam: OnlineTeam, doubles: boolean): Promise<OnlineViews> => {
+  const session = getSessionInfo()
+  if (!session.username) throw new Error('Log in first')
+  const hostTeam = getTeamPokemonSets()
+  if (hostTeam.length === 0) throw new Error('Your team is empty - add Pokemon and assign them to your team first')
+  const guest = readOnlineTeam(friendTeam)
+  const level = Math.max(highestLevelOf(hostTeam), highestLevelOf(guest.team))
+  // The battle tells its two sides apart by name, so the friend can't share the host's.
+  const friendName = String(friend?.name ?? 'Friend').slice(0, 24) || 'Friend'
+  const guestName = friendName === session.username ? `${friendName} (2)` : friendName
+  onlineBattle?.forfeitSide(0)
+  const battle = new WildBattle(
+    scaleTeamToLevel(hostTeam, level),
+    doubles ? 'gen9doublescustomgame' : 'gen9customgame',
+    'gen9randombattle',
+    {
+      team: scaleTeamToLevel(guest.team, level),
+      name: guestName,
+      difficulty: 'easy',
+      trainerId: `online:${guestName}`,
+      spriteId: String(friend?.spriteId ?? 'red'),
+      noRewards: true,
+      online: { hostName: session.username, hostSpriteId: session.trainerSprite ?? 'red' }
+    },
+    {
+      p1: getTeamMergeStars(),
+      p2: guest.mergeStars,
+      everstone: { p1: getTeamEverstones(), p2: guest.everstone }
+    }
+  )
+  onlineBattle = battle
+  activeBattle = null
+  // A burst of changes (a whole turn) sends one update.
+  let pending: NodeJS.Timeout | null = null
+  const sender = event.sender
+  battle.onChange = () => {
+    if (pending) return
+    pending = setTimeout(() => {
+      pending = null
+      if (onlineBattle === battle && !sender.isDestroyed()) sender.send('online:views', onlineViews(battle))
+    }, 40)
+  }
+  await battle.getInitialView()
+  return onlineViews(battle)
+})
+
+// Either player's choice for the turn (side 0 is the host, 1 the friend).
+ipcMain.handle('online:choose', async (_event, side: 0 | 1, choice: string) => {
+  if (!onlineBattle) throw new Error('No online battle')
+  await onlineBattle.chooseFor(side === 1 ? 1 : 0, String(choice))
+})
+
+// Either player giving up - or the friend's connection dropping, which counts the same.
+ipcMain.handle('online:forfeit', (_event, side: 0 | 1) => {
+  onlineBattle?.forfeitSide(side === 1 ? 1 : 0)
+})
+
+// The battle's over (or the room closed): nothing more to send.
+ipcMain.handle('online:end', () => {
+  if (onlineBattle) onlineBattle.onChange = null
+  onlineBattle = null
 })
 
 // A Max Raid, paid for with a Raid Crystal (taken once the battle is set up): a doubles

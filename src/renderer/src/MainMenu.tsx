@@ -29,7 +29,7 @@ import DebugMenu from './DebugMenu'
 import DebugAddMon from './DebugAddMon'
 import PlayerTrainerModal from './PlayerTrainerModal'
 import PokedexModal from './PokedexModal'
-import ChallengeSection from './ChallengeSection'
+import OnlineSection from './OnlineSection'
 import StarterPicker from './StarterPicker'
 import PokemonContextMenu from './PokemonContextMenu'
 import MergeModal from './MergeModal'
@@ -83,7 +83,6 @@ interface Props {
   onChangeTrainerSprite: (id: string) => void
   username: string
   isAdmin: boolean
-  onChallengePlayer: (username: string, doubles: boolean) => Promise<void>
   // A Roguelite floor's fight has started - App takes it from here like any battle.
   onRunBattle: (view: BattleView, location?: WildLocationId) => Promise<void>
 }
@@ -163,7 +162,7 @@ const MODE_COLORS: Record<MenuPage, string> = {
 // Each page's name over it, beside its sidebar icon.
 const PAGE_TITLES: Record<MenuPage, string> = {
   home: 'Home',
-  classic: 'Classic',
+  classic: 'Battles',
   catch: 'Catch',
   box: 'Box',
   roguelite: 'Roguelite',
@@ -212,7 +211,6 @@ function MainMenu({
   onChangeTrainerSprite,
   username,
   isAdmin,
-  onChallengePlayer,
   onRunBattle
 }: Props): React.JSX.Element {
   const [boxState, setBoxState] = useState<BoxState | null>(null)
@@ -1403,8 +1401,8 @@ function MainMenu({
             </button>
           </div>
 
-          {/* A friendly fight against another player's saved team. */}
-          <ChallengeSection onChallengePlayer={onChallengePlayer} disabled={fightBusy || teamEmpty} />
+          {/* A battle with a friend on another computer. */}
+          <OnlineSection disabled={fightBusy || teamEmpty} />
           </>
           )}
           </div>

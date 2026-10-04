@@ -1,4 +1,5 @@
 import type { MissionClaimResult, MissionsState } from '../shared/missions'
+import type { OnlinePlayer, OnlineSelf, OnlineTeam, OnlineViews } from '../shared/online'
 import type { RarityOdds, RarityOddsSource } from '../shared/rarity'
 import { contextBridge, ipcRenderer } from 'electron'
 import type { LocalMusicFile } from '../shared/music'
@@ -157,6 +158,20 @@ const api = {
   // Gives up a draft match or a Roguelite fight; the view comes back already ended.
   forfeitBattle: (): Promise<BattleView> => ipcRenderer.invoke('battle:forfeit'),
   getBattleEligibility: (): Promise<BattleEligibility> => ipcRenderer.invoke('battle:eligibility'),
+  // Online battles with a friend: who this player is (and their team), and - on the
+  // host's copy, which runs the battle - starting it, each side's choices and forfeits.
+  getOnlineSelf: (): Promise<OnlineSelf> => ipcRenderer.invoke('online:self'),
+  startOnlineBattle: (friend: OnlinePlayer, friendTeam: OnlineTeam, doubles: boolean): Promise<OnlineViews> =>
+    ipcRenderer.invoke('online:start', friend, friendTeam, doubles),
+  chooseOnline: (side: 0 | 1, choice: string): Promise<void> => ipcRenderer.invoke('online:choose', side, choice),
+  forfeitOnline: (side: 0 | 1): Promise<void> => ipcRenderer.invoke('online:forfeit', side),
+  endOnlineBattle: (): Promise<void> => ipcRenderer.invoke('online:end'),
+  // Both screens, each time the host's battle moves on.
+  onOnlineViews: (listener: (views: OnlineViews) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, views: OnlineViews): void => listener(views)
+    ipcRenderer.on('online:views', handler)
+    return () => ipcRenderer.removeListener('online:views', handler)
+  },
   getMoveInfo: (id: string): Promise<MoveInfo | null> => ipcRenderer.invoke('dex:move', id),
   listBox: (): Promise<BoxState> => ipcRenderer.invoke('box:list'),
   addRandomBoxMon: (): Promise<BoxState> => ipcRenderer.invoke('box:addRandom'),

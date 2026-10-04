@@ -385,6 +385,36 @@ export interface OpponentConfig {
   statMultipliers?: { p1?: StatBlock[]; p2?: StatBlock[] }
   // Chaos drafts: the opponent's modifiers in words, for the tooltip on them.
   chaosModifiers?: OpponentModifiersView
+  // An online match with a friend: they play the other side from their own copy of the
+  // game (see online.ts in the renderer), so no AI drives it - this copy just runs the
+  // battle for both. `name`/`spriteId` above are the friend's; these are the host's own.
+  online?: { hostName: string; hostSpriteId: string }
+}
+
+// The friend's own copy of the battle log in an online match: the same lines told from
+// their side (their Pokemon are theirs, the host's are "the opposing" ones), with every
+// snapshot and slot flipped so their side is the one drawn at the bottom of their screen.
+interface MirroredLog {
+  parser: BattleTextParser
+  log: string[]
+  logStates: FieldSnapshot[]
+  feedback: (FeedbackEvent | null)[]
+  moveEvents: (MoveEvent | null)[]
+  gimmickEvents: (GimmickEvent | null)[]
+  abilityEvents: (AbilityEvent | null)[]
+}
+
+// The same slot seen from the other side: p1a <-> p2a, p1b <-> p2b.
+function flipSlot(slot: SlotKey): SlotKey {
+  return `${slot.startsWith('p1') ? 'p2' : 'p1'}${slot[2]}` as SlotKey
+}
+
+function flipSnapshot(snapshot: FieldSnapshot): FieldSnapshot {
+  return {
+    p1: snapshot.p2,
+    p2: snapshot.p1,
+    effects: snapshot.effects.map((e) => (e.side ? { ...e, side: e.side === 'p1' ? 'p2' : 'p1' } : e))
+  }
 }
 
 // An Everstone-locked Pokemon counts as fully evolved, so the sim's Eviolite skips any
@@ -410,12 +440,17 @@ function wrapEviolite(battle: SimBattle): void {
 class HumanPlayer extends BattlePlayer {
   latestRequest: ChoiceRequest | null = null
   version = 0
+  // Counts every request, waiting ones too - an online screen keeps its half-made choices
+  // while this stays the same.
+  requestSeq = 0
   // Set when the sim refuses a choice (it stays waiting for a valid one).
   lastError: Error | null = null
 
   constructor(
     stream: Streams.ObjectReadWriteStream<string>,
-    private readonly onUpdate: () => void
+    private readonly onUpdate: () => void,
+    // Online matches skip team preview: everyone leads with their first Pokemon.
+    private readonly autoTeamPreview = false
   ) {
     super(stream)
   }
@@ -426,6 +461,11 @@ class HumanPlayer extends BattlePlayer {
   }
 
   override receiveRequest(request: ChoiceRequest): void {
+    if (this.autoTeamPreview && request.teamPreview) {
+      this.choose('default')
+      return
+    }
+    this.requestSeq++
     this.latestRequest = request
     if (!request.wait) {
       this.version++
@@ -441,7 +481,13 @@ export class WildBattle {
   private readonly battleStream = new BattleStream()
   private readonly streams = getPlayerStreams(this.battleStream)
   private readonly human: HumanPlayer
-  private readonly ai: AIPlayer
+  private readonly ai: AIPlayer | null
+  // Online: the friend playing p2, their own name for p1 (the host's), and their copy of the log.
+  private readonly remote: HumanPlayer | null
+  private readonly p1Name: string
+  private readonly guestLog: MirroredLog | null
+  // Online: called whenever either player's screen should catch up (see index.ts).
+  onChange: (() => void) | null = null
   private readonly displayLog: string[] = []
   private readonly logStates: FieldSnapshot[] = []
   // Parallel to displayLog/logStates - see computeFeedbackEvent.
@@ -499,20 +545,45 @@ export class WildBattle {
     this.opponent = opponent
     this.mergeStars = { p1: mergeStars.p1 ?? [], p2: mergeStars.p2 ?? [] }
     this.everstone = { p1: mergeStars.everstone?.p1 ?? [], p2: mergeStars.everstone?.p2 ?? [] }
-    this.human = new HumanPlayer(this.streams.p1, () => this.wake())
-    this.ai = new AIPlayer(this.streams.p2, 'p2', opponent?.difficulty ?? 'easy', (slot, moveId) =>
-      this.aiMovePower(slot, moveId)
+    const online = opponent?.online
+    this.p1Name = online?.hostName ?? 'You'
+    this.human = new HumanPlayer(
+      this.streams.p1,
+      () => {
+        this.wake()
+        this.changed()
+      },
+      !!online
     )
+    if (online) {
+      this.remote = new HumanPlayer(this.streams.p2, () => this.changed(), true)
+      this.ai = null
+      this.guestLog = {
+        parser: new BattleTextParser('p2'),
+        log: [],
+        logStates: [],
+        feedback: [],
+        moveEvents: [],
+        gimmickEvents: [],
+        abilityEvents: []
+      }
+    } else {
+      this.remote = null
+      this.guestLog = null
+      this.ai = new AIPlayer(this.streams.p2, 'p2', opponent?.difficulty ?? 'easy', (slot, moveId) =>
+        this.aiMovePower(slot, moveId)
+      )
+    }
     // Each in the form its held item gives it (a plated Arceus, an Origin Forme Giratina...).
     this.p1team = p1team.map(heldItemForme)
     this.p2team = (opponent?.team ?? [generateRandomSingle(generationFormat)]).map(heldItemForme)
 
     void this.human.start()
-    void this.ai.start()
+    void (this.remote ?? this.ai)?.start()
     void this.drainOmniscient()
 
     const spec = { formatid: formatId }
-    const p1spec = { name: 'You', team: packTeam(this.p1team) }
+    const p1spec = { name: this.p1Name, team: packTeam(this.p1team) }
     // A raid's side also brings the placeholder that keeps the doubles battle running (see raid.ts).
     const p2spec = {
       name: opponent?.name ?? 'Wild',
@@ -834,7 +905,7 @@ export class WildBattle {
 
   // A run battle's end goes to the run instead of the regular rewards.
   private finishRunBattle(): void {
-    if (this.winner === 'You') {
+    if (this.winner === this.p1Name) {
       const { expGains, fainted, itemReward } = finishRunBattleWon(this.p1Outcome(), this.opponent!.run!.kind)
       this.expGains = expGains
       this.runFainted = fainted
@@ -910,21 +981,32 @@ export class WildBattle {
           this.abilityEvents.push(eventUsed ? null : abilityEvent)
           eventUsed = true
         }
+        // The friend's copy: parsed afresh (the parser tidies the args it's given in place).
+        if (this.guestLog) {
+          const guest = BattleTextParser.parseBattleLine(line)
+          if (args[0] === '-weather' && kwArgs.from) guest.kwArgs.from = kwArgs.from
+          let guestEventUsed = false
+          for (const textLine of (this.guestLog.parser.parseArgs(guest.args, guest.kwArgs) || '').split('\n')) {
+            if (!textLine.trim()) continue
+            this.pushGuestLine(textLine, guestEventUsed ? {} : { event, moveEvent, gimmickEvent, abilityEvent })
+            guestEventUsed = true
+          }
+        }
 
         this.pushHpDeltaLine(line, hpBefore)
 
         if (line.startsWith('|win|')) {
           this.ended = true
           this.winner = line.slice('|win|'.length)
-          if (this.opponent?.dexNavHunt && this.winner !== 'You') breakDexNavChain()
+          if (this.opponent?.dexNavHunt && this.winner !== this.p1Name) breakDexNavChain()
           if (this.opponent?.run) {
             this.finishRunBattle()
           } else if (this.opponent?.draft) {
             this.draftResult = finishDraftBattle(
-              this.winner === 'You',
+              this.winner === this.p1Name,
               this.p1Outcome().every((mon) => !mon.fainted)
             )
-          } else if (this.winner === 'You' && !this.opponent?.noRewards) {
+          } else if (this.winner === this.p1Name && !this.opponent?.noRewards) {
             if (this.opponent?.trainerId) {
               // The cap the fight was held under - read before a boss win raises it.
               const levelCap = getProgression().levelCap
@@ -972,7 +1054,37 @@ export class WildBattle {
         }
       }
       this.reconcileFieldEffects(liveEffects)
+      this.changed()
     }
+  }
+
+  private changed(): void {
+    this.onChange?.()
+  }
+
+  // One line of the friend's log, with its moment's field and events flipped to their side.
+  private pushGuestLine(
+    text: string,
+    events: { event?: FeedbackEvent | null; moveEvent?: MoveEvent | null; gimmickEvent?: GimmickEvent | null; abilityEvent?: AbilityEvent | null }
+  ): void {
+    const guest = this.guestLog
+    if (!guest) return
+    const { event, moveEvent, gimmickEvent, abilityEvent } = events
+    guest.log.push(text)
+    guest.logStates.push(flipSnapshot(this.snapshotField()))
+    guest.feedback.push(event ? { ...event, slot: flipSlot(event.slot) } : null)
+    guest.moveEvents.push(
+      moveEvent
+        ? {
+            ...moveEvent,
+            attackerSlot: flipSlot(moveEvent.attackerSlot),
+            targetSlots: moveEvent.targetSlots.map(flipSlot),
+            missedSlots: moveEvent.missedSlots.map(flipSlot)
+          }
+        : null
+    )
+    guest.gimmickEvents.push(gimmickEvent ? { ...gimmickEvent, slot: flipSlot(gimmickEvent.slot) } : null)
+    guest.abilityEvents.push(abilityEvent ? { ...abilityEvent, slot: flipSlot(abilityEvent.slot) } : null)
   }
 
   // The sim's own record of every field effect that has a countdown - the
@@ -1128,14 +1240,14 @@ export class WildBattle {
     if (before == null || after == null || before === after) return
 
     const delta = after - before
-    const name = this.textParser.pokemon(parts[1])
-    const text = delta > 0 ? `  ${name} restored ${delta}% HP.` : `  ${name} lost ${-delta}% HP.`
-    this.displayLog.push(text)
+    const say = (name: string): string => (delta > 0 ? `  ${name} restored ${delta}% HP.` : `  ${name} lost ${-delta}% HP.`)
+    this.displayLog.push(say(this.textParser.pokemon(parts[1])))
     this.logStates.push(this.snapshotField())
     this.feedback.push(null)
     this.moveEvents.push(null)
     this.gimmickEvents.push(null)
     this.abilityEvents.push(null)
+    if (this.guestLog) this.pushGuestLine(say(this.guestLog.parser.pokemon(parts[1])), {})
   }
 
   private snapshotField(): FieldSnapshot {
@@ -1213,10 +1325,16 @@ export class WildBattle {
     }
   }
 
-  private buildTeamView(): ActivePokemonView[] {
-    const request = this.human.latestRequest
+  // The player on this side (online, side 1 is the friend; otherwise there's only p1's).
+  private playerOn(side: 0 | 1): HumanPlayer | null {
+    return side === 0 ? this.human : this.remote
+  }
+
+  private buildTeamView(side: 0 | 1 = 0): ActivePokemonView[] {
+    const request = this.playerOn(side)?.latestRequest
     if (!request) return []
-    const simSide = this.battleStream.battle?.sides[0]
+    const simSide = this.battleStream.battle?.sides[side]
+    const team = side === 0 ? this.p1team : this.p2team
     return request.side.pokemon.map((mon, i) => {
       // side.pokemon isn't in fixed roster order - it's reordered so the currently
       // active Pokemon comes first. The sim's own list is in that same order, and each
@@ -1226,15 +1344,15 @@ export class WildBattle {
       const { hpPercent, fainted, status } = parseCondition(mon.condition)
       const live = simSide?.pokemon[i]
       let rosterIndex = live ? simSide.team.indexOf(live.set) : -1
-      if (rosterIndex < 0 || !sameBaseSpecies(this.p1team[rosterIndex].species, species)) {
-        rosterIndex = findRosterIndex(this.p1team, species)
+      if (rosterIndex < 0 || !sameBaseSpecies(team[rosterIndex].species, species)) {
+        rosterIndex = findRosterIndex(team, species)
       }
-      const set = rosterIndex >= 0 ? this.p1team[rosterIndex] : null
+      const set = rosterIndex >= 0 ? team[rosterIndex] : null
       const view = this.buildActiveView(species, hpPercent, fainted, status, set, 0, rosterIndex)
       // The request reports its ability as it is now - a Mega's new one included.
       if (mon.baseAbility) view.ability = abilityName(mon.baseAbility)
-      view.moveMatchups = this.moveMatchupsFor(view, 0, live ?? null)
-      return this.withMergeStats(view, 'p1')
+      view.moveMatchups = this.moveMatchupsFor(view, side, live ?? null)
+      return this.withMergeStats(view, side === 0 ? 'p1' : 'p2')
     })
   }
 
@@ -1257,9 +1375,10 @@ export class WildBattle {
   // so each entry's own species is read off itself rather than matched
   // positionally against p2team, same as buildTeamView does for the player's
   // own team.
-  private opponentRoster(): RosterSlotView[] {
-    const side = this.battleStream.battle?.sides[1]
-    if (!side) return this.p2team.map((mon) => ({ species: mon.species, fainted: false, status: null }))
+  private opponentRoster(foeSide: 0 | 1 = 1): RosterSlotView[] {
+    const side = this.battleStream.battle?.sides[foeSide]
+    const team = foeSide === 0 ? this.p1team : this.p2team
+    if (!side) return team.map((mon) => ({ species: mon.species, fainted: false, status: null }))
     return side.pokemon.filter((mon) => !(this.opponent?.raid && mon.name === RAID_PLACEHOLDER_NAME)).map((mon) => ({
       species: mon.species?.name ?? mon.name,
       fainted: mon.fainted,
@@ -1306,10 +1425,10 @@ export class WildBattle {
    * nobody has seen yet (Shadow Tag, Arena Trap, Magnet Pull) is left off it by the sim -
    * hidden from a player who couldn't know - but here the switch list should just say so.
    */
-  private requestWithTraps(): ChoiceRequest | null {
-    const request = this.human.latestRequest
+  private requestWithTraps(side: 0 | 1 = 0): ChoiceRequest | null {
+    const request = this.playerOn(side)?.latestRequest ?? null
     if (!request || !('active' in request) || !request.active) return request
-    const active = this.battleStream.battle?.sides[0].active ?? []
+    const active = this.battleStream.battle?.sides[side].active ?? []
     return {
       ...request,
       active: request.active.map((slot, i) => (active[i]?.trapped && !slot.trapped ? { ...slot, trapped: true } : slot))
@@ -1332,7 +1451,7 @@ export class WildBattle {
   }
 
   catchWildPokemon(replaceRunMonId?: string): CatchResult {
-    if (!this.ended || this.winner !== 'You') throw new Error('You have not won this battle yet')
+    if (!this.ended || this.winner !== this.p1Name) throw new Error('You have not won this battle yet')
     if (this.opponent?.raid) throw new Error('A raid boss is caught as soon as it is beaten')
     if (this.opponent?.trainerId) throw new Error('Only a wild Pokemon can be caught')
     if (this.caught) throw new Error('This Pokemon has already been caught')
@@ -1368,7 +1487,7 @@ export class WildBattle {
   // you walked away from - it's simply abandoned. A wild Pokemon an ambush woke can't
   // be run from either.
   private runCost(): number | null {
-    if (this.opponent?.noRun) return null
+    if (this.opponent?.noRun || this.opponent?.online) return null
     if (!this.opponent?.trainerId) return 0
     if (this.opponent.isBoss || this.opponent.run || this.opponent.draft) return null
     // A friendly match (another player's team) has nothing riding on it, and the
@@ -1402,7 +1521,34 @@ export class WildBattle {
   // A draft match or a Roguelite fight can't be run from, but it can be given up: the
   // player simply loses, so a draft match counts as lost and a run is over.
   private canForfeit(): boolean {
-    return !!(this.opponent?.run || this.opponent?.draft)
+    return !!(this.opponent?.run || this.opponent?.draft || this.opponent?.online)
+  }
+
+  // Online: either player giving up (or the friend's connection dropping) - the sim
+  // declares that side beaten, and both screens catch up through onChange.
+  forfeitSide(side: 0 | 1): void {
+    if (!this.ended) void this.streams.omniscient.write(`>forcelose p${side + 1}`)
+  }
+
+  /**
+   * Online: one player's choice for the turn. The sim only answers when it refuses one, so
+   * this gives it a moment to - otherwise the choice stands and both screens move on
+   * through onChange once the other player has chosen too.
+   */
+  async chooseFor(side: 0 | 1, choice: string): Promise<void> {
+    const player = this.playerOn(side)
+    if (!player || this.ended) return
+    player.lastError = null
+    const seq = player.requestSeq
+    player.choose(choice)
+    for (let waited = 0; waited < 300 && !player.lastError && player.requestSeq === seq && !this.ended; waited += 20) {
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    }
+    const refused = player.lastError as Error | null
+    if (refused) {
+      player.lastError = null
+      throw new Error(refused.message.replace(/^\[[^\]]*\]\s*/, ''))
+    }
   }
 
   /** Gives up the battle: the sim declares the player beaten, and the usual loss follows. */
@@ -1766,8 +1912,8 @@ export class WildBattle {
 
   // For the switch list: the best multiplier each team member's own types get against
   // each foe out right now (its current types - Tera and the like included).
-  private teamMatchups(team: ActivePokemonView[]): (number | null)[][] {
-    const foes = [this.active.p2a, this.active.p2b]
+  private teamMatchups(team: ActivePokemonView[], side: 0 | 1 = 0): (number | null)[][] {
+    const foes = side === 0 ? [this.active.p2a, this.active.p2b] : [this.active.p1a, this.active.p1b]
     return team.map((member) =>
       foes.map((foe) =>
         member.fainted || !foe || foe.fainted
@@ -1779,8 +1925,8 @@ export class WildBattle {
 
   // The other way round: the worst multiplier each foe's types get against each team
   // member - by type alone (the move buttons are where abilities like Levitate count).
-  private teamDefense(team: ActivePokemonView[]): (number | null)[][] {
-    const foes = [this.active.p2a, this.active.p2b]
+  private teamDefense(team: ActivePokemonView[], side: 0 | 1 = 0): (number | null)[][] {
+    const foes = side === 0 ? [this.active.p2a, this.active.p2b] : [this.active.p1a, this.active.p1b]
     return team.map((member) =>
       foes.map((foe) =>
         member.fainted || !foe || foe.fainted
@@ -1792,13 +1938,13 @@ export class WildBattle {
 
   // Each of the player's moves' type effectiveness against each foe slot, for the
   // move buttons and the doubles target picker - same shape as liveMovePowers.
-  private moveEffectivenessView(): (Record<string, (number | null)[]> | null)[] {
+  private moveEffectivenessView(side: 0 | 1 = 0): (Record<string, (number | null)[]> | null)[] {
     const battle = this.battleStream.battle
-    const request = this.human.latestRequest
+    const request = this.playerOn(side)?.latestRequest
     if (this.ended || !battle || !request || !('active' in request) || !request.active) return []
-    const foeSlots = [0, 1].map((i) => battle.sides[1].active[i] ?? null)
+    const foeSlots = [0, 1].map((i) => battle.sides[1 - side].active[i] ?? null)
     return request.active.map((activeData, i) => {
-      const source = battle.sides[0].active[i]
+      const source = battle.sides[side].active[i]
       if (!source || source.fainted) return null
       const byMove: Record<string, (number | null)[]> = {}
       for (const move of activeData.moves) {
@@ -1812,13 +1958,13 @@ export class WildBattle {
 
   // What each of the player's moves would hit for right now, asked of the battle
   // itself while a choice is being made.
-  private liveMovePowers(): (Record<string, LiveMovePower> | null)[] {
+  private liveMovePowers(side: 0 | 1 = 0): (Record<string, LiveMovePower> | null)[] {
     const battle = this.battleStream.battle
-    const request = this.human.latestRequest
+    const request = this.playerOn(side)?.latestRequest
     if (this.ended || !battle || !request || !('active' in request) || !request.active) return []
-    const foes = battle.sides[1].active.filter((p): p is SimPokemon => !!p && !p.fainted)
+    const foes = battle.sides[1 - side].active.filter((p): p is SimPokemon => !!p && !p.fainted)
     return request.active.map((activeData, i) => {
-      const source = battle.sides[0].active[i]
+      const source = battle.sides[side].active[i]
       if (!source || source.fainted) return null
       const powers: Record<string, LiveMovePower> = {}
       for (const move of activeData.moves) {
@@ -1845,8 +1991,10 @@ export class WildBattle {
       gimmickEvents: [...this.gimmickEvents],
       abilityEvents: [...this.abilityEvents],
       request: this.ended ? null : this.requestWithTraps(),
+      requestSeq: this.human.requestSeq,
       ended: this.ended,
-      winner: this.winner,
+      // The screen knows its own player as "You" (online, p1 goes by the host's real name).
+      winner: this.winner === this.p1Name ? 'You' : this.winner,
       expGains: this.expGains,
       itemDrops: this.itemDrops,
       tmQuickCheck: this.tmQuickCheck,
@@ -1874,6 +2022,51 @@ export class WildBattle {
       raid: this.opponent?.raid
         ? { gigantamax: this.opponent.raid.gigantamax, stars: this.opponent.raid.stars, caught: this.raidCatch }
         : null
+    }
+  }
+
+  /** Online: the battle as one of the two players sees it (side 1, the friend's, flipped round). */
+  onlineView(side: 0 | 1): BattleView {
+    const guest = this.guestLog
+    if (side === 0 || !guest) return this.view()
+    const team = this.buildTeamView(1)
+    const field = flipSnapshot(this.snapshotField())
+    return {
+      log: [...guest.log],
+      logStates: [...guest.logStates],
+      feedback: [...guest.feedback],
+      moveEvents: [...guest.moveEvents],
+      gimmickEvents: [...guest.gimmickEvents],
+      abilityEvents: [...guest.abilityEvents],
+      request: this.ended ? null : this.requestWithTraps(1),
+      requestSeq: this.remote?.requestSeq,
+      ended: this.ended,
+      winner: this.winner !== null && this.winner === this.opponent?.name ? 'You' : this.winner,
+      expGains: [],
+      itemDrops: [],
+      tmQuickCheck: false,
+      tmRewards: [],
+      moneyGained: 0,
+      p1: field.p1,
+      p2: field.p2,
+      team,
+      teamMatchups: this.teamMatchups(team, 1),
+      teamDefense: this.teamDefense(team, 1),
+      movePowers: this.liveMovePowers(1),
+      moveEffectiveness: this.moveEffectivenessView(1),
+      opponentTrainer: { name: this.p1Name, spriteId: this.opponent?.online?.hostSpriteId ?? '' },
+      runCost: null,
+      canAffordRun: true,
+      canForfeit: true,
+      opponentRoster: this.opponentRoster(0),
+      rewards: null,
+      chaosModifiers: null,
+      runBattle: false,
+      runFainted: [],
+      runItemReward: false,
+      draftResult: null,
+      bossBattle: false,
+      raid: null
     }
   }
 

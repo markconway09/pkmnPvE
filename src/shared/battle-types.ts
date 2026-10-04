@@ -1443,6 +1443,8 @@ export interface BattleView {
   gimmickEvents: (GimmickEvent | null)[]
   abilityEvents: (AbilityEvent | null)[]
   request: ChoiceRequest | null
+  // Goes up with every new request - an online screen keeps its half-made choices while it stays the same.
+  requestSeq?: number
   ended: boolean
   winner: string | null
   expGains: ExpGainResult[]

@@ -22327,3 +22327,102 @@ img.sprite-smooth {
   color: #ffe0b2;
   background: rgba(255, 183, 77, 0.14);
 }
+
+/* Online battle (Classic page): the room's row - host or join, the code to share, then the
+   friend who joined - in the same dark trough as Challenge a player. */
+.online-section .online-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid #2c3442;
+  border-radius: 14px;
+  background: rgba(10, 13, 18, 0.5);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.online-section .online-row button {
+  height: 34px;
+  padding: 0 20px;
+  border: 1px solid #2f3746;
+  border-radius: 17px;
+  background: #1a1f28;
+  white-space: nowrap;
+}
+
+.online-section .online-join {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+}
+
+.online-section .online-join input[type='text'] {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 14px;
+  box-sizing: border-box;
+  border: 1px solid #2c3442;
+  border-radius: 17px;
+  background: rgba(10, 13, 18, 0.7);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.online-section .online-join input[type='text']:focus {
+  outline: none;
+  border-color: #6bb0ff;
+  box-shadow: 0 0 0 3px rgba(107, 176, 255, 0.16);
+}
+
+.online-section .online-or,
+.online-section .online-status {
+  color: #9aa6b8;
+  font-size: 0.9em;
+}
+
+.online-section .online-status {
+  flex: 1;
+}
+
+/* The room code: big and gold, click to copy. */
+.online-section .online-row .online-code {
+  padding: 0 16px;
+  border-color: rgba(255, 204, 102, 0.6);
+  background: rgba(255, 204, 102, 0.12);
+  color: #ffd27a;
+  font-size: 1.15em;
+  font-weight: bold;
+  letter-spacing: 0.25em;
+}
+
+.online-section .online-friend-sprite {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.online-section .online-friend-name {
+  flex: 1;
+  font-weight: bold;
+}
+
+/* Host / Join / Start battle: red, the section's strong action. */
+.online-section .online-row > button:first-child:not(:disabled),
+.online-section .online-join button:not(:disabled),
+.online-section .online-row .online-start:not(:disabled) {
+  border-color: #ff8a80;
+  background: linear-gradient(180deg, #d9473c, #a8302a);
+  color: #fff;
+  font-weight: bold;
+}
+
+.online-section .online-row .online-leave:hover:not(:disabled) {
+  border-color: #ff8a80;
+}
+
+.online-waiting {
+  color: #9aa6b8;
+  font-style: italic;
+}

@@ -36,6 +36,7 @@ import {
 } from './effectiveness'
 import { loadLegacyTrainerSprite } from './trainerSprite'
 import Login from './Login'
+import { chooseOnline, forfeitOnline, leaveOnlineBattle, onOnlineBattleView } from './online'
 
 type Screen = 'menu' | 'battle' | 'trainers' | 'rogueliteBosses' | 'premadeTeams'
 
@@ -231,6 +232,25 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
   const [trainerSprite, setTrainerSprite] = useState<string>(initialTrainerSprite)
   // The player's achievement title, shown by their name in battle - read as each battle starts.
   const [playerTitle, setPlayerTitle] = useState<string | null>(null)
+  // An online battle with a friend is on screen: its choices go to the friend's room (see
+  // online.ts), and its screens arrive from there rather than as replies.
+  const [onlineMode, setOnlineMode] = useState(false)
+
+  useEffect(
+    () =>
+      onOnlineBattleView((next, fresh) => {
+        if (fresh) {
+          setBackdrop(randomBackdropId())
+          setWildRebattle(null)
+          setRevealedCount(0)
+          setError(null)
+          setOnlineMode(true)
+          setScreen('battle')
+        }
+        setView(next)
+      }),
+    []
+  )
 
   // R presses the battle's Run button - the button itself, so a run that costs money or
   // leaves a shiny still asks first (R again to confirm). Never while typing, and never
@@ -503,8 +523,6 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
     }
   }
 
-  // Another player's saved team. Unlike the other fights, a failure is thrown back to
-  // whoever asked (the challenge box shows it) rather than set on the main menu.
   // A Roguelite floor's fight, already started by the run menu. A failure goes back to
   // the run menu, which shows it.
   async function startRunBattle(started: BattleView, location?: WildLocationId): Promise<void> {
@@ -515,21 +533,6 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
     setWildRebattle(null)
     setRevealedCount(0)
     setScreen('battle')
-  }
-
-  async function startPlayerBattle(name: string, doubles: boolean): Promise<void> {
-    setBusy(true)
-    try {
-      const initial = await skipTeamPreview(await window.api.startPlayerBattle(name, doubles))
-      setBackdrop(randomBackdropId())
-      setView(initial)
-      setWildRebattle(null)
-      setRevealedCount(0)
-      setError(null)
-      setScreen('battle')
-    } finally {
-      setBusy(false)
-    }
   }
 
   async function runFromBattle(): Promise<void> {
@@ -550,6 +553,11 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
   // screen shows, just like losing it outright.
   async function forfeitBattle(): Promise<void> {
     if (busy) return
+    // Online, the end screen arrives with the next screen from the room.
+    if (onlineMode) {
+      forfeitOnline()
+      return
+    }
     setBusy(true)
     try {
       setView(await window.api.forfeitBattle())
@@ -566,8 +574,8 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
     setBusy(true)
     setError(null)
     try {
-      const next = await skipTeamPreview(await window.api.submitChoice(choice))
-      setView(next)
+      if (onlineMode) await chooseOnline(choice)
+      else setView(await skipTeamPreview(await window.api.submitChoice(choice)))
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       // The turn wasn't accepted: hand back a fresh copy of the request so every slot
@@ -833,7 +841,6 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
           onChangeTrainerSprite={changeTrainerSprite}
           username={username}
           isAdmin={isAdmin}
-          onChallengePlayer={startPlayerBattle}
           onRunBattle={startRunBattle}
         />
       </>
@@ -985,7 +992,13 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
             tmQuickCheck={!!view.tmQuickCheck}
             tmRewards={view.tmRewards ?? []}
             onRebattle={wildRebattle ? () => startBattle(wildRebattle.location, wildRebattle.levelCap) : undefined}
-            onClose={() => setScreen('menu')}
+            onClose={() => {
+              if (onlineMode) {
+                leaveOnlineBattle()
+                setOnlineMode(false)
+              }
+              setScreen('menu')
+            }}
           />
         )}
 
@@ -1154,6 +1167,14 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
         )}
 
         {caughtUp && !view?.ended && !view?.request && <p>Waiting...</p>}
+        {/* Online: the friend still has to choose (or this side has nothing to choose). */}
+        {onlineMode &&
+          caughtUp &&
+          !view?.ended &&
+          view?.request &&
+          (view.request.wait || (pendingChoices.length > 0 && pendingChoices.every((c) => c !== null))) && (
+            <p className="online-waiting">Waiting for {view.opponentTrainer?.name ?? 'your friend'}...</p>
+          )}
         {error && <p style={{ color: '#ff6b6b' }}>{error}</p>}
       </div>
 

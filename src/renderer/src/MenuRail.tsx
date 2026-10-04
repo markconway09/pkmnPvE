@@ -71,7 +71,7 @@ function MenuRail({
     { id: 'home', label: 'Home', icon: <HomeIcon /> },
     { id: 'catch', label: 'Catch', icon: <img className="menu-rail-icon" src="./icons/nav/classic.png" alt="" /> },
     { id: 'box', label: 'Box', icon: <img className="menu-rail-icon" src="./icons/nav/box.png" alt="" /> },
-    { id: 'classic', label: 'Classic', icon: <img className="menu-rail-icon menu-rail-icon-pixel" src="./icons/nav/challenge.png" alt="" /> },
+    { id: 'classic', label: 'Battles', icon: <img className="menu-rail-icon menu-rail-icon-pixel" src="./icons/nav/challenge.png" alt="" /> },
     {
       id: 'roguelite',
       label: 'Roguelite',
