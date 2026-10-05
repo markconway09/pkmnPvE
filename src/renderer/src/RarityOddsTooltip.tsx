@@ -67,7 +67,7 @@ interface Props {
 function RarityOddsTooltip({ source, heading, className, children }: Props): React.JSX.Element {
   return (
     <Tooltip
-      placement="above"
+      placement="below"
       className={`rarity-odds-trigger${className ? ` ${className}` : ''}`}
       content={<OddsPanel source={source} heading={heading} />}
     >

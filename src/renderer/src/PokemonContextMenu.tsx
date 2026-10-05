@@ -10,6 +10,8 @@ import type { BoxPokemonView, EvolutionItemUse } from '../../shared/battle-types
 const POKE_BALL_SPRITENUM = 345
 // The Shiny Patch's icon (see ItemSprite).
 const SHINY_PATCH_SPRITENUM = -8
+// The Friendship Petal's icon (see ItemSprite).
+const FRIENDSHIP_PETAL_SPRITENUM = -31
 
 interface Props {
   x: number
@@ -28,6 +30,9 @@ interface Props {
   onUseShinyPatch?: () => void
   // How many Shiny Patches the bag holds.
   shinyPatches?: number
+  // Friendship not maxed and Friendship Petals in the bag: how many (see BoxPokemonView.friendshipPetals).
+  friendshipPetals?: number
+  onUseFriendshipPetal?: () => void
   // With a form-change item (Rotom Catalog, Prison Bottle...): the forms it can change into.
   // One Change Form entry opens the editor at its Form changes section, so a Pokemon
   // with many forms (Rotom, Alcremie) doesn't stretch the menu.
@@ -66,6 +71,8 @@ function PokemonContextMenu({
   canUseShinyPatch = false,
   onUseShinyPatch,
   shinyPatches,
+  friendshipPetals,
+  onUseFriendshipPetal,
   formChanges,
   onOpenForms,
   fusions = [],
@@ -207,6 +214,15 @@ function PokemonContextMenu({
                 if (!confirmingPatch) setConfirmingPatch(true)
                 else onUseShinyPatch()
               }}
+            />
+          )}
+          {friendshipPetals !== undefined && onUseFriendshipPetal && (
+            <PokemonMenuAction
+              tone="item"
+              icon={<ItemSprite spritenum={FRIENDSHIP_PETAL_SPRITENUM} />}
+              label="Max friendship"
+              detail={`Uses up a Friendship Petal (×${friendshipPetals})`}
+              onClick={onUseFriendshipPetal}
             />
           )}
         </PokemonMenuSection>

@@ -1034,6 +1034,8 @@ export interface AchievementsState {
   disabled: string[]
   // Every title they've claimed.
   titles: string[]
+  // Every species in the National Dex registered: the Pokedex and the player's name turn gold.
+  dexComplete: boolean
 }
 
 export interface AchievementClaimResult {

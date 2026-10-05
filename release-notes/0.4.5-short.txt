@@ -1,0 +1,8 @@
+Screen size, 6-star merges & Friendship Petals
+
+- New Screen size option (Auto, or 75%-150%) and drag-to-scroll on every list
+- Merging goes up to 6 stars (64 copies); stats at 0 IVs no longer get the bonus
+- New Friendship Petal (₽3,000): max a Pokémon's friendship, or evolve merge candidates
+- New wild battle result screen with search, catch and battle again side by side
+- Battle Bond turns Greninja into Ash-Greninja; Z-Move names shown in the editor
+- A full Pokédex turns your name gold

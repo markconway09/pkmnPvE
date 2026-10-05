@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react'
-import FitName from './FitName'
 import { createPortal } from 'react-dom'
 import { useDroppable } from '@dnd-kit/core'
 import type { BoxPokemonView, CompanionSize, CompanionSizeChoice } from '../../shared/battle-types'
-import { COMPANION_SIZES, toSpriteId } from '../../shared/battle-types'
+import { COMPANION_SIZES, MAX_HAPPINESS, toSpriteId } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
 import { loadSpriteStyle } from './spriteStyle'
 import ContextMenuPanel from './ContextMenuPanel'
@@ -89,7 +88,13 @@ function CompanionSlot({ companion, dragging, size, sizeChoice, onSetSize, onRet
               ))}
             </span>
           )}
-          <FitName className="companion-name" text={companion.species} />
+          {/* Its friendship, as a tiny pink bar under it. */}
+          <span className="companion-happiness" title={`Friendship ${companion.happiness ?? MAX_HAPPINESS}/${MAX_HAPPINESS}`}>
+            <span
+              className="companion-happiness-fill"
+              style={{ width: `${(Math.min(companion.happiness ?? MAX_HAPPINESS, MAX_HAPPINESS) / MAX_HAPPINESS) * 100}%` }}
+            />
+          </span>
         </>
       ) : (
         <span className="companion-slot-hint">

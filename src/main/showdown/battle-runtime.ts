@@ -762,15 +762,18 @@ export class WildBattle {
 
   // Merge stars: every Attack, Defense, Sp. Atk, Sp. Def and Speed the sim works out goes
   // through these (the same hooks items and abilities use, so it lasts through Mega
-  // Evolution and form changes), for any Pokemon given a boost below.
+  // Evolution and form changes), for any Pokemon given a boost below. A stat with 0 IVs
+  // is kept low on purpose (a Trick Room team's Speed, Foul Play's Attack), so it's left alone.
   private installMergeBoosts(): void {
     const battle = this.battleStream.battle
     if (!battle || ![...this.mergeStars.p1, ...this.mergeStars.p2].some((s) => s > 0)) return
-    const boost = function (this: SimBattle, _value: number, pokemon: SimPokemon | null): void {
-      const multiplier = pokemon?.m?.mergeBoost as number | undefined
-      if (multiplier) this.chainModify(multiplier)
+    for (const [stat, key] of [['Atk', 'atk'], ['Def', 'def'], ['SpA', 'spa'], ['SpD', 'spd'], ['Spe', 'spe']] as const) {
+      const boost = function (this: SimBattle, _value: number, pokemon: SimPokemon | null): void {
+        const multiplier = pokemon?.m?.mergeBoost as number | undefined
+        if (multiplier && pokemon?.set.ivs?.[key] !== 0) this.chainModify(multiplier)
+      }
+      battle.onEvent(`Modify${stat}`, battle.format, boost as never)
     }
-    for (const stat of ['Atk', 'Def', 'SpA', 'SpD', 'Spe']) battle.onEvent(`Modify${stat}`, battle.format, boost as never)
   }
 
   private readonly everstone: { p1: boolean[]; p2: boolean[] }
@@ -797,8 +800,10 @@ export class WildBattle {
       const growth = mergeGrowthFor(mon.species.name, mon.m.everstone ? undefined : mon.set.item)
       const multiplier = mergeStatMultiplier(count, speciesRarityTier(mon.species.name), growth)
       this.mergeMultipliers[sideIndex === 0 ? 'p1' : 'p2'][side.team.indexOf(mon.set)] = multiplier
-      const ratio = mon.maxhp > 0 ? mon.hp / mon.maxhp : 1
       mon.m.mergeBoost = multiplier
+      // Its HP too, unless that's at 0 IVs (see installMergeBoosts).
+      if (mon.set.ivs?.hp === 0) continue
+      const ratio = mon.maxhp > 0 ? mon.hp / mon.maxhp : 1
       mon.baseMaxhp = Math.floor(mon.baseMaxhp * multiplier)
       mon.maxhp = Math.floor(mon.maxhp * multiplier)
       mon.hp = ratio >= 1 ? mon.maxhp : Math.max(1, Math.round(ratio * mon.maxhp))
@@ -861,8 +866,12 @@ export class WildBattle {
     }
     const multiplier = view.rosterIndex !== undefined ? this.mergeMultipliers[side][view.rosterIndex] : undefined
     if (!multiplier) return view
+    // Not a stat at 0 IVs (see installMergeBoosts).
+    const ivs = (side === 'p1' ? this.p1team : this.p2team)[view.rosterIndex!]?.ivs as Record<string, number> | undefined
     const stats = { ...view.stats }
-    for (const key of Object.keys(stats) as (keyof typeof stats)[]) stats[key] = Math.floor(stats[key] * multiplier)
+    for (const key of Object.keys(stats) as (keyof typeof stats)[]) {
+      if (ivs?.[key] !== 0) stats[key] = Math.floor(stats[key] * multiplier)
+    }
     view.stats = stats
     return view
   }

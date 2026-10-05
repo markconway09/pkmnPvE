@@ -17,6 +17,8 @@ interface Props {
   onClose: () => void
   // The wallet changed (coins bought) - the menu bar's money needs refreshing.
   onMoneyChange: (money: number) => void
+  // A Pokemon was bought into the box - the main menu's box needs refreshing.
+  onBoxChange?: () => void
   // A page of the main menu instead of a window: no overlay and no close button.
   inline?: boolean
   // Mid-spin / mid-hand - the main menu's sidebar locks too, like the tabs.
@@ -29,7 +31,7 @@ interface Props {
  * held float at the top right, under the tabs. A game mid-spin or mid-hand locks the tabs and the
  * close button until it's done.
  */
-function GameCornerModal({ initialTab, onTabChange, onClose, onMoneyChange, inline, onBusyChange }: Props): React.JSX.Element {
+function GameCornerModal({ initialTab, onTabChange, onClose, onMoneyChange, onBoxChange, inline, onBusyChange }: Props): React.JSX.Element {
   const [tab, setTab] = useState<GameCornerTab>(initialTab)
   const [busy, setBusy] = useState(false)
   useEffect(() => onBusyChange?.(busy), [busy, onBusyChange])
@@ -95,6 +97,7 @@ function GameCornerModal({ initialTab, onTabChange, onClose, onMoneyChange, inli
           {tab === 'shop' && (
             <CoinShopPanel
               onCoinsChange={setCoins}
+              onBoxChange={onBoxChange}
               onMoneyChange={(m) => {
                 setMoney(m)
                 onMoneyChange(m)

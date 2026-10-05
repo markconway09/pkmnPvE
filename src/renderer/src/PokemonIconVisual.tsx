@@ -15,10 +15,12 @@ function PokemonIconVisual({ mon }: Props): React.JSX.Element {
 
   return (
     <>
-      {/* The sprite in a glow of its rarity colour - and a fully merged (★5) Pokemon's
-          pulsing gold glow behind it too. */}
+      {/* The sprite in a glow of its rarity colour - and a ★5 Pokemon's pulsing gold glow
+          behind it too, turning rainbow for a fully merged (★6) one. */}
       <RarityGlow tier={mon.rarityTier ?? 'common'} size={null} className="box-icon-glow">
-        {mon.mergeStars === MERGE_MAX_STARS && <span className="box-icon-star-glow" />}
+        {(mon.mergeStars ?? 0) >= MERGE_MAX_STARS - 1 && (
+          <span className={`box-icon-star-glow${mon.mergeStars === MERGE_MAX_STARS ? ' box-icon-star-glow-rainbow' : ''}`} />
+        )}
         <SpriteImage
           style="3d-static"
           className="box-icon-img"

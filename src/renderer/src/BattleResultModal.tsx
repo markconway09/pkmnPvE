@@ -119,13 +119,13 @@ function BattleResultModal({
     ? runBattle
       ? 'Added to team!'
       : freeCatch
-      ? 'Caught! (free - Catching Charm)'
-      : 'Caught!'
+        ? 'Caught! (free - Catching Charm)'
+        : 'Caught!'
     : runBattle
       ? 'Add to team'
       : hasPokeballs
-      ? `Catch (${pokeballs} Poke Ball${pokeballs === 1 ? '' : 's'})`
-      : `Buy Poke Ball (${formatMoney(pokeballPrice)})`
+        ? `Catch (${pokeballs} Poke Ball${pokeballs === 1 ? '' : 's'})`
+        : `Buy Poke Ball (${formatMoney(pokeballPrice)})`
 
   // Only a defeated shiny you could still have caught is worth a warning.
   const leaveNeedsConfirm = canCatch && opponentShiny && !caught
@@ -135,174 +135,216 @@ function BattleResultModal({
   else if (winner) heading = isRaid ? 'You lost the raid!' : isWildBattle ? 'You lost to the wild pokemon!' : `${winner} won the battle!`
   if (runBattle && winner !== 'You') heading = 'Your run is over!'
 
+  // A Classic wild battle splits in two: the result and rewards on the left, and on the
+  // right what to do next - search the area, catch, battle again or head back.
+  const wildLayout = isWildBattle && !runBattle && !isRaid
+
+  const catchRow = canCatch && !replacing && (
+    <div className="catch-row">
+      <button type="button" disabled={catchDisabled} onClick={() => void catchPokemon()}>
+        {catchLabel}
+      </button>
+    </div>
+  )
+
+  const rewards = (
+    <>
+      {replacing && (
+        <div className="run-replace">
+          <p className="box-empty-hint">
+            Your run team is full - who should make room? The new Pokémon takes over its held item, and any ability or moves it got from New
+            Ability and New Move floors.
+          </p>
+          <div className="run-replace-grid">
+            {replacing.map((mon) => (
+              <button
+                key={mon.id}
+                className={`run-replace-card rarity-card rarity-tier-${mon.rarityTier ?? 'common'}`}
+                disabled={busy}
+                onClick={() => void catchPokemon(mon.id)}
+              >
+                <RarityGlow size={52}>
+                  <SpriteImage
+                    style="3d-static"
+                    className="run-replace-sprite"
+                    spriteId={toSpriteId(mon.species)}
+                    shiny={mon.shiny}
+                    alt=""
+                  />
+                </RarityGlow>
+                <span>{mon.species}</span>
+                <span className="box-empty-hint">Lv {mon.level}</span>
+              </button>
+            ))}
+          </div>
+          <button type="button" disabled={busy} onClick={() => setReplacing(null)}>
+            Keep my team
+          </button>
+        </div>
+      )}
+      {raidCatch && (
+        <div className="raid-catch">
+          <SpriteImage
+            style="3d-static"
+            className="raid-catch-sprite"
+            spriteId={toSpriteId(raidCatch.species)}
+            shiny={raidCatch.shiny}
+            alt={raidCatch.species}
+          />
+          <div className="raid-catch-text">
+            <strong>
+              Caught {raidCatch.shiny ? 'a shiny ' : ''}
+              {raidCatch.species}!
+            </strong>
+            <span className="merge-stars">{'★'.repeat(raidStars)}</span>
+            <span className="box-empty-hint">
+              It joined your box as ★{raidStars} ({2 ** raidStars} copies merged)
+              {raidGigantamax ? ' - and it can Gigantamax' : ''}.
+            </span>
+          </div>
+        </div>
+      )}
+      {error && <p className="editor-error">{error}</p>}
+      {draftResult && (
+        <div className="exp-gain-list">
+          <div className="exp-gain-row">
+            <span className="exp-gain-species">Draft record</span>
+            <span className="exp-gain-detail">
+              {draftResult.wins}-{draftResult.losses}
+              {draftResult.over &&
+                ` · ${draftResult.wins >= DRAFT_MAX_WINS ? 'perfect run!' : 'draft over'} · +${draftResult.reward} coins`}
+            </span>
+          </div>
+        </div>
+      )}
+      {runItemReward && (
+        <div className="exp-gain-list">
+          <div className="exp-gain-row">
+            <span className="exp-gain-species">Reward</span>
+            <span className="exp-gain-detail">Pick your reward back on the run menu</span>
+          </div>
+        </div>
+      )}
+      {runBattle && winner === 'You' && runFainted.length > 0 && (
+        <div className="exp-gain-list">
+          {runFainted.map((species, i) => (
+            <div key={i} className="exp-gain-row">
+              <span className="exp-gain-species">{species}</span>
+              <span className="exp-gain-detail run-fainted-detail">Fainted - left the run</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {moneyGained > 0 && (
+        <div className="exp-gain-list">
+          <div className="exp-gain-row">
+            <span className="exp-gain-species">Reward</span>
+            <span className="exp-gain-detail">+{formatMoney(moneyGained)}</span>
+          </div>
+        </div>
+      )}
+      {expGains.length > 0 && (
+        <div className="exp-gain-list">
+          {expGains.map((g, i) => (
+            <div key={i} className="exp-gain-row">
+              <span className="exp-gain-species">{g.species}</span>
+              {g.cappedOut ? (
+                <span className="exp-gain-detail">At level cap</span>
+              ) : (
+                <span className="exp-gain-detail">
+                  +{g.gained} exp
+                  {g.levelAfter > g.levelBefore && ` · Lv ${g.levelBefore} → Lv ${g.levelAfter}`}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {itemDrops.length > 0 && (
+        <div className="exp-gain-list">
+          {itemDrops.map((d, i) => (
+            <div key={i} className="exp-gain-row">
+              <span className="exp-gain-species">
+                <ItemSprite spritenum={d.spritenum} className="item-drop-icon" />
+                {d.itemName}
+              </span>
+              <span className="exp-gain-detail">Added to bag</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {tmRewards.length > 0 && (
+        <div className="tm-reward-row">
+          {tmRewards.map((tm) => (
+            <TmCard key={tm.moveId} tm={tm} framed className="tm-reward-card">
+              <span className="tm-find-note">New TM!</span>
+            </TmCard>
+          ))}
+        </div>
+      )}
+    </>
+  )
+
+  const actions = (
+    <div className="editor-actions battle-result-actions">
+      {onRebattle && (
+        <button
+          className={leaveNeedsConfirm && confirmingLeave === 'rebattle' ? 'confirm-button' : undefined}
+          disabled={busy || rebattling}
+          onClick={() => {
+            if (leaveNeedsConfirm && confirmingLeave !== 'rebattle') {
+              setConfirmingLeave('rebattle')
+              return
+            }
+            setRebattling(true)
+            void onRebattle().finally(() => setRebattling(false))
+          }}
+        >
+          {leaveNeedsConfirm && confirmingLeave === 'rebattle' ? 'Leave the shiny uncaught? Click again' : 'Battle again'}
+        </button>
+      )}
+      <button
+        className={leaveNeedsConfirm && confirmingLeave === 'menu' ? 'confirm-button' : undefined}
+        disabled={rebattling}
+        onClick={() => {
+          if (leaveNeedsConfirm && confirmingLeave !== 'menu') setConfirmingLeave('menu')
+          else onClose()
+        }}
+      >
+        {leaveNeedsConfirm && confirmingLeave === 'menu' ? 'Leave the shiny uncaught? Click again' : 'Back to menu'}
+      </button>
+    </div>
+  )
+
   return createPortal(
     <div className="modal-overlay">
       {/* Tinted green for a win, red for a loss (grey for a tie). */}
-      <div className={`modal-panel battle-result-modal battle-result-${winner === 'You' ? 'won' : winner ? 'lost' : 'tie'}`}>
-        <h2>{heading}</h2>
-        {canCatch && !replacing && (
-          <div className="catch-row">
-            <button type="button" disabled={catchDisabled} onClick={() => void catchPokemon()}>
-              {catchLabel}
-            </button>
-          </div>
-        )}
-        {replacing && (
-          <div className="run-replace">
-            <p className="box-empty-hint">
-              Your run team is full - who should make room? The new Pokémon takes over its held item, and any ability
-              or moves it got from New Ability and New Move floors.
-            </p>
-            <div className="run-replace-grid">
-              {replacing.map((mon) => (
-                <button
-                  key={mon.id}
-                  className={`run-replace-card rarity-card rarity-tier-${mon.rarityTier ?? 'common'}`}
-                  disabled={busy}
-                  onClick={() => void catchPokemon(mon.id)}
-                >
-                  <RarityGlow size={52}>
-                    <SpriteImage style="3d-static" className="run-replace-sprite" spriteId={toSpriteId(mon.species)} shiny={mon.shiny} alt="" />
-                  </RarityGlow>
-                  <span>{mon.species}</span>
-                  <span className="box-empty-hint">Lv {mon.level}</span>
-                </button>
-              ))}
+      <div
+        className={`modal-panel battle-result-modal battle-result-${winner === 'You' ? 'won' : winner ? 'lost' : 'tie'}${
+          wildLayout ? ' battle-result-wild' : ''
+        }`}
+      >
+        {wildLayout ? (
+          <>
+            <div className="battle-result-main">
+              <h2>{heading}</h2>
+              {rewards}
             </div>
-            <button type="button" disabled={busy} onClick={() => setReplacing(null)}>
-              Keep my team
-            </button>
-          </div>
-        )}
-        {raidCatch && (
-          <div className="raid-catch">
-            <SpriteImage
-              style="3d-static"
-              className="raid-catch-sprite"
-              spriteId={toSpriteId(raidCatch.species)}
-              shiny={raidCatch.shiny}
-              alt={raidCatch.species}
-            />
-            <div className="raid-catch-text">
-              <strong>
-                Caught {raidCatch.shiny ? 'a shiny ' : ''}
-                {raidCatch.species}!
-              </strong>
-              <span className="merge-stars">{'★'.repeat(raidStars)}</span>
-              <span className="box-empty-hint">
-                It joined your box as ★{raidStars} ({2 ** raidStars} copies merged)
-                {raidGigantamax ? ' - and it can Gigantamax' : ''}.
-              </span>
+            <div className="battle-result-side">
+              {tmQuickCheck && <TmQuickCheck />}
+              {catchRow}
+              {actions}
             </div>
-          </div>
+          </>
+        ) : (
+          <>
+            <h2>{heading}</h2>
+            {catchRow}
+            {rewards}
+            {tmQuickCheck && <TmQuickCheck />}
+            {actions}
+          </>
         )}
-        {error && <p className="editor-error">{error}</p>}
-        {draftResult && (
-          <div className="exp-gain-list">
-            <div className="exp-gain-row">
-              <span className="exp-gain-species">Draft record</span>
-              <span className="exp-gain-detail">
-                {draftResult.wins}-{draftResult.losses}
-                {draftResult.over &&
-                  ` · ${draftResult.wins >= DRAFT_MAX_WINS ? 'perfect run!' : 'draft over'} · +${draftResult.reward} coins`}
-              </span>
-            </div>
-          </div>
-        )}
-        {runItemReward && (
-          <div className="exp-gain-list">
-            <div className="exp-gain-row">
-              <span className="exp-gain-species">Reward</span>
-              <span className="exp-gain-detail">Pick your reward back on the run menu</span>
-            </div>
-          </div>
-        )}
-        {runBattle && winner === 'You' && runFainted.length > 0 && (
-          <div className="exp-gain-list">
-            {runFainted.map((species, i) => (
-              <div key={i} className="exp-gain-row">
-                <span className="exp-gain-species">{species}</span>
-                <span className="exp-gain-detail run-fainted-detail">Fainted - left the run</span>
-              </div>
-            ))}
-          </div>
-        )}
-        {moneyGained > 0 && (
-          <div className="exp-gain-list">
-            <div className="exp-gain-row">
-              <span className="exp-gain-species">Reward</span>
-              <span className="exp-gain-detail">+{formatMoney(moneyGained)}</span>
-            </div>
-          </div>
-        )}
-        {expGains.length > 0 && (
-          <div className="exp-gain-list">
-            {expGains.map((g, i) => (
-              <div key={i} className="exp-gain-row">
-                <span className="exp-gain-species">{g.species}</span>
-                {g.cappedOut ? (
-                  <span className="exp-gain-detail">At level cap</span>
-                ) : (
-                  <span className="exp-gain-detail">
-                    +{g.gained} exp
-                    {g.levelAfter > g.levelBefore && ` · Lv ${g.levelBefore} → Lv ${g.levelAfter}`}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-        {itemDrops.length > 0 && (
-          <div className="exp-gain-list">
-            {itemDrops.map((d, i) => (
-              <div key={i} className="exp-gain-row">
-                <span className="exp-gain-species">
-                  <ItemSprite spritenum={d.spritenum} className="item-drop-icon" />
-                  {d.itemName}
-                </span>
-                <span className="exp-gain-detail">Added to bag</span>
-              </div>
-            ))}
-          </div>
-        )}
-        {tmRewards.length > 0 && (
-          <div className="tm-reward-row">
-            {tmRewards.map((tm) => (
-              <TmCard key={tm.moveId} tm={tm} framed className="tm-reward-card">
-                <span className="tm-find-note">New TM!</span>
-              </TmCard>
-            ))}
-          </div>
-        )}
-        {tmQuickCheck && <TmQuickCheck />}
-        <div className="editor-actions battle-result-actions">
-          {onRebattle && (
-            <button
-              className={leaveNeedsConfirm && confirmingLeave === 'rebattle' ? 'confirm-button' : undefined}
-              disabled={busy || rebattling}
-              onClick={() => {
-                if (leaveNeedsConfirm && confirmingLeave !== 'rebattle') {
-                  setConfirmingLeave('rebattle')
-                  return
-                }
-                setRebattling(true)
-                void onRebattle().finally(() => setRebattling(false))
-              }}
-            >
-              {leaveNeedsConfirm && confirmingLeave === 'rebattle' ? 'Leave the shiny uncaught? Click again' : 'Battle again'}
-            </button>
-          )}
-          <button
-            className={leaveNeedsConfirm && confirmingLeave === 'menu' ? 'confirm-button' : undefined}
-            disabled={rebattling}
-            onClick={() => {
-              if (leaveNeedsConfirm && confirmingLeave !== 'menu') setConfirmingLeave('menu')
-              else onClose()
-            }}
-          >
-            {leaveNeedsConfirm && confirmingLeave === 'menu' ? 'Leave the shiny uncaught? Click again' : 'Back to menu'}
-          </button>
-        </div>
       </div>
     </div>,
     document.body

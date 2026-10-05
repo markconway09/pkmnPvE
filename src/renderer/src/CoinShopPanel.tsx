@@ -39,6 +39,8 @@ interface Props {
   onCoinsChange: (coins: number) => void
   // The wallet changed - the top bar's and the menu bar's money need refreshing.
   onMoneyChange: (money: number) => void
+  // A Pokemon joined the box - the main menu's box needs refreshing.
+  onBoxChange?: () => void
 }
 
 /**
@@ -47,7 +49,7 @@ interface Props {
  * the bottom, the Pokemon of the day: a bubble on the banner points to it while it's
  * still for sale.
  */
-function CoinShopPanel({ onCoinsChange, onMoneyChange }: Props): React.JSX.Element {
+function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange }: Props): React.JSX.Element {
   const [coins, setCoins] = useState<number | null>(null)
   const [money, setMoney] = useState<number | null>(null)
   const [items, setItems] = useState<Map<string, ItemOptionEntry>>(new Map())
@@ -134,6 +136,7 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange }: Props): React.JSX.Eleme
       setCoins(result.coins)
       onCoinsChange(result.coins)
       setDailyMon((m) => (m ? { ...m, bought: true } : m))
+      onBoxChange?.()
       return `${result.shiny ? 'A shiny ' : ''}${result.species} joined your box`
     })
   }

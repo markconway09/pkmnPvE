@@ -7889,12 +7889,6 @@ button.editor-evolution:disabled.editor-evolution-locked {
   background: rgba(0, 0, 0, 0.35);
 }
 
-.companion-name {
-  margin-top: 4px;
-  font-size: 11px;
-  color: #b7c0cf;
-}
-
 .companion-hearts {
   position: absolute;
   inset: 0;
@@ -8065,7 +8059,7 @@ button.editor-evolution:disabled.editor-evolution-locked {
 }
 
 .companion-slot-filled .companion-sprite,
-.companion-slot-filled .companion-name {
+.companion-slot-filled .companion-happiness {
   pointer-events: auto;
 }
 
@@ -17023,17 +17017,20 @@ img.sprite-smooth {
     linear-gradient(180deg, #1f2530, #151a21);
 }
 
-.battle-result-modal > h2 {
+.battle-result-modal > h2,
+.battle-result-main > h2 {
   margin: 0 0 4px;
   font-size: 20px;
   text-align: center;
 }
 
-.battle-result-won > h2 {
+.battle-result-won > h2,
+.battle-result-won .battle-result-main > h2 {
   color: #9fe0a8;
 }
 
-.battle-result-lost > h2 {
+.battle-result-lost > h2,
+.battle-result-lost .battle-result-main > h2 {
   color: #ff9a8f;
 }
 
@@ -17091,11 +17088,13 @@ img.sprite-smooth {
   background: #1a1f28;
 }
 
-.battle-result-modal > .editor-actions {
+.battle-result-modal > .editor-actions,
+.battle-result-side > .editor-actions {
   margin-top: 14px;
 }
 
-.battle-result-modal > .editor-actions button {
+.battle-result-modal > .editor-actions button,
+.battle-result-side > .editor-actions button {
   width: 100%;
   height: 36px;
   border: 1px solid #2f3746;
@@ -17103,12 +17102,14 @@ img.sprite-smooth {
   background: #1a1f28;
 }
 
-.battle-result-modal > .editor-actions button:hover:not(:disabled) {
+.battle-result-modal > .editor-actions button:hover:not(:disabled),
+.battle-result-side > .editor-actions button:hover:not(:disabled) {
   border-color: #4a5468;
   background: #222935;
 }
 
-.battle-result-modal > .editor-actions button.confirm-button {
+.battle-result-modal > .editor-actions button.confirm-button,
+.battle-result-side > .editor-actions button.confirm-button {
   border-color: #e0453b;
   background: rgba(224, 69, 59, 0.25);
   color: #ffd9d6;
@@ -20848,12 +20849,25 @@ img.sprite-smooth {
   border-radius: 8px;
 }
 .achievement-action button {
+  /* No top/bottom padding: the global 10px left the text no room in a 28px button,
+     so it sat off-centre. Flex centres the label instead. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
   height: 28px;
+  padding: 0 8px;
   border-radius: 14px;
   font-size: 12px;
+  line-height: 1;
 }
 .achievement-action .mission-col-done {
-  padding: 4px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0;
+  line-height: 1;
+  text-indent: 0.1875em;
 }
 
 /* Move animation styles beyond the plain arcing shot - see AnimationLayer.tsx
@@ -21132,6 +21146,11 @@ img.sprite-smooth {
   max-width: 320px;
 }
 
+/* Options: the screen size tabs (Auto and the fixed zooms). */
+.options-scale-tabs {
+  max-width: 520px;
+}
+
 /* A double resist (1/4x) - or, from the receiving end, a 4x weakness - in a darker red
    than a plain 1/2x, so the two read apart at a glance. */
 .eff-resisted.eff-strong {
@@ -21150,7 +21169,7 @@ img.sprite-smooth {
 }
 
 .rarity-odds-panel {
-  width: 230px;
+  width: 300px;
 }
 
 .rarity-odds-heading {
@@ -21181,7 +21200,7 @@ img.sprite-smooth {
 }
 
 .rarity-odds-name {
-  width: 66px;
+  width: 92px;
   flex: none;
   color: var(--tier);
   font-weight: bold;
@@ -21202,7 +21221,7 @@ img.sprite-smooth {
 }
 
 .rarity-odds-chance {
-  min-width: 42px;
+  min-width: 54px;
   text-align: right;
   font-weight: bold;
   font-variant-numeric: tabular-nums;
@@ -21760,7 +21779,8 @@ img.sprite-smooth {
 }
 
 /* Battle result: "Battle again" stacked above "Back to menu". */
-.battle-result-modal > .battle-result-actions {
+.battle-result-modal > .battle-result-actions,
+.battle-result-side > .battle-result-actions {
   flex-direction: column;
 }
 
@@ -22425,4 +22445,310 @@ img.sprite-smooth {
 .online-waiting {
   color: #9aa6b8;
   font-style: italic;
+}
+
+
+/* A Classic wild win's result in two columns: the result and its rewards on the left,
+   and on the right Search the area at the top, then Catch, Battle again and Back to menu. */
+.modal-panel.battle-result-modal.battle-result-wild {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  width: 660px;
+  max-width: calc(100vw - 32px);
+}
+
+.battle-result-main,
+.battle-result-side {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.battle-result-side {
+  justify-content: center;
+  gap: 10px;
+  padding-left: 18px;
+  border-left: 1px solid #2c3442;
+}
+
+.battle-result-side .tm-quick-check {
+  margin: 0;
+}
+
+.battle-result-side .tm-quick-check-start {
+  width: 100%;
+}
+
+.battle-result-side .catch-row {
+  margin: 0;
+}
+
+.battle-result-side > .editor-actions {
+  margin-top: 0;
+}
+
+
+/* A long catch label (a free catch from the Catching Charm) wraps onto a second line
+   inside the button instead of spilling out of it. */
+.battle-result-modal .catch-row button,
+.battle-result-modal .catch-row button:disabled,
+.battle-result-modal .catch-row button:not(:disabled) {
+  height: auto;
+  min-height: 40px;
+  padding: 6px 14px;
+  line-height: 1.25;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+
+/* The case result's four buttons as one huge bar along the window's bottom edge: edge to
+   edge, joined with thin dividers, the outer corners rounded to the window's own. */
+.case-modal .case-bottom {
+  height: 190px;
+  justify-content: flex-end;
+}
+
+.case-modal .case-result {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.case-modal .case-result > p:first-child {
+  margin-top: auto;
+}
+
+.case-modal .case-result-actions {
+  gap: 0;
+  max-width: none;
+  height: 76px;
+  margin: auto -20px -16px;
+  padding-top: 0;
+  border-top: 1px solid #2c3442;
+}
+
+.case-modal .case-skip-hint {
+  margin-bottom: 30px;
+}
+
+.case-modal .case-result-actions > .rarity-odds-trigger {
+  height: 100%;
+}
+
+.case-modal .case-result-actions button {
+  flex: 1;
+  height: 100%;
+  min-width: 0;
+  padding: 0 12px;
+  border: 0;
+  border-left: 1px solid #2c3442;
+  border-radius: 0;
+  background: #1a1f28;
+  font-size: 18px;
+  line-height: 1.2;
+  white-space: normal;
+}
+
+.case-modal .case-result-actions > button:first-child {
+  border-left: 0;
+  border-bottom-left-radius: 15px;
+}
+
+/* Only the Nice! / Done button is gold - not Open another, last inside its tooltip. */
+.case-modal .case-result-actions .rarity-odds-trigger button:last-child {
+  border-color: #2c3442;
+  background: #1a1f28;
+  color: inherit;
+  font-weight: normal;
+}
+
+.case-modal .case-result-actions .rarity-odds-trigger button:last-child:hover:not(:disabled) {
+  background: #222935;
+}
+
+.case-modal .case-result-actions > button:last-child {
+  border-left: 0;
+  border-bottom-right-radius: 15px;
+}
+
+/* The companion's friendship: a tiny pink bar where its name used to be. */
+.companion-happiness {
+  display: block;
+  width: 36px;
+  height: 4px;
+  margin-top: 4px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.companion-happiness-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: #ff7eb6;
+}
+
+/* A fully merged (6-star) Pokemon: the pulsing glow behind it turns rainbow, its colours turning. */
+.box-icon-star-glow-rainbow {
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 70%),
+    conic-gradient(from 0deg, #ff5a5a, #ffb340, #fff35a, #5aff8c, #5ac8ff, #8c6bff, #ff5ad2, #ff5a5a);
+  -webkit-mask-image: radial-gradient(circle, #000 0%, rgba(0, 0, 0, 0.6) 40%, transparent 70%);
+  mask-image: radial-gradient(circle, #000 0%, rgba(0, 0, 0, 0.6) 40%, transparent 70%);
+  animation: star-glow-pulse 2.4s ease-in-out infinite, star-glow-hue 4s linear infinite;
+}
+
+@keyframes star-glow-hue {
+  from { filter: hue-rotate(0deg); }
+  to { filter: hue-rotate(360deg); }
+}
+
+/* The box merge bar's ticks - evo items, Friendship Petals, Rare Candies - as one compact
+   group, so all three fit beside the buttons. */
+.box-merge-ticks {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  padding: 2px 8px;
+  border: 1px solid #3a4150;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.box-merge-ticks-label {
+  font-size: 11px;
+  color: #8a93a3;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.box-merge-ticks .box-merge-items-toggle {
+  gap: 3px;
+  font-size: 0.8rem;
+}
+
+.box-merge-tick-icon {
+  margin: -4px -2px;
+}
+
+/* The loadout window's buttons keep their words on one line inside the pill (the wide
+   Pokemon font pushed them out); when a card runs short of room its buttons drop under the
+   team instead of squashing. */
+.loadouts-modal .loadout-card-body {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+.loadouts-modal .loadout-actions {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.loadouts-modal .loadout-actions button,
+.loadouts-modal .loadout-save-row button {
+  flex-shrink: 0;
+  width: auto;
+  min-width: max-content;
+  padding: 0 12px;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+/* Drag-to-scroll: no text selection and a grabbing hand while a list is being dragged. */
+body.drag-scrolling,
+body.drag-scrolling * {
+  user-select: none !important;
+  cursor: grabbing !important;
+}
+
+/* An empty strip down the box's right side to grab and drag-scroll it, since dragging a
+   Pokemon picks it up instead. Faintly shaded so it reads as a handle. It is one card plus
+   its gap wide (88px + 10px), so each row holds exactly one Pokemon fewer than before. */
+.box-grid {
+  padding-right: 108px;
+  background-image: linear-gradient(to left, rgba(255, 255, 255, 0.04) 98px, transparent 98px);
+}
+
+/* ---- A full Pokedex: the Pokedex header and the player's name in gold cards ---- */
+.pokedex-header.rarity-card.pokedex-header-complete {
+  border: 2px solid var(--tier);
+  background:
+    radial-gradient(ellipse at 10% 50%, color-mix(in srgb, var(--tier) 24%, transparent), transparent 60%),
+    linear-gradient(180deg, #2a2312, #16131f);
+  box-shadow:
+    inset 0 0 22px color-mix(in srgb, var(--tier) 22%, transparent),
+    0 0 14px color-mix(in srgb, var(--tier) 30%, transparent);
+}
+
+.pokedex-header-complete h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--tier);
+}
+
+.pokedex-complete-badge,
+.trainer-card-name-badge {
+  padding: 2px 9px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--tier) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tier) 60%, transparent);
+  color: var(--tier);
+  font-size: 12px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+/* A full bar says nothing the badge doesn't - it makes room for the search instead. */
+.pokedex-header-complete .pokedex-progress {
+  display: none;
+}
+
+.nav-player-name.rarity-card.nav-player-name-gold {
+  align-self: flex-start;
+  padding: 0 7px;
+  border-width: 1px;
+  border-radius: 6px;
+  color: var(--tier);
+  text-shadow: 0 0 6px color-mix(in srgb, var(--tier) 50%, transparent);
+}
+
+.player-trainer-modal > .trainer-card-name-gold {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 8px 14px;
+}
+
+.player-trainer-modal > .trainer-card-name-gold h2 {
+  margin: 0;
+  font-size: 22px;
+  color: var(--tier);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--tier) 45%, transparent);
+}
+
+/* The badge takes room from the search, which shrinks to fit rather than spilling out. */
+.pokedex-header-complete .search-bar.pokedex-search,
+.pokedex-header-complete .search-bar.pokedex-search input {
+  min-width: 0;
+}
+
+/* A full Pokedex: the player's name and title in battle, in a gold card hugging the text. */
+.trainer-hud-name.rarity-card.trainer-hud-name-gold {
+  align-self: center;
+  max-width: 100%;
+  padding: 2px 10px;
+  border-width: 1px;
+  border-radius: 8px;
+  color: var(--tier);
+  text-shadow: 0 0 6px color-mix(in srgb, var(--tier) 50%, transparent);
+}
+
+.trainer-hud-name-gold .trainer-hud-title-the {
+  color: color-mix(in srgb, var(--tier) 55%, #c9c3b0);
+  text-shadow: none;
 }

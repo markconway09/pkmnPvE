@@ -232,6 +232,8 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
   const [trainerSprite, setTrainerSprite] = useState<string>(initialTrainerSprite)
   // The player's achievement title, shown by their name in battle - read as each battle starts.
   const [playerTitle, setPlayerTitle] = useState<string | null>(null)
+  // A full Pokedex puts the player's name and title in a gold card.
+  const [playerDexComplete, setPlayerDexComplete] = useState(false)
   // An online battle with a friend is on screen: its choices go to the friend's room (see
   // online.ts), and its screens arrive from there rather than as replies.
   const [onlineMode, setOnlineMode] = useState(false)
@@ -281,8 +283,14 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
     if (!inBattle || !onBattleScreen) return
     window.api
       .getAchievements()
-      .then((state) => setPlayerTitle(state.title))
-      .catch(() => setPlayerTitle(null))
+      .then((state) => {
+        setPlayerTitle(state.title)
+        setPlayerDexComplete(state.dexComplete)
+      })
+      .catch(() => {
+        setPlayerTitle(null)
+        setPlayerDexComplete(false)
+      })
     window.api
       .listBox()
       .then((box) => setPlayerCompanion(box.companion ? { species: box.companion.species, shiny: box.companion.shiny, gmaxLook: box.companion.gmaxLook, size: box.companionSize ?? 'S' } : null))
@@ -893,6 +901,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
             <TrainerHud
               name={username}
               title={playerTitle}
+              gold={playerDexComplete}
               spriteId={trainerSprite}
               companion={playerCompanion}
               hideBalls
@@ -1037,8 +1046,9 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
               // A draft match or a Roguelite fight has Forfeit in Run's place instead.
               const canForfeit = !canGoBack && !!view?.canForfeit
               const canRun = (!canGoBack && !!view && runCost !== null) || canForfeit
-              // A paid run, walking away from a shiny, or forfeiting asks for a second click.
-              const runNeedsConfirm = (runCost ?? 0) > 0 || !!view?.p2[0]?.shiny || canForfeit
+              // A paid run, walking away from a wild shiny, or forfeiting asks for a second click.
+              const wildShiny = !view?.opponentTrainer && !!view?.p2[0]?.shiny
+              const runNeedsConfirm = (runCost ?? 0) > 0 || wildShiny || canForfeit
               return (
                 <div key={slotIndex} className="battle-action-slot">
                   {activeRequest.length > 1 && slotMon && (
@@ -1104,22 +1114,29 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
                     </div>
                   )}
                   <div className="menu-panel">
-                    {active.moves.map((move, i) => (
-                      <MoveButton
-                        key={move.id}
-                        id={move.id}
-                        name={move.move}
-                        pp={move.pp ?? 0}
-                        maxpp={move.maxpp ?? 0}
-                        disabled={!caughtUp || busy || !!move.disabled || chosen}
-                        power={view?.movePowers?.[slotIndex]?.[move.id]}
-                        effectiveness={effectivenessChipsFor(slotIndex, move.id)}
-                        stabTypes={stabTypes}
-                        onChoose={() =>
-                          chooseMoveForSlot(slotIndex, i, move.target, gimmickOn && gimmick ? ` ${gimmick.suffix}` : '')
-                        }
-                      />
-                    ))}
+                    {active.moves.map((move, i) => {
+                      // With Z-Move ticked, each move shows the Z-Move it becomes (Gigavolt Havoc,
+                      // Z-Swords Dance) - one with no Z-Move can't be picked until it's unticked.
+                      const zMoves = gimmickOn && gimmick?.suffix === 'zmove' ? (active.canZMove as ({ move: string } | null)[]) : null
+                      const zMove = zMoves ? (zMoves[i] ?? null) : undefined
+                      return (
+                        <MoveButton
+                          key={move.id}
+                          id={move.id}
+                          name={zMove ? zMove.move : move.move}
+                          pp={move.pp ?? 0}
+                          maxpp={move.maxpp ?? 0}
+                          disabled={!caughtUp || busy || !!move.disabled || chosen || zMove === null}
+                          // The base move's power isn't the Z-Move's, so none is shown for it.
+                          power={zMove ? undefined : view?.movePowers?.[slotIndex]?.[move.id]}
+                          effectiveness={effectivenessChipsFor(slotIndex, move.id)}
+                          stabTypes={stabTypes}
+                          onChoose={() =>
+                            chooseMoveForSlot(slotIndex, i, move.target, gimmickOn && gimmick ? ` ${gimmick.suffix}` : '')
+                          }
+                        />
+                      )
+                    })}
                   </div>
                 </div>
               )

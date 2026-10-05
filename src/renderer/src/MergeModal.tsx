@@ -36,7 +36,7 @@ function nextStarAt(copies: number): number | null {
 
 /**
  * Merging duplicates into a Pokemon: pick which of the same species go in. Their copies
- * add to its own (stars at 2, 4, 8, 16 and 32), a shiny makes it shiny, it keeps the
+ * add to its own (stars at 2, 4, 8, 16, 32 and 64), a shiny makes it shiny, it keeps the
  * higher friendship, and their held items go back to the bag.
  */
 function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
@@ -127,8 +127,8 @@ function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
         </div>
 
         <p className="editor-hint">
-          Each star is {bonusText(1)} in classic battles and friendly matches (not Roguelite runs). Stars come
-          at 2, 4, 8, 16 and 32 copies - past 32, the last one in keeps what's left over (and the stars that go with it). Its pre-evolutions can go in too, evolving on the way in - if they could evolve into it right now (level, friendship, and the evolution items, which are used up). Merged-in Pokémon leave your box: a shiny makes {keeper.species} shiny, a favorite makes it a favorite,
+          Each star is {bonusText(1)} in classic battles (not Roguelite runs or friendly matches), but never to a stat at 0 IVs. Stars come
+          at 2, 4, 8, 16, 32 and 64 copies - past 64, the last one in keeps what's left over (and the stars that go with it). Its pre-evolutions can go in too, evolving on the way in - if they could evolve into it right now (level, friendship, and the evolution items, which are used up). Merged-in Pokémon leave your box: a shiny makes {keeper.species} shiny, a favorite makes it a favorite,
           it keeps the higher level and friendship, and held items go back to your bag.
         </p>
 

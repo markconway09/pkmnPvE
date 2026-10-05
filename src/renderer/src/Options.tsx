@@ -21,6 +21,7 @@ import {
 import TabStrip from './TabStrip'
 import { cornerSoundsOn, setCornerSoundsOn } from './ticks'
 import { ANIM_SPEEDS, ANIM_SPEED_LABELS, animSpeed, setAnimSpeed, type AnimSpeed } from './animSpeed'
+import { UI_SCALE_CHOICES, UI_SCALE_LABELS, type UiScaleState } from '../../shared/ui-scale'
 
 interface Props {
   username: string
@@ -102,6 +103,39 @@ function MusicSourceSettings(): React.JSX.Element {
         </>
       )}
     </div>
+  )
+}
+
+/** Options → Screen size: Auto fits the game to the screen, or a fixed zoom. */
+function ScreenSizeSection(): React.JSX.Element {
+  const [state, setState] = useState<UiScaleState | null>(null)
+
+  useEffect(() => {
+    void window.api.getUiScale().then(setState)
+  }, [])
+
+  return (
+    <section className="options-section">
+      <h2 className="options-heading">Screen size</h2>
+      {state && (
+        <>
+          <TabStrip
+            className="options-scale-tabs"
+            tabs={UI_SCALE_CHOICES.map((id) => ({ id, label: UI_SCALE_LABELS[id] }))}
+            current={state.choice}
+            onSwitch={(next) => {
+              setState({ ...state, choice: next })
+              void window.api.setUiScale(next).then(setState)
+            }}
+          />
+          <p className="editor-hint">
+            {state.choice === 'auto'
+              ? `Fits the game to this screen - ${Math.round(state.zoom * 100)}% here.`
+              : 'The game always draws at this size; the window is never bigger than the screen.'}
+          </p>
+        </>
+      )}
+    </section>
   )
 }
 
@@ -252,6 +286,8 @@ function Options({
             ))}
           </div>
           </section>
+
+          <ScreenSizeSection />
 
           <section className="options-section">
             <h2 className="options-heading">Move animations</h2>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import Tooltip from './Tooltip'
 import { createPortal } from 'react-dom'
 import {
   DndContext,
@@ -9,7 +10,18 @@ import {
   type DragEndEvent,
   type DragStartEvent
 } from '@dnd-kit/core'
-import { CONFIRM_SELL_TIERS, MERGE_MAX_STARS, POKEMON_SELL_PRICES, WILD_LOCATIONS } from '../../shared/battle-types'
+import {
+  CONFIRM_SELL_TIERS,
+  FRIENDSHIP_PETAL_ITEM_ID,
+  MERGE_MAX_STARS,
+  POKEMON_SELL_PRICES,
+  RARE_CANDY_ITEM_ID,
+  WILD_LOCATIONS
+} from '../../shared/battle-types'
+
+// The Friendship Petal's and Rare Candy's icons (see ItemSprite).
+const FRIENDSHIP_PETAL_SPRITENUM = -31
+const RARE_CANDY_SPRITENUM = -2
 import type {
   BattleEligibility,
   BattleView,
@@ -54,12 +66,14 @@ import type { GameCornerTab } from './GameCornerTabs'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
 import GameCornerModal from './GameCornerModal'
 import SearchBar from './SearchBar'
+import RarityCard from './RarityCard'
 import type { AchievementsState } from '../../shared/achievements'
 import { LOCATION_BUTTON_BACKDROP, backdropUrl, locationIconUrl } from './battleScenery'
 import { TmSearchStrip, useTmSearch } from './TmSearch'
 import DexNavPanel from './DexNavPanel'
 import { formatMoney } from './money'
 import ShinyIcon from './ShinyIcon'
+import ItemSprite from './ItemSprite'
 import MusicPlayer from './MusicPlayer'
 
 interface Props {
@@ -286,6 +300,9 @@ function MainMenu({
   const [boxFilters, setBoxFilters] = useState<Set<BoxFilterKey>>(new Set())
   // Whether "Select all duplicates" also picks pre-evolutions that use up an evolution item.
   const [mergeWithItems, setMergeWithItems] = useState(false)
+  // ...and those that need Friendship Petals (a friendship evolution) or Rare Candies (a level one).
+  const [mergeWithPetals, setMergeWithPetals] = useState(false)
+  const [mergeWithCandies, setMergeWithCandies] = useState(false)
   const [selectMenuOpen, setSelectMenuOpen] = useState(false)
   // The sort order's menu (the same kind as Select's).
   const [sortMenuOpen, setSortMenuOpen] = useState(false)
@@ -569,7 +586,7 @@ function MainMenu({
   // Favorites are kept safe from a bulk sell, and a fused Pokemon has to be unfused first.
   const canBulkSell = (mon: BoxPokemonView): boolean => !mon.favorite && !mon.unfuse
   // Merging takes favorites (the heart carries over), but not a fused Pokemon.
-  // A 5-star one is done merging - it can be neither the keeper nor merged away.
+  // A 6-star one is done merging - it can be neither the keeper nor merged away.
   const canBulkMerge = (mon: BoxPokemonView): boolean => !mon.unfuse && (mon.mergeStars ?? 0) < MERGE_MAX_STARS
   const canSelect = boxSelectMode === 'merge' ? canBulkMerge : canBulkSell
 
@@ -593,20 +610,28 @@ function MainMenu({
   function selectAllDuplicates(): void {
     setConfirmingBoxSell(false)
     // Each fully evolved keeper with something to take in, and every one ready to go into it.
-    // Pre-evolutions that need an evolution item only go in with the tick on, and only as
-    // many as the bag holds items for.
+    // Pre-evolutions that need an evolution item, Friendship Petals or Rare Candies only go
+    // in with that tick on, and only as many as the bag holds them for.
     const ids = new Set<string>()
     const stock = new Map<string, number>()
     const fits = (c: MergeCandidateView): boolean => {
+      const boost = c.boost
+      if (c.notReady && !boost) return false
       const items = c.evolveItems ?? []
-      if (items.length === 0) return true
-      if (!mergeWithItems) return false
-      if (items.some((i) => (stock.get(i.itemId) ?? i.owned) < 1)) return false
-      for (const i of items) stock.set(i.itemId, (stock.get(i.itemId) ?? i.owned) - 1)
+      if (items.length > 0 && !mergeWithItems) return false
+      if (boost?.petals && !mergeWithPetals) return false
+      if (boost?.candies && !mergeWithCandies) return false
+      const needs = [
+        ...items.map((i) => ({ id: i.itemId, owned: i.owned, n: 1 })),
+        ...(boost?.petals ? [{ id: FRIENDSHIP_PETAL_ITEM_ID, owned: boost.petalsOwned, n: boost.petals }] : []),
+        ...(boost?.candies ? [{ id: RARE_CANDY_ITEM_ID, owned: boost.candiesOwned, n: boost.candies }] : [])
+      ]
+      if (needs.some((i) => (stock.get(i.id) ?? i.owned) < i.n)) return false
+      for (const i of needs) stock.set(i.id, (stock.get(i.id) ?? i.owned) - i.n)
       return true
     }
     for (const m of boxMons) {
-      const ready = (m.mergeCandidates ?? []).filter((c) => !c.notReady && !ids.has(c.id) && fits(c))
+      const ready = (m.mergeCandidates ?? []).filter((c) => !ids.has(c.id) && fits(c))
       // The companion is left out - picking it would only ever make it the keeper.
       if (!canBulkMerge(m) || m.companion || ready.length === 0) continue
       ids.add(m.id)
@@ -654,7 +679,7 @@ function MainMenu({
     }
     setBusy(true)
     try {
-      const result = await window.api.mergeSelectedMons([...boxSelection])
+      const result = await window.api.mergeSelectedMons([...boxSelection], { petals: mergeWithPetals, candies: mergeWithCandies })
       setBoxState(result.box)
       const stars = result.results.map((r) => `${r.species} ★${r.stars}`).join(', ')
       notes.show(`Merged ${result.merged} Pokemon - ${stars}`, at)
@@ -728,6 +753,16 @@ function MainMenu({
       )
     } catch (e) {
       notes.show(errorMessage(e), { x: window.innerWidth / 2, y: window.innerHeight / 3 }, 'bad')
+    }
+  }
+
+  async function useFriendshipPetal(monId: string): Promise<void> {
+    setContextMenu(null)
+    setBusy(true)
+    try {
+      setBoxState(await window.api.useFriendshipPetal(monId))
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -1042,7 +1077,14 @@ function MainMenu({
           >
             <img className="nav-trainer-sprite" src={trainerSpriteUrl(trainerSprite)} alt="" />
             <span className="nav-player-text">
-              <span className="nav-player-name">{username}</span>
+              {/* A full Pokedex puts the name in a gold card. */}
+              {achievements?.dexComplete ? (
+                <RarityCard tier="legendary" framed className="nav-player-name nav-player-name-gold" title="Pokédex complete">
+                  {username}
+                </RarityCard>
+              ) : (
+                <span className="nav-player-name">{username}</span>
+              )}
               {achievements?.title && <span className="nav-player-title">{achievements.title}</span>}
             </span>
             {money !== null && <span className="nav-player-money">{formatMoney(money)}</span>}
@@ -1143,6 +1185,7 @@ function MainMenu({
           onClose={() => {}}
           onBusyChange={setCornerBusy}
           onMoneyChange={setMoney}
+          onBoxChange={refreshBox}
         />
       ) : (
       <>
@@ -1461,17 +1504,42 @@ function MainMenu({
                       .reduce((sum, m) => sum + (m.sellPrice ?? POKEMON_SELL_PRICES[m.rarityTier ?? 'common']), 0)
                   )}
             </span>
-            <span className="box-selection-hint">
-              {boxSelectMode === 'merge'
-                ? 'Each species goes into its best copy (most stars, then highest level)'
-                : "Favorites can't be picked"}
-            </span>
+            {boxSelectMode === 'merge' ? (
+              <>
+                <Tooltip
+                  className="game-corner-info"
+                  placement="below"
+                  content={<div className="tooltip-panel">Each species goes into its best copy (most stars, then most evolved, then highest level)</div>}
+                >
+                  <span className="game-corner-info-icon" aria-label="How merging works">
+                    i
+                  </span>
+                </Tooltip>
+                <span className="box-selection-hint" />
+              </>
+            ) : (
+              <span className="box-selection-hint">Favorites can't be picked</span>
+            )}
             {boxSelectMode === 'merge' && (
               <>
-                <label className="box-merge-items-toggle" title="Also pick pre-evolutions that use up an evolution item to go in (as many as your bag has items for)">
-                  <input type="checkbox" checked={mergeWithItems} onChange={(e) => setMergeWithItems(e.target.checked)} />
-                  <span>Use evo items</span>
-                </label>
+                {/* What "Select all duplicates" may spend on pre-evolutions that need it to go in. */}
+                <span className="box-merge-ticks">
+                  <span className="box-merge-ticks-label">Use</span>
+                  <label className="box-merge-items-toggle" title="Also pick pre-evolutions that use up an evolution item to go in (as many as your bag has items for)">
+                    <input type="checkbox" checked={mergeWithItems} onChange={(e) => setMergeWithItems(e.target.checked)} />
+                    <span>Evo items</span>
+                  </label>
+                  <label className="box-merge-items-toggle" title="Also pick pre-evolutions with a friendship evolution, using up a Friendship Petal each to max their friendship">
+                    <input type="checkbox" checked={mergeWithPetals} onChange={(e) => setMergeWithPetals(e.target.checked)} />
+                    <ItemSprite spritenum={FRIENDSHIP_PETAL_SPRITENUM} className="box-merge-tick-icon" />
+                    <span>Petals</span>
+                  </label>
+                  <label className="box-merge-items-toggle" title="Also pick pre-evolutions short of their evolution's level, using up Rare Candies to reach it (up to the level cap)">
+                    <input type="checkbox" checked={mergeWithCandies} onChange={(e) => setMergeWithCandies(e.target.checked)} />
+                    <ItemSprite spritenum={RARE_CANDY_SPRITENUM} className="box-merge-tick-icon" />
+                    <span>Candies</span>
+                  </label>
+                </span>
                 <button disabled={busy} onClick={selectAllDuplicates} title="Pick every Pokémon shown that has another of its species">
                   Select all duplicates
                 </button>
@@ -1812,6 +1880,8 @@ function MainMenu({
           canUseShinyPatch={contextMenu.mon.canUseShinyPatch ?? false}
           onUseShinyPatch={() => void useShinyPatch(contextMenu.mon.id)}
           shinyPatches={contextMenu.mon.shinyPatches}
+          friendshipPetals={contextMenu.mon.friendshipPetals}
+          onUseFriendshipPetal={() => void useFriendshipPetal(contextMenu.mon.id)}
           formChanges={contextMenu.mon.formChanges}
           onOpenForms={() => openEditor(contextMenu.mon.id, false, true)}
           fusions={contextMenu.mon.fusions}

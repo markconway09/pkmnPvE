@@ -9,7 +9,7 @@ import {
   EXP_CANDY_EXP,
   LINK_CABLE_ITEM_ID,
   MAX_HAPPINESS,
-  MERGE_MAX_STARS,
+  MERGE_GROWTH_STARS,
   mergeBonusPerStar,
   mergeGrowthHolding,
   OPENABLE_ITEM_IDS,
@@ -20,6 +20,7 @@ import {
   LOCK_CAPSULE_ITEM_ID,
   RARE_CANDY_ITEM_ID,
   SHINY_PATCH_ITEM_ID,
+  FRIENDSHIP_PETAL_ITEM_ID,
   WISHING_PIECE_ITEM_ID,
   RAID_GIGANTAMAX_CHANCE,
   RAID_RESTRICTED_CHANCE,
@@ -102,6 +103,25 @@ const { BattlePlayer } = require('pokemon-showdown/dist/sim/battle-stream.js') a
   // wild, found where the other mythicals are.
   pokedex.floetteeternal = { ...pokedex.floetteeternal, tags: ['Mythical'] }
   ;(Dex.species as unknown as { speciesCache: Map<string, unknown> }).speciesCache.clear()
+}
+
+// Battle Bond works the Gen 7 way here: after Greninja knocks out a foe with a move it
+// becomes Ash-Greninja for the rest of the battle (Gen 9 only gives it +1 Atk/SpA/Spe).
+{
+  type BondPokemon = Pokemon & { bondTriggered?: boolean }
+  const abilities = Dex.data.Abilities as unknown as Record<string, Record<string, unknown>>
+  abilities.battlebond = {
+    ...abilities.battlebond,
+    onSourceAfterFaint(this: Battle, _length: number, _target: Pokemon, source: BondPokemon, effect: { effectType?: string } | null) {
+      if (source.bondTriggered || effect?.effectType !== 'Move') return
+      if (source.species.id === 'greninjabond' && source.hp && !source.transformed && source.side.foePokemonLeft()) {
+        this.add('-activate', source, 'ability: Battle Bond')
+        source.formeChange('Greninja-Ash', this.effect, true)
+        source.formeRegression = true
+        source.bondTriggered = true
+      }
+    }
+  }
 }
 
 // Teams/Dex aren't re-exported directly: their method signatures reference
@@ -1002,6 +1022,16 @@ const SHINY_PATCH_ITEM: ItemOptionEntry = {
 }
 const SHINY_PATCH_PRICE = 25000
 
+// -31 maps to its own image (see ItemSprite).
+const FRIENDSHIP_PETAL_ITEM: ItemOptionEntry = {
+  id: FRIENDSHIP_PETAL_ITEM_ID,
+  name: 'Friendship Petal',
+  description:
+    "Right-click a Pokemon in your box or team and use it to max out that Pokemon's friendship. The box's merge can spend them on friendship evolutions too.",
+  spritenum: -31
+}
+const FRIENDSHIP_PETAL_PRICE = 3000
+
 // A key item (see KEY_ITEM_IDS) - never sold. -11 maps to its own image (see ItemSprite).
 // More key items. -12 and -13 map to their own images (see ItemSprite).
 const EXP_CHARM_ITEM: ItemOptionEntry = {
@@ -1198,6 +1228,7 @@ export function getEditorOptions(): EditorOptions {
       RANDOM_LEGENDARY_ITEM,
       LOCK_CAPSULE_ITEM,
       SHINY_PATCH_ITEM,
+      FRIENDSHIP_PETAL_ITEM,
       WISHING_PIECE_ITEM,
       ROTOM_CATALOG_ITEM,
       EXP_CHARM_ITEM,
@@ -1452,6 +1483,7 @@ export function getDefaultShopCatalog(): ShopItemEntry[] {
       if (
         item.id === RARE_CANDY_ITEM_ID ||
         item.id === SHINY_PATCH_ITEM_ID ||
+        item.id === FRIENDSHIP_PETAL_ITEM_ID ||
         item.id === WISHING_PIECE_ITEM_ID ||
         OPENABLE_ITEM_IDS.has(item.id) ||
         item.id in EXP_CANDY_PRICE ||
@@ -1475,6 +1507,7 @@ export function getDefaultShopCatalog(): ShopItemEntry[] {
       if (item.id === LOCK_CAPSULE_ITEM_ID) return { ...item, price: LOCK_CAPSULE_PRICE, category: 'Recommended' }
       if (item.id in EXP_CANDY_PRICE) return { ...item, price: EXP_CANDY_PRICE[item.id], category: 'Recommended' }
       if (item.id === SHINY_PATCH_ITEM_ID) return { ...item, price: SHINY_PATCH_PRICE, category: 'Recommended' }
+      if (item.id === FRIENDSHIP_PETAL_ITEM_ID) return { ...item, price: FRIENDSHIP_PETAL_PRICE, category: 'Recommended' }
       if (item.id === WISHING_PIECE_ITEM_ID) return { ...item, price: WISHING_PIECE_PRICE, category: 'Recommended' }
       if (evolutionOnlyIds.has(item.id)) return { ...item, price: COMPETITIVE_ITEM_PRICE, category: 'Evolution Items' }
       const dexItem = Dex.items.get(item.id)
@@ -2230,7 +2263,7 @@ export function mergeGrowthFor(speciesName: string, item?: string): number {
   // ...or, if that's more, enough that its 5-star multiplier (1 + 5 x bonus x growth)
   // reaches the evolution's 2-star stats - the big boost for the weakest ones.
   const target = ratio * (1 + 2 * mergeBonusPerStar(speciesRarityTier(final.name)))
-  const growth = (target - 1) / (MERGE_MAX_STARS * mergeBonusPerStar(speciesRarityTier(own.name)))
+  const growth = (target - 1) / (MERGE_GROWTH_STARS * mergeBonusPerStar(speciesRarityTier(own.name)))
   return Math.round(Math.max(1, ratio, growth) * 100) / 100
 }
 
@@ -2532,6 +2565,12 @@ export function evolutionOptionsFor(set: PokemonSet): EvolutionOption[] {
   return options
 }
 
+/** The level a level-up evolution happens at (null for any other kind). */
+export function evolutionLevelOf(speciesName: string): number | null {
+  const species = Dex.species.get(speciesName)
+  return species.exists && species.evoType === undefined && !evolutionItemsFor(species) ? (species.evoLevel ?? 1) : null
+}
+
 /**
  * Every Pokemon this one can evolve into, ready or not, with what it takes - "Level 36",
  * "Use a Thunder Stone", "Max friendship (120/255)" - by the same rules as
@@ -2597,6 +2636,12 @@ export function formChangeFor(speciesName: string): { forms: string[]; itemId: s
 export function heldItemForme<T extends PokemonSet>(set: T): T {
   const species = Dex.species.get(set.species)
   if (!species.exists) return set
+  // A Greninja with Battle Bond goes in as Greninja-Bond, the form the ability needs to
+  // turn into Ash-Greninja (one stored as Ash-Greninja starts back at Greninja-Bond too).
+  if ((species.name === 'Greninja' || species.name === 'Greninja-Ash') && toID(set.ability ?? '') === 'battlebond') {
+    const wasDefaultName = !set.name || set.name === set.species
+    return { ...set, species: 'Greninja-Bond', name: wasDefaultName ? 'Greninja' : set.name }
+  }
   const base = Dex.species.get(species.baseSpecies)
   const itemFormes = [base.name, ...(base.otherFormes ?? [])]
     .map((name) => Dex.species.get(name))

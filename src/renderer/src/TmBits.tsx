@@ -78,9 +78,15 @@ export function TmQuickCheck(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null)
 
   function onDone(result: SkillCheckResult, timedOut: boolean): void {
+    const doneAt = Date.now()
     window.api
       .takeTmQuickCheck(result, timedOut)
-      .then((r) => setOutcome({ result, find: r.find, item: r.item ?? null }))
+      .then((r) => {
+        const next = { result, find: r.find, item: r.item ?? null }
+        // A prize waits a beat so the check's result shows on the ring first.
+        const wait = next.find || next.item ? Math.max(0, 300 - (Date.now() - doneAt)) : 0
+        setTimeout(() => setOutcome(next), wait)
+      })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
   }
 
@@ -96,7 +102,8 @@ export function TmQuickCheck(): React.JSX.Element {
         </button>
       ) : (
         <>
-          <SkillCheckRing runKey={runKey} settings={DEFAULT_SKILL_CHECK} onDone={onDone} />
+          {/* Once the check turns something up, the finished ring makes way for the prize. */}
+          {!outcome?.find && !outcome?.item && <SkillCheckRing runKey={runKey} settings={DEFAULT_SKILL_CHECK} onDone={onDone} />}
           {outcome?.find ? (
             <TmFindCard find={outcome.find} />
           ) : outcome?.item ? (

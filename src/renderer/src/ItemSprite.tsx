@@ -42,7 +42,8 @@ const SYNTHETIC_SPRITES: Record<number, string> = {
   '-27': './sprites/misc/decorationbox.png', // Decoration Box (Serebii's Apricorn Box)
   '-28': './sprites/misc/fashioncase.png', // Fashion Case (Serebii)
   '-29': './sprites/misc/scanner.png', // Scanner
-  '-30': './sprites/misc/dexnav.png' // DexNav (Bulbagarden Archives)
+  '-30': './sprites/misc/dexnav.png', // DexNav (Bulbagarden Archives)
+  '-31': './sprites/misc/friendshippetal.png' // Friendship Petal (Serebii's Pink Petal)
 }
 
 function ItemSprite({ spritenum, className }: Props): React.JSX.Element {

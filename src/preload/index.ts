@@ -3,6 +3,7 @@ import type { OnlinePlayer, OnlineSelf, OnlineTeam, OnlineViews } from '../share
 import type { RarityOdds, RarityOddsSource } from '../shared/rarity'
 import { contextBridge, ipcRenderer } from 'electron'
 import type { LocalMusicFile } from '../shared/music'
+import type { UiScaleChoice, UiScaleState } from '../shared/ui-scale'
 import type { CoinBalance, DailyCoinMon, DailyCoinMonPurchase, DailyCoinOffer, SlotRules, SlotSpinResult } from '../shared/slots'
 import type { BlackjackView } from '../shared/blackjack'
 import type { AchievementClaimResult, AchievementsState } from '../shared/achievements'
@@ -57,7 +58,8 @@ import type {
   Trainer,
   WildDropEntry,
   WildLocationId,
-  CompanionSizeChoice
+  CompanionSizeChoice,
+  MergeBoosts
 } from '../shared/battle-types'
 
 const api = {
@@ -192,6 +194,7 @@ const api = {
   returnCompanion: (): Promise<BoxState> => ipcRenderer.invoke('box:returnCompanion'),
   setCompanionSize: (size: CompanionSizeChoice): Promise<BoxState> => ipcRenderer.invoke('box:setCompanionSize', size),
   useShinyPatch: (id: string): Promise<BoxState> => ipcRenderer.invoke('box:useShinyPatch', id),
+  useFriendshipPetal: (id: string): Promise<BoxState> => ipcRenderer.invoke('box:useFriendshipPetal', id),
   changeForm: (id: string, form: string): Promise<BoxState> => ipcRenderer.invoke('box:changeForm', id, form),
   fuseMon: (id: string, partnerId: string): Promise<BoxState> => ipcRenderer.invoke('box:fuse', id, partnerId),
   unfuseMon: (id: string): Promise<BoxState> => ipcRenderer.invoke('box:unfuse', id),
@@ -199,8 +202,11 @@ const api = {
   mergeMons: (keeperId: string, fodderIds: string[]): Promise<BoxState> =>
     ipcRenderer.invoke('box:merge', keeperId, fodderIds),
   // The expanded box's "select to merge" (see mergeSelectedMons).
-  mergeSelectedMons: (ids: string[]): Promise<{ box: BoxState; merged: number; results: { species: string; stars: number }[] }> =>
-    ipcRenderer.invoke('box:mergeSelected', ids),
+  mergeSelectedMons: (
+    ids: string[],
+    boosts?: MergeBoosts
+  ): Promise<{ box: BoxState; merged: number; results: { species: string; stars: number }[] }> =>
+    ipcRenderer.invoke('box:mergeSelected', ids, boosts),
   // A Random Pokemon's "Auto merge": straight into its best keeper (see autoMergeMon).
   autoMergeMon: (monId: string): Promise<{ box: BoxState; species: string; stars: number }> =>
     ipcRenderer.invoke('box:autoMerge', monId),
@@ -371,7 +377,10 @@ const api = {
     ipcRenderer.invoke('premadeTeams:setDoubleBattle', teamId, isDoubleBattle),
   // The "local folder" music source: pick a folder, then list the audio files in it.
   pickMusicFolder: (): Promise<string | null> => ipcRenderer.invoke('music:pickFolder'),
-  listMusicFolder: (folder: string): Promise<LocalMusicFile[]> => ipcRenderer.invoke('music:listFolder', folder)
+  listMusicFolder: (folder: string): Promise<LocalMusicFile[]> => ipcRenderer.invoke('music:listFolder', folder),
+  // Options → Screen size: how big the game draws (Auto fits it to the screen).
+  getUiScale: (): Promise<UiScaleState> => ipcRenderer.invoke('uiScale:get'),
+  setUiScale: (choice: UiScaleChoice): Promise<UiScaleState> => ipcRenderer.invoke('uiScale:set', choice)
 }
 
 contextBridge.exposeInMainWorld('api', api)

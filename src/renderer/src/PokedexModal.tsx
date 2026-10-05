@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { RarityGlow } from './RarityCard'
+import RarityCard, { RarityGlow } from './RarityCard'
 import FitName from './FitName'
 import { createPortal } from 'react-dom'
 import type { PokedexEntry } from '../../shared/battle-types'
@@ -39,6 +39,8 @@ function PokedexModal({ onClose }: Props): React.JSX.Element {
   const forms = entries?.filter((e) => e.form) ?? []
   const registeredCount = species.filter((e) => e.registered).length
   const registeredForms = forms.filter((e) => e.registered).length
+  // Every species registered: the header turns into a gold card.
+  const complete = species.length > 0 && registeredCount === species.length
   // Matches a name ("char") or a Dex number ("6", "#006").
   const query = search.trim().toLowerCase().replace(/^#/, '')
   const shown = (entries ?? []).filter(
@@ -50,8 +52,8 @@ function PokedexModal({ onClose }: Props): React.JSX.Element {
   return createPortal(
     <div className="modal-overlay" onMouseDown={onClose}>
       <div className={`modal-panel pokedex-modal${entries ? '' : ' modal-panel-loading'}`} onMouseDown={(e) => e.stopPropagation()}>
-        <div className="pokedex-header">
-          <h2>Pokédex</h2>
+        <RarityCard tier={complete ? 'legendary' : 'common'} framed={complete} className={`pokedex-header${complete ? ' pokedex-header-complete' : ''}`}>
+          <h2>Pokédex{complete && <span className="pokedex-complete-badge">★ Complete</span>}</h2>
           {entries && (
             <span className="pokedex-count" title="Species in their usual form · alternate forms">
               {registeredCount}/{species.length}
@@ -71,7 +73,7 @@ function PokedexModal({ onClose }: Props): React.JSX.Element {
             Where to find?
           </span>
           <SearchBar className="pokedex-search" placeholder="Search name or number…" value={search} onChange={setSearch} autoFocus />
-        </div>
+        </RarityCard>
         <div className={`pokedex-grid${entries ? '' : ' pokedex-grid-loading'}`}>
           {!entries && <ModalSpinner />}
           {shown.map((e) => {

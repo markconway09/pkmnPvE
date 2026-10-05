@@ -38,6 +38,9 @@ export const EXP_CANDY_EXP: Record<string, number> = {
 // Spent from a Pokemon's right-click menu to make it shiny. Not a real Dex item -
 // see getEditorOptions() in sim-access.ts.
 export const SHINY_PATCH_ITEM_ID = 'shinypatch'
+// Spent the same way to max out a Pokemon's friendship - and by the box's merge, on
+// pre-evolutions with a friendship evolution (see MergeBoosts). Not a real Dex item.
+export const FRIENDSHIP_PETAL_ITEM_ID = 'friendshippetal'
 // Starts a Max Raid Battle from the Classic menu (used up when the raid begins).
 export const WISHING_PIECE_ITEM_ID = 'wishingpiece'
 
@@ -188,6 +191,7 @@ export const NON_HELD_ITEM_IDS = new Set([
   BLACK_AUGURITE_ITEM_ID,
   PEAT_BLOCK_ITEM_ID,
   SHINY_PATCH_ITEM_ID,
+  FRIENDSHIP_PETAL_ITEM_ID,
   WISHING_PIECE_ITEM_ID,
   ...KEY_ITEM_IDS,
   ...OPENABLE_ITEM_IDS,
@@ -494,6 +498,8 @@ export interface BoxPokemonView extends PokemonSummary {
   id: string
   // At the top of the friendship scale - the only Pokemon that can be a companion.
   maxFriendship?: boolean
+  // Its friendship, 0-MAX_HAPPINESS (the companion shows it as a little pink bar).
+  happiness?: number
   // In the companion slot - it can take merges, but can't be merged into anything.
   companion?: boolean
   // Only present for the player's own persisted box/team Pokemon - premade
@@ -512,6 +518,8 @@ export interface BoxPokemonView extends PokemonSummary {
   canUseShinyPatch?: boolean
   // How many Shiny Patches the bag holds, shown beside that menu option.
   shinyPatches?: number
+  // Friendship not maxed yet, and this many Friendship Petals in the bag to max it.
+  friendshipPetals?: number
   // Every Pokemon it can evolve into, ready or not, with what it takes and whether it's
   // already in the Pokedex (the edit window lists them all).
   evolutionPaths?: { species: string; method: string; ready: boolean; registered: boolean }[]
@@ -1238,11 +1246,15 @@ export const POKEMON_SELL_PRICES: Record<RarityTier, number> = {
 
 // ---- Merging duplicates ----
 // Merging a duplicate into a Pokemon adds its copies to it: stars go up each time the
-// copies double (2 = 1 star, 4 = 2 stars ... 32 = 5 stars), and each star is +10% to all
-// its stats in classic battles and friendly matches (never in a Roguelite run) - less for
-// the strongest: +7.5% a star for a red Pokemon and +5% for a gold one.
-export const MERGE_MAX_STARS = 5
+// copies double (2 = 1 star, 4 = 2 stars ... 32 = 5 stars, 64 = 6 stars), and each star is +10% to all
+// its stats in classic battles (never in a Roguelite run or a friendly match) - less for
+// the strongest: +7.5% a star for a red Pokemon and +5% for a gold one. A stat at 0 IVs
+// takes no bonus (kept low on purpose - a Trick Room team's Speed, Foul Play's Attack).
+export const MERGE_MAX_STARS = 6
 export const MERGE_MAX_COPIES = 2 ** MERGE_MAX_STARS
+// The stars a not-fully-evolved Pokemon's growth is worked out at (see below) - set before
+// the 6th star came in, so that one is a bonus on top.
+export const MERGE_GROWTH_STARS = 5
 export const MERGE_STAT_BONUS_PER_STAR = 0.1
 export const MERGE_STAT_BONUS_BY_TIER: Partial<Record<RarityTier, number>> = { epic: 0.075, legendary: 0.05 }
 // A Pokemon that isn't fully evolved (only an Everstone-locked one takes merges - see
@@ -1324,6 +1336,16 @@ export interface MergeCandidateView {
   // the bag has), or why it can't yet ("Needs a Whipped Dream", "Level 36") - see mergeEvolutionFor.
   evolveItems?: { itemId: string; name: string; spritenum: number | null; owned: number }[]
   notReady?: string
+  // Not ready, but it would be with Friendship Petals (a friendship evolution) and/or Rare
+  // Candies (a level one) - how many it takes, and how many the bag holds. Only the box's
+  // "Select all duplicates" spends these, with its ticks on.
+  boost?: { petals: number; candies: number; petalsOwned: number; candiesOwned: number }
+}
+
+// The box's merge ticks: spend Friendship Petals / Rare Candies on pre-evolutions that need them.
+export interface MergeBoosts {
+  petals?: boolean
+  candies?: boolean
 }
 
 // A shiny sells for this much more, whatever its rarity (on top of any title's bonus).

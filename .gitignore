@@ -8,6 +8,7 @@ dist
 # Player saves stay out of the repo - only the shared game data in save/ is committed.
 save/players/
 save/session.json
+save/display.json
 
 # Local build secrets (the Google Drive OAuth client) - compiled into the build, never committed.
 .env.local

@@ -7,11 +7,14 @@ import SpriteImage from './SpriteImage'
 import { loadSpriteStyle } from './spriteStyle'
 import { toSpriteId } from '../../shared/battle-types'
 import type { CompanionSize } from '../../shared/battle-types'
+import RarityCard from './RarityCard'
 
 interface Props {
   name: string
   // The player's achievement title, in gold beside their name.
   title?: string | null
+  // A full Pokedex: the name and title sit in a gold card.
+  gold?: boolean
   spriteId: string
   roster: RosterSlotView[]
   align: 'left' | 'right'
@@ -63,7 +66,7 @@ function ballTitle(slot: RosterSlotView | undefined): string | undefined {
   return slot.species
 }
 
-function TrainerHud({ name, title, spriteId, roster, align, size = 'small', rewards, modifiers, companion, hideBalls }: Props): React.JSX.Element {
+function TrainerHud({ name, title, gold, spriteId, roster, align, size = 'small', rewards, modifiers, companion, hideBalls }: Props): React.JSX.Element {
   const slots = Array.from({ length: TEAM_SIZE }, (_, i) => roster[i])
   const sprite =
     modifiers || rewards !== undefined ? (
@@ -92,8 +95,8 @@ function TrainerHud({ name, title, spriteId, roster, align, size = 'small', rewa
   ) : (
     sprite
   )
-  const nameRow = (
-    <div className="trainer-hud-name">
+  const nameText = (
+    <>
       {name}
       {title && (
         <span className="trainer-hud-title">
@@ -101,7 +104,14 @@ function TrainerHud({ name, title, spriteId, roster, align, size = 'small', rewa
           {title}
         </span>
       )}
-    </div>
+    </>
+  )
+  const nameRow = gold ? (
+    <RarityCard tier="legendary" framed className="trainer-hud-name trainer-hud-name-gold" title="Pokédex complete">
+      {nameText}
+    </RarityCard>
+  ) : (
+    <div className="trainer-hud-name">{nameText}</div>
   )
   // The player (no Poke Balls): the name along the top, the sprites centred under it.
   if (hideBalls) {

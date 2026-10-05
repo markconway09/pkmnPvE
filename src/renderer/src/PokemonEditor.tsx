@@ -97,7 +97,7 @@ function wheelScrollsSideways(strip: HTMLDivElement | null): void {
   )
 }
 
-// A box Pokemon's stars and how far it is to the next one (stars at 2, 4, 8, 16, 32 copies).
+// A box Pokemon's stars and how far it is to the next one (stars at 2, 4, 8, 16, 32, 64 copies).
 function MergeProgress({ copies, tier, growth }: { copies: number; tier: RarityTier | undefined; growth: number }): React.JSX.Element {
   const stars = mergeStarsFor(copies)
   const maxed = stars >= MERGE_MAX_STARS
@@ -1048,10 +1048,14 @@ function PokemonEditor({
                           ? finalStat(key, baseStats[key], set.level, set.ivs[key], set.evs[key], nature)
                           : '—'}
                         {!!mergeStars && baseStats && (
-                          <span className="editor-ev-stat-merged" title={`With the ★${mergeStars} merge bonus`}>
+                          <span
+                            className="editor-ev-stat-merged"
+                            title={set.ivs[key] === 0 ? 'At 0 IVs this stat takes no merge bonus' : `With the ★${mergeStars} merge bonus`}
+                          >
+                            {/* A stat at 0 IVs is kept low on purpose, so stars leave it alone. */}
                             {Math.floor(
                               finalStat(key, baseStats[key], set.level, set.ivs[key], set.evs[key], nature) *
-                                mergeStatMultiplier(mergeStars, rarityTier, growth)
+                                (set.ivs[key] === 0 ? 1 : mergeStatMultiplier(mergeStars, rarityTier, growth))
                             )}
                           </span>
                         )}

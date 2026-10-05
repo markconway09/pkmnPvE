@@ -13,7 +13,7 @@ import { addItem, hasItem } from './bag-store'
 import { boxAchievementStats } from './box-store'
 import { changeCoins } from './game-corner-store'
 import { addMoney, getMoney } from './money-store'
-import { getEditorOptions } from './sim-access'
+import { getEditorOptions, nationalDexSpecies } from './sim-access'
 import { tmAchievementStats } from './tm-store'
 import { getTrainerProfile } from './trainer-profile'
 
@@ -145,7 +145,13 @@ export function getAchievements(): AchievementsState {
     unlocked: unlocked.has(a.id),
     claimed: claimed.has(a.id)
   }))
-  return { achievements, title: progress.title, disabled: progress.disabledTitles, titles: claimedTitles() }
+  return {
+    achievements,
+    title: progress.title,
+    disabled: progress.disabledTitles,
+    titles: claimedTitles(),
+    dexComplete: stats.dexSpecies >= nationalDexSpecies().length
+  }
 }
 
 function claimedTitles(): string[] {

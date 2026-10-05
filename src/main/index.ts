@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'node:path'
 import { installMusicFolder } from './music-folder'
+import { initialWindowSize, installUiScale, installUiScaleIpc } from './ui-scale'
 import type {
   BattleEligibility,
   BossRematchInfo,
@@ -16,7 +17,7 @@ import type {
   NextBossInfo,
   Trainer
 } from '../shared/battle-types'
-import type { ItemQuantity, CompanionSizeChoice, WildLocationId } from '../shared/battle-types'
+import type { ItemQuantity, CompanionSizeChoice, MergeBoosts, WildLocationId } from '../shared/battle-types'
 import {
   WILD_LOCATIONS,
   rollWildWeather,
@@ -47,6 +48,7 @@ import {
   returnCompanion,
   setCompanionSize,
   useShinyPatch,
+  useFriendshipPetal,
   changeForm,
   fuseMon,
   unfuseMon,
@@ -55,7 +57,6 @@ import {
   autoMergeMon,
   getTeamMergeStars,
   getTeamEverstones,
-  readSavedTeamStarsOf,
   readSavedTeamEverstonesOf,
   readSavedTeamOf,
   scaleTeamToLevel,
@@ -257,19 +258,17 @@ ipcMain.handle = (channel, listener) =>
   })
 
 function createWindow(): void {
+  // The layout is built for 1280x960 - wide enough for the battle screen's 3-column
+  // layout (switch list, the stage, the log), tall enough for a full battle screen
+  // without the page scrolling. The window opens at that size zoomed to fit the
+  // screen (Options → Screen size, see ui-scale.ts), and can grow but not shrink
+  // below it.
+  const { width, height } = initialWindowSize()
   const mainWindow = new BrowserWindow({
-    // Wide enough for the battle screen's 3-column layout (switch list, the
-    // stage, the log) to sit comfortably instead of squeezing the side
-    // columns down to a sliver - see .battle-screen's own minmax floors for
-    // what happens below this anyway.
-    width: 1280,
-    // Tall enough for a full battle screen (moves, the team panel, the Run
-    // button) without the page scrolling.
-    height: 960,
-    // The window can grow, but not shrink below the size it opens at - below
-    // this the battle screen's 3-column layout starts running out of room.
-    minWidth: 1280,
-    minHeight: 960,
+    width,
+    height,
+    minWidth: width,
+    minHeight: height,
     // No File/Edit/View menu bar - it's Electron's default, not the game's. A dev
     // copy still shows it on Alt, for reload and the DevTools.
     autoHideMenuBar: true,
@@ -282,6 +281,8 @@ function createWindow(): void {
       sandbox: false
     }
   })
+
+  installUiScale(mainWindow)
 
   // The packaged game has no menu at all (so Alt doesn't bring one up mid-battle).
   if (app.isPackaged) mainWindow.removeMenu()
@@ -431,8 +432,7 @@ ipcMain.handle('battle:startPlayer', async (_event, username: string, doubles = 
     spriteId: player.trainerSprite ?? 'red',
     noRewards: true
   }, {
-    p1: getTeamMergeStars(),
-    p2: readSavedTeamStarsOf(player.slug),
+    // No merge star boosts on either side - a friendly match is fought on the sets alone.
     everstone: { p1: getTeamEverstones(), p2: readSavedTeamEverstonesOf(player.slug) }
   })
   return activeBattle.getInitialView()
@@ -522,11 +522,8 @@ ipcMain.handle('online:start', async (event, friend: OnlinePlayer, friendTeam: O
       noRewards: true,
       online: { hostName: session.username, hostSpriteId: session.trainerSprite ?? 'red' }
     },
-    {
-      p1: getTeamMergeStars(),
-      p2: guest.mergeStars,
-      everstone: { p1: getTeamEverstones(), p2: guest.everstone }
-    }
+    // No merge star boosts on either side, as in a friendly match.
+    { everstone: { p1: getTeamEverstones(), p2: guest.everstone } }
   )
   onlineBattle = battle
   activeBattle = null
@@ -774,11 +771,14 @@ ipcMain.handle('box:setCompanion', (_event, id: string) => setCompanion(id))
 ipcMain.handle('box:returnCompanion', () => returnCompanion())
 ipcMain.handle('box:setCompanionSize', (_event, size: CompanionSizeChoice) => setCompanionSize(size))
 ipcMain.handle('box:useShinyPatch', (_event, id: string) => useShinyPatch(id))
+ipcMain.handle('box:useFriendshipPetal', (_event, id: string) => useFriendshipPetal(id))
 ipcMain.handle('box:changeForm', (_event, id: string, form: string) => changeForm(id, form))
 ipcMain.handle('box:fuse', (_event, id: string, partnerId: string) => fuseMon(id, partnerId))
 ipcMain.handle('box:unfuse', (_event, id: string) => unfuseMon(id))
 ipcMain.handle('box:merge', (_event, keeperId: string, fodderIds: string[]) => mergeMons(keeperId, fodderIds))
-ipcMain.handle('box:mergeSelected', (_event, ids: string[]) => mergeSelectedMons(ids))
+ipcMain.handle('box:mergeSelected', (_event, ids: string[], boosts?: MergeBoosts) =>
+  mergeSelectedMons(ids, { petals: !!boosts?.petals, candies: !!boosts?.candies })
+)
 ipcMain.handle('box:autoMerge', (_event, monId: string) => autoMergeMon(monId))
 
 ipcMain.handle('loadouts:list', () => listLoadouts())
@@ -1004,6 +1004,7 @@ ipcMain.handle(
 void app.whenReady().then(() => {
   restoreRememberedSession()
   installMusicFolder()
+  installUiScaleIpc()
   createWindow()
 
   app.on('activate', () => {

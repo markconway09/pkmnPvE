@@ -8,6 +8,7 @@ import { TITLE_CHANGED_EVENT } from './BetSlider'
 import { trainerSpriteUrl } from './trainerSprite'
 import TitlePicker from './TitlePicker'
 import TrainerSpritePicker from './TrainerSpritePicker'
+import RarityCard from './RarityCard'
 
 interface Props {
   username: string
@@ -36,7 +37,7 @@ function PlayerTrainerModal({
 
   const [profile, setProfile] = useState<TrainerProfile | null>(null)
   // The titles earned from achievements, the one shown and the ones turned off.
-  const [titles, setTitles] = useState<Pick<AchievementsState, 'title' | 'titles' | 'disabled'> | null>(null)
+  const [titles, setTitles] = useState<Pick<AchievementsState, 'title' | 'titles' | 'disabled' | 'dexComplete'> | null>(null)
 
   useEffect(() => {
     window.api
@@ -88,7 +89,15 @@ function PlayerTrainerModal({
   return createPortal(
     <div className="modal-overlay" onMouseDown={onClose}>
       <div className="modal-panel player-trainer-modal" onMouseDown={(e) => e.stopPropagation()}>
-        <h2>{username}</h2>
+        {/* A full Pokedex puts the name in a gold card. */}
+        {titles?.dexComplete ? (
+          <RarityCard tier="legendary" framed className="trainer-card-name-gold" title="Pokédex complete">
+            <h2>{username}</h2>
+            <span className="trainer-card-name-badge">★ Pokédex complete</span>
+          </RarityCard>
+        ) : (
+          <h2>{username}</h2>
+        )}
         <div className="trainer-card-row">
           <button className="trainer-sprite-current" onClick={() => setPickerOpen(true)}>
             <img className="trainer-sprite-current-img" src={trainerSpriteUrl(trainerSprite)} alt={trainerSprite} />

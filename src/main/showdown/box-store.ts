@@ -34,7 +34,9 @@ import {
   planMerge,
   RARE_CANDY_ITEM_ID,
   ROTOM_CATALOG_ITEM_ID,
-  SHINY_PATCH_ITEM_ID
+  SHINY_PATCH_ITEM_ID,
+  FRIENDSHIP_PETAL_ITEM_ID,
+  type MergeBoosts
 } from '../../shared/battle-types'
 import {
   applyEditableSet,
@@ -62,6 +64,7 @@ import {
   raidBossCandidates,
   evolutionOptionsFor,
   evolutionPathsFor,
+  evolutionLevelOf,
   evolveSet,
   formChangedSet,
   formChangeFor,
@@ -74,6 +77,7 @@ import {
   pickRandomUnevolvedSpecies,
   toEditableSet,
   toID,
+  type EvolutionOption,
   type PokemonSet
 } from './sim-access'
 import { expProgressForLevel, getExpInfo, levelForExp, totalExpForSpeciesLevel } from './exp'
@@ -284,7 +288,7 @@ export function getPokedex(): PokedexEntry[] {
 // same form, or a pre-evolution into its evolution (Charmander into Charizard, Eevee into
 // Vaporeon - never the other way, see canMergeInto). A fused one can take in a duplicate
 // but can't be merged away (its partner would go with it).
-// At 5 stars (MERGE_MAX_COPIES): never merged into, nor merged away into another.
+// At 6 stars (MERGE_MAX_COPIES): never merged into, nor merged away into another.
 function isMergeMaxed(mon: StoredMon): boolean {
   return (mon.copies ?? 1) >= MERGE_MAX_COPIES
 }
@@ -314,7 +318,7 @@ function mergeGroups(mons: StoredMon[]): Map<string, StoredMon[]> {
 function mergeCandidatesFor(mon: StoredMon, groups: Map<string, StoredMon[]>): MergeCandidateView[] {
   // Only a fully evolved (or Everstone-locked) Pokemon takes merges.
   if (!takesMerges(mon)) return []
-  // A 5-star one is done: it takes nothing more in and is never merged away, so it
+  // A 6-star one is done: it takes nothing more in and is never merged away, so it
   // doesn't count as anyone's duplicate either.
   if (isMergeMaxed(mon)) return []
   const { team: teamSlots, companionId } = getState()
@@ -324,9 +328,17 @@ function mergeCandidatesFor(mon: StoredMon, groups: Map<string, StoredMon[]>): M
       (other) => other.id !== mon.id && !other.fusedWith && !isMergeMaxed(other) && mergesInto(mon, other)
     )
     .map((other) => {
-      const evolution = mergeEvolutionFor(other.set, mon.set.species, new Map())
+      const plain = mergeEvolutionFor(other.set, mon.set.species, new Map())
+      // Not ready as it is, but it would be with Friendship Petals or Rare Candies - the
+      // box's "Select all duplicates" can spend those (see MergeCandidateView.boost).
+      const boosted = plain.ready ? null : mergeEvolutionFor(other.set, mon.set.species, new Map(), { petals: true, candies: true })
+      const evolution = boosted?.ready ? boosted : plain
+      const petals = evolution.items.filter((id) => id === FRIENDSHIP_PETAL_ITEM_ID).length
+      const candies = evolution.items.filter((id) => id === RARE_CANDY_ITEM_ID).length
       const used = new Map<string, number>()
-      for (const id of evolution.items) used.set(id, (used.get(id) ?? 0) + 1)
+      for (const id of evolution.items) {
+        if (id !== FRIENDSHIP_PETAL_ITEM_ID && id !== RARE_CANDY_ITEM_ID) used.set(id, (used.get(id) ?? 0) + 1)
+      }
       return {
         id: other.id,
         species: other.set.species,
@@ -342,13 +354,22 @@ function mergeCandidatesFor(mon: StoredMon, groups: Map<string, StoredMon[]>): M
           spritenum: getItemSpritenumById(id),
           owned: getItemQuantity(id)
         })),
+        boost:
+          boosted?.ready && other.id !== companionId
+          ? {
+              petals,
+              candies,
+              petalsOwned: getItemQuantity(FRIENDSHIP_PETAL_ITEM_ID),
+              candiesOwned: getItemQuantity(RARE_CANDY_ITEM_ID)
+            }
+          : undefined,
         // The companion stays itself - it can't be merged away while it's in the slot.
         notReady:
           other.id === companionId
             ? "It's your companion - take it out of the companion slot first"
-            : evolution.ready
+            : plain.ready
               ? undefined
-              : evolution.reason
+              : plain.reason
       }
     })
 }
@@ -360,11 +381,15 @@ function mergeCandidatesFor(mon: StoredMon, groups: Map<string, StoredMon[]>): M
  * (Swirlix into Slurpuff takes a Whipped Dream; Charmander into Charizard, two level steps,
  * only the level for both). `stock` holds what's left of each item after the others being
  * merged with it (it's taken from as items are counted in).
+ * With `boosts`, a step it can't take yet can be helped along: a Friendship Petal maxes its
+ * friendship for a friendship evolution, Rare Candies (one a level, up to the level cap)
+ * reach a level evolution's level - those go in `items` too, to be used up.
  */
 function mergeEvolutionFor(
   set: PokemonSet,
   keeperSpecies: string,
-  stock: Map<string, number>
+  stock: Map<string, number>,
+  boosts: MergeBoosts = {}
 ): { ready: boolean; items: string[]; reason?: string } {
   const line = mergeLineOf(keeperSpecies)
   const from = dexFormOf(set.species)
@@ -376,8 +401,41 @@ function mergeEvolutionFor(
   const left = (id: string): number => (stock.get(id) ?? getItemQuantity(id)) - (reserved.get(id) ?? 0)
   let current: PokemonSet = { ...set }
   const items: string[] = []
+  const levelCap = getProgression().levelCap
+  const reach = (s: PokemonSet, step: string): EvolutionOption | undefined =>
+    evolutionOptionsFor(s).find((o) => dexFormOf(o.species) === step)
   for (const step of steps) {
-    const option = evolutionOptionsFor(current).find((o) => dexFormOf(o.species) === step)
+    let option = reach(current, step)
+    // A petal first, then candies, then both - only what the step really needs.
+    if (!option && (boosts.petals || boosts.candies)) {
+      const friend = { ...current, happiness: MAX_HAPPINESS }
+      const levelled = { ...current, level: Math.max(current.level, levelCap) }
+      const tries: { set: PokemonSet; petal: boolean; candy: boolean }[] = []
+      if (boosts.petals) tries.push({ set: friend, petal: true, candy: false })
+      if (boosts.candies) tries.push({ set: levelled, petal: false, candy: true })
+      if (boosts.petals && boosts.candies) tries.push({ set: { ...levelled, happiness: MAX_HAPPINESS }, petal: true, candy: true })
+      for (const t of tries) {
+        const found = reach(t.set, step)
+        if (!found) continue
+        // The candies reach the level that evolution needs (a friendship one: no candies).
+        const target = t.candy ? Math.max(current.level, evolutionLevelOf(found.species) ?? current.level) : current.level
+        const candies = target - current.level
+        if (t.candy && candies === 0 && !t.petal) continue
+        if (t.petal && left(FRIENDSHIP_PETAL_ITEM_ID) < 1) continue
+        if (left(RARE_CANDY_ITEM_ID) < candies) continue
+        if (t.petal) {
+          reserved.set(FRIENDSHIP_PETAL_ITEM_ID, (reserved.get(FRIENDSHIP_PETAL_ITEM_ID) ?? 0) + 1)
+          items.push(FRIENDSHIP_PETAL_ITEM_ID)
+        }
+        if (candies > 0) {
+          reserved.set(RARE_CANDY_ITEM_ID, (reserved.get(RARE_CANDY_ITEM_ID) ?? 0) + candies)
+          for (let i = 0; i < candies; i++) items.push(RARE_CANDY_ITEM_ID)
+        }
+        current = { ...current, level: target, happiness: t.petal ? MAX_HAPPINESS : current.happiness }
+        option = found
+        break
+      }
+    }
     if (!option) {
       const path = evolutionPathsFor(current).find((p) => dexFormOf(p.species) === step)
       return { ready: false, items: [], reason: path ? `${current.species}: ${path.method}` : `${current.species} can't evolve into ${step}` }
@@ -410,6 +468,7 @@ function toView(mon: StoredMon, arrival: number, groups?: Map<string, StoredMon[
   }
   const canLevelUpWithCandy = mon.set.level < getProgression().levelCap && hasItem(RARE_CANDY_ITEM_ID)
   const canUseShinyPatch = !mon.set.shiny && hasItem(SHINY_PATCH_ITEM_ID)
+  const canUsePetal = !atMaxFriendship(mon) && hasItem(FRIENDSHIP_PETAL_ITEM_ID)
   const formChange = formChangeFor(mon.set.species)
   // Listed whether or not the item's been unlocked yet (the edit window shows them greyed out).
   const formChanges = formChange
@@ -437,12 +496,14 @@ function toView(mon: StoredMon, arrival: number, groups?: Map<string, StoredMon[
     canLevelUpWithCandy,
     canUseShinyPatch,
     shinyPatches: canUseShinyPatch ? getItemQuantity(SHINY_PATCH_ITEM_ID) : undefined,
+    friendshipPetals: canUsePetal ? getItemQuantity(FRIENDSHIP_PETAL_ITEM_ID) : undefined,
     formChanges,
     fusions: fusion.fusions,
     unfuse: fusion.unfuse,
     itemSpritenum,
     favorite: !!mon.favorite,
     maxFriendship: atMaxFriendship(mon),
+    happiness: mon.set.happiness ?? MAX_HAPPINESS,
     companion: getState().companionId === mon.id || undefined,
     copies: mon.copies ?? 1,
     mergeStars: mergeStarsFor(mon.copies),
@@ -766,7 +827,7 @@ export function mergeMons(keeperId: string, fodderIds: string[]): BoxState {
  * last one only gives what fits and keeps the rest. Only those merged in whole leave the
  * box and pass on their shininess, heart, level and friendship. How many went in.
  */
-function mergeInto(keeperId: string, fodderIds: string[]): number {
+function mergeInto(keeperId: string, fodderIds: string[], boosts: MergeBoosts = {}): number {
   const box = getState()
   const keeper = box.mons.find((m) => m.id === keeperId)
   if (!keeper) throw new Error(`Unknown Pokemon id: ${keeperId}`)
@@ -797,7 +858,7 @@ function mergeInto(keeperId: string, fodderIds: string[]): number {
   const stock = new Map<string, number>()
   const evolveItems = new Map<string, string[]>()
   for (const m of fodder) {
-    const evolution = mergeEvolutionFor(m.set, keeper.set.species, stock)
+    const evolution = mergeEvolutionFor(m.set, keeper.set.species, stock, boosts)
     if (!evolution.ready) throw new Error(`${m.set.species} can't merge in yet - ${evolution.reason}`)
     evolveItems.set(m.id, evolution.items)
   }
@@ -814,7 +875,8 @@ function mergeInto(keeperId: string, fodderIds: string[]): number {
     partial.copies = plan.partial.left
   }
   for (const mon of fodder.filter((m) => whole.has(m.id))) {
-    // The evolution items it used on its way in (not counted as an evolution).
+    // The evolution items (and petals and candies) it used on its way in (not counted as
+    // an evolution) - it passes on its own level and friendship, not what those gave it.
     for (const itemId of evolveItems.get(mon.id) ?? []) removeItem(itemId, 1)
     if (mon.set.item) addItem(toID(mon.set.item), 1)
     if (mon.set.shiny) keeper.set.shiny = true
@@ -841,12 +903,13 @@ function mergeInto(keeperId: string, fodderIds: string[]): number {
 
 /**
  * The expanded box's "select to merge": the picked Pokemon, evolution line by line,
- * each merged into the best of them - the most evolved, then the most copies, then the highest level, then a
- * shiny, then a favorite. Past the 32-copy top the rest stays in the box (see planMerge),
+ * each merged into the best of them - the most copies, then the most evolved, then the highest level, then a
+ * shiny, then a favorite. Past the 64-copy top the rest stays in the box (see planMerge),
  * one already at the top is left out, and a Pokemon with no other of its species picked
- * is left alone.
+ * is left alone. `boosts`: the box's ticks for spending Friendship Petals and Rare Candies
+ * on pre-evolutions that aren't ready yet (see mergeEvolutionFor).
  */
-export function mergeSelectedMons(ids: string[]): { box: BoxState; merged: number; results: { species: string; stars: number }[] } {
+export function mergeSelectedMons(ids: string[], boosts: MergeBoosts = {}): { box: BoxState; merged: number; results: { species: string; stars: number }[] } {
   const box = getState()
   const wanted = new Set(ids)
   const picked = box.mons.filter((m) => wanted.has(m.id) && !m.fusedWith && (m.copies ?? 1) < MERGE_MAX_COPIES)
@@ -859,15 +922,15 @@ export function mergeSelectedMons(ids: string[]): { box: BoxState; merged: numbe
   let merged = 0
   for (const group of groups.values()) {
     if (group.length < 2) continue
-    // The keeper takes merges (fully evolved or Everstone-locked), the most evolved first -
-    // then the most copies...
+    // The keeper takes merges (fully evolved or Everstone-locked), the most copies first -
+    // then the most evolved...
     // (the companion before the rest, as it can't go into another)...
     const ranked = [...group].sort(
       (a, b) =>
         Number(takesMerges(b)) - Number(takesMerges(a)) ||
+        (b.copies ?? 1) - (a.copies ?? 1) ||
         Number(isFullyEvolved(b.set.species)) - Number(isFullyEvolved(a.set.species)) ||
         Number(b.id === box.companionId) - Number(a.id === box.companionId) ||
-        (b.copies ?? 1) - (a.copies ?? 1) ||
         b.set.level - a.set.level ||
         Number(!!b.set.shiny) - Number(!!a.set.shiny) ||
         Number(!!b.favorite) - Number(!!a.favorite)
@@ -882,12 +945,13 @@ export function mergeSelectedMons(ids: string[]): { box: BoxState; merged: numbe
       (m) =>
         m.id !== box.companionId &&
         mergesInto(keeper, m) &&
-        mergeEvolutionFor(m.set, keeper.set.species, stock).ready
+        mergeEvolutionFor(m.set, keeper.set.species, stock, boosts).ready
     )
     if (fodder.length === 0) continue
     merged += mergeInto(
       keeper.id,
-      fodder.map((m) => m.id)
+      fodder.map((m) => m.id),
+      boosts
     )
     results.push({ species: keeper.set.species, stars: mergeStarsFor(keeper.copies) })
   }
@@ -913,6 +977,7 @@ function bestMergeKeeperFor(monId: string): StoredMon | null {
   keepers.sort(
     (a, b) =>
       (b.copies ?? 1) - (a.copies ?? 1) ||
+      Number(isFullyEvolved(b.set.species)) - Number(isFullyEvolved(a.set.species)) ||
       b.set.level - a.set.level ||
       Number(!!b.set.shiny) - Number(!!a.set.shiny) ||
       Number(!!b.favorite) - Number(!!a.favorite)
@@ -969,11 +1034,6 @@ export function getTeamPokemonSets(): PokemonSet[] {
  */
 export function readSavedTeamOf(playerSlug: string): PokemonSet[] {
   return readSavedTeamMons(playerSlug).map((m) => structuredClone(m.set))
-}
-
-/** That player's team members' merge stars, in the same order as readSavedTeamOf. */
-export function readSavedTeamStarsOf(playerSlug: string): number[] {
-  return readSavedTeamMons(playerSlug).map((m) => mergeStarsFor(m.copies))
 }
 
 /** Which of that player's team members are Everstone-locked, in the same order as readSavedTeamOf. */
@@ -1277,6 +1337,17 @@ export function useShinyPatch(id: string): BoxState {
   if (mon.set.shiny) throw new Error(`${mon.set.species} is already shiny`)
   if (!removeItem(SHINY_PATCH_ITEM_ID, 1)) throw new Error(`You don't have a Shiny Patch`)
   mon.set.shiny = true
+  persist()
+  return getBoxState()
+}
+
+// Spends a Friendship Petal from the bag to max out one Pokemon's friendship.
+export function useFriendshipPetal(id: string): BoxState {
+  const mon = getState().mons.find((m) => m.id === id)
+  if (!mon) throw new Error(`Unknown Pokemon id: ${id}`)
+  if (atMaxFriendship(mon)) throw new Error(`${mon.set.species}'s friendship is already maxed`)
+  if (!removeItem(FRIENDSHIP_PETAL_ITEM_ID, 1)) throw new Error(`You don't have a Friendship Petal`)
+  mon.set.happiness = MAX_HAPPINESS
   persist()
   return getBoxState()
 }

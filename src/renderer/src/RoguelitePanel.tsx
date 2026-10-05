@@ -133,7 +133,7 @@ const NODE_INFO: Record<RunNodeKind, { label: string; hint: string; short: strin
   villain: {
     label: 'Villain',
     hint: 'The villain who took this floor over - free to fight. Beat them to pick one of 3 Pokémon at the next level cap, each holding an item',
-    short: 'Free · Win a Pokémon'
+    short: 'Takeover'
   }
 }
 
@@ -763,7 +763,15 @@ function RoguelitePanel({
       >
         {/* The number key that picks it. */}
         <span className="run-node-key">{index + 1}</span>
+        {/* What it costs in gems: the corrupted tiles their price, the villain 0 (free to fight). */}
         {corrupted && <span className="run-node-cost">{gemPrice(cost)}</span>}
+        {villain && (
+          <span className="run-node-cost">
+            <span className="run-shop-price">
+              <GemIcon />0
+            </span>
+          </span>
+        )}
         <NodeIcon choice={choice} villainSprite={takeover?.spriteId} />
         <span className="run-node-label">
           {location
@@ -775,7 +783,7 @@ function RoguelitePanel({
                 : NODE_INFO[choice.kind].label}
         </span>
         <span className="run-node-sub">
-          {location ? 'Wild Pokémon' : villain ? `${villain.classLabel} · ${NODE_INFO.villain.short}` : NODE_INFO[choice.kind].short}
+          {location ? 'Wild Pokémon' : villain ? villain.classLabel : NODE_INFO[choice.kind].short}
         </span>
       </button>
     )
