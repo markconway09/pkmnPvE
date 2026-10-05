@@ -1,0 +1,8 @@
+A secret raid boss, a daily Shiny Patch, box tools
+
+- Max Raids: 1% of legendary raids bring the secret boss, Eternamax Eternatus
+- Shiny Patch: one a day in the Coin Shop, plus one for your first Draft win each day
+- Merge stars no longer raise HP; merge window gets Select all
+- Box: rarity filter, Select all when selling, and scroll buttons
+- Item Charm now adds 15 points to each wild drop chance; petals drop at 15%
+- New Coin Shop prizes: Rare Candy and Exp. Candy M
