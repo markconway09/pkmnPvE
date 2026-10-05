@@ -41,6 +41,8 @@ export const SHINY_PATCH_ITEM_ID = 'shinypatch'
 // Spent the same way to max out a Pokemon's friendship - and by the box's merge, on
 // pre-evolutions with a friendship evolution (see MergeBoosts). Not a real Dex item.
 export const FRIENDSHIP_PETAL_ITEM_ID = 'friendshippetal'
+// A wild Pokemon with a friendship evolution drops a Friendship Petal this often (in %).
+export const FRIENDSHIP_PETAL_DROP_CHANCE = 25
 // Starts a Max Raid Battle from the Classic menu (used up when the raid begins).
 export const WISHING_PIECE_ITEM_ID = 'wishingpiece'
 
@@ -464,6 +466,9 @@ export interface ActivePokemonView extends PokemonSummary {
   // A wild Pokemon of a species the player has caught (had in their box) before -
   // a Poke Ball shows by its name, like the games do.
   caughtBefore?: boolean
+  // Its merge stars, set only when they are raising its stats in this battle - shown
+  // beside its level.
+  mergeStars?: number
   // Temporary conditions on it (Confused, Taunted, Leech Seed, Perish 2, ...), shown as
   // badges under its HP bar like Showdown does - see volatile-badges.ts.
   volatiles: VolatileBadge[]

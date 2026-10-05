@@ -22752,3 +22752,235 @@ body.drag-scrolling * {
   color: color-mix(in srgb, var(--tier) 55%, #c9c3b0);
   text-shadow: none;
 }
+
+/* The Coin Shop's daily Friendship Petals: a pink-trimmed banner between the prizes and
+   the TMs of the day - a free pack and a coin pack side by side, each greyed out once
+   taken until the next day. */
+.coin-petals {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 18px 0 12px;
+  padding: 16px 14px 12px;
+  background:
+    linear-gradient(100deg, rgba(255, 150, 200, 0.16), transparent 60%),
+    linear-gradient(180deg, #3a1a2c, #24101c);
+  border: 2px solid #f08cbf;
+  border-radius: 12px;
+  box-shadow:
+    inset 0 0 18px rgba(255, 150, 200, 0.15),
+    0 4px 14px rgba(0, 0, 0, 0.45);
+}
+
+.coin-petals-tag {
+  position: absolute;
+  top: -10px;
+  left: 16px;
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #3a0c22;
+  background: linear-gradient(180deg, #ffb3d6, #e07aab);
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+.coin-petals-deal {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.22);
+  border-radius: 8px;
+}
+
+.coin-petals-deal-gone {
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+
+.coin-petals-icon {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  image-rendering: pixelated;
+}
+
+.coin-petals-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.coin-petals-amount {
+  font-size: 16px;
+  font-weight: bold;
+  color: #ffc2de;
+}
+
+.coin-petals-note {
+  font-size: 12px;
+  color: #e3bfd0;
+}
+
+.coin-petals-buy {
+  flex: none;
+  width: 110px;
+  text-align: center;
+}
+
+.coin-petals-buy .buy-button {
+  width: 100%;
+}
+
+@media (max-width: 760px) {
+  .coin-petals {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Merge stars beside a battler's level, while they raise its stats */
+.sprite-merge-stars {
+  font-size: 11px;
+  color: #ffd76b;
+}
+
+/* Keep a battler's name row on one line: a long name shortens with "..." instead
+   of pushing its level, stars or status onto the next line. */
+.sprite-name-row {
+  flex-wrap: nowrap;
+}
+
+.sprite-name-row .sprite-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sprite-name-row > :not(.sprite-name) {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.sprite-level + .sprite-merge-stars {
+  margin-left: -3px;
+}
+
+/* The DexNav's Change / Stop buttons: matching pills with an icon, Change lighting gold on
+   hover and Stop red - a second "Sure?" click when it would throw a chain away. */
+.dexnav-actions {
+  min-width: 92px;
+}
+
+.dexnav-action {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px 0 6px;
+  border: 1px solid #2c3442;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #283140, #1f2631);
+  color: #c9d3e0;
+  font-size: 12px;
+  font-weight: 700;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+}
+
+.dexnav-action:active {
+  transform: translateY(1px);
+}
+
+.dexnav-action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 11px;
+  line-height: 1;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.dexnav-action-change .dexnav-action-icon {
+  background: rgba(255, 215, 107, 0.16);
+  color: #ffd76b;
+}
+
+.dexnav-action-change:hover {
+  border-color: #ffd76b;
+  color: #fff;
+}
+
+.dexnav-action-change:hover .dexnav-action-icon {
+  background: #ffd76b;
+  color: #1c232e;
+}
+
+.dexnav-action-stop .dexnav-action-icon {
+  background: rgba(255, 110, 96, 0.16);
+  color: #ff8a7a;
+  font-size: 9px;
+}
+
+.dexnav-action-stop:hover {
+  border-color: #ff8a7a;
+  color: #fff;
+}
+
+.dexnav-action-stop:hover .dexnav-action-icon,
+.dexnav-action-confirm .dexnav-action-icon {
+  background: #ff6e60;
+  color: #fff;
+}
+
+.dexnav-action-confirm {
+  border-color: #ff6e60;
+  background: linear-gradient(180deg, #5a2a2a, #3e1d1f);
+  color: #fff;
+  animation: dexnav-confirm-pulse 0.9s ease-in-out infinite;
+}
+
+.dexnav-action-confirm .dexnav-action-icon {
+  font-size: 12px;
+  font-weight: 900;
+}
+
+@keyframes dexnav-confirm-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 110, 96, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(255, 110, 96, 0);
+  }
+}
+
+/* The DexNav buttons' icons are drawn as SVG so they sit dead centre in their circles. */
+.dexnav-action-icon svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dexnav-action-icon .dexnav-action-fill {
+  fill: currentColor;
+  stroke: none;
+}
+
+.dexnav-action-confirm .dexnav-action-icon svg {
+  stroke-width: 2;
+}

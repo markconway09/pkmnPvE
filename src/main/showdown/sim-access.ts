@@ -1030,7 +1030,6 @@ const FRIENDSHIP_PETAL_ITEM: ItemOptionEntry = {
     "Right-click a Pokemon in your box or team and use it to max out that Pokemon's friendship. The box's merge can spend them on friendship evolutions too.",
   spritenum: -31
 }
-const FRIENDSHIP_PETAL_PRICE = 3000
 
 // A key item (see KEY_ITEM_IDS) - never sold. -11 maps to its own image (see ItemSprite).
 // More key items. -12 and -13 map to their own images (see ItemSprite).
@@ -1480,10 +1479,11 @@ export function getDefaultShopCatalog(): ShopItemEntry[] {
     .items.filter((item) => {
       // Key items are never sold, nor bought back (see shop-store's listShop).
       if (KEY_ITEM_IDS.has(item.id)) return false
+      // Friendship Petals come from wild drops and the Coin Shop's daily petals, never the Shop.
+      if (item.id === FRIENDSHIP_PETAL_ITEM_ID) return false
       if (
         item.id === RARE_CANDY_ITEM_ID ||
         item.id === SHINY_PATCH_ITEM_ID ||
-        item.id === FRIENDSHIP_PETAL_ITEM_ID ||
         item.id === WISHING_PIECE_ITEM_ID ||
         OPENABLE_ITEM_IDS.has(item.id) ||
         item.id in EXP_CANDY_PRICE ||
@@ -1507,7 +1507,6 @@ export function getDefaultShopCatalog(): ShopItemEntry[] {
       if (item.id === LOCK_CAPSULE_ITEM_ID) return { ...item, price: LOCK_CAPSULE_PRICE, category: 'Recommended' }
       if (item.id in EXP_CANDY_PRICE) return { ...item, price: EXP_CANDY_PRICE[item.id], category: 'Recommended' }
       if (item.id === SHINY_PATCH_ITEM_ID) return { ...item, price: SHINY_PATCH_PRICE, category: 'Recommended' }
-      if (item.id === FRIENDSHIP_PETAL_ITEM_ID) return { ...item, price: FRIENDSHIP_PETAL_PRICE, category: 'Recommended' }
       if (item.id === WISHING_PIECE_ITEM_ID) return { ...item, price: WISHING_PIECE_PRICE, category: 'Recommended' }
       if (evolutionOnlyIds.has(item.id)) return { ...item, price: COMPETITIVE_ITEM_PRICE, category: 'Evolution Items' }
       const dexItem = Dex.items.get(item.id)
@@ -2563,6 +2562,26 @@ export function evolutionOptionsFor(set: PokemonSet): EvolutionOption[] {
     }
   }
   return options
+}
+
+/**
+ * Whether this Pokemon has an evolution that takes max friendship here (see
+ * evolutionOptionsFor) - wild ones drop Friendship Petals.
+ */
+export function hasFriendshipEvolution(speciesName: string): boolean {
+  return Dex.species
+    .get(speciesName)
+    .evos.map((name) => Dex.species.get(name))
+    .some(
+      (evo) =>
+        evo.exists &&
+        !isBattleOnlyForme(evo) &&
+        !expandAlcremie(evo.name) &&
+        !evolutionItemsFor(evo) &&
+        evo.evoType !== undefined &&
+        evo.evoType !== 'useItem' &&
+        evo.evoType !== 'levelHold'
+    )
 }
 
 /** The level a level-up evolution happens at (null for any other kind). */

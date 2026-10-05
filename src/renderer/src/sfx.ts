@@ -26,7 +26,7 @@ const REPEAT_GAP_MS = 40
 // How loud the files play - they come at full volume, and menu sounds should be subtle.
 const FILE_GAIN = 0.35
 
-let volume = loadNumber(VOLUME_KEY, 0.5)
+let volume = loadNumber(VOLUME_KEY, 0.25)
 let on = loadBool(ON_KEY, true)
 let audio: AudioContext | null = null
 let master: GainNode | null = null

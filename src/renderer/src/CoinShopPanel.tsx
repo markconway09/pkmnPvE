@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { GameCornerLoading } from './GameCornerTabs'
 import type { ItemOptionEntry } from '../../shared/battle-types'
-import { COIN_PACKS, COIN_PRICE, COIN_PRIZES, type DailyCoinMon, type DailyCoinOffer } from '../../shared/slots'
+import { COIN_PACKS, COIN_PRICE, COIN_PRIZES, type DailyCoinMon, type DailyCoinOffer, type DailyPetalDeals } from '../../shared/slots'
 import { SHINY_PATCH_ITEM_ID, WISHING_PIECE_ITEM_ID, toSpriteId } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
 import ItemSprite from './ItemSprite'
@@ -12,6 +12,9 @@ import RarityCard, { RarityGlow } from './RarityCard'
 import { coinPrizeRarityTier } from '../../shared/rarity'
 import type { TmShopView } from '../../shared/tms'
 import { TmCard } from './TmBits'
+
+// The Friendship Petal's icon (see ItemSprite).
+const FRIENDSHIP_PETAL_SPRITENUM = -31
 
 // Each coin pack's name, smallest to biggest.
 const PACK_NAMES = ['Handful', 'Pouch', 'Sack', 'Chest']
@@ -63,6 +66,8 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange }: Props): Re
   const notes = useFloatingNotes()
   // Today's TMs (a set only ever sold here) and the Scanner key item.
   const [tmShop, setTmShop] = useState<TmShopView | null>(null)
+  // Today's Friendship Petals: a free pack and a coin pack, each once a day.
+  const [petals, setPetals] = useState<DailyPetalDeals | null>(null)
 
   // The Raid Crystal and the Shiny Patch are locked until Max Raids open (see BattleEligibility.raidsUnlocked).
   const [raidLock, setRaidLock] = useState<{ unlocked: boolean; boss: string | null } | null>(null)
@@ -92,6 +97,10 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange }: Props): Re
     window.api
       .getTmShop()
       .then(setTmShop)
+      .catch(() => {})
+    window.api
+      .getDailyPetalDeals()
+      .then(setPetals)
       .catch(() => {})
   }, [])
 
@@ -149,6 +158,23 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange }: Props): Re
       return result.quantity > 1
         ? `Got ${result.quantity} ${result.itemName} - they're in your bag`
         : `Got a ${result.itemName} - it's in your bag`
+    })
+  }
+
+  function claimFreePetals(e: React.MouseEvent): void {
+    void act(e, async () => {
+      setPetals(await window.api.claimFreePetals())
+      return `Got ${petals?.free.petals ?? ''} Friendship Petals - they're in your bag`
+    })
+  }
+
+  function buyPetalPack(e: React.MouseEvent): void {
+    void act(e, async () => {
+      const result = await window.api.buyPetalPack()
+      setCoins(result.coins)
+      onCoinsChange(result.coins)
+      setPetals(result.deals)
+      return `Got ${result.deals.pack.petals} Friendship Petals - they're in your bag`
     })
   }
 
@@ -291,6 +317,39 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange }: Props): Re
           )
         })}
       </div>
+
+      {/* Today's Friendship Petals: a free pack and a coin pack side by side, each once a day. */}
+      {petals && (
+        <div className="coin-petals">
+          <span className="coin-petals-tag">Daily petals</span>
+          <div className={`coin-petals-deal${petals.free.claimed ? ' coin-petals-deal-gone' : ''}`}>
+            <ItemSprite spritenum={FRIENDSHIP_PETAL_SPRITENUM} className="coin-petals-icon" />
+            <span className="coin-petals-text">
+              <span className="coin-petals-amount">{petals.free.petals} Friendship Petals</span>
+              <span className="coin-petals-note">{petals.free.claimed ? 'Claimed today - more tomorrow' : 'Free · once a day'}</span>
+            </span>
+            <span className="coin-petals-buy">
+              {petals.free.claimed ? (
+                <span className="coin-tm-owned">✓ Claimed</span>
+              ) : (
+                <button className="buy-button" disabled={busy} onClick={claimFreePetals}>
+                  Claim
+                </button>
+              )}
+            </span>
+          </div>
+          <div className={`coin-petals-deal${petals.pack.bought ? ' coin-petals-deal-gone' : ''}`}>
+            <ItemSprite spritenum={FRIENDSHIP_PETAL_SPRITENUM} className="coin-petals-icon" />
+            <span className="coin-petals-text">
+              <span className="coin-petals-amount">{petals.pack.petals} Friendship Petals</span>
+              <span className="coin-petals-note">{petals.pack.bought ? 'Bought today - back tomorrow' : 'Once a day'}</span>
+            </span>
+            <span className="coin-petals-buy">
+              <BuyButton price={petals.pack.coins} currency="coins" held={coins} busy={busy} soldOut={petals.pack.bought} onBuy={buyPetalPack} />
+            </span>
+          </div>
+        </div>
+      )}
 
       {tmShop && (
         <>

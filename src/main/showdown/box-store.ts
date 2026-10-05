@@ -1041,6 +1041,11 @@ export function readSavedTeamEverstonesOf(playerSlug: string): boolean[] {
   return readSavedTeamMons(playerSlug).map((m) => !!m.everstone)
 }
 
+/** That player's team members' merge stars, in the same order as readSavedTeamOf. */
+export function readSavedTeamMergeStarsOf(playerSlug: string): number[] {
+  return readSavedTeamMons(playerSlug).map((m) => mergeStarsFor(m.copies))
+}
+
 function readSavedTeamMons(playerSlug: string): StoredMon[] {
   let saved: StoredBox
   try {

@@ -43,8 +43,9 @@ export type OnlineMessage =
   | { type: 'hello'; player: OnlinePlayer }
   // The host turning the friend away (a different version, a room already full...).
   | { type: 'reject'; reason: string }
-  // Host -> friend: send your team, a battle is starting (singles or doubles).
-  | { type: 'teamRequest'; doubles: boolean }
+  // Host -> friend: send your team, a battle is starting (singles or doubles, with or
+  // without merge star boosts).
+  | { type: 'teamRequest'; doubles: boolean; stars?: boolean }
   // Friend -> host: the team asked for, or why there isn't one.
   | { type: 'team'; team: OnlineTeam }
   | { type: 'teamError'; reason: string }

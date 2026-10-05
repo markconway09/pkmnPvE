@@ -144,6 +144,16 @@ export interface DailyCoinOffer {
   bought: boolean
 }
 
+// The Coin Shop's daily Friendship Petals: a free pack to claim, and a bigger one to buy
+// with coins - each once a day.
+export const DAILY_FREE_PETALS = 5
+export const DAILY_PETAL_PACK = { petals: 10, coins: 10000 }
+
+export interface DailyPetalDeals {
+  free: { petals: number; claimed: boolean }
+  pack: { petals: number; coins: number; bought: boolean }
+}
+
 // The most of one prize traded at once.
 export const MAX_PRIZE_BULK = 99
 

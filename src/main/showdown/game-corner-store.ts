@@ -1,11 +1,13 @@
 import { randomInt } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
-import type { CoinBalance, DailyCoinMon, DailyCoinMonPurchase, DailyCoinOffer, SlotRules, SlotSpinResult, SlotSymbol } from '../../shared/slots'
+import type { CoinBalance, DailyCoinMon, DailyCoinMonPurchase, DailyCoinOffer, DailyPetalDeals, SlotRules, SlotSpinResult, SlotSymbol } from '../../shared/slots'
 import {
   CHERRY_ONE,
   CHERRY_TWO,
   COIN_PACKS,
   DAILY_COIN_OFFER,
+  DAILY_FREE_PETALS,
+  DAILY_PETAL_PACK,
   DAILY_MON_MARKUP,
   DAILY_MON_STARS,
   MAX_PRIZE_BULK,
@@ -16,7 +18,7 @@ import {
   SLOT_RULES,
   slotWins
 } from '../../shared/slots'
-import { POKEMON_SELL_PRICES } from '../../shared/battle-types'
+import { FRIENDSHIP_PETAL_ITEM_ID, POKEMON_SELL_PRICES } from '../../shared/battle-types'
 import { GOLDEN_TOUCH_JACKPOT_BONUS, GOLDEN_TOUCH_PAYOUT_MULTIPLIER } from '../../shared/titles'
 import { betCap, hasTitle } from './title-perks'
 import { getMoney, spendMoney } from './money-store'
@@ -48,6 +50,9 @@ interface StoredCoins {
   coins: number
   // The day (local date) the daily coin offer was last bought.
   dailyOfferDay?: string
+  // The days (local dates) the free petals were last claimed and the petal pack last bought.
+  freePetalsDay?: string
+  petalPackDay?: string
   // The Pokemon of the day: picked the first time the shop is looked at each day, and
   // kept for the rest of it.
   dailyMon?: { day: string; species: string; bought: boolean }
@@ -66,6 +71,8 @@ function getState(): StoredCoins {
       state = {
         coins: typeof parsed.coins === 'number' ? parsed.coins : 0,
         dailyOfferDay: typeof parsed.dailyOfferDay === 'string' ? parsed.dailyOfferDay : undefined,
+        freePetalsDay: typeof parsed.freePetalsDay === 'string' ? parsed.freePetalsDay : undefined,
+        petalPackDay: typeof parsed.petalPackDay === 'string' ? parsed.petalPackDay : undefined,
         dailyMon:
           parsed.dailyMon && typeof parsed.dailyMon.species === 'string' && typeof parsed.dailyMon.day === 'string'
             ? { day: parsed.dailyMon.day, species: parsed.dailyMon.species, bought: !!parsed.dailyMon.bought }
@@ -136,6 +143,34 @@ export function buyDailyCoinOffer(): CoinBalance {
   getState().dailyOfferDay = today()
   persist()
   return { coins: getCoins(), money: getMoney() }
+}
+
+/** The Coin Shop's daily Friendship Petals: the free pack and the coin pack, and whether each is gone today. */
+export function getDailyPetalDeals(): DailyPetalDeals {
+  return {
+    free: { petals: DAILY_FREE_PETALS, claimed: getState().freePetalsDay === today() },
+    pack: { petals: DAILY_PETAL_PACK.petals, coins: DAILY_PETAL_PACK.coins, bought: getState().petalPackDay === today() }
+  }
+}
+
+/** Claims today's free Friendship Petals - once a day. They go into the bag. */
+export function claimFreePetals(): DailyPetalDeals {
+  if (getState().freePetalsDay === today()) throw new Error("Today's free petals are claimed - more tomorrow")
+  getState().freePetalsDay = today()
+  persist()
+  addItem(FRIENDSHIP_PETAL_ITEM_ID, DAILY_FREE_PETALS)
+  return getDailyPetalDeals()
+}
+
+/** Buys today's pack of Friendship Petals with coins - once a day. They go into the bag. */
+export function buyPetalPack(): CoinBalance & { deals: DailyPetalDeals } {
+  if (getState().petalPackDay === today()) throw new Error("Today's petal pack is gone - it's back tomorrow")
+  if (getCoins() < DAILY_PETAL_PACK.coins) throw new Error(`The petal pack costs ${DAILY_PETAL_PACK.coins.toLocaleString('en-US')} coins`)
+  getState().coins -= DAILY_PETAL_PACK.coins
+  getState().petalPackDay = today()
+  persist()
+  addItem(FRIENDSHIP_PETAL_ITEM_ID, DAILY_PETAL_PACK.petals)
+  return { coins: getCoins(), money: getMoney(), deals: getDailyPetalDeals() }
 }
 
 // Today's Pokemon of the day - a new one picked once the day has turned.

@@ -536,8 +536,8 @@ export class WildBattle {
     formatId = 'gen9customgame',
     generationFormat = 'gen9randombattle',
     opponent?: OpponentConfig,
-    // Each team member's merge stars, in team order (classic battles and friendly
-    // matches only): +10% to all its stats per star. "everstone": which are Everstone-locked
+    // Each team member's merge stars, in team order (classic battles, Max Raids
+    // and friendly matches only): +10% to all its stats per star. "everstone": which are Everstone-locked
     // (they count as fully evolved, so an Eviolite does nothing for them).
     mergeStars: { p1?: number[]; p2?: number[]; everstone?: { p1?: boolean[]; p2?: boolean[] } } = {}
   ) {
@@ -866,6 +866,7 @@ export class WildBattle {
     }
     const multiplier = view.rosterIndex !== undefined ? this.mergeMultipliers[side][view.rosterIndex] : undefined
     if (!multiplier) return view
+    view.mergeStars = this.mergeStars[side][view.rosterIndex!]
     // Not a stat at 0 IVs (see installMergeBoosts).
     const ivs = (side === 'p1' ? this.p1team : this.p2team)[view.rosterIndex!]?.ivs as Record<string, number> | undefined
     const stats = { ...view.stats }

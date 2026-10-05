@@ -70,7 +70,7 @@ const FREE_TO_USE: MusicTrack[] = (freeToUseTracks as { id: string; title: strin
 }))
 
 let on = loadBool(ON_KEY, true)
-let volume = loadNumber(VOLUME_KEY, 0.1)
+let volume = loadNumber(VOLUME_KEY, 0.05)
 let muted = loadBool(MUTED_KEY, false)
 let source = loadSource()
 let links = loadString(LINKS_KEY, '')

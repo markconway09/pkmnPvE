@@ -4,7 +4,7 @@ import type { RarityOdds, RarityOddsSource } from '../shared/rarity'
 import { contextBridge, ipcRenderer } from 'electron'
 import type { LocalMusicFile } from '../shared/music'
 import type { UiScaleChoice, UiScaleState } from '../shared/ui-scale'
-import type { CoinBalance, DailyCoinMon, DailyCoinMonPurchase, DailyCoinOffer, SlotRules, SlotSpinResult } from '../shared/slots'
+import type { CoinBalance, DailyCoinMon, DailyCoinMonPurchase, DailyCoinOffer, DailyPetalDeals, SlotRules, SlotSpinResult } from '../shared/slots'
 import type { BlackjackView } from '../shared/blackjack'
 import type { AchievementClaimResult, AchievementsState } from '../shared/achievements'
 import type { CloudSave, CloudStatus } from '../shared/cloud'
@@ -67,8 +67,8 @@ const api = {
   login: (username: string, remember: boolean): Promise<SessionInfo> => ipcRenderer.invoke('auth:login', username, remember),
   logout: (): Promise<SessionInfo> => ipcRenderer.invoke('auth:logout'),
   setTrainerSprite: (spriteId: string): Promise<SessionInfo> => ipcRenderer.invoke('profile:setTrainerSprite', spriteId),
-  startPlayerBattle: (username: string, doubles: boolean): Promise<BattleView> =>
-    ipcRenderer.invoke('battle:startPlayer', username, doubles),
+  startPlayerBattle: (username: string, doubles: boolean, stars = false): Promise<BattleView> =>
+    ipcRenderer.invoke('battle:startPlayer', username, doubles, stars),
   startBattle: (location?: WildLocationId, levelCap?: number): Promise<BattleView> =>
     ipcRenderer.invoke('battle:start', location, levelCap),
   startTrainerBattle: (boss: boolean, rematchTrainerId?: string): Promise<BattleView> =>
@@ -163,8 +163,8 @@ const api = {
   // Online battles with a friend: who this player is (and their team), and - on the
   // host's copy, which runs the battle - starting it, each side's choices and forfeits.
   getOnlineSelf: (): Promise<OnlineSelf> => ipcRenderer.invoke('online:self'),
-  startOnlineBattle: (friend: OnlinePlayer, friendTeam: OnlineTeam, doubles: boolean): Promise<OnlineViews> =>
-    ipcRenderer.invoke('online:start', friend, friendTeam, doubles),
+  startOnlineBattle: (friend: OnlinePlayer, friendTeam: OnlineTeam, doubles: boolean, stars: boolean): Promise<OnlineViews> =>
+    ipcRenderer.invoke('online:start', friend, friendTeam, doubles, stars),
   chooseOnline: (side: 0 | 1, choice: string): Promise<void> => ipcRenderer.invoke('online:choose', side, choice),
   forfeitOnline: (side: 0 | 1): Promise<void> => ipcRenderer.invoke('online:forfeit', side),
   endOnlineBattle: (): Promise<void> => ipcRenderer.invoke('online:end'),
@@ -253,6 +253,9 @@ const api = {
   // The Coin Shop's once-a-day discounted coins.
   getDailyCoinOffer: (): Promise<DailyCoinOffer> => ipcRenderer.invoke('coins:dailyOffer'),
   buyDailyCoinOffer: (): Promise<CoinBalance> => ipcRenderer.invoke('coins:buyDailyOffer'),
+  getDailyPetalDeals: (): Promise<DailyPetalDeals> => ipcRenderer.invoke('coins:petalDeals'),
+  claimFreePetals: (): Promise<DailyPetalDeals> => ipcRenderer.invoke('coins:claimFreePetals'),
+  buyPetalPack: (): Promise<CoinBalance & { deals: DailyPetalDeals }> => ipcRenderer.invoke('coins:buyPetalPack'),
   // The Coin Shop's Pokemon of the day, bought once a day at 2 stars.
   getDailyCoinMon: (): Promise<DailyCoinMon> => ipcRenderer.invoke('coins:dailyMon'),
   buyDailyCoinMon: (): Promise<DailyCoinMonPurchase> => ipcRenderer.invoke('coins:buyDailyMon'),

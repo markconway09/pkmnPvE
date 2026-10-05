@@ -11,7 +11,7 @@ const ON_KEY = 'pkmnpve.cryOn'
 const MAX_GAIN = 0.25
 // Names Showdown has no cry for, so they go straight to the fallback next time.
 const missing = new Set<string>()
-let volume = loadNumber(VOLUME_KEY, 0.1)
+let volume = loadNumber(VOLUME_KEY, 0.05)
 let on = loadBool(ON_KEY, true)
 
 /** The cry volume slider's setting, 0 (muted) to 1 - kept while cries are switched off. */

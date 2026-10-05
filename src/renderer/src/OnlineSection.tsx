@@ -25,6 +25,7 @@ function OnlineSection({ disabled }: Props): React.JSX.Element {
   const [online, setOnline] = useState<OnlineState>(getOnlineState)
   const [code, setCode] = useState('')
   const [doubles, setDoubles] = useState(false)
+  const [stars, setStars] = useState(false)
   const [copied, setCopied] = useState(false)
 
   useEffect(() => subscribeOnline(setOnline), [])
@@ -105,10 +106,14 @@ function OnlineSection({ disabled }: Props): React.JSX.Element {
               <label className="challenge-doubles">
                 <input type="checkbox" checked={doubles} onChange={(e) => setDoubles(e.target.checked)} /> Double battle
               </label>
+              {/* Merge stars: each team member's +10% stats per star, on both sides. */}
+              <label className="challenge-doubles" title="Both teams get their merge star stat boosts">
+                <input type="checkbox" checked={stars} onChange={(e) => setStars(e.target.checked)} /> Use stars
+              </label>
               <button
                 className="online-start"
                 disabled={disabled || online.starting || online.phase !== 'lobby'}
-                onClick={() => startOnlineBattle(doubles)}
+                onClick={() => startOnlineBattle(doubles, stars)}
               >
                 {online.starting ? 'Starting...' : 'Start battle'}
               </button>

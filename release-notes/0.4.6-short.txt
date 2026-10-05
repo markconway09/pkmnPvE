@@ -1,0 +1,8 @@
+Friendship Petals rework, merge stars online & long press
+
+- Friendship Petals: 5 free a day and a 10-pack for coins in the Coin Shop, plus wild drops (no longer in the Shop)
+- Online battles: the host can turn on merge stars for both sides
+- Merge stars show beside a Pokémon's level in battle
+- Long press anything to open its right-click menu
+- DexNav asks before stopping a hunt with a chain going
+- Quieter default volumes for music, cries and sound effects

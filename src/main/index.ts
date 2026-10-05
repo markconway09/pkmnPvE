@@ -23,6 +23,8 @@ import {
   rollWildWeather,
   WILD_RANDOM_DROP_CHANCE,
   WISHING_PIECE_ITEM_ID,
+  FRIENDSHIP_PETAL_DROP_CHANCE,
+  FRIENDSHIP_PETAL_ITEM_ID,
   normalizeUsername,
   usernameProblem
 } from '../shared/battle-types'
@@ -58,6 +60,7 @@ import {
   getTeamMergeStars,
   getTeamEverstones,
   readSavedTeamEverstonesOf,
+  readSavedTeamMergeStarsOf,
   readSavedTeamOf,
   scaleTeamToLevel,
   resetBox,
@@ -77,7 +80,8 @@ import {
   generateLabWildMon,
   generateRandomWildMon,
   getEditorOptions,
-  getSpeciesEditInfo
+  getSpeciesEditInfo,
+  hasFriendshipEvolution
 } from './showdown/sim-access'
 import { addTrainer, deleteTrainer, duplicateTrainer, listTrainers, updateTrainer } from './showdown/trainer-store'
 import {
@@ -108,7 +112,7 @@ import {
   lateItemsUnlocked
 } from './showdown/progression-store'
 import { getMoney, resetMoney, setMoney } from './showdown/money-store'
-import { buyCoinPrize, buyCoins, buyDailyCoinMon, buyDailyCoinOffer, getCoins, getDailyCoinMon, getDailyCoinOffer, getSlotRules, setCoins, spinSlots } from './showdown/game-corner-store'
+import { buyCoinPrize, buyCoins, buyDailyCoinMon, buyDailyCoinOffer, buyPetalPack, claimFreePetals, getCoins, getDailyCoinMon, getDailyCoinOffer, getDailyPetalDeals, getSlotRules, setCoins, spinSlots } from './showdown/game-corner-store'
 import {
   abandonTmSearch,
   buyScanner,
@@ -326,11 +330,16 @@ ipcMain.handle('battle:start', async (_event, locationId?: WildLocationId, level
     (location?.id === 'lab' ? generateLabWildMon(effectiveLevelCap) : generateRandomWildMon(effectiveLevelCap, location))
   if (!wildMon) throw new Error('Could not find a wild Pokemon for your current level cap in that location')
   const wildDrop = getWildDropFor(wildMon.species)
+  // A Pokemon with a friendship evolution can drop a Friendship Petal, on top of its own drop.
+  const wildDrops: ItemDropConfig[] = [
+    ...(wildDrop ? [wildDrop] : []),
+    ...(hasFriendshipEvolution(wildMon.species) ? [{ itemId: FRIENDSHIP_PETAL_ITEM_ID, chance: FRIENDSHIP_PETAL_DROP_CHANCE }] : [])
+  ]
   activeBattle = new WildBattle(p1team, 'gen9customgame', 'gen9randombattle', {
     team: [wildMon],
     name: 'Wild',
     difficulty: 'easy',
-    drops: wildDrop ? [wildDrop] : undefined,
+    drops: wildDrops.length ? wildDrops : undefined,
     randomDropChance: WILD_RANDOM_DROP_CHANCE,
     location: location?.id ?? 'all',
     // Now and then the area's weather is up when the battle starts (never in the Cave or the Lab).
@@ -414,7 +423,8 @@ ipcMain.handle('battle:startTrainer', async (_event, boss: boolean, rematchTrain
 // so the AI drives it, at the hardest setting, with their real moves and items. Their whole
 // team is set to the level of the challenger's highest-level Pokemon, up or down, so the
 // match is even whatever levels the two saves are at. It never pays out - no exp, money, drops, friendship or boss progress.
-ipcMain.handle('battle:startPlayer', async (_event, username: string, doubles = false) => {
+// Singles or doubles, and with `stars` both sides get their merge star boosts.
+ipcMain.handle('battle:startPlayer', async (_event, username: string, doubles = false, stars = false) => {
   const p1team = getTeamPokemonSets()
   if (p1team.length === 0) throw new Error('Your team is empty - add Pokemon and assign them to your team first')
   const problem = usernameProblem(username)
@@ -432,7 +442,8 @@ ipcMain.handle('battle:startPlayer', async (_event, username: string, doubles = 
     spriteId: player.trainerSprite ?? 'red',
     noRewards: true
   }, {
-    // No merge star boosts on either side - a friendly match is fought on the sets alone.
+    // Merge star boosts only when asked for - otherwise it's fought on the sets alone.
+    ...(stars ? { p1: getTeamMergeStars(), p2: readSavedTeamMergeStarsOf(player.slug) } : {}),
     everstone: { p1: getTeamEverstones(), p2: readSavedTeamEverstonesOf(player.slug) }
   })
   return activeBattle.getInitialView()
@@ -497,8 +508,9 @@ function onlineViews(battle: WildBattle): OnlineViews {
 
 // The host starting a battle with the friend: both teams set to the level of the
 // higher-level one's best Pokemon, and nothing paid out (like a friendly match). Both
-// screens are sent to the renderer each time the battle moves on.
-ipcMain.handle('online:start', async (event, friend: OnlinePlayer, friendTeam: OnlineTeam, doubles: boolean): Promise<OnlineViews> => {
+// screens are sent to the renderer each time the battle moves on. Singles or doubles, with
+// or without both sides' merge star boosts, as the host picked.
+ipcMain.handle('online:start', async (event, friend: OnlinePlayer, friendTeam: OnlineTeam, doubles: boolean, stars = false): Promise<OnlineViews> => {
   const session = getSessionInfo()
   if (!session.username) throw new Error('Log in first')
   const hostTeam = getTeamPokemonSets()
@@ -522,8 +534,11 @@ ipcMain.handle('online:start', async (event, friend: OnlinePlayer, friendTeam: O
       noRewards: true,
       online: { hostName: session.username, hostSpriteId: session.trainerSprite ?? 'red' }
     },
-    // No merge star boosts on either side, as in a friendly match.
-    { everstone: { p1: getTeamEverstones(), p2: guest.everstone } }
+    // Merge star boosts only when the host ticked "Use stars".
+    {
+      ...(stars ? { p1: getTeamMergeStars(), p2: guest.mergeStars } : {}),
+      everstone: { p1: getTeamEverstones(), p2: guest.everstone }
+    }
   )
   onlineBattle = battle
   activeBattle = null
@@ -808,6 +823,9 @@ ipcMain.handle('coins:buy', (_event, amount: number) => buyCoins(amount))
 ipcMain.handle('coins:prize', (_event, itemId: string, quantity?: number) => buyCoinPrize(itemId, quantity))
 ipcMain.handle('coins:dailyOffer', () => getDailyCoinOffer())
 ipcMain.handle('coins:buyDailyOffer', () => buyDailyCoinOffer())
+ipcMain.handle('coins:petalDeals', () => getDailyPetalDeals())
+ipcMain.handle('coins:claimFreePetals', () => claimFreePetals())
+ipcMain.handle('coins:buyPetalPack', () => buyPetalPack())
 ipcMain.handle('coins:dailyMon', () => getDailyCoinMon())
 ipcMain.handle('coins:buyDailyMon', () => buyDailyCoinMon())
 

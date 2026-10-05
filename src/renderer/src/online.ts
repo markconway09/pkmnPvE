@@ -33,9 +33,10 @@ let state: OnlineState = IDLE
 let peer: Peer | null = null
 let conn: DataConnection | null = null
 let self: OnlinePlayer | null = null
-// Host: the doubles setting for the battle being set up, and how much of the friend's log
-// they already have.
+// Host: the doubles and merge-star settings for the battle being set up, and how much of
+// the friend's log they already have.
 let pendingDoubles = false
+let pendingStars = false
 let guestSent = 0
 // The last screen shown here, so the next can keep its half-made choices (and, for the
 // friend, be pieced together from just the new lines).
@@ -273,7 +274,7 @@ async function receive(message: OnlineMessage): Promise<void> {
       try {
         guestSent = 0
         lastView = null
-        const views = await window.api.startOnlineBattle(state.friend, message.team, pendingDoubles)
+        const views = await window.api.startOnlineBattle(state.friend, message.team, pendingDoubles, pendingStars)
         hostViews(views)
       } catch (e) {
         const reason = e instanceof Error ? e.message : String(e)
@@ -324,11 +325,12 @@ window.api.onOnlineViews((views) => {
 })
 
 /** Host: asks for the friend's team and starts a battle with it. */
-export function startOnlineBattle(doubles: boolean): void {
+export function startOnlineBattle(doubles: boolean, stars: boolean): void {
   if (state.role !== 'host' || state.phase !== 'lobby' || state.starting) return
   pendingDoubles = doubles
+  pendingStars = stars
   setState({ starting: true, error: null })
-  send({ type: 'teamRequest', doubles })
+  send({ type: 'teamRequest', doubles, stars })
 }
 
 /** This player's choice for the turn. Resolves once it stands (rejects if the sim refused it). */

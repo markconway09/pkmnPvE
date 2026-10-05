@@ -35,6 +35,7 @@ function DexNavPanel({ wildLevel, disabled, onHunt }: Props): React.JSX.Element 
   const [state, setState] = useState<DexNavState | null>(null)
   const [picking, setPicking] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [confirmStop, setConfirmStop] = useState(false)
 
   useEffect(() => {
     window.api
@@ -56,6 +57,16 @@ function DexNavPanel({ wildLevel, disabled, onHunt }: Props): React.JSX.Element 
     } catch (err) {
       setError(errorMessage(err))
     }
+  }
+
+  // Stopping throws the chain away, so a chain worth keeping asks for a second click.
+  function stopHunting(): void {
+    if (state && state.chain > 0 && !confirmStop) {
+      setConfirmStop(true)
+      return
+    }
+    setConfirmStop(false)
+    void choose(null)
   }
 
   return (
@@ -114,9 +125,30 @@ function DexNavPanel({ wildLevel, disabled, onHunt }: Props): React.JSX.Element 
               )}
             </div>
             <div className="dexnav-actions">
-              <button onClick={() => setPicking(true)}>Change</button>
-              <button onClick={() => void choose(null)} title="Stop hunting - the chain is lost">
-                Stop
+              <button className="dexnav-action dexnav-action-change" onClick={() => setPicking(true)} title="Hunt a different Pokémon">
+                <span className="dexnav-action-icon">
+                  <svg viewBox="0 0 12 12" aria-hidden="true">
+                    <path d="M2 4h7.5M7.5 2l2 2-2 2M10 8H2.5M4.5 6l-2 2 2 2" />
+                  </svg>
+                </span>
+                Change
+              </button>
+              <button
+                className={`dexnav-action dexnav-action-stop${confirmStop ? ' dexnav-action-confirm' : ''}`}
+                onClick={stopHunting}
+                onMouseLeave={() => setConfirmStop(false)}
+                title={state.chain > 0 ? `Stop hunting - your chain of ${state.chain} is lost` : 'Stop hunting'}
+              >
+                <span className="dexnav-action-icon">
+                  <svg viewBox="0 0 12 12" aria-hidden="true">
+                    {confirmStop ? (
+                      <path d="M6 2.5v4.5M6 9.2v0.3" />
+                    ) : (
+                      <rect className="dexnav-action-fill" x="3.5" y="3.5" width="5" height="5" rx="1" />
+                    )}
+                  </svg>
+                </span>
+                {confirmStop ? 'Sure?' : 'Stop'}
               </button>
             </div>
           </>

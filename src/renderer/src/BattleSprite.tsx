@@ -379,6 +379,11 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
           )}
           {displayed.shiny && <ShinyIcon />}
           <span className="sprite-level">Lv{displayed.level}</span>
+          {!!displayed.mergeStars && (
+            <span className="sprite-merge-stars" title={`${displayed.mergeStars} merge stars - its stats are raised`}>
+              ★{displayed.mergeStars}
+            </span>
+          )}
           {displayed.status && (
             <span className={`status-badge status-${displayed.status}`}>
               {STATUS_LABELS[displayed.status] ?? displayed.status.toUpperCase()}
