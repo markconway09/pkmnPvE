@@ -217,6 +217,7 @@ const api = {
   deleteLoadout: (id: string): Promise<LoadoutView[]> => ipcRenderer.invoke('loadouts:delete', id),
   applyLoadout: (id: string): Promise<BoxState> => ipcRenderer.invoke('loadouts:apply', id),
   listBag: (): Promise<BagItemView[]> => ipcRenderer.invoke('bag:list'),
+  getBagItem: (itemId: string): Promise<BagItemView | null> => ipcRenderer.invoke('bag:item', itemId),
   useExpCandy: (itemId: string): Promise<ExpGainResult[]> => ipcRenderer.invoke('bag:useExpCandy', itemId),
   useExpCandiesUntilCap: (itemId: string): Promise<{ used: number; results: ExpGainResult[]; allCapped: boolean }> =>
     ipcRenderer.invoke('bag:useExpCandiesUntilCap', itemId),

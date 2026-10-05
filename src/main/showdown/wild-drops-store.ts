@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from 'node:fs'
-import type { ItemDropConfig, WildDropEntry } from '../../shared/battle-types'
+import { WILD_DROP_MAX_CHANCE, type ItemDropConfig, type WildDropEntry } from '../../shared/battle-types'
 import { toID } from './sim-access'
 import { savePathFor } from './save-paths'
 
@@ -43,13 +43,15 @@ export function setWildDrop(species: string, drop: ItemDropConfig): WildDropEntr
   } else {
     getState()[key] = {
       species,
-      drop: { itemId: drop.itemId, chance: Math.max(0, Math.min(100, drop.chance)) }
+      drop: { itemId: drop.itemId, chance: Math.max(0, Math.min(WILD_DROP_MAX_CHANCE, drop.chance)) }
     }
   }
   persist()
   return listWildDrops()
 }
 
+// Capped at WILD_DROP_MAX_CHANCE here too, in case the file holds a higher one.
 export function getWildDropFor(species: string): ItemDropConfig | null {
-  return getState()[toID(species)]?.drop ?? null
+  const drop = getState()[toID(species)]?.drop
+  return drop ? { ...drop, chance: Math.min(WILD_DROP_MAX_CHANCE, drop.chance) } : null
 }

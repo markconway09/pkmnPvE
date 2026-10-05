@@ -22984,3 +22984,411 @@ body.drag-scrolling * {
 .dexnav-action-confirm .dexnav-action-icon svg {
   stroke-width: 2;
 }
+
+/* Bag and Shop: a button per category under the search, scrolling the list down to it. */
+.bag-shop-modal .category-jump-bar {
+  margin-top: 10px;
+  padding: 3px;
+  border-radius: 12px;
+}
+.bag-shop-modal .category-jump-bar button {
+  border-radius: 9px;
+}
+.bag-shop-modal .category-jump-bar + .bag-scroll {
+  margin-top: 4px;
+}
+
+/* ---- Bag window's Items tab: the bag and the shop as one grid, with a pane beside it
+   showing the clicked item (what it does, and buttons to use, buy or sell it) ---- */
+.modal-panel.bag-shop-modal {
+  width: min(1000px, 96vw);
+}
+
+.items-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.items-list {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.bag-shop-modal .items-list .category-jump-bar {
+  margin-top: 0;
+}
+
+.items-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+/* A card: the whole of it is the button - the item, its name, and its price below. */
+.items-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px 8px 10px;
+  cursor: pointer;
+  outline: none;
+}
+
+.items-card:focus-visible {
+  outline: 2px solid #6bb0ff;
+  outline-offset: 2px;
+}
+
+/* The one shown in the pane: a gold ring. */
+.items-card.items-card-selected {
+  outline: 2px solid #ffd76b;
+  outline-offset: 2px;
+}
+
+.items-card-note {
+  margin-top: auto;
+  font-size: 12px;
+  font-weight: bold;
+  color: #9fe0a8;
+}
+
+.items-card-note-faint {
+  font-weight: normal;
+  color: #6c7688;
+}
+
+.bag-card-picking .items-card-note {
+  color: #c9d1dd;
+}
+
+.bag-item-selected .items-card-note {
+  color: #ffd76b;
+}
+
+/* The pane: a sunken tile of its own, scrolling if an item has a lot to say. */
+.items-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+  border: 1px solid #2c3442;
+  border-radius: 14px;
+  background: rgba(10, 13, 18, 0.5);
+  box-sizing: border-box;
+}
+
+.items-detail-empty {
+  justify-content: center;
+  text-align: center;
+  color: #8a94a6;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.items-detail-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.items-detail-icon {
+  transform: scale(2.6);
+  image-rendering: pixelated;
+}
+
+.items-detail-name {
+  margin: 6px 0 0;
+  font-size: 18px;
+  color: #fff;
+}
+
+.items-detail-meta {
+  font-size: 12px;
+  color: #8a94a6;
+}
+
+.items-detail-desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #c9d1dd;
+}
+
+.items-detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #2c3442;
+}
+
+.items-detail-section h4 {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #8a94a6;
+}
+
+.items-detail-hint {
+  margin: 0;
+  font-size: 12px;
+  color: #aab4c4;
+}
+
+.items-detail-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.items-detail-buttons > *,
+.items-detail-btn {
+  flex: 1;
+}
+
+/* Use, Open, Restore: big pill buttons, easy to hit. */
+.items-detail-btn {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid #3b6ea8;
+  border-radius: 18px;
+  background: #1c2c40;
+  color: #cfe6ff;
+  font-size: 13px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.items-detail-btn:hover:not(:disabled) {
+  background: #24395a;
+}
+
+.items-detail-btn:disabled {
+  opacity: 0.5;
+}
+
+/* The buy and sell bars span the pane, at a size that's easy to hit. */
+.items-detail .buy-button-group {
+  width: 100%;
+}
+
+.items-detail .buy-button {
+  min-height: 36px;
+  font-size: 13px;
+}
+
+/* A narrow window: three cards to a row and a slimmer pane. */
+@media (max-width: 900px) {
+  .items-body {
+    grid-template-columns: minmax(0, 1fr) 230px;
+  }
+  .items-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Items pane's Buy section: a row per amount (×1, ×5, ×10). A discounted row is tinted
+   orange, with the full price struck through, what it saves in green and a -25% badge. */
+.items-buy-deal-hint {
+  color: #ffb070;
+}
+
+.items-buy-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.items-buy-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px 6px 12px;
+  border: 1px solid #2c3442;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.items-buy-option.items-buy-option-deal {
+  border-color: rgba(255, 154, 60, 0.35);
+  background: linear-gradient(90deg, rgba(255, 154, 60, 0.1), rgba(255, 154, 60, 0.02));
+}
+
+.items-buy-qty {
+  flex: none;
+  min-width: 30px;
+  font-size: 15px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.items-buy-price {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.items-buy-each {
+  font-size: 12px;
+  color: #aab4c4;
+}
+
+.items-buy-was {
+  margin-left: auto;
+  font-size: 12px;
+  color: #7c8698;
+  text-decoration-color: #ff7a7a;
+}
+
+.items-buy-save {
+  font-size: 12px;
+  font-weight: bold;
+  color: #9fe0a8;
+}
+
+.items-buy-badge {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: 8px;
+  background: linear-gradient(#ffad5c, #e8782a);
+  color: #1f1206;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.items-buy-option .buy-button {
+  flex: none;
+  min-width: 78px;
+  margin-left: auto;
+}
+
+/* With the struck price taking the space, the button sits right beside it. */
+.items-buy-was + .buy-button {
+  margin-left: 0;
+}
+
+/* The amounts side by side as three tiles, each stacked top to bottom: the amount, the
+   discount badge and struck full price (when discounted), then the buy button. */
+.items-buy-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.items-buy-option {
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 5px;
+  padding: 8px 6px;
+  text-align: center;
+}
+
+.items-buy-qty {
+  min-width: 0;
+}
+
+.items-buy-was {
+  margin-left: 0;
+  font-size: 11px;
+}
+
+.items-buy-option .buy-button,
+.items-buy-was + .buy-button {
+  width: 100%;
+  min-width: 0;
+  margin-top: auto;
+  margin-left: 0;
+}
+
+.items-buy-option.items-buy-option-deal {
+  background: linear-gradient(180deg, rgba(255, 154, 60, 0.12), rgba(255, 154, 60, 0.02));
+}
+
+/* Room around the Items grid, so a selected card's ring (4px outside it) isn't cut off by the scrolling list. */
+.bag-shop-modal .items-list .bag-scroll {
+  padding: 4px 6px 6px;
+}
+
+/* Items pane's sell buttons: what it is on top, what it pays underneath in green. */
+.items-detail .buy-button-group > .buy-button {
+  flex: 1;
+}
+
+.items-sell-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.25;
+}
+
+.items-sell-pays {
+  font-size: 11px;
+  color: #9fe0a8;
+}
+
+/* Items: a Friendship Petal comes from the Coin Shop - its card says so in pink, and its
+   pane has a pink button there. */
+.items-card-note.items-card-note-coins {
+  color: #f6a8d0;
+}
+
+.items-detail-btn.items-detail-btn-coins {
+  border-color: #f08cbf;
+  background: #3a1a2c;
+  color: #ffd1e8;
+}
+
+.items-detail-btn.items-detail-btn-coins:hover:not(:disabled) {
+  background: #4c2239;
+}
+
+/* The Coin Shop's daily petals, flashed when sent there from the Items window. */
+.coin-petals.coin-petals-flash {
+  animation: coin-petals-flash 0.8s ease-in-out 2;
+}
+
+@keyframes coin-petals-flash {
+  50% {
+    box-shadow: 0 0 0 3px #ffd1e8, 0 0 24px rgba(240, 140, 191, 0.8);
+  }
+}
+
+/* A battler's HP panel shows off its merge stars: gold at 5 stars, a slowly shifting
+   rainbow at 6. A dark wash over the colour keeps the name and HP text readable. */
+.sprite-info.sprite-info-stars-5 {
+  background:
+    linear-gradient(rgba(16, 20, 26, 0.55), rgba(16, 20, 26, 0.55)),
+    linear-gradient(135deg, #8a6a14, #e8b923 45%, #fff0a8 55%, #b8860b);
+  border-color: #ffd76b;
+}
+
+.sprite-info.sprite-info-stars-6 {
+  background:
+    linear-gradient(rgba(16, 20, 26, 0.5), rgba(16, 20, 26, 0.5)),
+    linear-gradient(90deg, #ff4d4d, #ffa43a, #ffe94a, #4ddc6a, #3ab8ff, #7a5cff, #e45cff, #ff4d4d);
+  background-size: 100% 100%, 300% 100%;
+  border-color: #ffffff;
+  animation: sprite-info-rainbow 6s linear infinite;
+}
+
+@keyframes sprite-info-rainbow {
+  from {
+    background-position: 0 0, 0% 0;
+  }
+  to {
+    background-position: 0 0, 150% 0;
+  }
+}

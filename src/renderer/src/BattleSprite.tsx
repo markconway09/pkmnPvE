@@ -369,7 +369,11 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
           )}
         </div>
       </div>
-      <div className="sprite-info">
+      <div
+        className={`sprite-info${
+          (displayed.mergeStars ?? 0) >= 6 ? ' sprite-info-stars-6' : displayed.mergeStars === 5 ? ' sprite-info-stars-5' : ''
+        }`}
+      >
         <div className="sprite-name-row">
           <span className="sprite-name">{displayed.species}</span>
           {displayed.caughtBefore && (

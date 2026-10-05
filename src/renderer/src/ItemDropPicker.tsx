@@ -7,9 +7,11 @@ interface Props {
   chance: number
   onChangeItem: (id: string | null) => void
   onChangeChance: (chance: number) => void
+  // The highest chance allowed (wild drops stop at 75%).
+  maxChance?: number
 }
 
-function ItemDropPicker({ label, items, itemId, chance, onChangeItem, onChangeChance }: Props): React.JSX.Element {
+function ItemDropPicker({ label, items, itemId, chance, onChangeItem, onChangeChance, maxChance = 100 }: Props): React.JSX.Element {
   return (
     <label className="editor-field editor-field-full">
       <span>{label}</span>
@@ -27,9 +29,9 @@ function ItemDropPicker({ label, items, itemId, chance, onChangeItem, onChangeCh
             <input
               type="number"
               min={0}
-              max={100}
+              max={maxChance}
               value={chance}
-              onChange={(e) => onChangeChance(Number(e.target.value))}
+              onChange={(e) => onChangeChance(Math.min(maxChance, Number(e.target.value)))}
             />
             <span>%</span>
           </span>

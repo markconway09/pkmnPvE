@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from 'node:fs'
-import type { BagItemView, EvolutionItemUse, RarityTier } from '../../shared/battle-types'
+import type { BagItemView, EvolutionItemUse, ItemOptionEntry, RarityTier } from '../../shared/battle-types'
 import { COIN_PRIZES } from '../../shared/slots'
 import { coinPrizeRarityTier, priceRarityTier } from '../../shared/rarity'
 import { EXP_CANDY_EXP, OPENABLE_ITEM_IDS } from '../../shared/battle-types'
@@ -84,6 +84,33 @@ function persist(): void {
   writeFileSync(playerPathFor('bag.json'), JSON.stringify(getState()), 'utf8')
 }
 
+/**
+ * One item as the bag shows it, with however many the bag holds - none included. For an
+ * item the Items window always lists (a Friendship Petal), owned or not. Null for an
+ * unknown item.
+ */
+export function getBagItemView(itemId: string): BagItemView | null {
+  const item = getEditorOptions().items.find((i) => i.id === itemId)
+  return item ? bagItemView(item, getItemQuantity(itemId)) : null
+}
+
+function bagItemView(item: ItemOptionEntry, quantity: number): BagItemView {
+  return {
+    id: item.id,
+    name: item.name,
+    category: bagCategoryFor(item.id),
+    description: item.description,
+    spritenum: item.spritenum,
+    quantity,
+    sellPrice: sellPriceFor(item.id),
+    opens: OPENABLE_ITEM_IDS.has(item.id),
+    fossil: fossilKindOf(item.id),
+    restoresTo: singleFossilSpecies(item.id),
+    teamExp: EXP_CANDY_EXP[item.id] ?? null,
+    rarityTier: bagItemRarity(item.id)
+  }
+}
+
 export function getBagState(): BagItemView[] {
   const catalog = new Map(getEditorOptions().items.map((i) => [i.id, i]))
   const views: BagItemView[] = []
@@ -91,20 +118,7 @@ export function getBagState(): BagItemView[] {
     if (quantity <= 0) continue
     const item = catalog.get(id)
     if (!item) continue
-    views.push({
-      id: item.id,
-      name: item.name,
-      category: bagCategoryFor(item.id),
-      description: item.description,
-      spritenum: item.spritenum,
-      quantity,
-      sellPrice: sellPriceFor(item.id),
-      opens: OPENABLE_ITEM_IDS.has(item.id),
-      fossil: fossilKindOf(item.id),
-      restoresTo: singleFossilSpecies(item.id),
-      teamExp: EXP_CANDY_EXP[item.id] ?? null,
-      rarityTier: bagItemRarity(item.id)
-    })
+    views.push(bagItemView(item, quantity))
   }
   // Grouped by category in the shop's order, then by name within each.
   return views.sort(

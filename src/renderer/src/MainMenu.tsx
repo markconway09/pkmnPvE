@@ -49,7 +49,6 @@ import RewardsModal, { type RewardsTab } from './RewardsModal'
 import { onRewardsFocus } from './AchievementToasts'
 import type { MissionsState } from '../../shared/missions'
 import BagShopModal from './BagShopModal'
-import type { BagShopTab } from './BagShopTabs'
 import WildDropsModal from './WildDropsModal'
 import ShopPricesModal from './ShopPricesModal'
 import LoadoutsModal from './LoadoutsModal'
@@ -320,8 +319,12 @@ function MainMenu({
   const [playerTrainerOpen, setPlayerTrainerOpen] = useState(false)
   const [pokedexOpen, setPokedexOpen] = useState(false)
   const [starterOpen, setStarterOpen] = useState(false)
-  // The Bag | Shop window, open on one of its tabs.
-  const [bagShopTab, setBagShopTab] = useState<BagShopTab | null>(null)
+  // The Items window (the bag and the shop together, the Key Items and the TMs).
+  const [itemsOpen, setItemsOpen] = useState(false)
+  // Sent from the Items window to the Coin Shop's daily petals: the Game Corner page is
+  // remounted on its Coin Shop (jump counts the trips) and scrolls down to them.
+  const [petalJump, setPetalJump] = useState(0)
+  const [focusPetals, setFocusPetals] = useState(false)
   // The Game Corner page's tab (one of its games or the Coin Shop) - it reopens on the
   // one played last.
   const gameCornerOpen = mode === 'corner'
@@ -551,7 +554,7 @@ function MainMenu({
   // from the bag, or won from an achievement or the daily missions - so it's brought up
   // to date once those are all closed again (claims refresh it straight away too).
   const [draftRefreshKey, setDraftRefreshKey] = useState(0)
-  const itemWindowOpen = bagShopTab !== null || gameCornerOpen || rewardsTab !== null
+  const itemWindowOpen = itemsOpen || gameCornerOpen || rewardsTab !== null
   useEffect(() => {
     if (!itemWindowOpen) {
       refreshEligibility()
@@ -1050,8 +1053,7 @@ function MainMenu({
         runFloor={run?.status === 'active' ? run.floor : null}
         raidCrystals={eligibility?.raidsUnlocked ? eligibility.wishingPieces : null}
         rewardsWaiting={claimableMissions + unclaimedAchievements}
-        onBag={() => setBagShopTab('bag')}
-        onShop={() => setBagShopTab('shop')}
+        onItems={() => setItemsOpen(true)}
         onPokedex={() => setPokedexOpen(true)}
         onRewards={openRewards}
         onOptions={onOptions}
@@ -1158,8 +1160,7 @@ function MainMenu({
             setRewardsTab('missions')
           }}
           rewardsWaiting={claimableMissions + unclaimedAchievements}
-          onBag={() => setBagShopTab('bag')}
-          onShop={() => setBagShopTab('shop')}
+          onItems={() => setItemsOpen(true)}
           onPokedex={() => setPokedexOpen(true)}
           onRewards={openRewards}
           onOptions={onOptions}
@@ -1171,7 +1172,7 @@ function MainMenu({
           levelCap={levelCap}
           fightBusy={fightBusy}
           onStart={onRaidFight}
-          onOpenShop={() => setBagShopTab('shop')}
+          onOpenShop={() => setItemsOpen(true)}
           onOpenCoinShop={() => {
             setGameCornerTab('shop')
             goTo('corner', document.querySelector<HTMLElement>('.menu-rail-corner'))
@@ -1179,7 +1180,10 @@ function MainMenu({
         />
       ) : mode === 'corner' ? (
         <GameCornerModal
+          key={petalJump}
           inline
+          focusPetals={focusPetals}
+          onPetalsFocused={() => setFocusPetals(false)}
           initialTab={gameCornerTab}
           onTabChange={setGameCornerTab}
           onClose={() => {}}
@@ -1922,10 +1926,16 @@ function MainMenu({
         />
       )}
 
-      {bagShopTab && (
+      {itemsOpen && (
         <BagShopModal
-          initialTab={bagShopTab}
-          onClose={() => setBagShopTab(null)}
+          onClose={() => setItemsOpen(false)}
+          onOpenCoinShop={() => {
+            setItemsOpen(false)
+            setGameCornerTab('shop')
+            setFocusPetals(true)
+            setPetalJump((n) => n + 1)
+            goTo('corner', document.querySelector<HTMLElement>('.menu-rail-corner'))
+          }}
           onChanged={() => {
             refreshMoney()
             refreshBox()

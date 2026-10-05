@@ -77,7 +77,8 @@ const MISSION_STATS: Partial<Record<AchievementStat, MissionStat>> = {
   evolutions: 'evolutions',
   skillGreats: 'skillGreats',
   pokemonMerged: 'merges',
-  raidsWon: 'raidsWon'
+  raidsWon: 'raidsWon',
+  draftBattlesWon: 'draftWins'
 }
 
 /** Adds to one of the achievement-only tallies (and any daily mission counting the same). */

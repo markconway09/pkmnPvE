@@ -57,7 +57,6 @@ import type { TmInfo } from '../../shared/tms'
 import { RAID_PLACEHOLDER_NAME, raidPlaceholderSet } from './raid'
 import { RAID_LEADER_EXTRA_COPIES } from '../../shared/titles'
 import { countAchievement } from './achievement-progress'
-import { recordMission } from './mission-store'
 import { AIPlayer, type AiMovePower } from './battle-ai'
 
 // Moves that only work on the user's first turn after coming out.
@@ -343,16 +342,14 @@ export interface OpponentConfig {
   // The drop set on the premade team the trainer chose - rolled with `drops`, kept
   // apart only so the rewards tooltip can say where it comes from.
   teamDrop?: ItemDropConfig
-  // A boss rematch (the menu once every boss is beaten): exp and drops, but no prize money.
-  noPrizeMoney?: boolean
   // Percent chance of one extra drop picked at random from the whole item pool.
   randomDropChance?: number
   // A wild Pokemon woken by a noisy TM search: no running from it.
   noRun?: boolean
   // The DexNav's hunted Pokemon: beating it grows the chain, running or losing breaks it.
   dexNavHunt?: boolean
-  // A friendly match (another player's saved team): winning gives no exp, money,
-  // friendship, item drops or boss progress.
+  // A friendly match (another player's saved team) or a boss rematch: winning gives no
+  // exp, money, friendship, item drops, TMs or boss progress.
   noRewards?: boolean
   // A Roguelite run's battle (see run-store): the run's team goes in with the HP and
   // status it had (one entry per team member, in order), and how it ends goes back
@@ -1023,10 +1020,9 @@ export class WildBattle {
               recordTrainerWin(this.opponent.trainerId, !!this.opponent.isBoss)
               // Bosses are tallied by the progression's own list of beaten bosses.
               if (!this.opponent.isBoss) countStat('trainersDefeated')
-              else recordMission('bossWins')
               // Per Pokemon on the team they actually sent out, or a flat sum for a
               // boss - either way plus the level cap as a percentage on top.
-              this.moneyGained = this.opponent.noPrizeMoney ? 0 : this.prizeMoney(levelCap)
+              this.moneyGained = this.prizeMoney(levelCap)
               if (this.moneyGained > 0) addMoney(this.moneyGained)
               if (this.opponent.tmRewards?.length) this.tmRewards = grantRewardTms(this.opponent.tmRewards)
             } else if (!this.opponent?.raid) {
@@ -2095,7 +2091,7 @@ export class WildBattle {
     for (const drop of opponent?.drops ?? []) add(drop, opponent?.trainerId ? 'trainer' : 'wild')
     add(opponent?.teamDrop, 'team')
     return {
-      money: opponent?.trainerId && !opponent.noPrizeMoney ? this.prizeMoney(getProgression().levelCap) : null,
+      money: opponent?.trainerId ? this.prizeMoney(getProgression().levelCap) : null,
       items,
       randomDropChance: opponent?.randomDropChance ?? 0,
       tms: opponent?.tmRewards?.length ? unownedRewardTms(opponent.tmRewards) : []

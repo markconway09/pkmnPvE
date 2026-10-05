@@ -24,8 +24,7 @@ interface Props {
   onOpenMissions: () => void
   // Mission rewards and achievements waiting to be claimed, shown on the Rewards button.
   rewardsWaiting: number
-  onBag: () => void
-  onShop: () => void
+  onItems: () => void
   onPokedex: () => void
   onRewards: () => void
   onOptions: () => void
@@ -58,8 +57,7 @@ function HomeHub({
   onGo,
   onOpenMissions,
   rewardsWaiting,
-  onBag,
-  onShop,
+  onItems,
   onPokedex,
   onRewards,
   onOptions
@@ -96,8 +94,7 @@ function HomeHub({
   const crystals = eligibility?.wishingPieces ?? 0
   // The windows the sidebar's lower buttons open, repeated as small buttons under the cards.
   const tools: { label: string; icon: string; smooth?: boolean; action: () => void; badge?: number }[] = [
-    { label: 'Bag', icon: './icons/nav/bag.png', action: onBag },
-    { label: 'Shop', icon: './icons/nav/shop.svg', smooth: true, action: onShop },
+    { label: 'Items', icon: './icons/nav/bag.png', action: onItems },
     { label: 'Pokédex', icon: './icons/nav/pokedex.png', action: onPokedex },
     { label: 'Achievements', icon: './icons/nav/achievements.png', action: onRewards, badge: rewardsWaiting },
     { label: 'Options', icon: './icons/nav/options.png', action: onOptions }

@@ -1,0 +1,8 @@
+One Items window, mission & title tweaks
+
+- Bag and Shop merged into one Items tab, with category buttons and a side pane per item
+- Friendship Petals now unlock with Max Raids (late game)
+- Missions: "Beat a boss" means a Roguelite boss; new "Win a Draft match" mission
+- Walking Disc finds new TMs more often; Perfectionist works from purple searches
+- Boss rematches no longer pay anything; ★5/★6 HP panels turn gold/rainbow
+- Wild drops are capped at 75%

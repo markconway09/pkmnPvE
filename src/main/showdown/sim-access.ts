@@ -1430,11 +1430,18 @@ function getEvolutionOnlyItemIds(): Set<string> {
 /**
  * Items kept out of the shop until the boss flagged `unlocksLateItems` is
  * beaten (see lateItemsUnlocked in progression-store.ts): the Exp. Candies, the
- * evolution items, the Shiny Patch, and the Raid Crystal (Max Raids open up at the same time). Drops are
- * never affected.
+ * evolution items, the Shiny Patch, the Raid Crystal (Max Raids open up at the same time)
+ * and the Friendship Petals (the Coin Shop's daily petals, and the wild petal drop). Other
+ * drops are never affected.
  */
 export function isLateGameItem(itemId: string): boolean {
-  return itemId in EXP_CANDY_EXP || itemId === WISHING_PIECE_ITEM_ID || itemId === SHINY_PATCH_ITEM_ID || getEvolutionOnlyItemIds().has(itemId)
+  return (
+    itemId in EXP_CANDY_EXP ||
+    itemId === WISHING_PIECE_ITEM_ID ||
+    itemId === SHINY_PATCH_ITEM_ID ||
+    itemId === FRIENDSHIP_PETAL_ITEM_ID ||
+    getEvolutionOnlyItemIds().has(itemId)
+  )
 }
 
 let cachedWildDropPool: ItemOptionEntry[] | null = null

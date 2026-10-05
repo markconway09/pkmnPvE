@@ -41,6 +41,7 @@ import {
   SPECIALIST_REFUND_CHANCE,
   UNSTOPPABLE_QUICK_CHECK_MULTIPLIER,
   STEADY_HANDS_GREAT_MULTIPLIER,
+  WALKING_DISC_NEW_TM_CHANCE,
   WALKING_DISC_PAYOUT_MULTIPLIER
 } from '../../shared/titles'
 
@@ -300,14 +301,22 @@ export function tmSearchRarityOdds(location: WildLocationId): RarityOdds {
 }
 
 // A TM of this rarity from the area - or, if it has none of that rarity, the nearest one
-// it does have (lower first).
+// it does have (lower first). Walking Disc: a TM already owned is, half the time, swapped
+// for one of the same rarity the player doesn't have yet.
 function pickTm(location: WildLocationId, tier: RarityTier): TmInfo {
   const pool = getTmCatalog().filter((t) => t.locations.includes(location))
   const at = TM_TIERS.indexOf(tier)
   for (let step = 0; step < TM_TIERS.length; step++) {
     for (const i of [at - step, at + step]) {
       const matches = pool.filter((t) => t.tier === TM_TIERS[i])
-      if (matches.length > 0) return matches[Math.floor(Math.random() * matches.length)]
+      if (matches.length === 0) continue
+      const picked = matches[Math.floor(Math.random() * matches.length)]
+      const owned = getState().owned
+      if (owned.includes(picked.moveId) && hasTitle('Walking Disc') && Math.random() < WALKING_DISC_NEW_TM_CHANCE) {
+        const fresh = matches.filter((t) => !owned.includes(t.moveId))
+        if (fresh.length > 0) return fresh[Math.floor(Math.random() * fresh.length)]
+      }
+      return picked
     }
   }
   throw new Error('That area has no TMs')
@@ -403,7 +412,8 @@ export function reportTmSearchCheck(result: SkillCheckResult, timedOut = false):
   if (active.location === 'lab') countAchievement('labSearches')
   if (find.tm.tier === 'legendary') countAchievement('legendaryTmsFound')
   if (active.allGreat) countAchievement('flawlessSearches')
-  if (active.allGreat && active.tier === 'legendary') countAchievement('flawlessLegendarySearches')
+  // Perfectionist: a purple (rare) or better search with every check a Great.
+  if (active.allGreat && TM_TIERS.indexOf(active.tier) >= TM_TIERS.indexOf('rare')) countAchievement('flawlessLegendarySearches')
   // Specialist: a search that found something may give the area's search back.
   const s = getState()
   const refunded = hasTitle('Specialist') && (s.used[active.location] ?? 0) > 0 && Math.random() < SPECIALIST_REFUND_CHANCE

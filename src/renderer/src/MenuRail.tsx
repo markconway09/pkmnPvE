@@ -13,8 +13,7 @@ interface Props {
   raidCrystals: number | null
   // Mission rewards and achievements waiting to be claimed.
   rewardsWaiting: number
-  onBag: () => void
-  onShop: () => void
+  onItems: () => void
   onPokedex: () => void
   onRewards: () => void
   onOptions: () => void
@@ -43,8 +42,7 @@ function MenuRail({
   runFloor,
   raidCrystals,
   rewardsWaiting,
-  onBag,
-  onShop,
+  onItems,
   onPokedex,
   onRewards,
   onOptions
@@ -88,8 +86,7 @@ function MenuRail({
     { id: 'corner', label: 'Game Corner', icon: <img className="menu-rail-icon" src="./icons/nav/coin.png" alt="" /> }
   ]
   const tools: { label: string; icon: React.ReactNode; action: () => void; badge?: number }[] = [
-    { label: 'Bag', icon: <img className="menu-rail-icon" src="./icons/nav/bag.png" alt="" />, action: onBag },
-    { label: 'Shop', icon: <img className="menu-rail-icon menu-rail-icon-smooth" src="./icons/nav/shop.svg" alt="" />, action: onShop },
+    { label: 'Items', icon: <img className="menu-rail-icon" src="./icons/nav/bag.png" alt="" />, action: onItems },
     { label: 'Pokédex', icon: <img className="menu-rail-icon" src="./icons/nav/pokedex.png" alt="" />, action: onPokedex },
     {
       label: 'Rewards',

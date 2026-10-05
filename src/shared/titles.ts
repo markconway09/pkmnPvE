@@ -68,7 +68,7 @@ export const TITLE_PERKS: Record<Title, string> = {
   'Grand Drafter': 'Drafts cost 25% less to enter',
   Prospector: 'TM searches find gold TMs twice as often',
   'Light Sleeper': 'A TM search takes one extra miss before a wild Pokemon wakes',
-  'Walking Disc': 'A TM you already own pays double',
+  'Walking Disc': 'A TM you already own pays double, and new TMs turn up more often',
   Specialist: "A TM search that finds a TM has a 50% chance to give the area's search back",
   'Steady Hands': "A TM search's Great slice is 50% wider",
   'Hex Master': 'A TM search needs one less Great to come up a rarity higher',
@@ -160,6 +160,7 @@ export const STARLIGHT_RAID_CHARM_MULTIPLIER = 5
 export const PROSPECTOR_LEGENDARY_WEIGHT_MULTIPLIER = 2
 export const LIGHT_SLEEPER_EXTRA_MISSES = 1
 export const WALKING_DISC_PAYOUT_MULTIPLIER = 2
+export const WALKING_DISC_NEW_TM_CHANCE = 0.5
 export const SPECIALIST_REFUND_CHANCE = 0.5
 export const STEADY_HANDS_GREAT_MULTIPLIER = 1.5
 export const HEX_MASTER_SPARE_CHECKS = 1

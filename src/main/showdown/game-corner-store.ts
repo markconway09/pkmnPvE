@@ -155,6 +155,7 @@ export function getDailyPetalDeals(): DailyPetalDeals {
 
 /** Claims today's free Friendship Petals - once a day. They go into the bag. */
 export function claimFreePetals(): DailyPetalDeals {
+  if (!lateItemsUnlocked()) throw new Error("Friendship Petals aren't unlocked yet")
   if (getState().freePetalsDay === today()) throw new Error("Today's free petals are claimed - more tomorrow")
   getState().freePetalsDay = today()
   persist()
@@ -164,6 +165,7 @@ export function claimFreePetals(): DailyPetalDeals {
 
 /** Buys today's pack of Friendship Petals with coins - once a day. They go into the bag. */
 export function buyPetalPack(): CoinBalance & { deals: DailyPetalDeals } {
+  if (!lateItemsUnlocked()) throw new Error("Friendship Petals aren't unlocked yet")
   if (getState().petalPackDay === today()) throw new Error("Today's petal pack is gone - it's back tomorrow")
   if (getCoins() < DAILY_PETAL_PACK.coins) throw new Error(`The petal pack costs ${DAILY_PETAL_PACK.coins.toLocaleString('en-US')} coins`)
   getState().coins -= DAILY_PETAL_PACK.coins
@@ -203,6 +205,8 @@ export function getDailyCoinMon(): DailyCoinMon {
  * random nature, the gift shiny chance).
  */
 export function buyDailyCoinMon(): DailyCoinMonPurchase {
+  // Unlocked with the late game items, like the daily petals.
+  if (!lateItemsUnlocked()) throw new Error("The Pokemon of the day isn't unlocked yet")
   const offer = getDailyCoinMon()
   if (offer.bought) throw new Error("Today's Pokemon is gone - a new one arrives tomorrow")
   if (getCoins() < offer.coins) throw new Error(`${offer.species} costs ${offer.coins.toLocaleString('en-US')} coins`)

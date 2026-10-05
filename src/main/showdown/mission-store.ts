@@ -122,7 +122,8 @@ function rerollsAllowed(): number {
 function allDone(missions: StoredMission[]): boolean {
   return missions.every((m) => {
     const t = templateOf(m.templateId)
-    return !!t && m.progress >= t.goal
+    // A mission since taken out of the game (rolled before an update) doesn't count against it.
+    return !t || m.progress >= t.goal
   })
 }
 

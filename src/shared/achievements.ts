@@ -929,7 +929,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'flawlessgold',
     name: 'Perfectionist',
-    description: 'Finish a gold TM search with every check a Great',
+    description: 'Finish a purple or higher TM search with every check a Great',
     category: 'TMs',
     stat: 'flawlessLegendarySearches',
     goal: 1,

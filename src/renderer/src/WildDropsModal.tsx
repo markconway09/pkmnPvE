@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { EditorOptions, WildDropEntry } from '../../shared/battle-types'
+import { WILD_DROP_MAX_CHANCE, type EditorOptions, type WildDropEntry } from '../../shared/battle-types'
 import ItemDropPicker from './ItemDropPicker'
 import ItemSprite from './ItemSprite'
 
@@ -90,6 +90,7 @@ function WildDropsModal({ onClose }: Props): React.JSX.Element {
             items={options?.items ?? []}
             itemId={itemId}
             chance={chance}
+            maxChance={WILD_DROP_MAX_CHANCE}
             onChangeItem={setItemId}
             onChangeChance={setChance}
           />

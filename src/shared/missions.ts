@@ -10,7 +10,6 @@ export const MISSION_TIERS: MissionTier[] = ['easy', 'medium', 'hard']
 export type MissionStat =
   | 'wildWins'
   | 'trainerWins'
-  | 'bossWins'
   | 'catches'
   | 'raidsWon'
   | 'evolutions'
@@ -24,6 +23,7 @@ export type MissionStat =
   | 'runFloors'
   | 'runTrainerWins'
   | 'runBossWins'
+  | 'draftWins'
 
 export interface MissionReward {
   money?: number
@@ -64,11 +64,11 @@ export const MISSION_TEMPLATES: MissionTemplate[] = [
   { id: 'runtrainers3', tier: 'medium', text: 'Beat 3 trainers in Roguelite runs', stat: 'runTrainerWins', goal: 3, reward: { coins: 500 } },
 
   // Hard
-  { id: 'boss1', tier: 'hard', text: 'Beat a boss (rematches count)', stat: 'bossWins', goal: 1, reward: { items: [item('randompokemon')] } },
+  { id: 'boss1', tier: 'hard', text: 'Beat a Roguelite boss', stat: 'runBossWins', goal: 1, reward: { items: [item('randompokemon')] } },
   { id: 'raid1', tier: 'hard', text: 'Win a Max Raid', stat: 'raidsWon', goal: 1, reward: { items: [item('randompokemon')] }, needsRaids: true },
   { id: 'trainers10', tier: 'hard', text: 'Beat 10 trainers', stat: 'trainerWins', goal: 10, reward: { items: [item('lockcapsule', 2)] } },
-  { id: 'runfloors15', tier: 'hard', text: 'Clear 15 Roguelite floors', stat: 'runFloors', goal: 15, reward: { items: [item('expcandyl')] } },
-  { id: 'runboss1', tier: 'hard', text: 'Beat a boss in a Roguelite run', stat: 'runBossWins', goal: 1, reward: { items: [item('randompokemon')] } }
+  { id: 'draft1', tier: 'hard', text: 'Win a match in Draft mode', stat: 'draftWins', goal: 1, reward: { items: [item('randompokemon')] } },
+  { id: 'runfloors15', tier: 'hard', text: 'Clear 15 Roguelite floors', stat: 'runFloors', goal: 15, reward: { items: [item('expcandyl')] } }
 ]
 
 // Finishing all three of the day's missions.

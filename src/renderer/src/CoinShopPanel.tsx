@@ -44,6 +44,10 @@ interface Props {
   onMoneyChange: (money: number) => void
   // A Pokemon joined the box - the main menu's box needs refreshing.
   onBoxChange?: () => void
+  // Scroll down to the daily Friendship Petals once they've loaded (and flash them), then
+  // report it done.
+  focusPetals?: boolean
+  onPetalsFocused?: () => void
 }
 
 /**
@@ -52,7 +56,7 @@ interface Props {
  * the bottom, the Pokemon of the day: a bubble on the banner points to it while it's
  * still for sale.
  */
-function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange }: Props): React.JSX.Element {
+function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusPetals, onPetalsFocused }: Props): React.JSX.Element {
   const [coins, setCoins] = useState<number | null>(null)
   const [money, setMoney] = useState<number | null>(null)
   const [items, setItems] = useState<Map<string, ItemOptionEntry>>(new Map())
@@ -68,8 +72,11 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange }: Props): Re
   const [tmShop, setTmShop] = useState<TmShopView | null>(null)
   // Today's Friendship Petals: a free pack and a coin pack, each once a day.
   const [petals, setPetals] = useState<DailyPetalDeals | null>(null)
+  const petalsRef = useRef<HTMLDivElement>(null)
+  const [petalsFlash, setPetalsFlash] = useState(false)
 
-  // The Raid Crystal and the Shiny Patch are locked until Max Raids open (see BattleEligibility.raidsUnlocked).
+  // The Raid Crystal and the Shiny Patch are locked until Max Raids open (see BattleEligibility.raidsUnlocked);
+  // the daily petals and the Pokemon of the day aren't shown at all until then.
   const [raidLock, setRaidLock] = useState<{ unlocked: boolean; boss: string | null } | null>(null)
   useEffect(() => {
     window.api
@@ -103,6 +110,16 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange }: Props): Re
       .then(setPetals)
       .catch(() => {})
   }, [])
+
+  // Sent here from the Items window's Friendship Petal: down to the petals, with a flash.
+  useEffect(() => {
+    if (!focusPetals || !petals || !petalsRef.current) return
+    petalsRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setPetalsFlash(true)
+    onPetalsFocused?.()
+    const timer = setTimeout(() => setPetalsFlash(false), 1600)
+    return () => clearTimeout(timer)
+  }, [focusPetals, petals])
 
   async function act(e: React.MouseEvent, action: () => Promise<string>): Promise<void> {
     const at = pointOf(e)
@@ -199,12 +216,13 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange }: Props): Re
   }
 
   if (coins === null) return <GameCornerLoading />
+  const lateUnlocked = !!raidLock?.unlocked
 
   return (
     <div className="game-corner-game coin-shop-panel">
       <div className="coin-shop-banner">
         {/* Today's Pokemon, while it's still for sale: a click scrolls down to it. */}
-        {dailyMon && !dailyMon.bought && (
+        {lateUnlocked && dailyMon && !dailyMon.bought && (
           <button
             className={`coin-daily-mon-bubble coin-daily-mon-bubble-${dailyMon.tier}`}
             title={`Today's Pokemon: ${dailyMon.species}`}
@@ -319,8 +337,8 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange }: Props): Re
       </div>
 
       {/* Today's Friendship Petals: a free pack and a coin pack side by side, each once a day. */}
-      {petals && (
-        <div className="coin-petals">
+      {lateUnlocked && petals && (
+        <div ref={petalsRef} className={`coin-petals${petalsFlash ? ' coin-petals-flash' : ''}`}>
           <span className="coin-petals-tag">Daily petals</span>
           <div className={`coin-petals-deal${petals.free.claimed ? ' coin-petals-deal-gone' : ''}`}>
             <ItemSprite spritenum={FRIENDSHIP_PETAL_SPRITENUM} className="coin-petals-icon" />
@@ -394,7 +412,7 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange }: Props): Re
         </>
       )}
 
-      {dailyMon && (
+      {lateUnlocked && dailyMon && (
         <>
           <div className="coin-shop-section-head">
             <h3>Pokemon of the day</h3>

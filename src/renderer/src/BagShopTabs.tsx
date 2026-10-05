@@ -2,7 +2,7 @@ import TabStrip from './TabStrip'
 import ItemSprite from './ItemSprite'
 import { TR_SPRITENUM } from './itemIcon'
 
-export type BagShopTab = 'bag' | 'shop' | 'keys' | 'tms'
+export type BagShopTab = 'items' | 'keys' | 'tms'
 
 interface Props {
   current: BagShopTab
@@ -11,7 +11,7 @@ interface Props {
   onClose: () => void
 }
 
-/** The strip at the top of the Bag | Shop window: the Bag, the Shop, the Key Items and the TMs. */
+/** The strip at the top of the Bag window: the Items (bag and shop together), the Key Items and the TMs. */
 function BagShopTabs({ current, onSwitch, onClose }: Props): React.JSX.Element {
   const label = (name: string, icon: string, smooth = false): React.JSX.Element => (
     <>
@@ -23,8 +23,7 @@ function BagShopTabs({ current, onSwitch, onClose }: Props): React.JSX.Element {
     <TabStrip
       className="bag-shop-tabs"
       tabs={[
-        { id: 'bag', label: label('Bag', './icons/nav/bag.png') },
-        { id: 'shop', label: label('Shop', './icons/nav/shop.svg', true) },
+        { id: 'items', label: label('Items', './icons/nav/bag.png') },
         { id: 'keys', label: label('Key Items', './sprites/misc/shinycharm.png') },
         {
           id: 'tms',

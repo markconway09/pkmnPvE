@@ -70,7 +70,7 @@ import {
   useExpCandiesUntilCap,
   getRaidBossPreviews
 } from './showdown/box-store'
-import { getBagState, getItemQuantity, hasItem, removeItem, resetBag } from './showdown/bag-store'
+import { getBagItemView, getBagState, getItemQuantity, hasItem, removeItem, resetBag } from './showdown/bag-store'
 import { generateRaidBoss, raidBossRarityOdds } from './showdown/raid'
 import { claimMission, claimMissionBonus, getMissions, rerollMission } from './showdown/mission-store'
 import { applyLoadout, deleteLoadout, listLoadouts, renameLoadout, saveLoadout, updateLoadout } from './showdown/loadout-store'
@@ -330,10 +330,12 @@ ipcMain.handle('battle:start', async (_event, locationId?: WildLocationId, level
     (location?.id === 'lab' ? generateLabWildMon(effectiveLevelCap) : generateRandomWildMon(effectiveLevelCap, location))
   if (!wildMon) throw new Error('Could not find a wild Pokemon for your current level cap in that location')
   const wildDrop = getWildDropFor(wildMon.species)
-  // A Pokemon with a friendship evolution can drop a Friendship Petal, on top of its own drop.
+  // A Pokemon with a friendship evolution can drop a Friendship Petal, on top of its own drop -
+  // once petals are unlocked (a late game item).
+  const petalDrop = hasFriendshipEvolution(wildMon.species) && lateItemsUnlocked()
   const wildDrops: ItemDropConfig[] = [
     ...(wildDrop ? [wildDrop] : []),
-    ...(hasFriendshipEvolution(wildMon.species) ? [{ itemId: FRIENDSHIP_PETAL_ITEM_ID, chance: FRIENDSHIP_PETAL_DROP_CHANCE }] : [])
+    ...(petalDrop ? [{ itemId: FRIENDSHIP_PETAL_ITEM_ID, chance: FRIENDSHIP_PETAL_DROP_CHANCE }] : [])
   ]
   activeBattle = new WildBattle(p1team, 'gen9customgame', 'gen9randombattle', {
     team: [wildMon],
@@ -360,8 +362,8 @@ ipcMain.handle('battle:startTrainer', async (_event, boss: boolean, rematchTrain
   let trainer: Trainer | null = null
   if (boss && rematchTrainerId) {
     // A rematch from the boss menu: any boss in the order the player has already beaten.
-    // It gives exp and drops like any boss fight, but no prize money, and can't move
-    // progression along (recordTrainerWin only counts the next unbeaten boss).
+    // Just for the fight - it pays nothing at all: no exp, money, drops, TMs, friendship,
+    // mission or stat progress, and no boss progress.
     const inOrder = progression.bossOrder.some((step) => step.trainerId === rematchTrainerId)
     if (!inOrder || !progression.bossesDefeated.includes(rematchTrainerId)) {
       throw new Error('Only a boss you have already beaten can be rematched')
@@ -411,7 +413,7 @@ ipcMain.handle('battle:startTrainer', async (_event, boss: boolean, rematchTrain
     teamDrop,
     tmRewards: trainer.tmRewards,
     isBoss: trainer.isBoss,
-    noPrizeMoney: !!(boss && rematchTrainerId),
+    noRewards: !!(boss && rematchTrainerId),
     startField: trainer.isBoss
       ? { weather: trainer.fieldWeather, terrain: trainer.fieldTerrain, trickRoom: trainer.fieldTrickRoom }
       : undefined
@@ -804,6 +806,7 @@ ipcMain.handle('loadouts:delete', (_event, id: string) => deleteLoadout(id))
 ipcMain.handle('loadouts:apply', (_event, id: string) => applyLoadout(id))
 
 ipcMain.handle('bag:list', () => getBagState())
+ipcMain.handle('bag:item', (_event, itemId: string) => getBagItemView(itemId))
 ipcMain.handle('bag:useExpCandy', (_event, itemId: string) => useExpCandy(itemId))
 ipcMain.handle('bag:useExpCandiesUntilCap', (_event, itemId: string) => useExpCandiesUntilCap(itemId))
 

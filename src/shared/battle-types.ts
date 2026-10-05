@@ -221,6 +221,10 @@ export const BOSS_PRIZE = 2500
 // drop configured for that species.
 export const WILD_RANDOM_DROP_CHANCE = 10
 
+// The highest chance a species' own wild drop can have (Snorlax's Leftovers included) -
+// never a sure thing.
+export const WILD_DROP_MAX_CHANCE = 75
+
 // The base prize grows with progress: the level cap the fight was held under is
 // added on as a percentage of it (cap 80 -> +80%, so a boss pays 2500 + 2000).
 export function prizeMoneyFor(isBoss: boolean, teamSize: number, levelCap: number): number {
