@@ -71,7 +71,7 @@ import {
   getRaidBossPreviews
 } from './showdown/box-store'
 import { getBagItemView, getBagState, getItemQuantity, hasItem, removeItem, resetBag } from './showdown/bag-store'
-import { generateRaidBoss, raidBossRarityOdds } from './showdown/raid'
+import { debugRaidBoss, generateRaidBoss, raidBossKindOdds, type RaidBoss } from './showdown/raid'
 import { claimMission, claimMissionBonus, getMissions, rerollMission } from './showdown/mission-store'
 import { applyLoadout, deleteLoadout, listLoadouts, renameLoadout, saveLoadout, updateLoadout } from './showdown/loadout-store'
 import {
@@ -112,7 +112,7 @@ import {
   lateItemsUnlocked
 } from './showdown/progression-store'
 import { getMoney, resetMoney, setMoney } from './showdown/money-store'
-import { buyCoinPrize, buyCoins, buyDailyCoinMon, buyDailyCoinOffer, buyPetalPack, claimFreePetals, getCoins, getDailyCoinMon, getDailyCoinOffer, getDailyPetalDeals, getSlotRules, setCoins, spinSlots } from './showdown/game-corner-store'
+import { buyCoinPrize, buyCoins, buyDailyCoinMon, buyDailyCoinOffer, buyPetalPack, claimFreePetals, getCoins, getDailyCoinMon, getDailyCoinOffer, getDailyPetalDeals, getDailyPrizesBought, getSlotRules, setCoins, spinSlots } from './showdown/game-corner-store'
 import {
   abandonTmSearch,
   buyScanner,
@@ -217,6 +217,7 @@ import {
   chooseChaosModifier,
   draftEntryFee,
   getDraftView,
+  draftDailyWinClaimed,
   pickDraftMon,
   rerollDraftPack,
   swapChaosItem,
@@ -389,6 +390,8 @@ ipcMain.handle('battle:startTrainer', async (_event, boss: boolean, rematchTrain
 
   let teamDrop: ItemDropConfig | undefined
   let isDoubleBattle = false
+  // A premade team's merge stars (random teams have none).
+  let p2Stars: number[] = []
   const p2team =
     trainer.teamMode === 'random'
       ? generateRandomTrainerTeam({ count: 6, levelCap })
@@ -399,6 +402,7 @@ ipcMain.handle('battle:startTrainer', async (_event, boss: boolean, rematchTrain
             if (selection) {
               teamDrop = selection.drop
               isDoubleBattle = selection.isDoubleBattle
+              p2Stars = selection.mergeStars
             }
             return selection?.sets ?? []
           })()
@@ -417,7 +421,7 @@ ipcMain.handle('battle:startTrainer', async (_event, boss: boolean, rematchTrain
     startField: trainer.isBoss
       ? { weather: trainer.fieldWeather, terrain: trainer.fieldTerrain, trickRoom: trainer.fieldTrickRoom }
       : undefined
-  }, { p1: getTeamMergeStars(), everstone: { p1: getTeamEverstones() } })
+  }, { p1: getTeamMergeStars(), p2: p2Stars, everstone: { p1: getTeamEverstones() } })
   return activeBattle.getInitialView()
 })
 
@@ -594,18 +598,30 @@ ipcMain.handle('battle:startRaid', async () => {
   const p1team = getTeamPokemonSets()
   if (p1team.length === 0) throw new Error('Your team is empty - add Pokemon and assign them to your team first')
   if (!hasItem(WISHING_PIECE_ITEM_ID)) throw new Error('You need a Raid Crystal to start a Max Raid - the Shop and the Game Corner sell them')
-  const boss = generateRaidBoss(getProgression().levelCap)
-  const battle = new WildBattle(
-    p1team,
-    'gen9doublescustomgame',
-    'gen9randombattle',
-    { team: [boss.set], name: 'Wild', difficulty: 'normal', raid: { gigantamax: boss.gigantamax, stars: boss.stars } },
-    { p1: getTeamMergeStars(), p2: [boss.stars], everstone: { p1: getTeamEverstones() } }
-  )
+  const battle = raidBattleAgainst(p1team, generateRaidBoss(getProgression().levelCap))
   removeItem(WISHING_PIECE_ITEM_ID, 1)
   activeBattle = battle
   return activeBattle.getInitialView()
 })
+
+// Debug: a raid against a chosen species - no crystal, unlocked or not.
+ipcMain.handle('debug:startRaid', (_event, species: string, level: number, shiny: boolean) => {
+  requireAdmin()
+  const p1team = getTeamPokemonSets()
+  if (p1team.length === 0) throw new Error('Your team is empty - add Pokemon and assign them to your team first')
+  activeBattle = raidBattleAgainst(p1team, debugRaidBoss(species, level, shiny))
+  return activeBattle.getInitialView()
+})
+
+function raidBattleAgainst(p1team: PokemonSet[], boss: RaidBoss): WildBattle {
+  return new WildBattle(
+    p1team,
+    'gen9doublescustomgame',
+    'gen9randombattle',
+    { team: [boss.set], name: 'Wild', difficulty: 'normal', raid: { gigantamax: boss.gigantamax, stars: boss.stars, secret: boss.secret } },
+    { p1: getTeamMergeStars(), p2: [boss.stars], everstone: { p1: getTeamEverstones() } }
+  )
+}
 
 // ---- Daily missions (see mission-store.ts) ----
 ipcMain.handle('missions:get', () => getMissions())
@@ -713,6 +729,7 @@ ipcMain.handle('run:choose', async (_event, index: number): Promise<RunChoiceRes
 
 // ---- Draft mode (see draft-store.ts) ----
 ipcMain.handle('draft:get', () => getDraftView())
+ipcMain.handle('draft:dailyWinClaimed', () => draftDailyWinClaimed())
 ipcMain.handle('draft:entryFee', () => draftEntryFee())
 ipcMain.handle('draft:start', (_event, format: DraftFormat) => startDraft(format))
 ipcMain.handle('draft:pick', (_event, index: number) => pickDraftMon(index))
@@ -824,6 +841,7 @@ ipcMain.handle('achievements:setTitle', (_event, title: string | null) => setAch
 ipcMain.handle('achievements:setTitleActive', (_event, title: string, active: boolean) => setTitleActive(title, active))
 ipcMain.handle('coins:buy', (_event, amount: number) => buyCoins(amount))
 ipcMain.handle('coins:prize', (_event, itemId: string, quantity?: number) => buyCoinPrize(itemId, quantity))
+ipcMain.handle('coins:dailyPrizesBought', () => getDailyPrizesBought())
 ipcMain.handle('coins:dailyOffer', () => getDailyCoinOffer())
 ipcMain.handle('coins:buyDailyOffer', () => buyDailyCoinOffer())
 ipcMain.handle('coins:petalDeals', () => getDailyPetalDeals())
@@ -874,7 +892,7 @@ ipcMain.handle('bag:quickSellSelection', () => quickSellSelection())
 ipcMain.handle('bag:open', (_event, itemId: string) => openBagItem(itemId))
 // The odds of each rarity colour, for a raid / case / TM search button's tooltip.
 ipcMain.handle('rarity:odds', (_event, source: RarityOddsSource) => {
-  if (source.kind === 'raid') return raidBossRarityOdds()
+  if (source.kind === 'raid') return raidBossKindOdds()
   if (source.kind === 'tm') return tmSearchRarityOdds(source.location)
   return openItemRarityOdds(source.itemId)
 })

@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import {
   FIELD_START_TERRAINS,
   FIELD_START_WEATHERS,
+  SHINY_PATCH_ITEM_ID,
   type AiDifficulty,
   type OpponentModifiersView,
   type StatBlock
@@ -47,7 +48,8 @@ import {
   speciesRarityTier,
   type PokemonSet
 } from './sim-access'
-import { changeCoins } from './game-corner-store'
+import { changeCoins, today } from './game-corner-store'
+import { addItem } from './bag-store'
 import { countAchievement, recordAchievementBest } from './achievement-progress'
 import { hasTitle } from './title-perks'
 import { GRAND_DRAFTER_FEE_MULTIPLIER } from '../../shared/titles'
@@ -278,6 +280,23 @@ function persist(): void {
   writeFileSync(playerPathFor('draft.json'), JSON.stringify(draft ?? null), 'utf8')
 }
 
+// The first Draft battle won each day gives a Shiny Patch. The day it was last given is
+// kept apart from draft.json, which starts over with every draft.
+/** Whether today's first-win Shiny Patch has already been given. */
+export function draftDailyWinClaimed(): boolean {
+  try {
+    return (JSON.parse(readFileSync(playerPathFor('draft-daily.json'), 'utf8')) as { firstWinDay?: string }).firstWinDay === today()
+  } catch {
+    return false
+  }
+}
+
+function firstWinToday(): boolean {
+  if (draftDailyWinClaimed()) return false
+  writeFileSync(playerPathFor('draft-daily.json'), JSON.stringify({ firstWinDay: today() }), 'utf8')
+  return true
+}
+
 function activeDraft(status: DraftView['status']): StoredDraft {
   const current = getDraft()
   if (!current || current.status !== status) {
@@ -492,7 +511,9 @@ export function chaosTutorMoves(pickIndex: number): ChaosTutorMove[] {
   const known = new Set(pick.set.moves.map((m) => Dex.moves.get(m).id))
   return Dex.moves
     .all()
-    .filter((move) => isTutorMove(move.id) && !known.has(move.id))
+    // Hidden Power is one move - its type comes from the Pokemon's IVs - so the typed
+    // copies Showdown also lists (Hidden Power Fire...) stay out.
+    .filter((move) => isTutorMove(move.id) && !known.has(move.id) && (move.id !== 'hiddenpower' || move.name === 'Hidden Power'))
     .map((move) => ({ id: move.id, name: move.name, type: move.type, category: move.category, description: moveDescription(move) }))
     .sort((a, b) => a.name.localeCompare(b.name))
 }
@@ -871,8 +892,10 @@ export function finishDraftBattle(won: boolean, flawless = false): DraftBattleRe
   const current = activeDraft('battling')
   current.inBattle = false
   if (won && flawless) countAchievement('flawlessDraftWins')
+  const shinyPatch = won && firstWinToday()
+  if (shinyPatch) addItem(SHINY_PATCH_ITEM_ID, 1)
   recordResult(current, won)
   persist()
-  return { wins: current.wins, losses: current.losses, over: current.status === 'finished', reward: current.reward }
+  return { wins: current.wins, losses: current.losses, over: current.status === 'finished', reward: current.reward, shinyPatch }
 }
 

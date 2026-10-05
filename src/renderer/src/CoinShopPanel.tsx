@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { GameCornerLoading } from './GameCornerTabs'
 import type { ItemOptionEntry } from '../../shared/battle-types'
 import { COIN_PACKS, COIN_PRICE, COIN_PRIZES, type DailyCoinMon, type DailyCoinOffer, type DailyPetalDeals } from '../../shared/slots'
-import { SHINY_PATCH_ITEM_ID, WISHING_PIECE_ITEM_ID, toSpriteId } from '../../shared/battle-types'
+import { FRIENDSHIP_PETAL_ITEM_ID, SHINY_PATCH_ITEM_ID, WISHING_PIECE_ITEM_ID, toSpriteId } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
 import ItemSprite from './ItemSprite'
 import { formatMoney } from './money'
@@ -10,6 +10,7 @@ import { errorMessage, pointOf, useFloatingNotes } from './FloatingNotes'
 import BuyButton, { BuyButtonGroup } from './BuyButton'
 import RarityCard, { RarityGlow } from './RarityCard'
 import { coinPrizeRarityTier } from '../../shared/rarity'
+import { recommendedRank } from './ItemsPanel'
 import type { TmShopView } from '../../shared/tms'
 import { TmCard } from './TmBits'
 
@@ -27,6 +28,8 @@ const BULK_AMOUNTS = [5, 10]
 // on hovering the card.
 const PRIZE_SUMMARIES: Record<string, string> = {
   lockcapsule: 'A random Shop item',
+  rarecandy: 'One level up for one Pokemon',
+  expcandym: '50,000 exp for your whole team',
   randompokemon: 'A random unevolved Pokemon',
   expcandyl: '100,000 exp for your whole team',
   wishingpiece: 'Starts one Max Raid',
@@ -34,8 +37,8 @@ const PRIZE_SUMMARIES: Record<string, string> = {
   randomlegendary: 'A random legendary, mythical, ultra beast or paradox Pokemon'
 }
 
-// Cheapest first.
-const PRIZES_BY_COST = [...COIN_PRIZES].sort((a, b) => a.coins - b.coins)
+// In the Items window's Recommended order, so the two read the same.
+const PRIZES_IN_ORDER = [...COIN_PRIZES].sort((a, b) => recommendedRank(a.itemId) - recommendedRank(b.itemId))
 
 interface Props {
   // The coins changed - the Game Corner's top bar shows them.
@@ -44,10 +47,10 @@ interface Props {
   onMoneyChange: (money: number) => void
   // A Pokemon joined the box - the main menu's box needs refreshing.
   onBoxChange?: () => void
-  // Scroll down to the daily Friendship Petals once they've loaded (and flash them), then
-  // report it done.
-  focusPetals?: boolean
-  onPetalsFocused?: () => void
+  // Scroll down to this item's daily deal (the Friendship Petals, the Shiny Patch) once
+  // it's loaded (and flash it), then report it done.
+  focusItem?: string | null
+  onItemFocused?: () => void
 }
 
 /**
@@ -56,7 +59,7 @@ interface Props {
  * the bottom, the Pokemon of the day: a bubble on the banner points to it while it's
  * still for sale.
  */
-function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusPetals, onPetalsFocused }: Props): React.JSX.Element {
+function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusItem, onItemFocused }: Props): React.JSX.Element {
   const [coins, setCoins] = useState<number | null>(null)
   const [money, setMoney] = useState<number | null>(null)
   const [items, setItems] = useState<Map<string, ItemOptionEntry>>(new Map())
@@ -74,6 +77,11 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusPetals,
   const [petals, setPetals] = useState<DailyPetalDeals | null>(null)
   const petalsRef = useRef<HTMLDivElement>(null)
   const [petalsFlash, setPetalsFlash] = useState(false)
+  // The Shiny Patch's prize card, for the same trip from the Items window.
+  const shinyPatchRef = useRef<HTMLDivElement>(null)
+  const [shinyPatchFlash, setShinyPatchFlash] = useState(false)
+  // The once-a-day prizes (the Shiny Patch) already traded for today.
+  const [dailyPrizesBought, setDailyPrizesBought] = useState<string[]>([])
 
   // The Raid Crystal and the Shiny Patch are locked until Max Raids open (see BattleEligibility.raidsUnlocked);
   // the daily petals and the Pokemon of the day aren't shown at all until then.
@@ -109,17 +117,28 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusPetals,
       .getDailyPetalDeals()
       .then(setPetals)
       .catch(() => {})
+    window.api
+      .getDailyPrizesBought()
+      .then(setDailyPrizesBought)
+      .catch(() => {})
   }, [])
 
-  // Sent here from the Items window's Friendship Petal: down to the petals, with a flash.
+  // Sent here from the Items window's Friendship Petal or Shiny Patch: down to its deal,
+  // with a flash.
   useEffect(() => {
-    if (!focusPetals || !petals || !petalsRef.current) return
-    petalsRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    setPetalsFlash(true)
-    onPetalsFocused?.()
-    const timer = setTimeout(() => setPetalsFlash(false), 1600)
+    const target =
+      focusItem === FRIENDSHIP_PETAL_ITEM_ID && petals
+        ? { el: petalsRef.current, flash: setPetalsFlash }
+        : focusItem === SHINY_PATCH_ITEM_ID && items.size > 0
+          ? { el: shinyPatchRef.current, flash: setShinyPatchFlash }
+          : null
+    if (!target?.el) return
+    target.el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    target.flash(true)
+    onItemFocused?.()
+    const timer = setTimeout(() => target.flash(false), 1600)
     return () => clearTimeout(timer)
-  }, [focusPetals, petals])
+  }, [focusItem, petals, items, raidLock])
 
   async function act(e: React.MouseEvent, action: () => Promise<string>): Promise<void> {
     const at = pointOf(e)
@@ -172,6 +191,9 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusPetals,
       const result = await window.api.buyCoinPrize(itemId, quantity)
       setCoins(result.coins)
       onCoinsChange(result.coins)
+      if (COIN_PRIZES.find((p) => p.itemId === itemId)?.daily) setDailyPrizesBought((ids) => [...ids, itemId])
+      // New items in the bag can let more pre-evolutions merge in.
+      onBoxChange?.()
       return result.quantity > 1
         ? `Got ${result.quantity} ${result.itemName} - they're in your bag`
         : `Got a ${result.itemName} - it's in your bag`
@@ -181,6 +203,7 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusPetals,
   function claimFreePetals(e: React.MouseEvent): void {
     void act(e, async () => {
       setPetals(await window.api.claimFreePetals())
+      onBoxChange?.()
       return `Got ${petals?.free.petals ?? ''} Friendship Petals - they're in your bag`
     })
   }
@@ -191,6 +214,7 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusPetals,
       setCoins(result.coins)
       onCoinsChange(result.coins)
       setPetals(result.deals)
+      onBoxChange?.()
       return `Got ${result.deals.pack.petals} Friendship Petals - they're in your bag`
     })
   }
@@ -288,24 +312,41 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusPetals,
         <span>Prizes go straight into your bag</span>
       </div>
       <div className="coin-prize-grid">
-        {PRIZES_BY_COST.map((prize) => {
+        {PRIZES_IN_ORDER.map((prize) => {
           const item = items.get(prize.itemId)
           const locked = (prize.itemId === WISHING_PIECE_ITEM_ID || prize.itemId === SHINY_PATCH_ITEM_ID) && !raidLock?.unlocked
+          const boughtToday = !!prize.daily && dailyPrizesBought.includes(prize.itemId)
           return (
             <RarityCard
               key={prize.itemId}
               tier={coinPrizeRarityTier(prize.coins)}
               lift
-              className={`coin-prize${locked ? ' coin-prize-locked' : ''}`}
+              cardRef={prize.itemId === SHINY_PATCH_ITEM_ID ? shinyPatchRef : undefined}
+              className={`coin-prize${locked ? ' coin-prize-locked' : ''}${
+                prize.itemId === SHINY_PATCH_ITEM_ID && shinyPatchFlash ? ' coin-prize-flash' : ''
+              }`}
               title={item?.description}
             >
               <RarityGlow size={80} className="coin-prize-art">
                 {item && <ItemSprite spritenum={item.spritenum} className="coin-prize-icon" />}
               </RarityGlow>
               <span className="coin-prize-name">{item?.name ?? prize.itemId}</span>
-              <span className="coin-prize-desc">{PRIZE_SUMMARIES[prize.itemId] ?? item?.description ?? ''}</span>
+              <span className="coin-prize-desc">
+                {PRIZE_SUMMARIES[prize.itemId] ?? item?.description ?? ''}
+                {prize.daily && (boughtToday ? ' · back tomorrow' : ' · one a day')}
+              </span>
               {locked ? (
                 <span className="coin-prize-lock">🔒 Beat {raidLock?.boss ?? 'the right boss'} to unlock</span>
+              ) : prize.daily ? (
+                // Just the one a day - no bulk buttons.
+                <BuyButton
+                  price={prize.coins}
+                  currency="coins"
+                  held={coins}
+                  busy={busy}
+                  soldOut={boughtToday}
+                  onBuy={(e) => buyPrize(e, prize.itemId, 1)}
+                />
               ) : (
                 // One for its price, or five / ten at once beside it.
                 <BuyButtonGroup>

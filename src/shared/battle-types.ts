@@ -42,7 +42,7 @@ export const SHINY_PATCH_ITEM_ID = 'shinypatch'
 // pre-evolutions with a friendship evolution (see MergeBoosts). Not a real Dex item.
 export const FRIENDSHIP_PETAL_ITEM_ID = 'friendshippetal'
 // A wild Pokemon with a friendship evolution drops a Friendship Petal this often (in %).
-export const FRIENDSHIP_PETAL_DROP_CHANCE = 25
+export const FRIENDSHIP_PETAL_DROP_CHANCE = 15
 // Starts a Max Raid Battle from the Classic menu (used up when the raid begins).
 export const WISHING_PIECE_ITEM_ID = 'wishingpiece'
 
@@ -57,13 +57,13 @@ export const EXP_CHARM_MULTIPLIER = 1.5
 export const SHINY_CHARM_MULTIPLIER = 3
 // The Friendship Charm doubles the friendship from each battle won; the Catching Charm
 // makes half of all catches free (no Poke Ball used, nothing paid); the Item Charm makes
-// a wild Pokemon's item drops 1.5x as likely.
+// each of a wild Pokemon's item drops 15 points likelier (75% to 90%).
 export const FRIENDSHIP_CHARM_ITEM_ID = 'friendshipcharm'
 export const CATCHING_CHARM_ITEM_ID = 'catchingcharm'
 export const ITEM_CHARM_ITEM_ID = 'itemcharm'
 export const FRIENDSHIP_CHARM_MULTIPLIER = 2
 export const CATCHING_CHARM_FREE_CHANCE = 0.5
-export const ITEM_CHARM_DROP_MULTIPLIER = 1.5
+export const ITEM_CHARM_DROP_BONUS = 15
 // The fusion items: each fuses a legendary with its partner (who waits inside until
 // they're unfused) - see FUSIONS.
 export const N_SOLARIZER_ITEM_ID = 'nsolarizer'
@@ -558,11 +558,9 @@ export interface BoxPokemonView extends PokemonSummary {
   copies?: number
   mergeStars?: number
   // Locked with an Everstone: it never evolves, but takes merges while not fully evolved,
-  // each star worth more (mergeGrowth - see mergeGrowthFor), and counts as fully evolved,
-  // so an Eviolite does nothing for it. The lock can only come off
+  // and counts as fully evolved, so an Eviolite does nothing for it. The lock can only come off
   // before anything's been merged in. Undefined: fully evolved, so there's nothing to lock.
   everstone?: { locked: boolean; canUnlock: boolean }
-  mergeGrowth?: number
   // The same species elsewhere in the box, that could be merged into this one.
   mergeCandidates?: MergeCandidateView[]
   // Its colour on the Random Pokemon roulette (see speciesRarityTier) - the box and
@@ -920,6 +918,10 @@ export const RAID_ATTACKS_PER_TURN = 2
 // gold one (restricted legendary) this often.
 export const RAID_GIGANTAMAX_CHANCE = 0.5
 export const RAID_RESTRICTED_CHANCE = 0.15
+// The secret boss: when a raid would bring a legendary (not a Gigantamax one), this
+// often it's Eternamax Eternatus instead - beaten, it joins the box in that form for good.
+export const RAID_SECRET_CHANCE = 0.01
+export const RAID_SECRET_SPECIES = 'Eternatus-Eternamax'
 
 export interface RaidView {
   gigantamax: boolean
@@ -951,6 +953,9 @@ export interface EditablePokemonSet {
   // always this many levels under it - and `level` is just what that works out to
   // right now. Null (or absent) means `level` is fixed.
   capOffset?: number | null
+  // Its merge stars (0-6), only changed through admin editing: a box Pokemon
+  // gets the copies that make them, a premade team Pokemon fights with them.
+  mergeStars?: number
   // Cosmetic only: shown with its Gigantamax sprite everywhere (same size, no glow) -
   // only offered when its species has a Gigantamax form (canGmax, read-only).
   gmaxLook?: boolean
@@ -1256,36 +1261,23 @@ export const POKEMON_SELL_PRICES: Record<RarityTier, number> = {
 // ---- Merging duplicates ----
 // Merging a duplicate into a Pokemon adds its copies to it: stars go up each time the
 // copies double (2 = 1 star, 4 = 2 stars ... 32 = 5 stars, 64 = 6 stars), and each star is +10% to all
-// its stats in classic battles (never in a Roguelite run or a friendly match) - less for
-// the strongest: +7.5% a star for a red Pokemon and +5% for a gold one. A stat at 0 IVs
+// its stats but HP in classic battles (never in a Roguelite run or a friendly match) - less for
+// the strongest: +7.5% a star for a red Pokemon and +5% for a gold one. The same for one that
+// isn't fully evolved (an Everstone-locked one). A stat at 0 IVs
 // takes no bonus (kept low on purpose - a Trick Room team's Speed, Foul Play's Attack).
 export const MERGE_MAX_STARS = 6
 export const MERGE_MAX_COPIES = 2 ** MERGE_MAX_STARS
-// The stars a not-fully-evolved Pokemon's growth is worked out at (see below) - set before
-// the 6th star came in, so that one is a bonus on top.
-export const MERGE_GROWTH_STARS = 5
 export const MERGE_STAT_BONUS_PER_STAR = 0.1
 export const MERGE_STAT_BONUS_BY_TIER: Partial<Record<RarityTier, number>> = { epic: 0.075, legendary: 0.05 }
-// A Pokemon that isn't fully evolved (only an Everstone-locked one takes merges - see
-// BoxPokemonView.everstone) grows more with each star - by its stat gap to its strongest
-// final evolution (Murkrow x1.25 for Honchkrow), or, when that's more, enough that at 5 stars
-// its stats match that evolution's at 2 stars (Pichu, 205, reaches a 2-star Raichu's
-// 485 x1.2). Never less than a normal star. An Everstone-locked one counts as fully evolved,
-// so an Eviolite does nothing for it.
 
-/** Its growth as it stands holding this item: none with an Eviolite (one that isn't Everstone-locked - a raid boss). */
-export function mergeGrowthHolding(growth: number | undefined, item: string | undefined): number {
-  return item && item.toLowerCase().replace(/[^a-z0-9]/g, '') === 'eviolite' ? 1 : (growth ?? 1)
-}
-
-/** What one star adds to all its stats, for a Pokemon of this rarity (and growth, see BoxPokemonView.mergeGrowth). */
-export function mergeBonusPerStar(tier: RarityTier | undefined, growth = 1): number {
-  return ((tier && MERGE_STAT_BONUS_BY_TIER[tier]) ?? MERGE_STAT_BONUS_PER_STAR) * growth
+/** What one star adds to its stats (all but HP), for a Pokemon of this rarity. */
+export function mergeBonusPerStar(tier: RarityTier | undefined): number {
+  return (tier && MERGE_STAT_BONUS_BY_TIER[tier]) ?? MERGE_STAT_BONUS_PER_STAR
 }
 
 /** "+37.5%" - its whole bonus at this many stars. */
-export function mergeBonusText(stars: number, tier: RarityTier | undefined, growth = 1): string {
-  return `+${Math.round(stars * mergeBonusPerStar(tier, growth) * 1000) / 10}%`
+export function mergeBonusText(stars: number, tier: RarityTier | undefined): string {
+  return `+${Math.round(stars * mergeBonusPerStar(tier) * 1000) / 10}%`
 }
 
 export function mergeStarsFor(copies: number | undefined): number {
@@ -1326,8 +1318,8 @@ export function planMerge(keeperCopies: number, others: { id: string; copies: nu
   return plan
 }
 
-export function mergeStatMultiplier(stars: number, tier: RarityTier | undefined, growth = 1): number {
-  return 1 + mergeBonusPerStar(tier, growth) * stars
+export function mergeStatMultiplier(stars: number, tier: RarityTier | undefined): number {
+  return 1 + mergeBonusPerStar(tier) * stars
 }
 
 // A duplicate that could be merged into a Pokemon (see BoxPokemonView.mergeCandidates).

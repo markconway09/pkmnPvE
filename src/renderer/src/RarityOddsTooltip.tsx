@@ -1,9 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import type { RarityTier } from '../../shared/battle-types'
-import { RARITY_TIERS, type RarityOdds, type RarityOddsSource } from '../../shared/rarity'
+import { RARITY_TIERS, type RarityOddsReport, type RarityOddsSource } from '../../shared/rarity'
 import Tooltip from './Tooltip'
 
-const TIER_LABELS: Record<RarityTier, string> = {
+export const TIER_LABELS: Record<RarityTier, string> = {
   common: 'Common',
   uncommon: 'Uncommon',
   rare: 'Rare',
@@ -20,7 +20,7 @@ function formatChance(chance: number): string {
 
 // Asked for when the tooltip opens, so a title or the TM pity is always counted as it is now.
 function OddsPanel({ source, heading }: { source: RarityOddsSource; heading?: ReactNode }): React.JSX.Element {
-  const [odds, setOdds] = useState<RarityOdds | null | undefined>(undefined)
+  const [odds, setOdds] = useState<RarityOddsReport | null | undefined>(undefined)
   // The source is a fresh object each render; what it points at is what matters.
   const sourceKey = JSON.stringify(source)
   useEffect(() => {
@@ -37,10 +37,11 @@ function OddsPanel({ source, heading }: { source: RarityOddsSource; heading?: Re
   return (
     <div className="tooltip-panel rarity-odds-panel">
       {heading && <div className="rarity-odds-heading">{heading}</div>}
-      <div className="tooltip-title">Rarity chances</div>
+      <div className="tooltip-title">{odds && 'kinds' in odds ? 'Chances by type' : 'Rarity chances'}</div>
       {odds === undefined && <div className="rarity-odds-note">Loading...</div>}
       {odds === null && <div className="rarity-odds-note">Not available</div>}
       {odds &&
+        !('kinds' in odds) &&
         RARITY_TIERS.filter((tier) => odds[tier] > 0).map((tier) => (
           <div key={tier} className={`rarity-odds-row rarity-tier-${tier}`}>
             <span className="rarity-odds-dot" />
@@ -49,6 +50,18 @@ function OddsPanel({ source, heading }: { source: RarityOddsSource; heading?: Re
               <span style={{ width: `${Math.max(2, odds[tier] * 100)}%` }} />
             </span>
             <span className="rarity-odds-chance">{formatChance(odds[tier])}</span>
+          </div>
+        ))}
+      {odds &&
+        'kinds' in odds &&
+        odds.kinds.map((kind) => (
+          <div key={kind.label} className={`rarity-odds-row rarity-odds-kind rarity-tier-${kind.tone}`}>
+            <span className="rarity-odds-dot" />
+            <span className="rarity-odds-name">{kind.label}</span>
+            <span className="rarity-odds-bar">
+              <span style={{ width: `${Math.max(2, kind.chance * 100)}%` }} />
+            </span>
+            <span className="rarity-odds-chance">{formatChance(kind.chance)}</span>
           </div>
         ))}
     </div>

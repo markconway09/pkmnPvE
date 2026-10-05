@@ -30,11 +30,31 @@ function scrollParent(start: Element | null): HTMLElement | null {
     const { x, y } = canScroll(el)
     if (x || y) return el
   }
-  const root = document.scrollingElement as HTMLElement | null
-  return root && root.scrollHeight > root.clientHeight + 1 ? root : null
+  // The window itself never scrolls - the game always fills it exactly.
+  return null
+}
+
+/**
+ * Keeps the window and every "no scrollbar" box pinned at the top. Content that pokes past
+ * the edge (a tooltip, a flying card, a scroll-into-view jump) can otherwise nudge them down,
+ * leaving the screen shifted past its end with no way to scroll back.
+ */
+function pinUnscrollable(): void {
+  document.addEventListener('scroll', (e) => {
+    const el = e.target === document ? document.scrollingElement : e.target
+    if (!(el instanceof HTMLElement)) return
+    if (el !== document.scrollingElement) {
+      const style = getComputedStyle(el)
+      const scrollable = (v: string): boolean => v === 'auto' || v === 'scroll' || v === 'overlay'
+      if (scrollable(style.overflowX) || scrollable(style.overflowY)) return
+    }
+    if (el.scrollTop !== 0) el.scrollTop = 0
+    if (el.scrollLeft !== 0) el.scrollLeft = 0
+  }, true)
 }
 
 export function installDragScroll(): void {
+  pinUnscrollable()
   let target: HTMLElement | null = null
   let startX = 0
   let startY = 0

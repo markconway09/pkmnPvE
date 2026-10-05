@@ -23,10 +23,10 @@ interface Props {
   inline?: boolean
   // Mid-spin / mid-hand - the main menu's sidebar locks too, like the tabs.
   onBusyChange?: (busy: boolean) => void
-  // Opened from the Items window's Friendship Petal: the Coin Shop scrolls to its daily
-  // petals, then says it has (so it doesn't again next time).
-  focusPetals?: boolean
-  onPetalsFocused?: () => void
+  // Opened from the Items window's Friendship Petal or Shiny Patch: the Coin Shop scrolls
+  // to that item's daily deal, then says it has (so it doesn't again next time).
+  focusItem?: string | null
+  onItemFocused?: () => void
 }
 
 /**
@@ -43,8 +43,8 @@ function GameCornerModal({
   onBoxChange,
   inline,
   onBusyChange,
-  focusPetals,
-  onPetalsFocused
+  focusItem,
+  onItemFocused
 }: Props): React.JSX.Element {
   const [tab, setTab] = useState<GameCornerTab>(initialTab)
   const [busy, setBusy] = useState(false)
@@ -112,8 +112,8 @@ function GameCornerModal({
             <CoinShopPanel
               onCoinsChange={setCoins}
               onBoxChange={onBoxChange}
-              focusPetals={focusPetals}
-              onPetalsFocused={onPetalsFocused}
+              focusItem={focusItem}
+              onItemFocused={onItemFocused}
               onMoneyChange={(m) => {
                 setMoney(m)
                 onMoneyChange(m)

@@ -248,61 +248,6 @@ function Options({
           </section>
 
           <section className="options-section">
-          <h2 className="options-heading">Account</h2>
-          <p className="editor-hint">Logged in as {username}</p>
-          <div>
-            <button
-              disabled={loggingOut}
-              onClick={() => {
-                setLoggingOut(true)
-                void onLogout().finally(() => setLoggingOut(false))
-              }}
-            >
-              Log out
-            </button>
-          </div>
-          </section>
-
-          <section className="options-section">
-            <CloudSavesSection />
-          </section>
-
-          <section className="options-section">
-          <h2 className="options-heading">Sprite style</h2>
-          <div className="sprite-style-grid">
-            {SPRITE_STYLES.map((style) => (
-              <button
-                key={style}
-                className={`sprite-style-option ${style === spriteStyle ? 'sprite-style-selected' : ''}`}
-                onClick={() => onChangeSpriteStyle(style)}
-              >
-                <img
-                  className="sprite-style-preview"
-                  src={spriteUrl(style, 'front', PREVIEW_SPECIES_ID)}
-                  alt={SPRITE_STYLE_LABELS[style]}
-                />
-                <span>{SPRITE_STYLE_LABELS[style]}</span>
-              </button>
-            ))}
-          </div>
-          </section>
-
-          <ScreenSizeSection />
-
-          <section className="options-section">
-            <h2 className="options-heading">Move animations</h2>
-            <TabStrip
-              className="options-anim-tabs"
-              tabs={ANIM_SPEEDS.map((id) => ({ id, label: ANIM_SPEED_LABELS[id] }))}
-              current={moveAnims}
-              onSwitch={(next) => {
-                setMoveAnims(next)
-                setAnimSpeed(next)
-              }}
-            />
-          </section>
-
-          <section className="options-section">
             <h2 className="options-heading">Sound</h2>
             <div className="options-volume">
               <VolumeRow
@@ -360,8 +305,63 @@ function Options({
             {musicOn && <MusicSourceSettings />}
           </section>
 
+          <ScreenSizeSection />
+
+          <section className="options-section">
+            <h2 className="options-heading">Move animations</h2>
+            <TabStrip
+              className="options-anim-tabs"
+              tabs={ANIM_SPEEDS.map((id) => ({ id, label: ANIM_SPEED_LABELS[id] }))}
+              current={moveAnims}
+              onSwitch={(next) => {
+                setMoveAnims(next)
+                setAnimSpeed(next)
+              }}
+            />
+          </section>
+
+          <section className="options-section">
+          <h2 className="options-heading">Sprite style</h2>
+          <div className="sprite-style-grid">
+            {SPRITE_STYLES.map((style) => (
+              <button
+                key={style}
+                className={`sprite-style-option ${style === spriteStyle ? 'sprite-style-selected' : ''}`}
+                onClick={() => onChangeSpriteStyle(style)}
+              >
+                <img
+                  className="sprite-style-preview"
+                  src={spriteUrl(style, 'front', PREVIEW_SPECIES_ID)}
+                  alt={SPRITE_STYLE_LABELS[style]}
+                />
+                <span>{SPRITE_STYLE_LABELS[style]}</span>
+              </button>
+            ))}
+          </div>
+          </section>
+
           <section className="options-section">
             <BackgroundSection background={background} onChange={onChangeBackground} />
+          </section>
+
+          <section className="options-section">
+            <CloudSavesSection />
+          </section>
+
+          <section className="options-section">
+          <h2 className="options-heading">Account</h2>
+          <p className="editor-hint">Logged in as {username}</p>
+          <div>
+            <button
+              disabled={loggingOut}
+              onClick={() => {
+                setLoggingOut(true)
+                void onLogout().finally(() => setLoggingOut(false))
+              }}
+            >
+              Log out
+            </button>
+          </div>
           </section>
         </div>
 

@@ -96,6 +96,8 @@ export interface DraftBattleResult {
   losses: number
   over: boolean
   reward: number
+  // The first Draft win of the day: it gave a Shiny Patch.
+  shinyPatch?: boolean
 }
 
 // ---- Chaos mode ----

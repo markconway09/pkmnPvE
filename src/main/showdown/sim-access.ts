@@ -2,16 +2,13 @@ import { createRequire } from 'node:module'
 import type { PokemonSet as ShowdownPokemonSet } from 'pokemon-showdown/dist/sim/teams.js'
 import type { Battle } from 'pokemon-showdown/dist/sim/battle.js'
 import type { Pokemon } from 'pokemon-showdown/dist/sim/pokemon.js'
-import { certainRarity, mixRarityOdds, type RarityOdds } from '../../shared/rarity'
+import { certainRarity, mixRarityOdds, type OddsKind, type RarityOdds } from '../../shared/rarity'
 import {
   BLACK_AUGURITE_ITEM_ID,
   DEFAULT_POKEBALL_ID,
   EXP_CANDY_EXP,
   LINK_CABLE_ITEM_ID,
   MAX_HAPPINESS,
-  MERGE_GROWTH_STARS,
-  mergeBonusPerStar,
-  mergeGrowthHolding,
   OPENABLE_ITEM_IDS,
   PEAT_BLOCK_ITEM_ID,
   POKEBALL_PRICE,
@@ -24,6 +21,8 @@ import {
   WISHING_PIECE_ITEM_ID,
   RAID_GIGANTAMAX_CHANCE,
   RAID_RESTRICTED_CHANCE,
+  RAID_SECRET_CHANCE,
+  RAID_SECRET_SPECIES,
   KEY_ITEM_IDS,
   ROTOM_CATALOG_ITEM_ID,
   EXP_CHARM_ITEM_ID,
@@ -1020,7 +1019,6 @@ const SHINY_PATCH_ITEM: ItemOptionEntry = {
   description: 'Right-click a Pokemon in your box or team and use it to make that Pokemon shiny.',
   spritenum: -8
 }
-const SHINY_PATCH_PRICE = 25000
 
 // -31 maps to its own image (see ItemSprite).
 const FRIENDSHIP_PETAL_ITEM: ItemOptionEntry = {
@@ -1064,7 +1062,7 @@ const MORE_CHARMS: ItemOptionEntry[] = [
   {
     id: ITEM_CHARM_ITEM_ID,
     name: 'Item Charm',
-    description: 'Wild Pokemon are 1.5× as likely to drop items.',
+    description: 'Each wild Pokemon item drop is 15% likelier (75% becomes 90%).',
     spritenum: -20
   }
 ]
@@ -1356,6 +1354,8 @@ let cachedShopCategoryById: Map<string, string> | null = null
 export function bagCategoryFor(itemId: string): string {
   if (!cachedShopCategoryById) cachedShopCategoryById = new Map(getShopCatalog().map((i) => [i.id, i.category]))
   if (KEY_ITEM_IDS.has(itemId)) return 'Key Items'
+  // Not sold in the Shop, but listed with the other Coin Shop goods (Raid Crystal...).
+  if (itemId === FRIENDSHIP_PETAL_ITEM_ID || itemId === SHINY_PATCH_ITEM_ID) return 'Recommended'
   const shopCategory = cachedShopCategoryById.get(itemId)
   if (shopCategory) return shopCategory
   if (getEvolutionOnlyItemIds().has(itemId)) return 'Evolution Items'
@@ -1460,7 +1460,7 @@ export function getWildDropPool(): ItemOptionEntry[] {
     cachedWildDropPool = getEditorOptions().items.filter(
       (item) =>
         !OPENABLE_ITEM_IDS.has(item.id) &&
-        item.id !== SHINY_PATCH_ITEM_ID && // shop-only
+        item.id !== SHINY_PATCH_ITEM_ID && // the Coin Shop and the Draft only
         item.id !== WISHING_PIECE_ITEM_ID && // the Shop and the Game Corner only
         (shopIds.has(item.id) || evolutionIds.has(item.id))
     )
@@ -1488,9 +1488,11 @@ export function getDefaultShopCatalog(): ShopItemEntry[] {
       if (KEY_ITEM_IDS.has(item.id)) return false
       // Friendship Petals come from wild drops and the Coin Shop's daily petals, never the Shop.
       if (item.id === FRIENDSHIP_PETAL_ITEM_ID) return false
+      // The Shiny Patch is never bought or sold here: the Coin Shop sells one a day, and the
+      // first Draft win of the day gives one.
+      if (item.id === SHINY_PATCH_ITEM_ID) return false
       if (
         item.id === RARE_CANDY_ITEM_ID ||
-        item.id === SHINY_PATCH_ITEM_ID ||
         item.id === WISHING_PIECE_ITEM_ID ||
         OPENABLE_ITEM_IDS.has(item.id) ||
         item.id in EXP_CANDY_PRICE ||
@@ -1513,7 +1515,6 @@ export function getDefaultShopCatalog(): ShopItemEntry[] {
       if (item.id === RANDOM_LEGENDARY_ITEM_ID) return { ...item, price: RANDOM_LEGENDARY_PRICE, category: 'Recommended' }
       if (item.id === LOCK_CAPSULE_ITEM_ID) return { ...item, price: LOCK_CAPSULE_PRICE, category: 'Recommended' }
       if (item.id in EXP_CANDY_PRICE) return { ...item, price: EXP_CANDY_PRICE[item.id], category: 'Recommended' }
-      if (item.id === SHINY_PATCH_ITEM_ID) return { ...item, price: SHINY_PATCH_PRICE, category: 'Recommended' }
       if (item.id === WISHING_PIECE_ITEM_ID) return { ...item, price: WISHING_PIECE_PRICE, category: 'Recommended' }
       if (evolutionOnlyIds.has(item.id)) return { ...item, price: COMPETITIVE_ITEM_PRICE, category: 'Evolution Items' }
       const dexItem = Dex.items.get(item.id)
@@ -1893,7 +1894,8 @@ export const RANDOM_POKEMON_LEGENDARY_CHANCE = 0.05
  */
 // Gold: the restricted legendaries, plus Arceus (every form) - tagged Mythical, but a
 // box legendary in all but name.
-const GOLD_EXTRA_SPECIES = new Set(['Arceus'])
+// Arceus, and Eternatus in every form (Eternamax, the raids' secret boss, too).
+const GOLD_EXTRA_SPECIES = new Set(['Arceus', 'Eternatus'])
 
 function isGoldSpecies(species: ReturnType<typeof Dex.species.get>): boolean {
   return species.tags.includes('Restricted Legendary') || GOLD_EXTRA_SPECIES.has(species.baseSpecies)
@@ -1954,15 +1956,24 @@ export function raidBossCandidates(): { species: string; num: number; gigantamax
 
 export function pickRaidSpecies(
   chances: { gigantamax: number; restricted: number } = { gigantamax: RAID_GIGANTAMAX_CHANCE, restricted: RAID_RESTRICTED_CHANCE }
-): { species: string; gigantamax: boolean } {
+): { species: string; gigantamax: boolean; secret?: boolean } {
   const pool = raidSpeciesPool()
   const restricted = isGoldSpecies
   if (Math.random() < chances.gigantamax) {
     const gmax = pool.filter((s) => !!s.canGigantamax)
     if (gmax.length > 0) return { species: pickFrom(gmax), gigantamax: true }
   }
+  // Now and then the legendary is the secret one.
+  if (Math.random() < RAID_SECRET_CHANCE) return { species: RAID_SECRET_SPECIES, gigantamax: false, secret: true }
   const gold = Math.random() < chances.restricted
   return { species: pickFrom(pool.filter((s) => (gold ? restricted(s) : isLegendaryClass(s) && !restricted(s)))), gigantamax: false }
+}
+
+/** Debug: a species picked for a raid, by its proper name, and whether it can Gigantamax. */
+export function raidSpeciesInfo(speciesName: string): { species: string; gigantamax: boolean } {
+  const s = Dex.species.get(speciesName)
+  if (!s.exists) throw new Error(`Unknown species: ${speciesName}`)
+  return { species: s.name, gigantamax: !!s.canGigantamax }
 }
 
 export function pickRandomSwapSpecies(kind: 'normal' | 'legendary' | 'restricted'): string {
@@ -2062,15 +2073,21 @@ export function randomLegendaryRarityOdds(restrictedChance: number): RarityOdds 
   ])
 }
 
-/** A Max Raid boss's odds of each rarity colour, at these chances (see pickRaidSpecies). */
-export function raidRarityOdds(chances: { gigantamax: number; restricted: number }): RarityOdds {
-  const gmax = raidSpeciesPool().filter((s) => !!s.canGigantamax)
-  const gmaxChance = gmax.length > 0 ? chances.gigantamax : 0
-  return mixRarityOdds([
-    [gmaxChance, speciesRarityShares(gmax)],
-    [(1 - gmaxChance) * chances.restricted, certainRarity('legendary')],
-    [(1 - gmaxChance) * (1 - chances.restricted), certainRarity('epic')]
-  ])
+/**
+ * A Max Raid boss's odds by kind, at these chances (see pickRaidSpecies): Gigantamax, a
+ * red legendary, a gold one, or the secret one.
+ */
+export function raidKindOdds(chances: { gigantamax: number; restricted: number }): OddsKind[] {
+  const gmaxChance = raidSpeciesPool().some((s) => !!s.canGigantamax) ? chances.gigantamax : 0
+  const legendaryChance = 1 - gmaxChance
+  const secretChance = legendaryChance * RAID_SECRET_CHANCE
+  const ordinaryChance = legendaryChance - secretChance
+  return [
+    { label: 'Gigantamax', chance: gmaxChance, tone: 'gigantamax' },
+    { label: 'Red legendary', chance: ordinaryChance * (1 - chances.restricted), tone: 'epic' },
+    { label: 'Gold legendary', chance: ordinaryChance * chances.restricted, tone: 'legendary' },
+    { label: 'Secret', chance: secretChance, tone: 'secret' }
+  ]
 }
 
 export function pickRandomUnevolvedSpecies(): string {
@@ -2244,33 +2261,6 @@ export function isFullyEvolved(speciesName: string): boolean {
     const evo = Dex.species.get(e)
     return !evo.exists || isBattleOnlyForme(evo)
   })
-}
-
-/**
- * How much more a merge star is worth to a Pokemon that isn't fully evolved: its strongest
- * final evolution's base stat total against its own, or - when that's more - enough that at
- * 5 stars it matches that evolution's at 2 stars. Same stats (Scyther, Scizor) is a plain star.
- * 1 when fully evolved, or while it holds a working Eviolite (left out for an Everstone-locked
- * one, which the Eviolite does nothing for).
- */
-export function mergeGrowthFor(speciesName: string, item?: string): number {
-  if (mergeGrowthHolding(2, item) === 1) return 1
-  const own = Dex.species.get(dexFormOf(speciesName))
-  if (!own.exists) return 1
-  const finalOf = (species: typeof own): typeof own => {
-    const evos = species.evos.map((e) => Dex.species.get(e)).filter((e) => e.exists && !isBattleOnlyForme(e))
-    if (evos.length === 0) return species
-    return evos.map(finalOf).reduce((best, e) => (bstOf(e.name) > bstOf(best.name) ? e : best))
-  }
-  const final = finalOf(own)
-  if (final.name === own.name) return 1
-  // At least its stat gap to the evolution (Murkrow's 405 against Honchkrow's 505: x1.25)...
-  const ratio = bstOf(final.name) / Math.max(1, bstOf(own.name))
-  // ...or, if that's more, enough that its 5-star multiplier (1 + 5 x bonus x growth)
-  // reaches the evolution's 2-star stats - the big boost for the weakest ones.
-  const target = ratio * (1 + 2 * mergeBonusPerStar(speciesRarityTier(final.name)))
-  const growth = (target - 1) / (MERGE_GROWTH_STARS * mergeBonusPerStar(speciesRarityTier(own.name)))
-  return Math.round(Math.max(1, ratio, growth) * 100) / 100
 }
 
 /**

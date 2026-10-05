@@ -1,6 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
-import { FOSSIL_RESTORE_COST, FRIENDSHIP_PETAL_ITEM_ID, QUICK_SELL_KEPT_BERRY_IDS, shopTotal } from '../../shared/battle-types'
+import {
+  DEFAULT_POKEBALL_ID,
+  FOSSIL_RESTORE_COST,
+  FRIENDSHIP_PETAL_ITEM_ID,
+  LOCK_CAPSULE_ITEM_ID,
+  QUICK_SELL_KEPT_BERRY_IDS,
+  RANDOM_LEGENDARY_ITEM_ID,
+  RANDOM_POKEMON_ITEM_ID,
+  RARE_CANDY_ITEM_ID,
+  SHINY_PATCH_ITEM_ID,
+  WISHING_PIECE_ITEM_ID,
+  shopTotal
+} from '../../shared/battle-types'
 import type { BagItemView, OpenItemResult, RarityTier, RestoreFossilResult, ShopItemEntry } from '../../shared/battle-types'
+import { RARITY_TIERS } from '../../shared/rarity'
 import ItemSprite from './ItemSprite'
 import RarityCard, { RarityGlow, priceRarityTier } from './RarityCard'
 import BuyButton, { BuyButtonGroup, SellButton } from './BuyButton'
@@ -17,8 +30,36 @@ import RarityOddsTooltip from './RarityOddsTooltip'
 const BULK_AMOUNTS = [5, 10]
 
 // Items the Shop doesn't sell that are listed anyway, owned or not, because the Game
-// Corner's Coin Shop hands them out (Friendship Petals: free ones daily, and a coin pack).
-const COIN_SHOP_ITEM_IDS = [FRIENDSHIP_PETAL_ITEM_ID]
+// Corner's Coin Shop hands them out (Friendship Petals: free ones daily, and a coin pack;
+// the Shiny Patch: one a day for coins).
+const COIN_SHOP_ITEM_IDS = [FRIENDSHIP_PETAL_ITEM_ID, SHINY_PATCH_ITEM_ID]
+
+// The Recommended row in a set order rather than by name: catching, then the Random
+// Pokemon items, then the candies smallest first, then the Coin Shop goods. Anything else
+// in the row comes after, by name.
+export const RECOMMENDED_ORDER = [
+  DEFAULT_POKEBALL_ID,
+  LOCK_CAPSULE_ITEM_ID,
+  RANDOM_POKEMON_ITEM_ID,
+  RANDOM_LEGENDARY_ITEM_ID,
+  RARE_CANDY_ITEM_ID,
+  'expcandys',
+  'expcandym',
+  'expcandyl',
+  SHINY_PATCH_ITEM_ID,
+  WISHING_PIECE_ITEM_ID,
+  FRIENDSHIP_PETAL_ITEM_ID
+]
+
+export function recommendedRank(id: string): number {
+  const i = RECOMMENDED_ORDER.indexOf(id)
+  return i === -1 ? RECOMMENDED_ORDER.length : i
+}
+
+// Every other row: rarest first (gold down to grey), then by name.
+function byRarityThenName(x: ItemRow, y: ItemRow): number {
+  return RARITY_TIERS.indexOf(y.tier) - RARITY_TIERS.indexOf(x.tier) || x.name.localeCompare(y.name)
+}
 
 // One item as the Items tab sees it: what the bag holds of it and what the shop asks for
 // it - either can be missing (a Mega Stone isn't sold, a Potion may not be owned yet).
@@ -57,7 +98,7 @@ function uniqueInOrder(list: string[]): string[] {
 }
 
 // Every item from the bag and the shop - plus the Coin Shop's, held or not - as one list,
-// grouped by category, by name within it.
+// grouped by category - Recommended in its set order, the rest rarest first.
 function mergeItems(bag: BagItemView[], catalog: ShopItemEntry[], coinShop: BagItemView[]): [string, ItemRow[]][] {
   const rows = new Map<string, ItemRow>()
   for (const item of catalog) {
@@ -91,7 +132,13 @@ function mergeItems(bag: BagItemView[], catalog: ShopItemEntry[], coinShop: BagI
   ])
   return order.map((category) => [
     category,
-    [...rows.values()].filter((r) => r.category === category).sort((x, y) => x.name.localeCompare(y.name))
+    [...rows.values()]
+      .filter((r) => r.category === category)
+      .sort((x, y) =>
+        category === 'Recommended'
+          ? recommendedRank(x.id) - recommendedRank(y.id) || x.name.localeCompare(y.name)
+          : byRarityThenName(x, y)
+      )
   ])
 }
 
@@ -100,8 +147,8 @@ interface Props {
   // opened case) the box, both of which the main menu is showing behind this.
   onChanged: () => void
   onMoneyChange: (money: number) => void
-  // Closes this and opens the Game Corner's Coin Shop at its daily Friendship Petals.
-  onOpenCoinShop: () => void
+  // Closes this and opens the Game Corner's Coin Shop at the item's daily deal.
+  onOpenCoinShop: (itemId: string) => void
 }
 
 /**
@@ -142,7 +189,7 @@ function ItemsPanel({ onChanged, onMoneyChange, onOpenCoinShop }: Props): React.
         Promise.all(COIN_SHOP_ITEM_IDS.map((id) => window.api.getBagItem(id))),
         window.api.getBattleEligibility()
       ])
-      setCoinShopItems(eligibility.raidsUnlocked ? coinShop.filter((i): i is BagItemView => i !== null) : [])
+      setCoinShopItems(coinShop.filter((i): i is BagItemView => i !== null))
       setLockedUntil(eligibility.raidsUnlocked ? null : (eligibility.raidUnlockBoss ?? 'the right boss'))
       // Key items have a tab of their own.
       setBag(items.filter((i) => i.category !== 'Key Items'))
@@ -183,6 +230,8 @@ function ItemsPanel({ onChanged, onMoneyChange, onOpenCoinShop }: Props): React.
       else {
         say(`Bought ${count > 1 ? `${count}× ` : ''}${item.name} for ${formatMoney(shopTotal(item, count))}`)
         await refresh()
+        // The box re-counts its evolution items, so the merge window sees the new ones.
+        onChanged()
       }
     } catch (e) {
       notes.show(errorMessage(e), lastPoint.current, 'bad')
@@ -526,7 +575,7 @@ function ItemCard({ row, selected, picking, picked, onFocus, onActivate, onArrow
       aria-pressed={picking ? picked : selected}
       aria-label={`${row.name}${row.owned ? `, ${row.owned.quantity} in bag` : ''}${row.shop ? `, ${formatMoney(row.shop.price)} in the shop` : ''}`}
       data-item-card=""
-      className={`items-card${selected ? ' items-card-selected' : ''}${picking ? ' bag-card-picking' : ''}${picked ? ' bag-item-selected' : ''}${unsellable ? ' bag-item-unsellable' : ''}`}
+      className={`items-card${selected ? ' items-card-selected' : ''}${picking ? ' bag-card-picking' : ''}${picked ? ' bag-item-selected' : ''}${unsellable ? ' bag-item-unsellable' : ''}${row.owned ? '' : ' items-card-unowned'}`}
       onFocus={onFocus}
       onClick={onActivate}
       onKeyDown={(e) => {
@@ -539,7 +588,7 @@ function ItemCard({ row, selected, picking, picked, onFocus, onActivate, onArrow
         }
       }}
     >
-      {row.owned && <span className="item-card-qty">×{row.owned.quantity}</span>}
+      {row.owned ? <span className="item-card-qty">×{row.owned.quantity}</span> : <span className="item-card-qty item-card-qty-none">×0</span>}
       {!picking && row.shop?.bulkPrice !== undefined && <span className="item-card-tag">-25% ×5+</span>}
       <RarityGlow size={56}>
         <ItemSprite spritenum={row.spritenum} className="item-card-icon" />
@@ -562,7 +611,7 @@ interface ItemDetailProps {
   onUseCandiesToCap: (item: BagItemView) => void
   onOpen: (item: BagItemView) => void
   onRestore: (item: BagItemView) => void
-  onOpenCoinShop: () => void
+  onOpenCoinShop: (itemId: string) => void
   // While the late game items are locked: the boss to beat (the Coin Shop's petals wait for it).
   lockedUntil: string | null
 }
@@ -676,12 +725,18 @@ function ItemDetail({
         <section className="items-detail-section">
           <h4>Get more</h4>
           {lockedUntil ? (
-            <p className="items-detail-hint">🔒 Beat {lockedUntil} to unlock the Coin Shop&apos;s daily petals.</p>
+            <p className="items-detail-hint">
+              🔒 Beat {lockedUntil} to unlock the Coin Shop&apos;s {row.id === SHINY_PATCH_ITEM_ID ? 'daily Shiny Patch' : 'daily petals'}.
+            </p>
           ) : (
             <>
-              <p className="items-detail-hint">Not sold here - the Game Corner&apos;s Coin Shop gives some free every day, with a pack for coins.</p>
+              <p className="items-detail-hint">
+                {row.id === SHINY_PATCH_ITEM_ID
+                  ? 'Not sold here - the Game Corner\'s Coin Shop sells one a day for coins, and your first Draft win each day gives one.'
+                  : 'Not sold here - the Game Corner\'s Coin Shop gives some free every day, with a pack for coins.'}
+              </p>
               <div className="items-detail-buttons">
-                <button className="items-detail-btn items-detail-btn-coins" onClick={onOpenCoinShop}>
+                <button className="items-detail-btn items-detail-btn-coins" onClick={() => onOpenCoinShop(row.id)}>
                   Go to the Coin Shop ›
                 </button>
               </div>

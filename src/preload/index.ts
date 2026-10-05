@@ -1,6 +1,6 @@
 import type { MissionClaimResult, MissionsState } from '../shared/missions'
 import type { OnlinePlayer, OnlineSelf, OnlineTeam, OnlineViews } from '../shared/online'
-import type { RarityOdds, RarityOddsSource } from '../shared/rarity'
+import type { RarityOddsReport, RarityOddsSource } from '../shared/rarity'
 import { contextBridge, ipcRenderer } from 'electron'
 import type { LocalMusicFile } from '../shared/music'
 import type { UiScaleChoice, UiScaleState } from '../shared/ui-scale'
@@ -76,6 +76,7 @@ const api = {
   getBossRematchList: (): Promise<BossRematchInfo[]> => ipcRenderer.invoke('battle:bossRematchList'),
   getRun: (): Promise<RunView | null> => ipcRenderer.invoke('run:get'),
   getDraft: (): Promise<DraftView | null> => ipcRenderer.invoke('draft:get'),
+  getDraftDailyWinClaimed: (): Promise<boolean> => ipcRenderer.invoke('draft:dailyWinClaimed'),
   getDraftEntryFee: (): Promise<number> => ipcRenderer.invoke('draft:entryFee'),
   startDraft: (format: DraftFormat): Promise<DraftView> => ipcRenderer.invoke('draft:start', format),
   pickDraftMon: (index: number): Promise<DraftView> => ipcRenderer.invoke('draft:pick', index),
@@ -254,6 +255,7 @@ const api = {
   // The Coin Shop's once-a-day discounted coins.
   getDailyCoinOffer: (): Promise<DailyCoinOffer> => ipcRenderer.invoke('coins:dailyOffer'),
   buyDailyCoinOffer: (): Promise<CoinBalance> => ipcRenderer.invoke('coins:buyDailyOffer'),
+  getDailyPrizesBought: (): Promise<string[]> => ipcRenderer.invoke('coins:dailyPrizesBought'),
   getDailyPetalDeals: (): Promise<DailyPetalDeals> => ipcRenderer.invoke('coins:petalDeals'),
   claimFreePetals: (): Promise<DailyPetalDeals> => ipcRenderer.invoke('coins:claimFreePetals'),
   buyPetalPack: (): Promise<CoinBalance & { deals: DailyPetalDeals }> => ipcRenderer.invoke('coins:buyPetalPack'),
@@ -306,6 +308,9 @@ const api = {
     admin: boolean,
     heldItem?: string
   ): Promise<AutoSetResult> => ipcRenderer.invoke('autoSets:build', species, level, optionId, admin, heldItem),
+  // Debug (admins only): a Max Raid against a chosen species, at a chosen level.
+  debugStartRaid: (species: string, level: number, shiny: boolean): Promise<BattleView> =>
+    ipcRenderer.invoke('debug:startRaid', species, level, shiny),
   // Debug menu (admins only): sets the money and coins outright.
   debugSetWallet: (money: number, coins: number): Promise<{ money: number; coins: number }> =>
     ipcRenderer.invoke('debug:setWallet', money, coins),
@@ -321,7 +326,7 @@ const api = {
   sellItems: (entries: ItemQuantity[]): Promise<SellResult> => ipcRenderer.invoke('bag:sellMany', entries),
   quickSellSelection: (): Promise<ItemQuantity[]> => ipcRenderer.invoke('bag:quickSellSelection'),
   openBagItem: (itemId: string): Promise<OpenItemResult> => ipcRenderer.invoke('bag:open', itemId),
-  getRarityOdds: (source: RarityOddsSource): Promise<RarityOdds | null> => ipcRenderer.invoke('rarity:odds', source),
+  getRarityOdds: (source: RarityOddsSource): Promise<RarityOddsReport | null> => ipcRenderer.invoke('rarity:odds', source),
   getGalarFossilPartners: (itemId: string): Promise<GalarFossilPartner[]> =>
     ipcRenderer.invoke('fossil:galarPartners', itemId),
   restoreFossil: (itemId: string, secondItemId?: string): Promise<RestoreFossilResult> =>

@@ -46,7 +46,7 @@ function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
   const [error, setError] = useState<string | null>(null)
 
   // Its bonus at so many stars - red and gold Pokemon get less from each one.
-  const bonusText = (stars: number): string => `${mergeBonusText(stars, keeper.rarityTier, keeper.mergeGrowth)} to all stats`
+  const bonusText = (stars: number): string => `${mergeBonusText(stars, keeper.rarityTier)} to all stats but HP`
   const candidates = keeper.mergeCandidates ?? []
   const chosen = candidates.filter((c) => picked.has(c.id))
   const copiesNow = keeper.copies ?? 1
@@ -89,6 +89,15 @@ function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
     })
   }
 
+  // Every one that can go in right now (not the pre-evolutions that can't evolve yet).
+  const selectable = candidates.filter((c) => !c.notReady)
+  const allPicked = selectable.length > 0 && selectable.every((c) => picked.has(c.id))
+
+  function toggleAll(): void {
+    setConfirming(false)
+    setPicked(allPicked ? new Set() : new Set(selectable.map((c) => c.id)))
+  }
+
   async function merge(): Promise<void> {
     if (needsConfirm && !confirming) {
       setConfirming(true)
@@ -127,9 +136,9 @@ function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
         </div>
 
         <p className="editor-hint">
-          Each star is {bonusText(1)} in classic battles (not Roguelite runs or friendly matches), but never to a stat at 0 IVs. Stars come
-          at 2, 4, 8, 16, 32 and 64 copies - past 64, the last one in keeps what's left over (and the stars that go with it). Its pre-evolutions can go in too, evolving on the way in - if they could evolve into it right now (level, friendship, and the evolution items, which are used up). Merged-in Pokémon leave your box: a shiny makes {keeper.species} shiny, a favorite makes it a favorite,
-          it keeps the higher level and friendship, and held items go back to your bag.
+          Each star is {bonusText(1)} in Battles, not runs or friendly matches (skips 0-IV stats). Stars at 2, 4, 8, 16, 32 and 64 copies. Pre-evolutions
+          that could evolve now can go in too. Merged Pokémon leave your box; shiny, favorite, higher level and friendship carry over,
+          held items return to your bag.
         </p>
 
         {keeperFull ? (
@@ -211,6 +220,11 @@ function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
         {error && <p className="editor-error">{error}</p>}
 
         <div className="editor-actions">
+          {!keeperFull && selectable.length > 0 && (
+            <button className="merge-select-all" onClick={toggleAll} disabled={busy}>
+              {allPicked ? 'Deselect all' : 'Select all'}
+            </button>
+          )}
           <button onClick={onClose} disabled={busy}>
             Cancel
           </button>

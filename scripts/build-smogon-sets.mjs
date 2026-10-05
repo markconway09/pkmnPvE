@@ -15,6 +15,7 @@ import { writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
+import { plainHiddenPower } from './plain-hidden-power.mjs'
 
 const require = createRequire(import.meta.url)
 const { Dex } = require('pokemon-showdown')
@@ -59,7 +60,9 @@ for (const [format, formatName] of formats) {
     const owner = species.battleOnly ? Dex.species.get(species.changesFrom ?? species.baseSpecies) : species
     const list = (bySpecies[owner.id] ??= [])
     for (const [setName, set] of Object.entries(sets)) {
-      list.push({ format, formatName, name: setName, ...set })
+      const entry = { format, formatName, name: setName, ...set }
+      plainHiddenPower(entry)
+      list.push(entry)
     }
   }
 }

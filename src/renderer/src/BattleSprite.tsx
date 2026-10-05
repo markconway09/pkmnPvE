@@ -7,7 +7,7 @@ import type {
   FieldEffectView,
   GimmickEvent
 } from '../../shared/battle-types'
-import { toSpriteId } from '../../shared/battle-types'
+import { RAID_SECRET_SPECIES, toSpriteId } from '../../shared/battle-types'
 import SideHazards from './SideHazards'
 import PokemonTooltipContent from './PokemonTooltipContent'
 import Tooltip from './Tooltip'
@@ -240,6 +240,8 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
 
   if (!displayed) return <div className={slotClass} />
 
+  // Eternamax (the raids' secret boss) is always giant, with a purple glow instead of Dynamax's red.
+  const eternamax = displayed.species === RAID_SECRET_SPECIES
   const hpClass = displayed.hpPercent > 50 ? 'hp-high' : displayed.hpPercent > 20 ? 'hp-mid' : 'hp-low'
   const imgClasses = [
     'sprite',
@@ -249,6 +251,7 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
     phase === 'sending-out' && 'sprite-sending-out',
     displayed.substituted && 'sprite-substituted',
     displayed.dynamaxed && 'sprite-dynamax',
+    eternamax && 'sprite-eternamax',
     shownFeedback?.emphasis && `sprite-emphasis-${shownFeedback.emphasis}`
   ]
     .filter(Boolean)
@@ -258,8 +261,8 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
 
   return (
     <Tooltip
-      // A Dynamaxed raid boss grows (see .sprite-slot-dynamax) and pushes its HP bar down.
-      className={`${slotClass}${displayed.dynamaxed ? ' sprite-slot-dynamax' : ''}`}
+      // A Dynamaxed raid boss (or Eternamax) grows (see .sprite-slot-dynamax) and pushes its HP bar down.
+      className={`${slotClass}${displayed.dynamaxed || eternamax ? ' sprite-slot-dynamax' : ''}`}
       placement={align === 'right' ? 'below' : 'above'}
       content={<PokemonTooltipContent pokemon={displayed} />}
     >

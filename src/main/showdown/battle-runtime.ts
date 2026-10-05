@@ -28,7 +28,6 @@ import {
   pokeballPrice,
   speciesStatsAndTypes,
   speciesRarityTier,
-  mergeGrowthFor,
   toID,
   type PokemonSet
 } from './sim-access'
@@ -80,7 +79,7 @@ import type { DraftBattleResult } from '../../shared/draft'
 import {
   CATCHING_CHARM_FREE_CHANCE,
   CATCHING_CHARM_ITEM_ID,
-  ITEM_CHARM_DROP_MULTIPLIER,
+  ITEM_CHARM_DROP_BONUS,
   ITEM_CHARM_ITEM_ID
 } from '../../shared/battle-types'
 import {
@@ -360,7 +359,7 @@ export interface OpponentConfig {
   draft?: boolean
   // A Max Raid: the one opponent is Dynamaxed all battle (Gigantamax if it can) and
   // joins the box when beaten - no Poke Ball needed.
-  raid?: { gigantamax: boolean; stars: number }
+  raid?: { gigantamax: boolean; stars: number; secret?: boolean }
   // A Classic wild battle's area: winning it offers a quick check for a TM from there
   // (with the Scanner).
   location?: WildLocationId
@@ -534,7 +533,7 @@ export class WildBattle {
     generationFormat = 'gen9randombattle',
     opponent?: OpponentConfig,
     // Each team member's merge stars, in team order (classic battles, Max Raids
-    // and friendly matches only): +10% to all its stats per star. "everstone": which are Everstone-locked
+    // and friendly matches only): +10% to all its stats but HP per star. "everstone": which are Everstone-locked
     // (they count as fully evolved, so an Eviolite does nothing for them).
     mergeStars: { p1?: number[]; p2?: number[]; everstone?: { p1?: boolean[]; p2?: boolean[] } } = {}
   ) {
@@ -682,10 +681,13 @@ export class WildBattle {
     if (!boss) return
     // Showdown only keeps a set's Gigantamax flag in Gen 8.
     if (raid.gigantamax) (boss as { gigantamax: boolean }).gigantamax = true
-    // Extra HP before it's sent out - Dynamaxing doubles it again on top.
-    boss.baseMaxhp = Math.floor(boss.baseMaxhp * RAID_HP_MULTIPLIER)
-    boss.maxhp = Math.floor(boss.maxhp * RAID_HP_MULTIPLIER)
-    boss.hp = boss.maxhp
+    // Extra HP before it's sent out - Dynamaxing doubles it again on top. Not for the
+    // secret boss (Eternamax): its own HP is big enough, so it only gets Dynamax's.
+    if (!raid.secret) {
+      boss.baseMaxhp = Math.floor(boss.baseMaxhp * RAID_HP_MULTIPLIER)
+      boss.maxhp = Math.floor(boss.maxhp * RAID_HP_MULTIPLIER)
+      boss.hp = boss.maxhp
+    }
     const onSwitchIn = function (this: SimBattle, pokemon: SimPokemon): void {
       if (pokemon.side !== side) return
       if (pokemon.name === RAID_PLACEHOLDER_NAME) {
@@ -786,24 +788,16 @@ export class WildBattle {
   }
 
   // Marks each boosted Pokemon on this side (by its place in the team, which the sim keeps
-  // on its set) and raises its max HP the same way.
+  // on its set). Its HP stays as it is.
   private applyMergeBoosts(sideIndex: 0 | 1, stars: number[]): void {
     const side = this.battleStream.battle?.sides[sideIndex]
     if (!side || !stars.some((s) => s > 0)) return
     for (const mon of side.pokemon) {
       const count = stars[side.team.indexOf(mon.set)] ?? 0
       if (!count) continue
-      // An Everstone-locked one keeps its growth whatever it holds (its Eviolite does nothing).
-      const growth = mergeGrowthFor(mon.species.name, mon.m.everstone ? undefined : mon.set.item)
-      const multiplier = mergeStatMultiplier(count, speciesRarityTier(mon.species.name), growth)
+      const multiplier = mergeStatMultiplier(count, speciesRarityTier(mon.species.name))
       this.mergeMultipliers[sideIndex === 0 ? 'p1' : 'p2'][side.team.indexOf(mon.set)] = multiplier
       mon.m.mergeBoost = multiplier
-      // Its HP too, unless that's at 0 IVs (see installMergeBoosts).
-      if (mon.set.ivs?.hp === 0) continue
-      const ratio = mon.maxhp > 0 ? mon.hp / mon.maxhp : 1
-      mon.baseMaxhp = Math.floor(mon.baseMaxhp * multiplier)
-      mon.maxhp = Math.floor(mon.maxhp * multiplier)
-      mon.hp = ratio >= 1 ? mon.maxhp : Math.max(1, Math.round(ratio * mon.maxhp))
     }
   }
 
@@ -864,11 +858,11 @@ export class WildBattle {
     const multiplier = view.rosterIndex !== undefined ? this.mergeMultipliers[side][view.rosterIndex] : undefined
     if (!multiplier) return view
     view.mergeStars = this.mergeStars[side][view.rosterIndex!]
-    // Not a stat at 0 IVs (see installMergeBoosts).
+    // Not HP, nor a stat at 0 IVs (see installMergeBoosts).
     const ivs = (side === 'p1' ? this.p1team : this.p2team)[view.rosterIndex!]?.ivs as Record<string, number> | undefined
     const stats = { ...view.stats }
     for (const key of Object.keys(stats) as (keyof typeof stats)[]) {
-      if (ivs?.[key] !== 0) stats[key] = Math.floor(stats[key] * multiplier)
+      if (key !== 'hp' && ivs?.[key] !== 0) stats[key] = Math.floor(stats[key] * multiplier)
     }
     view.stats = stats
     return view
@@ -1400,18 +1394,18 @@ export class WildBattle {
     const catalog = new Map(getEditorOptions().items.map((i) => [i.id, i]))
     const results: ItemDropResult[] = []
     const teamDrop = this.opponent?.teamDrop
-    // The Item Charm: a wild Pokemon's drops are 1.5x as likely.
-    const dropBoost = !this.opponent?.trainerId && hasItem(ITEM_CHARM_ITEM_ID) ? ITEM_CHARM_DROP_MULTIPLIER : 1
+    // The Item Charm: each of a wild Pokemon's drop chances goes up a flat 15 points.
+    const dropBoost = !this.opponent?.trainerId && hasItem(ITEM_CHARM_ITEM_ID) ? ITEM_CHARM_DROP_BONUS : 0
     for (const drop of [...(this.opponent?.drops ?? []), ...(teamDrop ? [teamDrop] : [])]) {
       if (!drop.itemId || drop.chance <= 0) continue
-      if (Math.random() * 100 >= drop.chance * dropBoost) continue
+      if (Math.random() * 100 >= drop.chance + dropBoost) continue
       const item = catalog.get(drop.itemId)
       if (!item) continue
       addItem(item.id, 1)
       results.push({ itemId: item.id, itemName: item.name, spritenum: item.spritenum })
     }
     const randomChance = this.opponent?.randomDropChance ?? 0
-    if (randomChance > 0 && Math.random() * 100 < randomChance * dropBoost) {
+    if (randomChance > 0 && Math.random() * 100 < randomChance + dropBoost) {
       const pool = getWildDropPool()
       const item = pool[Math.floor(Math.random() * pool.length)]
       addItem(item.id, 1)

@@ -21,6 +21,7 @@ import { itemIconStyle } from './itemIcon'
 import { TYPE_COLORS } from './moveAnimations'
 import ModalSpinner from './ModalSpinner'
 import { TmIcon } from './TmBits'
+import { hiddenPowerType } from '../../shared/hidden-power'
 
 export type PokemonEditorSource = { kind: 'box'; monId: string } | { kind: 'premadeTeam'; teamId: string; monId: string }
 
@@ -72,9 +73,7 @@ interface Props {
   mergeCopies?: number
   // Its rarity - red and gold Pokemon get less from each star.
   rarityTier?: RarityTier
-  // Not fully evolved: how much more each star is worth (see BoxPokemonView.mergeGrowth),
-  // and its Everstone lock, toggled under the portrait.
-  mergeGrowth?: number
+  // Not fully evolved: its Everstone lock, toggled under the portrait.
   everstone?: BoxPokemonView['everstone']
   onSetEverstone?: (locked: boolean) => void
 }
@@ -98,14 +97,14 @@ function wheelScrollsSideways(strip: HTMLDivElement | null): void {
 }
 
 // A box Pokemon's stars and how far it is to the next one (stars at 2, 4, 8, 16, 32, 64 copies).
-function MergeProgress({ copies, tier, growth }: { copies: number; tier: RarityTier | undefined; growth: number }): React.JSX.Element {
+function MergeProgress({ copies, tier }: { copies: number; tier: RarityTier | undefined }): React.JSX.Element {
   const stars = mergeStarsFor(copies)
   const maxed = stars >= MERGE_MAX_STARS
   const from = 2 ** stars
   const to = 2 ** (stars + 1)
   const percent = maxed ? 100 : ((copies - from) / (to - from)) * 100
   return (
-    <div className="editor-merge" title={stars > 0 ? `${mergeBonusText(stars, tier, growth)} to all stats in classic battles` : 'Merge duplicates in to earn stars'}>
+    <div className="editor-merge" title={stars > 0 ? `${mergeBonusText(stars, tier)} to all stats but HP in classic battles` : 'Merge duplicates in to earn stars'}>
       <span className="merge-stars">{starRow(stars)}</span>
       <div className="editor-merge-bar">
         <div className="editor-merge-fill" style={{ width: `${percent}%` }} />
@@ -194,10 +193,9 @@ function PokemonEditor({
   formChanges,
   onChangeForm,
   focusForms = false,
-  mergeStars,
+  mergeStars: mergeStarsProp,
   rarityTier,
   mergeCopies,
-  mergeGrowth,
   everstone,
   onSetEverstone
 }: Props): React.JSX.Element {
@@ -212,6 +210,8 @@ function PokemonEditor({
   const [bagItemIds, setBagItemIds] = useState<Set<string> | null>(null)
   const [speciesInfo, setSpeciesInfo] = useState<SpeciesEditInfo | null>(null)
   const [set, setSet] = useState<EditablePokemonSet | null>(null)
+  // Admin editing can change its stars, so the stats show the stars being set.
+  const mergeStars = isAdmin && typeof set?.mergeStars === 'number' ? set.mergeStars : mergeStarsProp
   // The set as it was opened - Save stays greyed out until something differs from it.
   const [loadedSet, setLoadedSet] = useState<string | null>(null)
   // The moves it knew when the editor opened: it keeps them at any level.
@@ -221,8 +221,6 @@ function PokemonEditor({
   const [heldItem, setHeldItem] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // Its merge growth - an Everstone-locked one keeps it whatever it holds.
-  const growth = mergeGrowth ?? 1
 
   // Premade team Pokemon can have a level that follows the player's level cap
   // (see capOffset); this is the cap it's shown against.
@@ -527,6 +525,11 @@ function PokemonEditor({
     }
   }
 
+  // A move's type on this Pokemon: plain Hidden Power's comes from its IVs, live as they change.
+  function moveType(m: { name: string; type: string }): string {
+    return m.name === 'Hidden Power' && set ? hiddenPowerType(set.ivs) : m.type
+  }
+
   function moveDisplayName(id: string): string {
     if (!id) return ''
     return speciesInfo?.moves.find((m) => m.id === id)?.name ?? id
@@ -616,7 +619,7 @@ function PokemonEditor({
                       )}
                     </span>
                   </div>
-                  {mergeCopies !== undefined && <MergeProgress copies={mergeCopies} tier={rarityTier} growth={growth} />}
+                  {mergeCopies !== undefined && <MergeProgress copies={mergeCopies} tier={rarityTier} />}
                 </div>
 
                 <div className="pokemon-editor-details">
@@ -732,6 +735,18 @@ function PokemonEditor({
                           />
                         </label>
                       )}
+                      {isAdmin && (
+                        <label className="editor-field" title={`Merge stars: +10% to all stats but HP each in classic battles (less for red and gold)`}>
+                          <span>Stars</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={MERGE_MAX_STARS}
+                            value={set.mergeStars ?? 0}
+                            onChange={(e) => update('mergeStars', Math.max(0, Math.min(MERGE_MAX_STARS, Math.round(Number(e.target.value) || 0))))}
+                          />
+                        </label>
+                      )}
                     </div>
                   )}
                   {isTeamMon && (
@@ -808,8 +823,7 @@ function PokemonEditor({
                                   : 'Locked for good: it has taken merges, so it never evolves (and an Eviolite does nothing).'
                                 : 'Lock it with an Everstone: it never evolves and counts as fully evolved (an Eviolite does nothing), but it can take merges.'}
                               <br />
-                              Each merge star: <b>{mergeBonusText(1, rarityTier, growth)}</b> to all stats
-                              {growth > 1 ? ' (more than an evolved one gets)' : ''}
+                              Each merge star: <b>{mergeBonusText(1, rarityTier)}</b> to all stats but HP
                             </span>
                           }
                         >
@@ -925,7 +939,8 @@ function PokemonEditor({
                 <div className="editor-moves-grid">
                   {[0, 1, 2, 3].map((i) => {
                     // The chosen move's type, category, power, accuracy and PP under its box.
-                    const move = speciesInfo.moves.find((m) => m.id === set.moves[i])
+                    const found = speciesInfo.moves.find((m) => m.id === set.moves[i])
+                    const move = found && { ...found, type: moveType(found) }
                     return (
                       <div
                         key={i}
@@ -976,9 +991,9 @@ function PokemonEditor({
                     {!!mergeStars && (
                       <span
                         className="merge-stat-badge"
-                        title={`Merged ★${mergeStars}: ${mergeBonusText(mergeStars, rarityTier, growth)} to all stats in classic battles - shown in gold beside each stat`}
+                        title={`Merged ★${mergeStars}: ${mergeBonusText(mergeStars, rarityTier)} to all stats but HP in classic battles - shown in gold beside each stat`}
                       >
-                        ★{mergeStars} {mergeBonusText(mergeStars, rarityTier, growth)}
+                        ★{mergeStars} {mergeBonusText(mergeStars, rarityTier)}
                       </span>
                     )}
                   </h3>
@@ -1050,12 +1065,12 @@ function PokemonEditor({
                         {!!mergeStars && baseStats && (
                           <span
                             className="editor-ev-stat-merged"
-                            title={set.ivs[key] === 0 ? 'At 0 IVs this stat takes no merge bonus' : `With the ★${mergeStars} merge bonus`}
+                            title={key === 'hp' ? 'Merge stars leave HP alone' : set.ivs[key] === 0 ? 'At 0 IVs this stat takes no merge bonus' : `With the ★${mergeStars} merge bonus`}
                           >
-                            {/* A stat at 0 IVs is kept low on purpose, so stars leave it alone. */}
+                            {/* Stars leave HP alone, and a stat at 0 IVs (kept low on purpose). */}
                             {Math.floor(
                               finalStat(key, baseStats[key], set.level, set.ivs[key], set.evs[key], nature) *
-                                (set.ivs[key] === 0 ? 1 : mergeStatMultiplier(mergeStars, rarityTier, growth))
+                                (key === 'hp' || set.ivs[key] === 0 ? 1 : mergeStatMultiplier(mergeStars, rarityTier))
                             )}
                           </span>
                         )}
@@ -1222,7 +1237,7 @@ function PokemonEditor({
                       <div className="selector-row-main">
                         <div className="selector-row-title">
                           {m.name}
-                          <span className={`type-badge type-${m.type.toLowerCase()}`}>{m.type}</span>
+                          <span className={`type-badge type-${moveType(m).toLowerCase()}`}>{moveType(m)}</span>
                           {learnedElsewhere && <span className="learned-badge">Learned</span>}
                           {swapping && <span className="swapping-badge">Swapping</span>}
                           {tmLocked && (

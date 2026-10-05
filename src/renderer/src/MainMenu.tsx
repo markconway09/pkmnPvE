@@ -33,8 +33,11 @@ import type {
 } from '../../shared/battle-types'
 import TeamDock from './TeamDock'
 import CompanionSlot, { COMPANION_SLOT_ID } from './CompanionSlot'
-import type { CompanionSizeChoice, MergeCandidateView, RunDifficulty } from '../../shared/battle-types'
+import type { CompanionSizeChoice, MergeCandidateView, RarityTier, RunDifficulty } from '../../shared/battle-types'
+import { RARITY_TIERS } from '../../shared/rarity'
+import { TIER_LABELS } from './RarityOddsTooltip'
 import BoxGrid from './BoxGrid'
+import ModalSpinner from './ModalSpinner'
 import PokemonEditor from './PokemonEditor'
 import PokemonIconVisual from './PokemonIconVisual'
 import DebugMenu from './DebugMenu'
@@ -85,6 +88,8 @@ interface Props {
   onTrainerFight: () => void
   // A Max Raid (uses up a Raid Crystal).
   onRaidFight: () => void
+  // Debug: a Max Raid against a chosen species.
+  onDebugRaid: (species: string, level: number, shiny: boolean) => void
   onBossFight: () => void
   onBossRematch: (trainerId: string) => void
   onOptions: () => void
@@ -213,6 +218,7 @@ function MainMenu({
   onChangeWildLevelCap,
   onTrainerFight,
   onRaidFight,
+  onDebugRaid,
   onBossFight,
   onBossRematch,
   onOptions,
@@ -293,15 +299,33 @@ function MainMenu({
   // The Box page: Classic's team and box with the battle buttons folded away, so the
   // box gets the rest of the window.
   const boxExpanded = mode === 'box'
+  // The Box page's grid is slow to build, so the page opens on a spinner first and builds
+  // the grid a couple of frames later - the click answers at once instead of hanging.
+  const [boxPageReady, setBoxPageReady] = useState(false)
+  useEffect(() => {
+    if (mode !== 'box') {
+      setBoxPageReady(false)
+      return
+    }
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => setBoxPageReady(true))
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [mode])
   // Picking Pokemon in the expanded box to sell at once (null: not picking).
   const [boxSelection, setBoxSelection] = useState<Set<string> | null>(null)
   // The expanded box's filter chips, and whether its Select menu is open.
   const [boxFilters, setBoxFilters] = useState<Set<BoxFilterKey>>(new Set())
+  // The one rarity colour the box shows (null: every rarity), and its menu.
+  const [boxRarity, setBoxRarity] = useState<RarityTier | null>(null)
+  const [rarityMenuOpen, setRarityMenuOpen] = useState(false)
   // Whether "Select all duplicates" also picks pre-evolutions that use up an evolution item.
   const [mergeWithItems, setMergeWithItems] = useState(false)
   // ...and those that need Friendship Petals (a friendship evolution) or Rare Candies (a level one).
   const [mergeWithPetals, setMergeWithPetals] = useState(false)
   const [mergeWithCandies, setMergeWithCandies] = useState(false)
+  // Whether the sell's "Select all" also picks Pokemon with merge stars.
+  const [sellWithStars, setSellWithStars] = useState(false)
   const [selectMenuOpen, setSelectMenuOpen] = useState(false)
   // The sort order's menu (the same kind as Select's).
   const [sortMenuOpen, setSortMenuOpen] = useState(false)
@@ -321,10 +345,11 @@ function MainMenu({
   const [starterOpen, setStarterOpen] = useState(false)
   // The Items window (the bag and the shop together, the Key Items and the TMs).
   const [itemsOpen, setItemsOpen] = useState(false)
-  // Sent from the Items window to the Coin Shop's daily petals: the Game Corner page is
-  // remounted on its Coin Shop (jump counts the trips) and scrolls down to them.
-  const [petalJump, setPetalJump] = useState(0)
-  const [focusPetals, setFocusPetals] = useState(false)
+  // Sent from the Items window to an item's daily deal in the Coin Shop (the petals, the
+  // Shiny Patch): the Game Corner page is remounted on its Coin Shop (jump counts the trips)
+  // and scrolls down to it.
+  const [coinShopJump, setCoinShopJump] = useState(0)
+  const [coinShopFocus, setCoinShopFocus] = useState<string | null>(null)
   // The Game Corner page's tab (one of its games or the Coin Shop) - it reopens on the
   // one played last.
   const gameCornerOpen = mode === 'corner'
@@ -609,6 +634,16 @@ function MainMenu({
     setConfirmingBoxSell(false)
   }
 
+  // Selling: pick every Pokemon on show - never a shiny or the companion (favorites can't
+  // be sold anyway), and starred ones only with that tick on.
+  function selectAllToSell(): void {
+    setConfirmingBoxSell(false)
+    const ids = boxMons
+      .filter((m) => canBulkSell(m) && !m.shiny && !m.companion && (sellWithStars || (m.mergeStars ?? 0) === 0))
+      .map((m) => m.id)
+    setBoxSelection(new Set(ids))
+  }
+
   // Merging: pick every Pokemon on show that has another of its species in the box.
   function selectAllDuplicates(): void {
     setConfirmingBoxSell(false)
@@ -647,6 +682,8 @@ function MainMenu({
   function collapseBox(): void {
     setBoxSearch('')
     setBoxFilters(new Set())
+    setBoxRarity(null)
+    setRarityMenuOpen(false)
     setSelectMenuOpen(false)
     setSortMenuOpen(false)
     stopBoxSelection()
@@ -910,6 +947,7 @@ function MainMenu({
   const boxMons = sortedBoxMons
     .filter((m) => matchesBoxSearch(m, boxSearch))
     .filter((m) => BOX_FILTERS.every((f) => !boxFilters.has(f.key) || f.test(m, mergeCandidateIds)))
+    .filter((m) => !boxRarity || (m.rarityTier ?? 'common') === boxRarity)
   const teamCount = team.filter(Boolean).length
   const teamEmpty = teamCount === 0
   const boxEmpty = (boxState?.mons.length ?? 0) === 0
@@ -1180,10 +1218,10 @@ function MainMenu({
         />
       ) : mode === 'corner' ? (
         <GameCornerModal
-          key={petalJump}
+          key={coinShopJump}
           inline
-          focusPetals={focusPetals}
-          onPetalsFocused={() => setFocusPetals(false)}
+          focusItem={coinShopFocus}
+          onItemFocused={() => setCoinShopFocus(null)}
           initialTab={gameCornerTab}
           onTabChange={setGameCornerTab}
           onClose={() => {}}
@@ -1524,6 +1562,19 @@ function MainMenu({
             ) : (
               <span className="box-selection-hint">Favorites can't be picked</span>
             )}
+            {boxSelectMode === 'sell' && (
+              <>
+                <span className="box-merge-ticks">
+                  <label className="box-merge-items-toggle" title="Also pick Pokémon with merge stars when selecting all">
+                    <input type="checkbox" checked={sellWithStars} onChange={(e) => setSellWithStars(e.target.checked)} />
+                    <span>★ Starred</span>
+                  </label>
+                </span>
+                <button disabled={busy} onClick={selectAllToSell} title="Pick every Pokémon shown, except favorites and shinies">
+                  Select all
+                </button>
+              </>
+            )}
             {boxSelectMode === 'merge' && (
               <>
                 {/* What "Select all duplicates" may spend on pre-evolutions that need it to go in. */}
@@ -1605,6 +1656,35 @@ function MainMenu({
                     </button>
                   ))}
                 </div>
+                {/* Rarity: a menu like Sort's - every rarity, or just one colour. */}
+                <div className="box-toolbar-section box-rarity-filter">
+                  <span className="box-select-menu-wrap">
+                    <button className="box-select-button box-rarity-button" title="Show one rarity" onClick={() => setRarityMenuOpen((v) => !v)}>
+                      {boxRarity && <span className={`box-rarity-dot rarity-tier-${boxRarity}`} />}
+                      {boxRarity ? TIER_LABELS[boxRarity] : 'Any rarity'} ▾
+                    </button>
+                    {rarityMenuOpen && (
+                      <>
+                        <div className="box-select-menu-backdrop" onMouseDown={() => setRarityMenuOpen(false)} />
+                        <div className="context-menu box-select-menu box-sort-menu">
+                          {[null, ...RARITY_TIERS].map((tier) => (
+                            <button
+                              key={tier ?? 'any'}
+                              className={`context-menu-item box-rarity-item${tier === boxRarity ? ' box-sort-menu-current' : ''}`}
+                              onClick={() => {
+                                setRarityMenuOpen(false)
+                                setBoxRarity(tier)
+                              }}
+                            >
+                              {tier && <span className={`box-rarity-dot rarity-tier-${tier}`} />}
+                              {tier ? TIER_LABELS[tier] : 'Any rarity'}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </span>
+                </div>
                 <div className="box-toolbar-section box-sort">
                   <span className="box-sort-label">Sort</span>
                   <span className="box-select-menu-wrap">
@@ -1676,15 +1756,21 @@ function MainMenu({
             }
           </>
         )}
-        <BoxGrid
-          mons={boxMons}
-          onEdit={(id) => openEditor(id, false)}
-          onContextMenu={handleContextMenu}
-          emptyHint={boxSearch.trim() ? 'No Pokemon in the box match that search.' : undefined}
-          selection={boxSelection}
-          onToggleSelect={toggleBoxSelected}
-          canSelect={canSelect}
-        />
+        {boxPageReady && boxState ? (
+          <BoxGrid
+            mons={boxMons}
+            onEdit={(id) => openEditor(id, false)}
+            onContextMenu={handleContextMenu}
+            emptyHint={boxSearch.trim() ? 'No Pokemon in the box match that search.' : undefined}
+            selection={boxSelection}
+            onToggleSelect={toggleBoxSelected}
+            canSelect={canSelect}
+          />
+        ) : (
+          <div className="box-grid box-page-loading">
+            <ModalSpinner />
+          </div>
+        )}
         </>
         )}
         </>
@@ -1746,7 +1832,6 @@ function MainMenu({
           mergeStars={monsById.get(editingMonId)?.mergeStars ?? 0}
           mergeCopies={monsById.get(editingMonId)?.copies}
           rarityTier={monsById.get(editingMonId)?.rarityTier}
-          mergeGrowth={monsById.get(editingMonId)?.mergeGrowth}
           everstone={monsById.get(editingMonId)?.everstone}
           onSetEverstone={(locked) =>
             void window.api
@@ -1801,7 +1886,16 @@ function MainMenu({
         />
       )}
 
-      {debugAddOpen && <DebugAddMon onAdded={setBoxState} onClose={() => setDebugAddOpen(false)} />}
+      {debugAddOpen && (
+        <DebugAddMon
+          onAdded={setBoxState}
+          onRaid={(species, level, shiny) => {
+            setDebugAddOpen(false)
+            onDebugRaid(species, level, shiny)
+          }}
+          onClose={() => setDebugAddOpen(false)}
+        />
+      )}
 
       {wildDropsOpen && <WildDropsModal onClose={() => setWildDropsOpen(false)} />}
       {shopPricesOpen && <ShopPricesModal onClose={() => setShopPricesOpen(false)} />}
@@ -1929,11 +2023,11 @@ function MainMenu({
       {itemsOpen && (
         <BagShopModal
           onClose={() => setItemsOpen(false)}
-          onOpenCoinShop={() => {
+          onOpenCoinShop={(itemId) => {
             setItemsOpen(false)
             setGameCornerTab('shop')
-            setFocusPetals(true)
-            setPetalJump((n) => n + 1)
+            setCoinShopFocus(itemId)
+            setCoinShopJump((n) => n + 1)
             goTo('corner', document.querySelector<HTMLElement>('.menu-rail-corner'))
           }}
           onChanged={() => {

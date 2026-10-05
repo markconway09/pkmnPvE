@@ -52,6 +52,8 @@ const CDN = 'https://data.freetouse.com/music/tracks'
 const ON_KEY = 'pkmnpve.musicOn'
 const VOLUME_KEY = 'pkmnpve.musicVolume'
 const MUTED_KEY = 'pkmnpve.musicMuted'
+// Paused from the top bar's player - it stays paused after a restart or reload.
+const PAUSED_KEY = 'pkmnpve.musicPaused'
 const SOURCE_KEY = 'pkmnpve.musicSource'
 const LINKS_KEY = 'pkmnpve.musicLinks'
 const FOLDER_KEY = 'pkmnpve.musicFolder'
@@ -72,6 +74,7 @@ const FREE_TO_USE: MusicTrack[] = (freeToUseTracks as { id: string; title: strin
 let on = loadBool(ON_KEY, true)
 let volume = loadNumber(VOLUME_KEY, 0.05)
 let muted = loadBool(MUTED_KEY, false)
+let paused = loadBool(PAUSED_KEY, false)
 let source = loadSource()
 let links = loadString(LINKS_KEY, '')
 let folder = loadString(FOLDER_KEY, '')
@@ -267,15 +270,17 @@ function reloadPlaylist(): void {
   }
 }
 
-/** Called once at startup: loads the chosen source and begins the music if it's switched on. */
+/** Called once at startup: loads the chosen source and begins the music if it's switched on and wasn't left paused. */
 export function startMusic(): void {
-  playing = on
+  playing = on && !paused
   reloadPlaylist()
 }
 
 export function toggleMusicPlaying(): void {
   fails = 0
   playing = !playing
+  paused = !playing
+  savePref(PAUSED_KEY, paused)
   if (index < 0) load(0)
   else if (playing) start()
   else audio?.pause()
@@ -303,6 +308,8 @@ export function setMusicOn(next: boolean): void {
   savePref(ON_KEY, on)
   if (on) {
     playing = true
+    paused = false
+    savePref(PAUSED_KEY, paused)
     fails = 0
     if (index < 0) load(0)
     else start()

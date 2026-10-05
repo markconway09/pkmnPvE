@@ -160,13 +160,17 @@ export const MAX_PRIZE_BULK = 99
 export interface CoinPrize {
   itemId: string
   coins: number
+  // Only one a day (the Shiny Patch) - never traded in bulk.
+  daily?: boolean
 }
 
 export const COIN_PRIZES: CoinPrize[] = [
   { itemId: 'lockcapsule', coins: 200 },
+  { itemId: 'rarecandy', coins: 100 },
+  { itemId: 'expcandym', coins: 1000 },
   { itemId: 'wishingpiece', coins: 5000 },
   { itemId: 'randompokemon', coins: 1000 },
-  { itemId: 'shinypatch', coins: 5000 },
+  { itemId: 'shinypatch', coins: 5000, daily: true },
   { itemId: 'expcandyl', coins: 2000 },
   { itemId: 'randomlegendary', coins: 20000 }
 ]

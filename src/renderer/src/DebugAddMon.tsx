@@ -9,6 +9,8 @@ import { errorMessage } from './FloatingNotes'
 
 interface Props {
   onAdded: (box: BoxState) => void
+  // Starts a Max Raid against the picked species, at this level, shiny or not.
+  onRaid: (species: string, level: number, shiny: boolean) => void
   onClose: () => void
 }
 
@@ -18,9 +20,10 @@ const MAX_SHOWN = 60
 /**
  * Debug: put any Pokemon in the box - search a species, pick its level and whether it's
  * shiny, and add it (as often as you like - the window stays open). Random adds a
- * random-battle set instead, as the old button did.
+ * random-battle set instead, as the old button did. Raid fights the picked species as a
+ * Max Raid boss instead (no crystal needed).
  */
-function DebugAddMon({ onAdded, onClose }: Props): React.JSX.Element {
+function DebugAddMon({ onAdded, onRaid, onClose }: Props): React.JSX.Element {
   const [species, setSpecies] = useState<SpeciesOptionEntry[] | null>(null)
   const [query, setQuery] = useState('')
   const [picked, setPicked] = useState<string | null>(null)
@@ -124,6 +127,13 @@ function DebugAddMon({ onAdded, onClose }: Props): React.JSX.Element {
           </button>
           <span className="debug-add-spacer" />
           <button onClick={onClose}>Close</button>
+          <button
+            disabled={busy || !picked}
+            title="A Max Raid against this species, at this level - no Raid Crystal needed"
+            onClick={() => onRaid(picked!, level, shiny)}
+          >
+            {picked ? `Raid ${picked}` : 'Raid'}
+          </button>
           <button
             className="debug-add-go"
             disabled={busy || !picked}

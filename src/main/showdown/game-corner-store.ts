@@ -53,6 +53,8 @@ interface StoredCoins {
   // The days (local dates) the free petals were last claimed and the petal pack last bought.
   freePetalsDay?: string
   petalPackDay?: string
+  // The days (local dates) each once-a-day prize (the Shiny Patch) was last traded for, by item.
+  dailyPrizeDays?: Record<string, string>
   // The Pokemon of the day: picked the first time the shop is looked at each day, and
   // kept for the rest of it.
   dailyMon?: { day: string; species: string; bought: boolean }
@@ -73,6 +75,7 @@ function getState(): StoredCoins {
         dailyOfferDay: typeof parsed.dailyOfferDay === 'string' ? parsed.dailyOfferDay : undefined,
         freePetalsDay: typeof parsed.freePetalsDay === 'string' ? parsed.freePetalsDay : undefined,
         petalPackDay: typeof parsed.petalPackDay === 'string' ? parsed.petalPackDay : undefined,
+        dailyPrizeDays: parsed.dailyPrizeDays && typeof parsed.dailyPrizeDays === 'object' ? parsed.dailyPrizeDays : undefined,
         dailyMon:
           parsed.dailyMon && typeof parsed.dailyMon.species === 'string' && typeof parsed.dailyMon.day === 'string'
             ? { day: parsed.dailyMon.day, species: parsed.dailyMon.species, bought: !!parsed.dailyMon.bought }
@@ -118,8 +121,8 @@ export function buyCoins(amount: number): CoinBalance {
   return { coins: getCoins(), money: getMoney() }
 }
 
-// Today's local date, as the daily offer's key.
-function today(): string {
+// Today's local date, as the daily offer's key (and the Draft's first win of the day).
+export function today(): string {
   const now = new Date()
   const pad = (n: number): string => String(n).padStart(2, '0')
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
@@ -221,6 +224,12 @@ export function buyDailyCoinMon(): DailyCoinMonPurchase {
   return { coins: getCoins(), money: getMoney(), species: offer.species, shiny }
 }
 
+/** The once-a-day prizes already traded for today. */
+export function getDailyPrizesBought(): string[] {
+  const days = getState().dailyPrizeDays ?? {}
+  return Object.keys(days).filter((id) => days[id] === today())
+}
+
 /** Trades coins for one of the prizes (several at once in bulk) - they go into the bag. */
 export function buyCoinPrize(itemId: string, quantity = 1): CoinBalance & { itemName: string; quantity: number } {
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_PRIZE_BULK) throw new Error(`Trade 1 to ${MAX_PRIZE_BULK} at a time`)
@@ -228,9 +237,13 @@ export function buyCoinPrize(itemId: string, quantity = 1): CoinBalance & { item
   if (!prize) throw new Error("That isn't one of the prizes")
   // Late items (the Raid Crystal, the Shiny Patch) wait for the same boss as the Shop's.
   if (isLateGameItem(prize.itemId) && !lateItemsUnlocked()) throw new Error("That prize isn't unlocked yet")
+  // A once-a-day prize: just the one, and only if today's is still there.
+  if (prize.daily && quantity !== 1) throw new Error('That prize is one a day')
+  if (prize.daily && getState().dailyPrizeDays?.[itemId] === today()) throw new Error("Today's is gone - it's back tomorrow")
   const cost = prize.coins * quantity
   if (getCoins() < cost) throw new Error(`That costs ${cost.toLocaleString('en-US')} coins`)
   getState().coins -= cost
+  if (prize.daily) getState().dailyPrizeDays = { ...getState().dailyPrizeDays, [itemId]: today() }
   persist()
   addItem(prize.itemId, quantity)
   const itemName = getEditorOptions().items.find((i) => i.id === prize.itemId)?.name ?? prize.itemId

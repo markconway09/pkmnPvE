@@ -27,6 +27,17 @@ export const RARITY_TIERS: RarityTier[] = ['common', 'uncommon', 'rare', 'epic',
 /** The chance (0-1) of each rarity colour coming out of something random - a case, a raid, a search. */
 export type RarityOdds = Record<RarityTier, number>
 
+/** One kind of outcome's chance, listed instead of the rarity colours (a raid boss being Gigantamax...). */
+export interface OddsKind {
+  label: string
+  chance: number
+  // Its colour: a rarity's, or its own.
+  tone: RarityTier | 'gigantamax' | 'secret'
+}
+
+/** A tooltip's odds: each rarity colour's (a case, a TM search), or each kind's (a raid). */
+export type RarityOddsReport = RarityOdds | { kinds: OddsKind[] }
+
 /** What a rarity-odds tooltip is for: a Max Raid's boss, an openable bag item, or a TM search in an area. */
 export type RarityOddsSource = { kind: 'raid' } | { kind: 'item'; itemId: string } | { kind: 'tm'; location: WildLocationId }
 

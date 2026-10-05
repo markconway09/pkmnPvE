@@ -31,6 +31,9 @@ import { DraftPackOpening, OpponentReveal } from './DraftPackOpening'
 import { trainerSpriteUrl } from './trainerSprite'
 import ItemSprite from './ItemSprite'
 
+// The Shiny Patch's icon (see ItemSprite).
+const SHINY_PATCH_SPRITENUM = -8
+
 interface Props {
   // Another fight (or the menu) holds things up.
   busy: boolean
@@ -197,6 +200,8 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
   const [coins, setCoins] = useState<number | null>(null)
   // What a draft costs to enter (less with the Grand Drafter title).
   const [entryFee, setEntryFee] = useState<number | null>(null)
+  // Today's first Draft win already gave its Shiny Patch.
+  const [dailyWinClaimed, setDailyWinClaimed] = useState<boolean | null>(null)
   const [working, setWorking] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [bring, setBring] = useState<number[]>(lastBring)
@@ -237,6 +242,10 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
       .getDraftEntryFee()
       .then(setEntryFee)
       .catch(() => setEntryFee(null))
+    window.api
+      .getDraftDailyWinClaimed()
+      .then(setDailyWinClaimed)
+      .catch(() => setDailyWinClaimed(null))
   }
 
   useEffect(refresh, [refreshKey])
@@ -468,6 +477,19 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
                 </div>
               ))}
             </div>
+            {/* The first battle won each day gives a Shiny Patch. */}
+            {dailyWinClaimed !== null && (
+              <div className={`draft-daily-win${dailyWinClaimed ? ' draft-daily-win-claimed' : ''}`}>
+                <ItemSprite spritenum={SHINY_PATCH_SPRITENUM} className="draft-daily-win-icon" />
+                <span className="draft-daily-win-text">
+                  <span className="draft-daily-win-name">Daily reward: Shiny Patch</span>
+                  <span className="draft-daily-win-note">
+                    {dailyWinClaimed ? 'Claimed today - back tomorrow' : 'For your first Draft win today'}
+                  </span>
+                </span>
+                {dailyWinClaimed && <span className="draft-daily-win-check">✓ Claimed</span>}
+              </div>
+            )}
           </div>
         </div>
       </div>

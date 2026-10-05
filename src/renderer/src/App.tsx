@@ -497,11 +497,15 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
     }
   }
 
-  async function startRaidBattle(): Promise<void> {
+  // A Max Raid - or, from the debug menu, one against a chosen species.
+  async function startRaidBattle(debug?: { species: string; level: number; shiny: boolean }): Promise<void> {
     setError(null)
     setBusy(true)
     try {
-      const initial = await skipTeamPreview(await window.api.startRaidBattle())
+      const view = debug
+        ? await window.api.debugStartRaid(debug.species, debug.level, debug.shiny)
+        : await window.api.startRaidBattle()
+      const initial = await skipTeamPreview(view)
       setBackdrop(battleBackdropId(initial))
       setView(initial)
       setWildRebattle(null)
@@ -838,6 +842,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
           onChangeWildLevelCap={setWildLevelCap}
           onTrainerFight={() => void startTrainerBattle(false)}
           onRaidFight={() => void startRaidBattle()}
+          onDebugRaid={(species, level, shiny) => void startRaidBattle({ species, level, shiny })}
           onBossFight={() => void startTrainerBattle(true)}
           onBossRematch={(trainerId) => void startTrainerBattle(true, trainerId)}
           onOptions={() => setOptionsOpen(true)}

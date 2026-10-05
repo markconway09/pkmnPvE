@@ -11,8 +11,8 @@ interface Props {
   // of which the main menu is showing behind this.
   onChanged: () => void
   onMoneyChange: (money: number) => void
-  // From a Friendship Petal: closes this and opens the Coin Shop at its daily petals.
-  onOpenCoinShop: () => void
+  // From a Friendship Petal or the Shiny Patch: closes this and opens the Coin Shop at that item.
+  onOpenCoinShop: (itemId: string) => void
 }
 
 /**

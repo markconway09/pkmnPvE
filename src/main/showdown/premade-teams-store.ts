@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
-import type { EditablePokemonSet, ItemDropConfig, PremadeTeamSummary } from '../../shared/battle-types'
+import { MERGE_MAX_STARS, type EditablePokemonSet, type ItemDropConfig, type PremadeTeamSummary } from '../../shared/battle-types'
 import {
   applyEditableSet,
   bstOf,
@@ -24,7 +24,8 @@ export const MAX_LEVELS_BELOW_CAP = 10
 // A set in a premade team. capOffset (Radical Red's "Max Level - n") means the
 // level is the current level cap minus n, worked out whenever it's needed, and
 // `level` is only a placeholder; without it `level` is exactly what's fought.
-export type TeamSet = PokemonSet & { capOffset?: number }
+// mergeStars raise its stats in battle the same way a player's merged Pokemon's do.
+export type TeamSet = PokemonSet & { capOffset?: number; mergeStars?: number }
 
 interface StoredTeamMon {
   id: string
@@ -38,7 +39,7 @@ function levelAtCap(set: TeamSet, levelCap: number): number {
 
 // The set as it stands at a given cap, as a plain Pokemon set.
 function withLevelAtCap(set: TeamSet, levelCap: number): PokemonSet {
-  const { capOffset: _capOffset, ...rest } = set
+  const { capOffset: _capOffset, mergeStars: _mergeStars, ...rest } = set
   return { ...rest, level: levelAtCap(set, levelCap) }
 }
 
@@ -275,7 +276,11 @@ export function getTeamMonSet(teamId: string, monId: string): EditablePokemonSet
   const team = findTeam(teamId)
   const mon = team.mons.find((m) => m.id === monId)
   if (!mon) throw new Error(`Unknown Pokemon id: ${monId}`)
-  return { ...toEditableSet(withLevelAtCap(mon.set, getProgression().levelCap)), capOffset: mon.set.capOffset ?? null }
+  return {
+    ...toEditableSet(withLevelAtCap(mon.set, getProgression().levelCap)),
+    capOffset: mon.set.capOffset ?? null,
+    mergeStars: mon.set.mergeStars ?? 0
+  }
 }
 
 export function updateTeamMon(teamId: string, monId: string, input: EditablePokemonSet): PremadeTeamSummary[] {
@@ -291,6 +296,9 @@ export function updateTeamMon(teamId: string, monId: string, input: EditablePoke
     // Otherwise the level is fixed, exactly as given.
     delete updated.capOffset
   }
+  const stars = typeof input.mergeStars === 'number' && Number.isFinite(input.mergeStars) ? Math.round(input.mergeStars) : 0
+  if (stars > 0) updated.mergeStars = Math.min(MERGE_MAX_STARS, stars)
+  else delete updated.mergeStars
   mon.set = updated
   persist()
   return listPremadeTeamsForTrainer(team.trainerId)
@@ -335,6 +343,8 @@ function skipsStatCeiling(trainerId: string): boolean {
 
 export interface PremadeTeamSelection {
   sets: PokemonSet[]
+  // Each member's merge stars, in team order.
+  mergeStars: number[]
   drop: ItemDropConfig
   isDoubleBattle: boolean
 }
@@ -368,6 +378,7 @@ export function pickRandomPremadeTeam(
   const team = pool[Math.floor(Math.random() * pool.length)]
   return {
     sets: team.mons.map((m) => withLevelAtCap(m.set, levelCap)),
+    mergeStars: team.mons.map((m) => m.set.mergeStars ?? 0),
     drop: team.drop,
     isDoubleBattle: team.isDoubleBattle
   }

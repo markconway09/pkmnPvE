@@ -1,4 +1,4 @@
-import { RAID_GIGANTAMAX_CHANCE, RAID_RESTRICTED_CHANCE, RAID_STARS } from '../../shared/battle-types'
+import { RAID_GIGANTAMAX_CHANCE, RAID_RESTRICTED_CHANCE, RAID_SECRET_SPECIES, RAID_STARS } from '../../shared/battle-types'
 import { FIVE_STAR_RESTRICTED_CHANCE, GIGANTAMAX_HUNTER_CHANCE } from '../../shared/titles'
 import { fillMoveset, recommendedLearnableMoves } from './auto-sets'
 import {
@@ -7,14 +7,15 @@ import {
   learnableMoveIds,
   levelUpMoveset,
   pickRaidSpecies,
-  raidRarityOdds,
+  raidKindOdds,
+  raidSpeciesInfo,
   randomNatureName,
   rollWildShiny,
   toID,
   type PokemonSet
 } from './sim-access'
 import { hasTitle } from './title-perks'
-import type { RarityOdds } from '../../shared/rarity'
+import type { OddsKind } from '../../shared/rarity'
 
 // Showdown can't run a doubles side with only one Pokemon (an empty active slot crashes
 // it), so a raid's side brings this one too: it faints the moment it's sent out (see
@@ -33,9 +34,9 @@ function raidChances(): { gigantamax: number; restricted: number } {
   }
 }
 
-/** The next raid boss's odds of each rarity colour, for the Start button's tooltip. */
-export function raidBossRarityOdds(): RarityOdds {
-  return raidRarityOdds(raidChances())
+/** The next raid boss's odds of each kind, for the Start button's tooltip. */
+export function raidBossKindOdds(): { kinds: OddsKind[] } {
+  return { kinds: raidKindOdds(raidChances()) }
 }
 
 /**
@@ -43,15 +44,33 @@ export function raidBossRarityOdds(): RarityOdds {
  * can tilt it: Gigantamax Hunter a Gigantamax one, Five-Star a gold one, Starlight
  * a shiny (see rollWildShiny).
  */
-export function generateRaidBoss(level: number): { set: PokemonSet; gigantamax: boolean; stars: number } {
-  const { species, gigantamax } = pickRaidSpecies(raidChances())
+export function generateRaidBoss(level: number): RaidBoss {
+  const { species, gigantamax, secret } = pickRaidSpecies(raidChances())
+  return raidBossOf(species, level, gigantamax, rollWildShiny(true), !!secret)
+}
+
+export interface RaidBoss {
+  set: PokemonSet
+  gigantamax: boolean
+  stars: number
+  // The secret boss (Eternamax Eternatus): no extra raid HP - its own is huge enough.
+  secret: boolean
+}
+
+/** Debug: a raid against this species - Gigantamax if it can be. */
+export function debugRaidBoss(species: string, level: number, shiny: boolean): RaidBoss {
+  const s = raidSpeciesInfo(species)
+  return raidBossOf(s.species, level, s.gigantamax, shiny, s.species === RAID_SECRET_SPECIES)
+}
+
+function raidBossOf(species: string, level: number, gigantamax: boolean, shiny: boolean, secret: boolean): RaidBoss {
   const set: PokemonSet = {
     ...buildBasicSet(species, level),
     nature: randomNatureName(),
-    shiny: rollWildShiny(true)
+    shiny
   }
   set.moves = raidMoveset(species, level)
-  return { set, gigantamax, stars: RAID_STARS }
+  return { set, gigantamax, stars: RAID_STARS, secret }
 }
 
 // Attacking moves only: Dynamaxed, every status move is Max Guard, which a raid boss

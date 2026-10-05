@@ -11,6 +11,9 @@ import { formatMoney } from './money'
 import { TmCard, TmQuickCheck } from './TmBits'
 import type { TmInfo } from '../../shared/tms'
 
+// The Poke Ball's icon on Showdown's item sheet.
+const POKE_BALL_SPRITENUM = 345
+
 interface Props {
   winner: string | null
   expGains: ExpGainResult[]
@@ -119,7 +122,7 @@ function BattleResultModal({
     ? runBattle
       ? 'Added to team!'
       : freeCatch
-        ? 'Caught! (free - Catching Charm)'
+        ? 'Caught! (free)'
         : 'Caught!'
     : runBattle
       ? 'Add to team'
@@ -141,7 +144,8 @@ function BattleResultModal({
 
   const catchRow = canCatch && !replacing && (
     <div className="catch-row">
-      <button type="button" disabled={catchDisabled} onClick={() => void catchPokemon()}>
+      <button type="button" className="battle-result-icon-button" disabled={catchDisabled} onClick={() => void catchPokemon()}>
+        <ItemSprite spritenum={POKE_BALL_SPRITENUM} className="battle-result-ball" />
         {catchLabel}
       </button>
     </div>
@@ -215,6 +219,12 @@ function BattleResultModal({
                 ` · ${draftResult.wins >= DRAFT_MAX_WINS ? 'perfect run!' : 'draft over'} · +${draftResult.reward} coins`}
             </span>
           </div>
+          {draftResult.shinyPatch && (
+            <div className="exp-gain-row">
+              <span className="exp-gain-species">First win today</span>
+              <span className="exp-gain-detail">+1 Shiny Patch</span>
+            </div>
+          )}
         </div>
       )}
       {runItemReward && (
@@ -289,7 +299,7 @@ function BattleResultModal({
     <div className="editor-actions battle-result-actions">
       {onRebattle && (
         <button
-          className={leaveNeedsConfirm && confirmingLeave === 'rebattle' ? 'confirm-button' : undefined}
+          className={`battle-result-icon-button${leaveNeedsConfirm && confirmingLeave === 'rebattle' ? ' confirm-button' : ''}`}
           disabled={busy || rebattling}
           onClick={() => {
             if (leaveNeedsConfirm && confirmingLeave !== 'rebattle') {
@@ -300,17 +310,22 @@ function BattleResultModal({
             void onRebattle().finally(() => setRebattling(false))
           }}
         >
-          {leaveNeedsConfirm && confirmingLeave === 'rebattle' ? 'Leave the shiny uncaught? Click again' : 'Battle again'}
+          <img className="battle-result-icon" src="./icons/tall-grass.png" alt="" />
+          {leaveNeedsConfirm && confirmingLeave === 'rebattle' ? 'Leave the shiny uncaught? Click again' : 'Find another'}
         </button>
       )}
       <button
-        className={leaveNeedsConfirm && confirmingLeave === 'menu' ? 'confirm-button' : undefined}
+        className={`battle-result-icon-button${leaveNeedsConfirm && confirmingLeave === 'menu' ? ' confirm-button' : ''}`}
         disabled={rebattling}
         onClick={() => {
           if (leaveNeedsConfirm && confirmingLeave !== 'menu') setConfirmingLeave('menu')
           else onClose()
         }}
       >
+        <svg className="battle-result-icon" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M2 8 8 2.5 14 8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M4 7.2V13.5h3V10h2v3.5h3V7.2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+        </svg>
         {leaveNeedsConfirm && confirmingLeave === 'menu' ? 'Leave the shiny uncaught? Click again' : 'Back to menu'}
       </button>
     </div>

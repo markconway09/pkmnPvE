@@ -48,7 +48,6 @@ import {
   dexFormOf,
   canMergeInto,
   isFullyEvolved,
-  mergeGrowthFor,
   randomEvolutionItemId,
   cosmeticLookOf,
   mergeLineOf,
@@ -508,7 +507,6 @@ function toView(mon: StoredMon, arrival: number, groups?: Map<string, StoredMon[
     copies: mon.copies ?? 1,
     mergeStars: mergeStarsFor(mon.copies),
     everstone: isFullyEvolved(mon.set.species) ? undefined : { locked: !!mon.everstone, canUnlock: (mon.copies ?? 1) <= 1 },
-    mergeGrowth: mergeGrowthFor(mon.set.species),
     gigantamax: !!mon.set.gigantamax,
     gmaxLook: gmaxLookOf(mon.set) || undefined,
     mergeCandidates: groups ? mergeCandidatesFor(mon, groups) : undefined,
@@ -768,7 +766,7 @@ export function copyBoxMonSet(id: string): PokemonSet {
 export function getMonSet(id: string): EditablePokemonSet {
   const mon = getState().mons.find((m) => m.id === id)
   if (!mon) throw new Error(`Unknown Pokemon id: ${id}`)
-  return toEditableSet(mon.set)
+  return { ...toEditableSet(mon.set), mergeStars: mergeStarsFor(mon.copies) }
 }
 
 // Admin edits (trainer roster mons edited through the same box path, see
@@ -800,6 +798,14 @@ export function updateMon(id: string, input: EditablePokemonSet, admin = false):
   }
   // In the form its (possibly new) held item gives it - see heldItemForme.
   mon.set = heldItemForme(applyEditableSet(mon.set, input))
+  // Admin only: new merge stars give it exactly the copies that make them.
+  if (admin && typeof input.mergeStars === 'number' && Number.isFinite(input.mergeStars)) {
+    const stars = Math.max(0, Math.min(MERGE_MAX_STARS, Math.round(input.mergeStars)))
+    if (stars !== mergeStarsFor(mon.copies)) {
+      if (stars > 0) mon.copies = 2 ** stars
+      else delete mon.copies
+    }
+  }
   // Exp progress only depends on species/level, and only a manual change to
   // one of those is an absolute override (reset to exactly the start of
   // whatever level/species was set, same as a freshly caught Pokemon) -
@@ -1209,7 +1215,7 @@ export function evolveMon(id: string, targetSpecies: string): BoxState {
 
 /**
  * Locks (or unlocks) a Pokemon that isn't fully evolved with an Everstone: locked, it never
- * evolves but takes merges, each star worth more the weaker it is (see mergeGrowthFor).
+ * evolves but takes merges.
  * One way once it's taken a merge - the lock can only come off while it's a single copy.
  */
 export function setEverstone(id: string, locked: boolean): BoxState {
