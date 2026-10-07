@@ -1,0 +1,8 @@
+Dice, Lock-On and a completed Pokédex
+
+- New Game Corner game: Dice - roll over or under a line you set; new Long Shot title
+- Croupier can now pay double winnings; High Roller works alongside the payout titles
+- "New Pokémon registered!" pop-ups, and a Pokédex Diploma for completing the Dex
+- New achievements gift Keldeo, Zarude, Magearna and Gimmighoul forms
+- Chaos Draft: new Lock-On modifier; Intimidate now drops Attack, Sp. Atk and Speed
+- Draft's daily Shiny Patch now needs a full gauntlet
