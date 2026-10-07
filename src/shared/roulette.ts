@@ -108,4 +108,6 @@ export interface RouletteSpin {
   history: number[]
   // A losing spin the Croupier title gave every bet back on (totalReturned is then the bets).
   refunded?: boolean
+  // A winning spin the Croupier title paid the winnings twice on (already in totalReturned).
+  doubled?: boolean
 }

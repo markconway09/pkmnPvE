@@ -1,19 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { toSpriteId } from '../../shared/battle-types'
+import SpriteImage from './SpriteImage'
 
 interface Toast {
   id: number
   name: string
   // A finished daily mission rather than an achievement.
   mission?: boolean
+  // A Pokedex entry registered for the first time (a new form, or a new Pokemon).
+  dex?: 'species' | 'form'
 }
 
 const TOAST_MS = 5000
 
-// A clicked toast asks the main menu to open that achievement (or the daily missions).
-// Clicked away from the menu (in a battle, say), it waits until the menu is back.
+// A clicked toast asks the main menu to open that achievement (or the daily missions, or
+// the Pokedex at that entry). Clicked away from the menu (in a battle, say), it waits
+// until the menu is back.
 export interface RewardsFocus {
-  tab: 'missions' | 'achievements'
+  tab: 'missions' | 'achievements' | 'pokedex'
   name: string
 }
 const FOCUS_EVENT = 'rewards-focus'
@@ -50,7 +55,10 @@ function AchievementToasts(): React.JSX.Element {
 
   function show(names: string[], mission: boolean): void {
     if (names.length === 0) return
-    const fresh = names.map((name) => ({ id: nextId.current++, name, mission }))
+    add(names.map((name) => ({ id: nextId.current++, name, mission })))
+  }
+
+  function add(fresh: Toast[]): void {
     setToasts((all) => [...all, ...fresh])
     const ids = new Set(fresh.map((t) => t.id))
     setTimeout(() => setToasts((all) => all.filter((t) => !ids.has(t.id))), TOAST_MS)
@@ -58,27 +66,54 @@ function AchievementToasts(): React.JSX.Element {
 
   useEffect(() => window.api.onAchievementsUnlocked((names) => show(names, false)), [])
   useEffect(() => window.api.onMissionsChanged((finished) => show(finished, true)), [])
+  useEffect(
+    () =>
+      window.api.onPokedexRegistered((entries) =>
+        add(entries.map((e) => ({ id: nextId.current++, name: e.species, dex: e.form ? 'form' : 'species' })))
+      ),
+    []
+  )
 
   return createPortal(
     <div className="achievement-toasts">
-      {toasts.map((toast) => (
-        <div
-          key={toast.id}
-          className="achievement-toast"
-          style={{ animationDuration: `${TOAST_MS}ms` }}
-          title={toast.mission ? 'Open the daily missions' : 'Open the achievement'}
-          onClick={() => {
-            requestFocus({ tab: toast.mission ? 'missions' : 'achievements', name: toast.name })
-            setToasts((all) => all.filter((t) => t.id !== toast.id))
-          }}
-        >
-          <span className="achievement-toast-icon">{toast.mission ? '📋' : '🏆'}</span>
-          <div>
-            <div className="achievement-toast-label">{toast.mission ? 'Daily mission complete!' : 'Achievement unlocked!'}</div>
-            <div className="achievement-toast-name">{toast.name}</div>
+      {toasts.map((toast) =>
+        toast.dex ? (
+          // A new Pokedex entry: clicking it opens the Pokedex there.
+          <div
+            key={toast.id}
+            className="achievement-toast dex-toast"
+            style={{ animationDuration: `${TOAST_MS}ms` }}
+            title="Open the Pokédex"
+            onClick={() => {
+              requestFocus({ tab: 'pokedex', name: toast.name })
+              setToasts((all) => all.filter((t) => t.id !== toast.id))
+            }}
+          >
+            <SpriteImage style="3d-static" className="dex-toast-sprite" spriteId={toSpriteId(toast.name)} alt={toast.name} />
+            <div>
+              <div className="achievement-toast-label">{toast.dex === 'form' ? 'New form registered!' : 'New Pokémon registered!'}</div>
+              <div className="achievement-toast-name">{toast.name}</div>
+            </div>
           </div>
-        </div>
-      ))}
+        ) : (
+          <div
+            key={toast.id}
+            className="achievement-toast"
+            style={{ animationDuration: `${TOAST_MS}ms` }}
+            title={toast.mission ? 'Open the daily missions' : 'Open the achievement'}
+            onClick={() => {
+              requestFocus({ tab: toast.mission ? 'missions' : 'achievements', name: toast.name })
+              setToasts((all) => all.filter((t) => t.id !== toast.id))
+            }}
+          >
+            <span className="achievement-toast-icon">{toast.mission ? '📋' : '🏆'}</span>
+            <div>
+              <div className="achievement-toast-label">{toast.mission ? 'Daily mission complete!' : 'Achievement unlocked!'}</div>
+              <div className="achievement-toast-name">{toast.name}</div>
+            </div>
+          </div>
+        )
+      )}
     </div>,
     document.body
   )

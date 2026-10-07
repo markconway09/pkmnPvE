@@ -82,6 +82,8 @@ export const FASHION_CASE_ITEM_ID = 'fashioncase'
 export const SCANNER_ITEM_ID = 'scanner'
 // The DexNav hunts one registered species in the wild (see dexnav.ts).
 export const DEXNAV_ITEM_ID = 'dexnav'
+// The Pokedex Diploma (for completing the Pokedex) lets the DexNav hunt any Pokemon.
+export const DIPLOMA_ITEM_ID = 'pokedexdiploma'
 
 // Pikachu's forms the Fashion Case changes between: plain Pikachu, the caps, the Cosplay
 // outfits, Partner and World. Owning three different ones at once unlocks it.
@@ -144,7 +146,8 @@ export const KEY_ITEM_IDS = new Set([
   DECORATION_BOX_ITEM_ID,
   FASHION_CASE_ITEM_ID,
   SCANNER_ITEM_ID,
-  DEXNAV_ITEM_ID
+  DEXNAV_ITEM_ID,
+  DIPLOMA_ITEM_ID
 ])
 
 // The form-change key items: with one in the bag, a Pokemon in its group can be changed
@@ -1232,6 +1235,13 @@ export interface PokedexEntry {
   hints: PokedexHint[]
   // Its rarity colour (see speciesRarityTier), for its cell.
   rarityTier: RarityTier
+}
+
+// A Pokedex entry just registered for the first time, for its pop-up.
+export interface PokedexRegistration {
+  species: string
+  // An alternate form of a species already registered (Alolan Ninetales after Ninetales).
+  form: boolean
 }
 
 // One place a Pokemon can be found: a wild location, the Lab, Max Raids...

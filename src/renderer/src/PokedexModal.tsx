@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import RarityCard, { RarityGlow } from './RarityCard'
 import FitName from './FitName'
 import { createPortal } from 'react-dom'
@@ -18,22 +18,38 @@ const LEGEND = [
 
 interface Props {
   onClose: () => void
+  // An entry to scroll to and flash (from a clicked "registered" pop-up).
+  focus?: string | null
 }
 
 // The trainer profile's Pokedex: every species in National Dex order, each followed by
 // its alternate forms (Alolan, Hisuian, Rotom-Wash...) - the ones the player has
 // registered (had in their box, in that form) with their sprite, the rest as a "?".
 // Each shows small icons for where to look for it, spelled out on hover.
-function PokedexModal({ onClose }: Props): React.JSX.Element {
+function PokedexModal({ onClose, focus }: Props): React.JSX.Element {
   const [entries, setEntries] = useState<PokedexEntry[] | null>(null)
   const [search, setSearch] = useState('')
+  const gridRef = useRef<HTMLDivElement>(null)
 
+  // Fetched again for a new focus, so an entry registered while it's open shows up.
   useEffect(() => {
     window.api
       .getPokedex()
       .then(setEntries)
       .catch(() => setEntries([]))
-  }, [])
+    if (focus) setSearch('')
+  }, [focus])
+
+  // Once the entries are in, the focused one is scrolled to and flashed.
+  useEffect(() => {
+    if (!focus || !entries) return
+    const el = gridRef.current?.querySelector<HTMLElement>(`[data-species="${CSS.escape(focus)}"]`)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.classList.remove('pokedex-cell-flash')
+    void el.offsetWidth
+    el.classList.add('pokedex-cell-flash')
+  }, [focus, entries])
 
   const species = entries?.filter((e) => !e.form) ?? []
   const forms = entries?.filter((e) => e.form) ?? []
@@ -74,7 +90,7 @@ function PokedexModal({ onClose }: Props): React.JSX.Element {
           </span>
           <SearchBar className="pokedex-search" placeholder="Search name or number…" value={search} onChange={setSearch} autoFocus />
         </RarityCard>
-        <div className={`pokedex-grid${entries ? '' : ' pokedex-grid-loading'}`}>
+        <div ref={gridRef} className={`pokedex-grid${entries ? '' : ' pokedex-grid-loading'}`}>
           {!entries && <ModalSpinner />}
           {shown.map((e) => {
             // An alternate form shows its species' name, and the form itself in a tag on
@@ -84,6 +100,7 @@ function PokedexModal({ onClose }: Props): React.JSX.Element {
             return (
             <div
               key={e.species}
+              data-species={e.species}
               className={`pokedex-cell rarity-card rarity-tier-${e.registered ? e.rarityTier : 'common'}${e.registered ? '' : ' pokedex-cell-unknown'}${e.form ? ' pokedex-cell-form' : ''}`}
               title={`#${e.num} ${e.species}${e.hints.length ? `\nFound: ${e.hints.map((h) => h.label).join(', ')}` : ''}`}
             >

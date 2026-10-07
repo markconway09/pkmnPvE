@@ -121,7 +121,7 @@ export function buyCoins(amount: number): CoinBalance {
   return { coins: getCoins(), money: getMoney() }
 }
 
-// Today's local date, as the daily offer's key (and the Draft's first win of the day).
+// Today's local date, as the daily offer's key (and the Draft's first full gauntlet of the day).
 export function today(): string {
   const now = new Date()
   const pad = (n: number): string => String(n).padStart(2, '0')

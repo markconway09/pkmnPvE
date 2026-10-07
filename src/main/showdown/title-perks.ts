@@ -2,6 +2,7 @@ import type { RarityTier } from '../../shared/battle-types'
 import { POKEMON_SELL_PRICES, SHINY_SELL_BONUS } from '../../shared/battle-types'
 import type { GameCornerPerks, Title } from '../../shared/titles'
 import {
+  GAME_CORNER_TITLES,
   BLACKJACK_PAYOUT,
   BROKER_DOUBLE_TIERS,
   EDGE_LORD_EDGE_MULTIPLIER,
@@ -68,6 +69,7 @@ export function getGameCornerPerks(): GameCornerPerks {
     plinkoEdgeMultiplier: hasTitle('Edge Lord') ? EDGE_LORD_EDGE_MULTIPLIER : 1,
     plinkoNearEdgeMultiplier: hasTitle('Edge Lord') ? EDGE_LORD_NEAR_EDGE_MULTIPLIER : 1,
     blackjackPayout: hasTitle('9+10') ? NINE_PLUS_TEN_BLACKJACK_PAYOUT : BLACKJACK_PAYOUT,
-    blackjackWinPayout: hasTitle('9+10') ? NINE_PLUS_TEN_WIN_PAYOUT : BLACKJACK_WIN_PAYOUT
+    blackjackWinPayout: hasTitle('9+10') ? NINE_PLUS_TEN_WIN_PAYOUT : BLACKJACK_WIN_PAYOUT,
+    titles: [...new Set(Object.values(GAME_CORNER_TITLES).flat())].filter(hasTitle)
   }
 }

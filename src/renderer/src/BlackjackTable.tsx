@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { GameCornerLoading } from './GameCornerTabs'
 import type { BlackjackOutcome, BlackjackView } from '../../shared/blackjack'
 import BetSlider, { maxBet, placedBet, useGameCornerPerks, useSavedBet, betStep } from './BetSlider'
+import GameCornerTitles from './GameCornerTitles'
 import type { GameCornerGameProps } from './GameCornerTabs'
 import PlayingCard from './PlayingCard'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
@@ -186,6 +187,7 @@ function BlackjackTable({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCor
           </button>
         </p>
       )}
+      <GameCornerTitles game="blackjack" perks={perks} />
       {notes.layer}
     </div>
   )

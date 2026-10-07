@@ -342,6 +342,8 @@ function MainMenu({
   const [boxSortDescending, setBoxSortDescending] = useState(true)
   const [playerTrainerOpen, setPlayerTrainerOpen] = useState(false)
   const [pokedexOpen, setPokedexOpen] = useState(false)
+  // The entry to open the Pokedex at - from a clicked "registered" pop-up.
+  const [pokedexFocus, setPokedexFocus] = useState<string | null>(null)
   const [starterOpen, setStarterOpen] = useState(false)
   // The Items window (the bag and the shop together, the Key Items and the TMs).
   const [itemsOpen, setItemsOpen] = useState(false)
@@ -555,6 +557,11 @@ function MainMenu({
   useEffect(
     () =>
       onRewardsFocus((focus) => {
+        if (focus.tab === 'pokedex') {
+          setPokedexFocus(focus.name)
+          setPokedexOpen(true)
+          return
+        }
         refreshMissions()
         refreshAchievements()
         setAchievementFocus(focus.tab === 'achievements' ? focus.name : null)
@@ -1443,7 +1450,7 @@ function MainMenu({
           {tmSearch.modal}
 
           {/* The DexNav (once owned): the Pokemon being hunted, its chain, and where to look. */}
-          <DexNavPanel wildLevel={effectiveWildLevelCap} disabled={fightBusy || teamEmpty} onHunt={(id) => onFight(id)} />
+          <DexNavPanel wildLevel={effectiveWildLevelCap} disabled={fightBusy || teamEmpty} labOpen={allBossesDefeated} onHunt={(id) => onFight(id)} />
           </>
           ) : (
           <>
@@ -1953,7 +1960,15 @@ function MainMenu({
         />
       )}
 
-      {pokedexOpen && <PokedexModal onClose={() => setPokedexOpen(false)} />}
+      {pokedexOpen && (
+        <PokedexModal
+          focus={pokedexFocus}
+          onClose={() => {
+            setPokedexOpen(false)
+            setPokedexFocus(null)
+          }}
+        />
+      )}
 
 
       {starterOpen && (

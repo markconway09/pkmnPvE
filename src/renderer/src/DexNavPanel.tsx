@@ -20,6 +20,8 @@ interface Props {
   // The wild level picked on the Battle page - the target only turns up once it's high enough.
   wildLevel: number
   disabled: boolean
+  // The Lab is open (every boss beaten) - where a Lab-only target is hunted.
+  labOpen: boolean
   // A wild battle in this area (the DexNav rolls for its target there).
   onHunt: (location: WildLocationId) => void
 }
@@ -31,7 +33,7 @@ const percent = (chance: number): string => `${Math.round(chance * 100)}%`
  * chain with how likely it is to turn up and its shiny boost, a Hunt button for every area
  * it lives in (and Anywhere), and a picker for a new target.
  */
-function DexNavPanel({ wildLevel, disabled, onHunt }: Props): React.JSX.Element | null {
+function DexNavPanel({ wildLevel, disabled, labOpen, onHunt }: Props): React.JSX.Element | null {
   const [state, setState] = useState<DexNavState | null>(null)
   const [picking, setPicking] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -47,7 +49,11 @@ function DexNavPanel({ wildLevel, disabled, onHunt }: Props): React.JSX.Element 
   if (!state?.owned) return null
   const target = state.target
   const tooLow = !!target && target.minLevel > wildLevel
-  const areas = target ? WILD_LOCATIONS.filter((l) => l.id === 'all' || target.locations.includes(l.id)) : []
+  // A Lab-only target (Pokedex Diploma) is hunted in the Lab alone - not Anywhere.
+  const areas = target
+    ? WILD_LOCATIONS.filter((l) => (l.id === 'all' && !target.labOnly) || target.locations.includes(l.id))
+    : []
+  const labLocked = !!target?.labOnly && !labOpen
 
   async function choose(species: string | null): Promise<void> {
     setError(null)
@@ -74,7 +80,7 @@ function DexNavPanel({ wildLevel, disabled, onHunt }: Props): React.JSX.Element 
       <div className="classic-section-head">
         <img className="classic-section-icon" src="./sprites/misc/dexnav.png" alt="" />
         <span className="run-hud-label">DexNav</span>
-        <span className="classic-section-sub">Hunt a Pokémon you've registered</span>
+        <span className="classic-section-sub">{state.diploma ? 'Hunt any Pokémon' : "Hunt a Pokémon you've registered"}</span>
       </div>
       <div className="dexnav-panel">
         {target ? (
@@ -106,6 +112,8 @@ function DexNavPanel({ wildLevel, disabled, onHunt }: Props): React.JSX.Element 
               </span>
               {tooLow ? (
                 <span className="dexnav-warning">Turns up from wild level {target.minLevel} - raise the wild level to hunt it</span>
+              ) : labLocked ? (
+                <span className="dexnav-warning">Only found in the Lab - it opens once every boss is beaten</span>
               ) : (
                 <div className="dexnav-areas">
                   {areas.map((loc) => (

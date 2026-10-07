@@ -3,6 +3,7 @@ import { GameCornerLoading } from './GameCornerTabs'
 import type { PlinkoDrop, PlinkoRisk } from '../../shared/plinko'
 import { PLINKO_PAYOUTS, PLINKO_RISKS, PLINKO_RISK_LABELS, PLINKO_ROWS, PLINKO_SLOTS, plinkoSlotMultiplier } from '../../shared/plinko'
 import BetSlider, { maxBet, placedBet, useGameCornerPerks, useSavedBet, betStep } from './BetSlider'
+import GameCornerTitles from './GameCornerTitles'
 import type { GameCornerGameProps } from './GameCornerTabs'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
 import { playCornerClunk, playCornerTick } from './ticks'
@@ -343,6 +344,7 @@ function PlinkoBoard({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorner
           </button>
         </p>
       )}
+      <GameCornerTitles game="plinko" perks={perks} />
       {notes.layer}
     </div>
   )

@@ -15,6 +15,8 @@ export type AchievementStat =
   // Pokedex entries registered: species, and alternate forms on top of those.
   | 'dexSpecies'
   | 'dexForms'
+  // 1 once every species in the National Dex is registered (forms don't count).
+  | 'dexComplete'
   // What the box holds right now.
   | 'shinyOwned'
   | 'legendaryOwned'
@@ -28,6 +30,9 @@ export type AchievementStat =
   | 'shayminOwned'
   | 'deoxysOwned'
   | 'zygardeOwned'
+  // Cobalion, Terrakion and Virizion registered in the Pokedex (how many of the three).
+  | 'swordsOfJustice'
+  | 'shinyCelebiOwned'
   // Pokemon owned (the companion too) at max friendship.
   | 'maxFriendship'
   // Alcremie's creams in the Pokedex (all nine - see ALCREMIE_FORMS).
@@ -45,6 +50,8 @@ export type AchievementStat =
   // The most stars a Pokemon has reached by merging (a raid catch's own stars don't count).
   | 'mergedStars'
   | 'mergeShinied'
+  // A Magearna (any form) owned at ★5 or more.
+  | 'magearnaFiveStar'
   | 'raidsWon'
   | 'gmaxSpecies'
   | 'goldRaidsWon'
@@ -85,6 +92,8 @@ export type AchievementStat =
   | 'rouletteNumberWins'
   | 'plinkoDrops'
   | 'plinkoEdges'
+  // Dice rolls won with a 5% chance to win or less.
+  | 'diceLongShots'
   // TMs: searches that found a TM, gold TMs found (searches and quick checks), searches
   // ended by a wild Pokemon, the base areas (not Anywhere or the Lab) searched, Lab
   // searches that found a TM, TMs owned, and types whose every TM is owned.
@@ -121,8 +130,18 @@ export interface AchievementReward {
   money?: number
   coins?: number
   items?: { itemId: string; count: number }[]
+  // Pokemon gifted straight into the box: a basic set of that species (its Showdown name,
+  // e.g. 'Pikachu' or 'Lycanroc-Dusk') at that level - or, with none, a little under the
+  // level cap like any other gift - shiny if asked.
+  pokemon?: AchievementGiftMon[]
   // A title the player can show beside their name.
   title?: string
+}
+
+export interface AchievementGiftMon {
+  species: string
+  level?: number
+  shiny?: boolean
 }
 
 export interface AchievementDef {
@@ -136,6 +155,12 @@ export interface AchievementDef {
 }
 
 const item = (itemId: string, count = 1): { itemId: string; count: number } => ({ itemId, count })
+// A gifted Pokemon, e.g. mon('Eevee'), mon('Eevee', 30) or mon('Rayquaza', 70, true).
+const mon = (species: string, level?: number, shiny = false): AchievementGiftMon => ({
+  species,
+  ...(level ? { level } : {}),
+  ...(shiny ? { shiny } : {})
+})
 
 export const ACHIEVEMENTS: AchievementDef[] = [
   // Battle
@@ -304,6 +329,15 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     reward: { items: [item('randomlegendary')], title: 'Professor', keyItems: ['shinycharm'] }
   },
   {
+    id: 'dexcomplete',
+    name: 'Pokédex Complete',
+    description: "Register every Pokémon in the National Dex (forms don't count)",
+    category: 'Collection',
+    stat: 'dexComplete',
+    goal: 1,
+    reward: { keyItems: ['pokedexdiploma'] }
+  },
+  {
     id: 'forms25',
     name: 'Shape Shifter',
     description: 'Register 25 alternate forms in the Pokédex',
@@ -464,6 +498,24 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     stat: 'zygardeOwned',
     goal: 1,
     reward: { keyItems: ['zygardecube'] }
+  },
+  {
+    id: 'swordsofjustice',
+    name: 'Swords of Justice',
+    description: 'Register Cobalion, Terrakion and Virizion in the Pokédex',
+    category: 'Collection',
+    stat: 'swordsOfJustice',
+    goal: 3,
+    reward: { pokemon: [mon('Keldeo-Resolute')] }
+  },
+  {
+    id: 'shinycelebi',
+    name: 'Time Traveler',
+    description: 'Own a shiny Celebi',
+    category: 'Collection',
+    stat: 'shinyCelebiOwned',
+    goal: 1,
+    reward: { pokemon: [mon('Zarude-Dada')] }
   },
   {
     id: 'evolve1',
@@ -658,7 +710,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     category: 'Game Corner',
     stat: 'jackpots',
     goal: 1,
-    reward: { coins: 1000, title: 'Golden Touch' }
+    reward: { coins: 1000, title: 'Golden Touch', pokemon: [mon('Gimmighoul-Roaming')] }
   },
   {
     id: 'slotwins10k',
@@ -723,6 +775,15 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     goal: 1,
     reward: { coins: 500, title: 'Edge Lord' }
   },
+  {
+    id: 'dicelongshot',
+    name: 'Against the Odds',
+    description: 'Win a Dice roll with a 5% chance to win or less',
+    category: 'Game Corner',
+    stat: 'diceLongShots',
+    goal: 1,
+    reward: { coins: 500, title: 'Long Shot' }
+  },
 
   // Merges & Raids
   {
@@ -751,6 +812,15 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     stat: 'mergedStars',
     goal: 5,
     reward: { title: 'Five-Star' }
+  },
+  {
+    id: 'magearna5',
+    name: 'Artificial Heart',
+    description: 'Have a ★5 Magearna',
+    category: 'Merges & Raids',
+    stat: 'magearnaFiveStar',
+    goal: 1,
+    reward: { pokemon: [mon('Magearna-Original')] }
   },
   {
     id: 'merge50',

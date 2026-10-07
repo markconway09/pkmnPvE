@@ -96,7 +96,7 @@ export interface DraftBattleResult {
   losses: number
   over: boolean
   reward: number
-  // The first Draft win of the day: it gave a Shiny Patch.
+  // The first full gauntlet of the day: it gave a Shiny Patch.
   shinyPatch?: boolean
 }
 
@@ -150,6 +150,7 @@ export type ChaosModifier =
   | { kind: 'glasscannon'; pick?: number }
   | { kind: 'fortress'; pick?: number }
   | { kind: 'wildcard'; pick?: number }
+  | { kind: 'lockon'; pick?: number }
 
 // The Pokemon a modifier is pinned to (its index in the picks), if it is.
 export function chaosModifierPin(modifier: ChaosModifier): number | undefined {
@@ -157,12 +158,12 @@ export function chaosModifierPin(modifier: ChaosModifier): number | undefined {
 }
 
 // The modifiers that go on one of the player's Pokemon.
-export const CHAOS_MON_MODIFIERS: ChaosModifier['kind'][] = ['ability', 'stat', 'tutor', 'glasscannon', 'fortress', 'wildcard']
+export const CHAOS_MON_MODIFIERS: ChaosModifier['kind'][] = ['ability', 'stat', 'tutor', 'glasscannon', 'fortress', 'wildcard', 'lockon']
 
 // How every chaos battle starts from now on. Weather and terrain last until a move or
 // ability replaces them, Trick Room until someone uses Trick Room; Tailwind (4 turns) and
 // Reflect + Light Screen (5 turns) on the player's side; hazards on the opponent's; and
-// the opponent's lead at -1 Attack.
+// the opponent's lead at -1 Attack, Sp. Atk and Speed.
 export interface ChaosField {
   weather: string | null
   terrain: string | null

@@ -6,6 +6,7 @@ import type { LocalMusicFile } from '../shared/music'
 import type { UiScaleChoice, UiScaleState } from '../shared/ui-scale'
 import type { CoinBalance, DailyCoinMon, DailyCoinMonPurchase, DailyCoinOffer, DailyPetalDeals, SlotRules, SlotSpinResult } from '../shared/slots'
 import type { BlackjackView } from '../shared/blackjack'
+import type { DiceRoll } from '../shared/dice'
 import type { AchievementClaimResult, AchievementsState } from '../shared/achievements'
 import type { CloudSave, CloudStatus } from '../shared/cloud'
 import type { RouletteSpin } from '../shared/roulette'
@@ -44,6 +45,7 @@ import type {
   RunMovesPreview,
   RunView,
   PokedexEntry,
+  PokedexRegistration,
   RaidBossPreview,
   UpdateCheckResult,
   UpdateProgress,
@@ -280,6 +282,8 @@ const api = {
   hitBlackjack: (): Promise<BlackjackView> => ipcRenderer.invoke('blackjack:hit'),
   standBlackjack: (): Promise<BlackjackView> => ipcRenderer.invoke('blackjack:stand'),
   doubleBlackjack: (): Promise<BlackjackView> => ipcRenderer.invoke('blackjack:double'),
+  // Bets the roll lands over (or under) the divider at target.
+  rollDice: (bet: number, target: number, over: boolean): Promise<DiceRoll> => ipcRenderer.invoke('dice:roll', bet, target, over),
   // What the player's titles change in the Game Corner (the bet cap, Plinko's edges).
   getGameCornerPerks: (): Promise<GameCornerPerks> => ipcRenderer.invoke('gamecorner:perks'),
   getRouletteHistory: (): Promise<number[]> => ipcRenderer.invoke('roulette:history'),
@@ -288,6 +292,12 @@ const api = {
   dropPlinko: (bet: number, risk: PlinkoRisk): Promise<PlinkoDrop> => ipcRenderer.invoke('plinko:drop', bet, risk),
   getTrainerProfile: (): Promise<TrainerProfile> => ipcRenderer.invoke('profile:get'),
   getPokedex: (): Promise<PokedexEntry[]> => ipcRenderer.invoke('profile:pokedex'),
+  // Pokedex entries just registered for the first time; returns a function to stop listening.
+  onPokedexRegistered: (listener: (entries: PokedexRegistration[]) => void): (() => void) => {
+    const handler = (_event: unknown, entries: PokedexRegistration[]): void => listener(entries)
+    ipcRenderer.on('pokedex:registered', handler)
+    return () => ipcRenderer.removeListener('pokedex:registered', handler)
+  },
   checkForUpdate: (): Promise<UpdateCheckResult> => ipcRenderer.invoke('update:check'),
   // The player's own background picture as a data: URL (null = the plain one).
   getBackground: (): Promise<string | null> => ipcRenderer.invoke('background:get'),

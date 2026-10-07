@@ -544,7 +544,7 @@ export class AIPlayer extends BattlePlayer {
   private ownEntryCost(mon: PokemonSwitchRequestData, hazards: Map<string, number> = this.ownHazards): { damage: number; extra: number } {
     const types = speciesStatsAndTypes(speciesOf(mon), null).types
     const ability = toID(mon.ability ?? mon.baseAbility)
-    const grounded = this.gravity || !(types.includes('Flying') || ability === 'levitate' || mon.item === 'airballoon')
+    const grounded = this.gravity || !(types.includes('Flying') || ability === 'levitate' || ability === 'eelevate' || mon.item === 'airballoon')
     const { status } = parseCondition(mon.condition)
     return this.hazardEntryCost(hazards, types, grounded, mon.item === 'heavydutyboots' || ability === 'magicguard', !!status)
   }
@@ -695,7 +695,7 @@ export class AIPlayer extends BattlePlayer {
   private foeGrounded(foe: OpponentInfo): Chance {
     if (this.gravity || foe.smackedDown) return 'certain'
     if (foe.types.includes('Flying') || foe.airBalloon || foe.magnetRise) return null
-    const levitate = this.foeAbilityChance(foe, (a) => a === 'levitate')
+    const levitate = this.foeAbilityChance(foe, (a) => a === 'levitate' || a === 'eelevate')
     return levitate === 'certain' ? null : levitate === 'possible' ? 'possible' : 'certain'
   }
 
@@ -703,7 +703,7 @@ export class AIPlayer extends BattlePlayer {
     if (this.gravity) return true
     return !(
       ownTypes.includes('Flying') ||
-      (ownActive.ability ?? ownActive.baseAbility) === 'levitate' ||
+      ['levitate', 'eelevate'].includes(ownActive.ability ?? ownActive.baseAbility) ||
       ownActive.item === 'airballoon'
     )
   }

@@ -2,7 +2,7 @@ import { randomInt } from 'node:crypto'
 import type { RouletteBetResult, RouletteSpin } from '../../shared/roulette'
 import { ROULETTE_MAX_FULL_BETS, ROULETTE_NUMBERS, betOdds, betWins, isRouletteBet } from '../../shared/roulette'
 import { betCap, hasTitle } from './title-perks'
-import { CROUPIER_REFUND_CHANCE } from '../../shared/titles'
+import { CROUPIER_DOUBLE_CHANCE, CROUPIER_REFUND_CHANCE } from '../../shared/titles'
 import { changeCoins, getCoins } from './game-corner-store'
 import { onPlayerChange } from './player-session'
 import { countAchievement } from './achievement-progress'
@@ -51,10 +51,13 @@ export function spinRoulette(bets: Record<string, number>): RouletteSpin {
   // The Croupier title: now and then a losing spin gives every bet back.
   const refunded = totalReturned < totalBet && hasTitle('Croupier') && Math.random() < CROUPIER_REFUND_CHANCE
   if (refunded) totalReturned = totalBet
+  // ...and now and then a winning one pays its winnings (what came back on top of the bets) twice.
+  const doubled = totalReturned > totalBet && hasTitle('Croupier') && Math.random() < CROUPIER_DOUBLE_CHANCE
+  if (doubled) totalReturned += totalReturned - totalBet
   if (totalReturned > 0) changeCoins(totalReturned)
 
   history = [pocket, ...history].slice(0, HISTORY_KEPT)
   countAchievement('rouletteSpins')
   if (results.some((r) => r.key.startsWith('n:') && r.returned > 0)) countAchievement('rouletteNumberWins')
-  return { pocket, bets: results, totalBet, totalReturned, coins: getCoins(), history: [...history], refunded }
+  return { pocket, bets: results, totalBet, totalReturned, coins: getCoins(), history: [...history], refunded, doubled }
 }

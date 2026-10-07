@@ -221,7 +221,7 @@ function BattleResultModal({
           </div>
           {draftResult.shinyPatch && (
             <div className="exp-gain-row">
-              <span className="exp-gain-species">First win today</span>
+              <span className="exp-gain-species">Full gauntlet today</span>
               <span className="exp-gain-detail">+1 Shiny Patch</span>
             </div>
           )}

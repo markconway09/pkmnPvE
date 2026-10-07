@@ -31,7 +31,8 @@ export function useGameCornerPerks(): GameCornerPerks {
     plinkoEdgeMultiplier: 1,
     plinkoNearEdgeMultiplier: 1,
     blackjackPayout: BLACKJACK_PAYOUT,
-    blackjackWinPayout: BLACKJACK_WIN_PAYOUT
+    blackjackWinPayout: BLACKJACK_WIN_PAYOUT,
+    titles: []
   })
   useEffect(() => {
     // Loaded again whenever the title changes (the trainer profile opens over the games).
@@ -53,7 +54,7 @@ export function useGameCornerPerks(): GameCornerPerks {
  * starts at the last amount bet there, and placedBet brings it down to what's held if
  * that's less.
  */
-export function useSavedBet(game: 'slots' | 'blackjack' | 'roulette' | 'plinko'): [number, (bet: number) => void] {
+export function useSavedBet(game: 'slots' | 'blackjack' | 'roulette' | 'plinko' | 'dice'): [number, (bet: number) => void] {
   const key = `pkmnpve.lastBet.${game}`
   const [bet, setBet] = useState(() => {
     try {

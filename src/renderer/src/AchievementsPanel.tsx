@@ -3,6 +3,9 @@ import type { ItemOptionEntry } from '../../shared/battle-types'
 import type { AchievementsState, AchievementView } from '../../shared/achievements'
 import { ACHIEVEMENT_CATEGORIES } from '../../shared/achievements'
 import ItemSprite from './ItemSprite'
+import SpriteImage from './SpriteImage'
+import ShinyIcon from './ShinyIcon'
+import { toSpriteId } from '../../shared/battle-types'
 import { formatMoney } from './money'
 import { errorMessage, pointOf, useFloatingNotes } from './FloatingNotes'
 import CoinIcon from './CoinIcon'
@@ -204,6 +207,17 @@ function AchievementsPanel({ state, onChange, onClaimed, focus, onFocused }: Pro
                   </li>
                 )
               })}
+              {(a.reward.pokemon ?? []).map(({ species, level, shiny }) => (
+                <li key={`mon-${species}`} className="achievement-reward-mon" title="A gift Pokemon - sent to the box">
+                  <span className="mission-reward-icon">
+                    <SpriteImage style="2d-static" spriteId={toSpriteId(species)} shiny={shiny} alt={species} draggable={false} />
+                  </span>
+                  <span className="mission-reward-name">
+                    {species} {level && <span className="achievement-reward-mon-level">Lv. {level}</span>}
+                  </span>
+                  {shiny ? <ShinyIcon /> : <span className="achievement-reward-tag">Pokémon</span>}
+                </li>
+              ))}
               {!!a.reward.money && (
                 <li className="mission-reward-money">
                   <span className="mission-reward-icon">₽</span>

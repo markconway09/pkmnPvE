@@ -110,6 +110,9 @@ interface DraftPick {
   boosts?: Partial<Record<keyof StatBlock, number>>
   glassCannon?: number
   fortress?: number
+  // Chaos: how many Lock-Ons - its moves never miss (one-hit KO moves aside), and a
+  // second one adds +1 critical-hit stage.
+  lockOn?: number
   // Chaos: how many Pokemon modifiers it has taken (see CHAOS_MON_MODIFIER_CAP).
   modifiers?: number
 }
@@ -280,9 +283,9 @@ function persist(): void {
   writeFileSync(playerPathFor('draft.json'), JSON.stringify(draft ?? null), 'utf8')
 }
 
-// The first Draft battle won each day gives a Shiny Patch. The day it was last given is
-// kept apart from draft.json, which starts over with every draft.
-/** Whether today's first-win Shiny Patch has already been given. */
+// The first full Draft gauntlet (all DRAFT_MAX_WINS wins) each day gives a Shiny Patch. The day
+// it was last given is kept apart from draft.json, which starts over with every draft.
+/** Whether today's full-gauntlet Shiny Patch has already been given. */
 export function draftDailyWinClaimed(): boolean {
   try {
     return (JSON.parse(readFileSync(playerPathFor('draft-daily.json'), 'utf8')) as { firstWinDay?: string }).firstWinDay === today()
@@ -411,8 +414,8 @@ function startChaosBattleStage(current: StoredDraft): void {
 }
 
 // A chaos opponent's modifiers: half the battle number (rounded down), each a battle-start
-// one they don't have yet - a weather or terrain only when the player has none up - or a
-// +50% boost to one of their Pokemon's best stat (not HP).
+// one they don't have yet - a weather or terrain only when the player has none up - a
+// +50% boost to one of their Pokemon's best stat (not HP), or a Lock-On on one of them.
 function giveOpponentModifiers(current: StoredDraft, opponent: NonNullable<StoredDraft['opponent']>): void {
   const mine = chaosFieldOf(current)
   const theirs: ChaosField = { weather: null, terrain: null, trickRoom: false }
@@ -435,6 +438,13 @@ function giveOpponentModifiers(current: StoredDraft, opponent: NonNullable<Store
     if (!theirs.stickyWeb) options.push(() => (theirs.stickyWeb = true))
     if ((theirs.spikes ?? 0) < CHAOS_MAX_SPIKES) options.push(() => (theirs.spikes = (theirs.spikes ?? 0) + 1))
     if (!theirs.intimidate) options.push(() => (theirs.intimidate = true))
+    const unlocked = opponent.team.filter((mon) => (mon.lockOn ?? 0) < CHAOS_MON_MODIFIER_CAP)
+    if (unlocked.length > 0) {
+      options.push(() => {
+        const mon = pickRandom(unlocked)
+        mon.lockOn = (mon.lockOn ?? 0) + 1
+      })
+    }
     pickRandom(options)()
   }
   opponent.field = theirs
@@ -590,11 +600,19 @@ export function chooseChaosModifier(index: number, target?: ChaosModifierTarget)
       if (!pick.set.moves[slot]) throw new Error('Pick a move to forget')
       if (!isTutorMove(learned.id) || pick.set.moves.some((m) => Dex.moves.get(m).id === learned.id)) throw new Error('Pick a move it can learn')
       pick.set.moves = pick.set.moves.map((m, i) => (i === slot ? learned.name : m))
+    } else if (modifier.kind === 'lockon') {
+      pick.lockOn = (pick.lockOn ?? 0) + 1
     } else if (modifier.kind === 'wildcard') {
-      // A new Pokemon in its place - the stat modifiers on that spot stay.
+      // A new Pokemon in its place - the stat modifiers (and Lock-Ons) on that spot stay.
       const [replacement] = rollMons([wildCardTier(current)], 1, current.picks)
       if (!replacement) throw new Error('No Pokémon left to swap in')
-      current.picks[target!.pick] = { ...replacement, boosts: pick.boosts, glassCannon: pick.glassCannon, fortress: pick.fortress }
+      current.picks[target!.pick] = {
+        ...replacement,
+        boosts: pick.boosts,
+        glassCannon: pick.glassCannon,
+        fortress: pick.fortress,
+        lockOn: pick.lockOn
+      }
     }
     current.picks[target!.pick].modifiers = (pick.modifiers ?? 0) + 1
   }
@@ -630,11 +648,13 @@ function chaosTags(pick: DraftPick): string[] | undefined {
   )
   if (pick.glassCannon) tags.push(`Glass Cannon${pick.glassCannon > 1 ? ` x${pick.glassCannon}` : ''}`)
   if (pick.fortress) tags.push(`Fortress${pick.fortress > 1 ? ` x${pick.fortress}` : ''}`)
+  if (pick.lockOn) tags.push(`Lock-On${pick.lockOn > 1 ? ` x${pick.lockOn}` : ''}`)
   return tags.length > 0 ? tags : undefined
 }
 
 // A chaos opponent's modifiers in words, for the tooltip on them in battle: their
-// battle-start ones as the player meets them, and the stat boosts of the Pokemon they bring.
+// battle-start ones as the player meets them, and the stat boosts and Lock-Ons of the
+// Pokemon they bring.
 function opponentModifiersView(mine: ChaosField, theirs: ChaosField | undefined, team: DraftPick[]): OpponentModifiersView {
   const label = (options: { id: string; label: string }[], id: string): string => options.find((o) => o.id === id)?.label ?? id
   const field = theirs
@@ -647,13 +667,14 @@ function opponentModifiersView(mine: ChaosField, theirs: ChaosField | undefined,
         theirs.stealthRock ? 'Stealth Rock on your side' : null,
         theirs.stickyWeb ? 'Sticky Web on your side' : null,
         theirs.spikes ? `Spikes on your side${theirs.spikes > 1 ? ` x${theirs.spikes}` : ''}` : null,
-        theirs.intimidate ? 'Your lead starts at -1 Attack' : null
+        theirs.intimidate ? 'Your lead starts at -1 Attack, Sp. Atk and Speed' : null
       ].filter((w): w is string => !!w)
     : []
   const mons = team.flatMap((pick) => {
     const boosts = (Object.entries(pick.boosts ?? {}) as [keyof StatBlock, number][])
       .filter(([, count]) => count > 0)
       .map(([stat, count]) => `+${Math.round((CHAOS_STAT_BOOST ** count - 1) * 100)}% ${CHAOS_STAT_LABELS[stat]}`)
+    if (pick.lockOn) boosts.push(pick.lockOn > 1 ? 'Lock-On x2 (never misses, +1 crit stage)' : 'Lock-On (never misses)')
     return boosts.length > 0 ? [{ species: pick.set.species, boosts }] : []
   })
   return { field, mons }
@@ -661,7 +682,7 @@ function opponentModifiersView(mine: ChaosField, theirs: ChaosField | undefined,
 
 // The battle's starting field from the chaos modifiers (see ChaosField).
 // Both sides' modifiers together: Tailwind and screens on their own side, hazards and the
-// Attack drop on the other one. Trick Room from both cancels out.
+// lead's stat drop on the other one. Trick Room from both cancels out.
 function chaosStartField(
   mine: ChaosField,
   theirs: ChaosField = { weather: null, terrain: null, trickRoom: false }
@@ -670,10 +691,10 @@ function chaosStartField(
   terrain: string | null
   trickRoom: boolean
   sideConditions: { side: 0 | 1; id: string; layers?: number }[]
-  leadAtkDrop: (0 | 1)[]
+  leadDrop: (0 | 1)[]
 } {
   const sideConditions: { side: 0 | 1; id: string; layers?: number }[] = []
-  const leadAtkDrop: (0 | 1)[] = []
+  const leadDrop: (0 | 1)[] = []
   ;([
     [mine, 0],
     [theirs, 1]
@@ -684,14 +705,14 @@ function chaosStartField(
     if (field.stealthRock) sideConditions.push({ side: other, id: 'stealthrock' })
     if (field.stickyWeb) sideConditions.push({ side: other, id: 'stickyweb' })
     if (field.spikes) sideConditions.push({ side: other, id: 'spikes', layers: field.spikes })
-    if (field.intimidate) leadAtkDrop.push(other)
+    if (field.intimidate) leadDrop.push(other)
   })
   return {
     weather: mine.weather ?? theirs.weather,
     terrain: mine.terrain ?? theirs.terrain,
     trickRoom: mine.trickRoom !== theirs.trickRoom,
     sideConditions,
-    leadAtkDrop
+    leadDrop
   }
 }
 
@@ -838,11 +859,14 @@ export function beginDraftBattle(bring: number[]): {
   format: DraftFormat
   p1team: PokemonSet[]
   opponent: { name: string; spriteId: string; team: PokemonSet[]; difficulty: AiDifficulty }
-  // Chaos: the starting field, and each side's Pokemon's stat multipliers (in team order).
+  // Chaos: the starting field, and each side's Pokemon's stat multipliers and Lock-Ons (in
+  // team order).
   chaos?: {
     field: ReturnType<typeof chaosStartField>
     boosts: StatBlock[]
     foeBoosts: StatBlock[]
+    lockOn: number[]
+    foeLockOn: number[]
     // The opponent's modifiers in words, for the tooltip on them.
     foeModifiers: OpponentModifiersView
   }
@@ -877,6 +901,8 @@ export function beginDraftBattle(bring: number[]): {
             field: chaosStartField(chaosFieldOf(current), current.opponent.field),
             boosts: bring.map((i) => boostMultipliers(current.picks[i])),
             foeBoosts: theirPicks.map((i) => boostMultipliers(current.opponent!.team[i])),
+            lockOn: bring.map((i) => current.picks[i].lockOn ?? 0),
+            foeLockOn: theirPicks.map((i) => current.opponent!.team[i].lockOn ?? 0),
             foeModifiers: opponentModifiersView(
               chaosFieldOf(current),
               current.opponent.field,
@@ -892,9 +918,10 @@ export function finishDraftBattle(won: boolean, flawless = false): DraftBattleRe
   const current = activeDraft('battling')
   current.inBattle = false
   if (won && flawless) countAchievement('flawlessDraftWins')
-  const shinyPatch = won && firstWinToday()
-  if (shinyPatch) addItem(SHINY_PATCH_ITEM_ID, 1)
   recordResult(current, won)
+  // The win that completes the gauntlet earns the day's Shiny Patch.
+  const shinyPatch = won && current.wins >= DRAFT_MAX_WINS && firstWinToday()
+  if (shinyPatch) addItem(SHINY_PATCH_ITEM_ID, 1)
   persist()
   return { wins: current.wins, losses: current.losses, over: current.status === 'finished', reward: current.reward, shinyPatch }
 }

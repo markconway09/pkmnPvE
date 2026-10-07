@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import type { PokemonSet } from 'pokemon-showdown/dist/sim/teams.js'
-import { DEXNAV_ITEM_ID, type WildLocationConfig } from '../../shared/battle-types'
+import { DEXNAV_ITEM_ID, DIPLOMA_ITEM_ID, type WildLocationConfig } from '../../shared/battle-types'
 import {
   DEXNAV_MAX_CHAIN,
   PROFESSOR_DEXNAV_MAX_CHAIN,
@@ -57,8 +57,13 @@ function persist(): void {
   writeFileSync(playerPathFor('dexnav.json'), JSON.stringify(getState()), 'utf8')
 }
 
+// With the Pokedex Diploma, any Pokemon can be hunted (see dexNavHuntInfo).
+function hasDiploma(): boolean {
+  return hasItem(DIPLOMA_ITEM_ID)
+}
+
 function candidateFor(species: string, num: number): DexNavCandidate | null {
-  const info = dexNavHuntInfo(species)
+  const info = dexNavHuntInfo(species, hasDiploma())
   return info ? { species, num, ...info, rarityTier: speciesRarityTier(species) } : null
 }
 
@@ -77,16 +82,21 @@ export function getDexNavState(): DexNavState {
   const s = getState()
   return {
     owned: hasItem(DEXNAV_ITEM_ID),
+    diploma: hasDiploma(),
     target: s.target ? candidateFor(s.target, getPokedex().find((e) => e.species === s.target)?.num ?? 0) : null,
     chain: effectiveChain(),
     maxChain: maxChain()
   }
 }
 
-/** Every species the DexNav can hunt right now: registered in the Pokedex, and found in the wild. */
+/**
+ * Every species the DexNav can hunt right now: registered in the Pokedex, and found in the
+ * wild - or, with the Pokedex Diploma, every Pokedex entry, forms too.
+ */
 export function listDexNavCandidates(): DexNavCandidate[] {
+  const diploma = hasDiploma()
   return getPokedex()
-    .filter((e) => e.registered)
+    .filter((e) => diploma || e.registered)
     .flatMap((e) => {
       const candidate = candidateFor(e.species, e.num)
       return candidate ? [candidate] : []
@@ -101,8 +111,9 @@ export function setDexNavTarget(species: string | null): DexNavState {
     s.target = null
     s.chain = 0
   } else {
-    if (!hasRegisteredSpecies(species)) throw new Error(`${species} isn't registered in your Pokédex yet`)
-    if (!dexNavHuntInfo(species)) throw new Error(`${species} can't be found in the wild`)
+    const diploma = hasDiploma()
+    if (!diploma && !hasRegisteredSpecies(species)) throw new Error(`${species} isn't registered in your Pokédex yet`)
+    if (!dexNavHuntInfo(species, diploma)) throw new Error(`${species} can't be found in the wild`)
     if (s.target !== species) s.chain = 0
     s.target = species
   }
@@ -113,17 +124,19 @@ export function setDexNavTarget(species: string | null): DexNavState {
 /**
  * A wild battle's roll for the hunted Pokemon: with the DexNav and a target that can live
  * in this area (Anywhere always counts, never the Lab) at this level, it's met at the
- * chain's chance. Null leaves the battle to the usual wild roll.
+ * chain's chance. A Lab-only target (Pokedex Diploma) is met in the Lab and nowhere else.
+ * Null leaves the battle to the usual wild roll.
  */
 export function rollDexNavEncounter(location: WildLocationConfig | null, levelCap: number): PokemonSet | null {
   const s = getState()
   if (!s.target || !hasItem(DEXNAV_ITEM_ID)) return null
-  if (location?.requiresAllBosses) return null
-  const info = dexNavHuntInfo(s.target)
+  const diploma = hasDiploma()
+  const info = dexNavHuntInfo(s.target, diploma)
   if (!info || info.minLevel > levelCap) return null
+  if (info.labOnly ? location?.id !== 'lab' : location?.requiresAllBosses) return null
   if (location && location.id !== 'all' && !info.locations.includes(location.id)) return null
   if (Math.random() >= dexNavChance(s.chain, maxChain())) return null
-  return generateHuntedMon(s.target, levelCap, dexNavShinyMultiplier(s.chain, maxChain()))
+  return generateHuntedMon(s.target, levelCap, dexNavShinyMultiplier(s.chain, maxChain()), diploma)
 }
 
 /** A hunted Pokemon beaten (or caught): the chain grows, up to its max. */

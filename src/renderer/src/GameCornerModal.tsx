@@ -5,9 +5,9 @@ import SlotMachine from './SlotMachine'
 import BlackjackTable from './BlackjackTable'
 import RouletteTable from './RouletteTable'
 import PlinkoBoard from './PlinkoBoard'
+import DiceGame from './DiceGame'
 import CoinShopPanel from './CoinShopPanel'
 import CoinIcon from './CoinIcon'
-import { formatMoney } from './money'
 
 interface Props {
   // The tab it opens on - the one played last.
@@ -30,8 +30,8 @@ interface Props {
 }
 
 /**
- * The Game Corner: one window holding its four games and the Coin Shop, with tabs across
- * the top to switch between them and the close button beside them. The coins and money
+ * The Game Corner: one window holding its games and the Coin Shop, with tabs across
+ * the top to switch between them and the close button beside them. The coins
  * held float at the top right, under the tabs. A game mid-spin or mid-hand locks the tabs and the
  * close button until it's done.
  */
@@ -52,14 +52,11 @@ function GameCornerModal({
   // Leaving the page never leaves the sidebar locked.
   useEffect(() => () => onBusyChange?.(false), [onBusyChange])
   const [coins, setCoins] = useState<number | null>(null)
-  const [money, setMoney] = useState<number | null>(null)
 
   useEffect(() => {
-    Promise.all([window.api.getCoins(), window.api.getMoney()])
-      .then(([c, m]) => {
-        setCoins(c)
-        setMoney(m)
-      })
+    window.api
+      .getCoins()
+      .then(setCoins)
       .catch(() => {})
   }, [])
 
@@ -81,14 +78,12 @@ function GameCornerModal({
     }
   }
 
-  // The coins and money held - floating over the game in the window, beside the tabs on
-  // the page.
+  // The coins held - floating over the game in the window, beside the tabs on the page.
   const balance = (
     <div className="game-corner-balance">
       <span className="slots-coins" title="Coins">
         <CoinIcon /> {coins === null ? '…' : coins.toLocaleString('en-US')}
       </span>
-      {money !== null && <span className="money-display">{formatMoney(money)}</span>}
     </div>
   )
 
@@ -108,21 +103,19 @@ function GameCornerModal({
           {tab === 'blackjack' && <BlackjackTable {...gameProps} />}
           {tab === 'roulette' && <RouletteTable {...gameProps} />}
           {tab === 'plinko' && <PlinkoBoard {...gameProps} />}
+          {tab === 'dice' && <DiceGame {...gameProps} />}
           {tab === 'shop' && (
             <CoinShopPanel
               onCoinsChange={setCoins}
               onBoxChange={onBoxChange}
               focusItem={focusItem}
               onItemFocused={onItemFocused}
-              onMoneyChange={(m) => {
-                setMoney(m)
-                onMoneyChange(m)
-              }}
+              onMoneyChange={onMoneyChange}
             />
           )}
         </div>
 
-        {/* The window: the coins and money held, floating at the top right under the tabs. */}
+        {/* The window: the coins held, floating at the top right under the tabs. */}
         {!inline && balance}
       </div>
     </div>

@@ -2,8 +2,8 @@ import CoinIcon from './CoinIcon'
 import ModalSpinner from './ModalSpinner'
 import TabStrip, { type TabStripTab } from './TabStrip'
 
-export type GameCornerGame = 'slots' | 'blackjack' | 'roulette' | 'plinko'
-// The Game Corner window's tabs: its four games, and the Coin Shop counter.
+export type GameCornerGame = 'slots' | 'blackjack' | 'roulette' | 'plinko' | 'dice'
+// The Game Corner window's tabs: its games, and the Coin Shop counter.
 export type GameCornerTab = GameCornerGame | 'shop'
 
 /** What each game gets from the Game Corner window around it. */
@@ -21,6 +21,7 @@ const TABS: TabStripTab<GameCornerTab>[] = [
   { id: 'blackjack', label: '🃏 Blackjack' },
   { id: 'roulette', label: '🎡 Roulette' },
   { id: 'plinko', label: '🔻 Plinko' },
+  { id: 'dice', label: '🎲 Dice' },
   {
     id: 'shop',
     label: (

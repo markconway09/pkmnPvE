@@ -135,6 +135,7 @@ import {
   hitBlackjack,
   standBlackjack
 } from './showdown/blackjack-store'
+import { rollDice } from './showdown/dice-store'
 import { resetStatsCounters } from './showdown/stats-store'
 import { getRouletteHistory, spinRoulette } from './showdown/roulette-store'
 import { dropPlinko } from './showdown/plinko-store'
@@ -756,6 +757,7 @@ ipcMain.handle('draft:battle', async (_event, bring: number[]) => {
     // Chaos: its modifiers' starting field and stat boosts.
     startField: chaos?.field,
     statMultipliers: chaos ? { p1: chaos.boosts, p2: chaos.foeBoosts } : undefined,
+    lockOn: chaos ? { p1: chaos.lockOn, p2: chaos.foeLockOn } : undefined,
     chaosModifiers: chaos?.foeModifiers
   })
   return activeBattle.getInitialView()
@@ -871,6 +873,7 @@ ipcMain.handle('blackjack:deal', (_event, bet: number) => dealBlackjack(bet))
 ipcMain.handle('blackjack:hit', () => hitBlackjack())
 ipcMain.handle('blackjack:stand', () => standBlackjack())
 ipcMain.handle('blackjack:double', () => doubleBlackjack())
+ipcMain.handle('dice:roll', (_event, bet: number, target: number, over: boolean) => rollDice(bet, target, over))
 ipcMain.handle('debug:setWallet', (_event, money: number, coins: number) => {
   requireAdmin()
   return { money: setMoney(money), coins: setCoins(coins) }

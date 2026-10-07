@@ -29,6 +29,7 @@ export type Title =
   | 'Starlight'
   | 'Diligent'
   | 'Croupier'
+  | 'Long Shot'
   | 'Grand Drafter'
   | 'Prospector'
   | 'Light Sleeper'
@@ -64,7 +65,8 @@ export const TITLE_PERKS: Record<Title, string> = {
   'Gigantamax Hunter': 'Raid bosses Gigantamax more often (65% instead of 50%)',
   Starlight: 'Raid bosses are 3× as likely to be shiny (5× with the Shiny Charm)',
   Diligent: 'One extra daily mission reroll',
-  Croupier: 'A losing roulette spin has a 10% chance to give every bet back',
+  Croupier: 'A losing roulette spin has a 10% chance to give every bet back, and a winning one a 10% chance to pay double winnings',
+  'Long Shot': 'A losing Dice roll has a 10% chance to give the bet back, and a winning one a 10% chance to pay double winnings',
   'Grand Drafter': 'Drafts cost 25% less to enter',
   Prospector: 'TM searches find gold TMs twice as often',
   'Light Sleeper': 'A TM search takes one extra miss before a wild Pokemon wakes',
@@ -80,12 +82,10 @@ export const TITLE_PERKS: Record<Title, string> = {
  * Titles that pull against each other: the lead and its rivals are never on together.
  * Turning the lead on turns the rivals off, and turning it off turns them back on; turning
  * a rival on turns the lead off, and once every rival is off the lead comes back on.
- * - High Roller's big bets against the Game Corner's payout perks.
  * - Five-Star against Gigantamax Hunter: a Gigantamax boss is never a gold one, so the
  *   two undercut each other.
  */
 export const TITLE_CLASHES: { lead: Title; rivals: Title[] }[] = [
-  { lead: 'High Roller', rivals: ['Golden Touch', '9+10', 'Croupier', 'Edge Lord'] },
   { lead: 'Five-Star', rivals: ['Gigantamax Hunter'] }
 ]
 
@@ -151,8 +151,13 @@ export const ALCHEMIST_ITEM_CHANCE = 0.1
 export const RAID_LEADER_EXTRA_COPIES = 2
 export const GIGANTAMAX_HUNTER_CHANCE = 0.65
 export const DILIGENT_EXTRA_REROLLS = 1
-// Croupier: how often a losing roulette spin gives every bet on it back.
+// Croupier: how often a losing roulette spin gives every bet on it back, and how often a
+// winning one pays its winnings twice.
 export const CROUPIER_REFUND_CHANCE = 0.1
+export const CROUPIER_DOUBLE_CHANCE = 0.1
+// Long Shot: the same two for Dice rolls.
+export const LONG_SHOT_REFUND_CHANCE = 0.1
+export const LONG_SHOT_DOUBLE_CHANCE = 0.1
 // Starlight's raid boss shiny multiplier - in place of the Shiny Charm's 3x, not on top of it.
 export const STARLIGHT_RAID_MULTIPLIER = 3
 export const STARLIGHT_RAID_CHARM_MULTIPLIER = 5
@@ -175,4 +180,16 @@ export interface GameCornerPerks {
   // What a natural blackjack pays, and an ordinary win, to 1.
   blackjackPayout: number
   blackjackWinPayout: number
+  // The titles on that change a Game Corner game (see GAME_CORNER_TITLES), for its badges.
+  titles: Title[]
+}
+
+// The titles that change each Game Corner game: High Roller's bet cap for every one, and
+// each game's own payout title.
+export const GAME_CORNER_TITLES: Record<'slots' | 'blackjack' | 'roulette' | 'plinko' | 'dice', Title[]> = {
+  slots: ['Golden Touch', 'High Roller'],
+  blackjack: ['9+10', 'High Roller'],
+  roulette: ['Croupier', 'High Roller'],
+  plinko: ['Edge Lord', 'High Roller'],
+  dice: ['Long Shot', 'High Roller']
 }

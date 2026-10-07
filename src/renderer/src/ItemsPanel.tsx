@@ -732,7 +732,7 @@ function ItemDetail({
             <>
               <p className="items-detail-hint">
                 {row.id === SHINY_PATCH_ITEM_ID
-                  ? 'Not sold here - the Game Corner\'s Coin Shop sells one a day for coins, and your first Draft win each day gives one.'
+                  ? 'Not sold here - the Game Corner\'s Coin Shop sells one a day for coins, and your first full Draft gauntlet (7 wins) each day gives one.'
                   : 'Not sold here - the Game Corner\'s Coin Shop gives some free every day, with a pack for coins.'}
               </p>
               <div className="items-detail-buttons">

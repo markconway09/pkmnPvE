@@ -41,6 +41,7 @@ import {
   FASHION_CASE_ITEM_ID,
   SCANNER_ITEM_ID,
   DEXNAV_ITEM_ID,
+  DIPLOMA_ITEM_ID,
   PRISON_BOTTLE_ITEM_ID,
   REVEAL_GLASS_ITEM_ID,
   GRACIDEA_ITEM_ID,
@@ -1158,6 +1159,16 @@ const DEXNAV_ITEM: ItemOptionEntry = {
   spritenum: -30
 }
 
+// The Pokedex Diploma: a key item from the Pokedex Complete achievement (see dexnav-store),
+// shown with the Blunder Policy's icon.
+const DIPLOMA_ITEM: ItemOptionEntry = {
+  id: DIPLOMA_ITEM_ID,
+  name: 'Pokédex Diploma',
+  description:
+    'Proof of a complete Pokédex. The DexNav can hunt any Pokémon, forms too - ones never met in the wild turn up only in the Lab.',
+  spritenum: Dex.items.get('blunderpolicy').spritenum ?? 0
+}
+
 const ROTOM_CATALOG_ITEM: ItemOptionEntry = {
   id: ROTOM_CATALOG_ITEM_ID,
   name: 'Rotom Catalog',
@@ -1235,6 +1246,7 @@ export function getEditorOptions(): EditorOptions {
       ...FUSION_ITEMS,
       SCANNER_ITEM,
       DEXNAV_ITEM,
+      DIPLOMA_ITEM,
       ...EXP_CANDY_ITEMS
     ])
     .sort(byName)
@@ -1489,7 +1501,7 @@ export function getDefaultShopCatalog(): ShopItemEntry[] {
       // Friendship Petals come from wild drops and the Coin Shop's daily petals, never the Shop.
       if (item.id === FRIENDSHIP_PETAL_ITEM_ID) return false
       // The Shiny Patch is never bought or sold here: the Coin Shop sells one a day, and the
-      // first Draft win of the day gives one.
+      // first full Draft gauntlet of the day gives one.
       if (item.id === SHINY_PATCH_ITEM_ID) return false
       if (
         item.id === RARE_CANDY_ITEM_ID ||
@@ -1927,6 +1939,10 @@ export function pickRandomUnevolvedAnySpecies(): string {
  * a red one (legendary-class) - now and then a gold one (a restricted legendary). Fully
  * evolved only.
  */
+// Formes with a Gigantamax of their own that a raid can bring too, though they're not
+// ordinary forms (Urshifu's Rapid Strike Style, Toxtricity's Low Key Form).
+const RAID_EXTRA_FORMES = new Set(['Urshifu-Rapid-Strike', 'Toxtricity-Low-Key'])
+
 // Fully evolved, ordinary-form species from current games (or Past) - what a raid
 // boss is drawn from.
 function raidSpeciesPool(): ReturnType<typeof Dex.species.get>[] {
@@ -1938,7 +1954,7 @@ function raidSpeciesPool(): ReturnType<typeof Dex.species.get>[] {
         s.num > 0 &&
         (!s.isNonstandard || s.isNonstandard === 'Past') &&
         !isBattleOnlyForme(s) &&
-        isPlainSpecies(s) &&
+        (isPlainSpecies(s) || RAID_EXTRA_FORMES.has(s.name)) &&
         s.evos.length === 0
     )
 }
@@ -2351,15 +2367,30 @@ function wildAreasFor(species: ReturnType<typeof Dex.species.get>): WildLocation
  * Pokemon a wild roll could bring up (no legendaries, Paradox, fossils or battle-only
  * forms). Its lowest level is where its evolution stage is reached, raised until the wild
  * level's BST limit (see generateRandomWildMon) lets it through.
+ * With the Pokedex Diploma (anyPokemon) every Pokedex entry can be hunted: one no wild roll
+ * brings up (a legendary, a fossil, a form never met in the wild...) turns up only in the
+ * Lab, from the level its evolution stage is reached.
  */
-export function dexNavHuntInfo(speciesName: string): { locations: WildLocationId[]; minLevel: number } | null {
+export function dexNavHuntInfo(
+  speciesName: string,
+  anyPokemon = false
+): { locations: WildLocationId[]; minLevel: number; labOnly: boolean } | null {
   const species = Dex.species.get(speciesName)
-  if (!species.exists || isLegendaryClass(species) || species.tags.some((tag) => LEGENDARY_TAGS.has(tag))) return null
-  if (isBattleOnlyForme(species) || isParadoxSpecies(species) || isFossilLine(species.id)) return null
-  if (!wildLineIds().has(species.id)) return null
-  const bstLevel = Math.ceil((bstOf(species.name) - 300) / 4)
-  const minLevel = Math.max(1, minLevelForSpecies(species.name), stageReachLevel(species), bstLevel)
-  return { locations: wildAreasFor(species).map((l) => l.id), minLevel }
+  if (!species.exists) return null
+  const wild =
+    !isLegendaryClass(species) &&
+    !species.tags.some((tag) => LEGENDARY_TAGS.has(tag)) &&
+    !isBattleOnlyForme(species) &&
+    !isParadoxSpecies(species) &&
+    !isFossilLine(species.id) &&
+    wildLineIds().has(species.id)
+  if (wild) {
+    const bstLevel = Math.ceil((bstOf(species.name) - 300) / 4)
+    const minLevel = Math.max(1, minLevelForSpecies(species.name), stageReachLevel(species), bstLevel)
+    return { locations: wildAreasFor(species).map((l) => l.id), minLevel, labOnly: false }
+  }
+  if (!anyPokemon || dexFormOf(species.name) !== species.name) return null
+  return { locations: ['lab'], minLevel: Math.max(1, minLevelForSpecies(species.name), stageReachLevel(species)), labOnly: true }
 }
 
 /**
@@ -2368,17 +2399,22 @@ export function dexNavHuntInfo(speciesName: string): { locations: WildLocationId
  * cap). Null when it can't turn up at this cap at all. Its shiny roll gets the chain's
  * multiplier on top of everything else.
  */
-export function generateHuntedMon(speciesName: string, levelCap: number, shinyMultiplier: number): PokemonSet | null {
-  const info = dexNavHuntInfo(speciesName)
+export function generateHuntedMon(
+  speciesName: string,
+  levelCap: number,
+  shinyMultiplier: number,
+  anyPokemon = false
+): PokemonSet | null {
+  const info = dexNavHuntInfo(speciesName, anyPokemon)
   if (!info || info.minLevel > levelCap) return null
   const min = Math.max(1, levelCap - 14)
   const max = Math.max(min, levelCap - 4)
   const rolled = min + Math.floor(Math.random() * (max - min + 1))
   const level = Math.min(levelCap, Math.max(rolled, info.minLevel))
   // Hunting a Pokemon by name meets any of its wild forms (a Wormadam cloak, a Burmy
-  // cloak...) - a form hunted by name stays that form.
+  // cloak...) - a form hunted by name stays that form, and so does a Lab-only one.
   const named = Dex.species.get(speciesName)
-  const species = named.forme ? named.name : withRandomCosmeticForm(withRandomWildForm(named.name))
+  const species = named.forme || info.labOnly ? named.name : withRandomCosmeticForm(withRandomWildForm(named.name))
   return {
     ...buildBasicSet(species, level),
     shiny: rollWildShiny(false, shinyMultiplier),
@@ -2725,9 +2761,11 @@ export interface MoveParty {
   statusBlocked?: string[]
 }
 
-// Abilities that make their holder immune to a whole attacking type.
+// Abilities that make their holder immune to a whole attacking type (Eelevate is
+// Mega Eelektross's Levitate).
 export const ABILITY_TYPE_IMMUNITIES: Record<string, string> = {
   levitate: 'Ground',
+  eelevate: 'Ground',
   eartheater: 'Ground',
   flashfire: 'Fire',
   wellbakedbody: 'Fire',
@@ -3012,6 +3050,7 @@ export function liveMovePower(battle: Battle, source: Pokemon, foes: Pokemon[], 
 // the ones that merely react to it.
 const DEFENDER_TYPE_ABILITIES: Record<string, Record<string, number>> = {
   levitate: { Ground: 0 },
+  eelevate: { Ground: 0 },
   eartheater: { Ground: 0 },
   flashfire: { Fire: 0 },
   wellbakedbody: { Fire: 0 },

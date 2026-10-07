@@ -5,6 +5,7 @@ import type { SlotRules } from '../../shared/slots'
 import { SLOT_LINES, SLOT_RULES } from '../../shared/slots'
 import ItemSprite from './ItemSprite'
 import BetSlider, { maxBet, placedBet, useGameCornerPerks, useSavedBet, betStep, TITLE_CHANGED_EVENT } from './BetSlider'
+import GameCornerTitles from './GameCornerTitles'
 import type { GameCornerGameProps } from './GameCornerTabs'
 import SpriteImage from './SpriteImage'
 import { toSpriteId } from '../../shared/battle-types'
@@ -287,6 +288,7 @@ function SlotMachine({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorner
           </span>
         </div>
       </div>
+      <GameCornerTitles game="slots" perks={perks} />
       {notes.layer}
     </div>
   )

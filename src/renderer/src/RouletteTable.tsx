@@ -11,6 +11,7 @@ import {
   pocketColor
 } from '../../shared/roulette'
 import BetSlider, { maxBet, placedBet, useGameCornerPerks, useSavedBet, betStep } from './BetSlider'
+import GameCornerTitles from './GameCornerTitles'
 import type { GameCornerGameProps } from './GameCornerTabs'
 import CoinIcon from './CoinIcon'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
@@ -216,6 +217,7 @@ function RouletteTable({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorn
         const rect = boardRef.current?.getBoundingClientRect()
         const at = rect ? { x: rect.left + rect.width / 2, y: rect.top } : { x: window.innerWidth / 2, y: 200 }
         if (outcome.refunded) notes.show('Refunded by the Croupier!', at)
+        else if (outcome.doubled) notes.show(`Doubled by the Croupier! +${net.toLocaleString('en-US')} coins`, at)
         else if (net > 0) notes.show(`+${net.toLocaleString('en-US')} coins`, at)
         else if (net < 0) notes.show(`${net.toLocaleString('en-US')} coins`, at, 'bad')
         else notes.show('Broke even', at)
@@ -281,7 +283,9 @@ function RouletteTable({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorn
                     .map((b) => betLabel(b.key))
                     .join(', ')} paid ${result.totalReturned.toLocaleString('en-US')} · ${
                     result.totalReturned >= result.totalBet ? '+' : ''
-                  }${(result.totalReturned - result.totalBet).toLocaleString('en-US')} overall`
+                  }${(result.totalReturned - result.totalBet).toLocaleString('en-US')} overall${
+                    result.doubled ? ' (winnings doubled by the Croupier)' : ''
+                  }`
                 : 'No winning bets'}
             </div>
           )}
@@ -360,6 +364,7 @@ function RouletteTable({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorn
           </button>
         </p>
       )}
+      <GameCornerTitles game="roulette" perks={perks} />
       {notes.layer}
     </div>
   )

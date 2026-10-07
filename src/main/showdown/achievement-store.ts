@@ -10,7 +10,8 @@ import { ACHIEVEMENTS } from '../../shared/achievements'
 import { titleClash } from '../../shared/titles'
 import { claimedTitlesOf, getAchievementProgress, persistAchievementProgress } from './achievement-progress'
 import { addItem, hasItem } from './bag-store'
-import { boxAchievementStats } from './box-store'
+import { addMonOfSpecies, boxAchievementStats } from './box-store'
+import { restoredLevel } from './fossil-store'
 import { changeCoins } from './game-corner-store'
 import { addMoney, getMoney } from './money-store'
 import { getEditorOptions, nationalDexSpecies } from './sim-access'
@@ -40,6 +41,7 @@ function currentStats(): Record<AchievementStat, number> {
     champion: beaten('champion'),
     dexSpecies: box.dexSpecies,
     dexForms: box.dexForms,
+    dexComplete: box.dexSpecies >= nationalDexSpecies().length ? 1 : 0,
     shinyOwned: box.shiny,
     legendaryOwned: box.legendaryClass,
     restrictedOwned: box.restricted,
@@ -52,6 +54,9 @@ function currentStats(): Record<AchievementStat, number> {
     shayminOwned: box.shaymin,
     deoxysOwned: box.deoxys,
     zygardeOwned: box.zygarde,
+    swordsOfJustice: box.swordsOfJustice,
+    shinyCelebiOwned: box.shinyCelebi,
+    magearnaFiveStar: box.magearnaFiveStar,
     maxFriendship: box.maxFriendship,
     alcremieForms: box.alcremieForms,
     miniorColors: box.miniorColors,
@@ -94,6 +99,7 @@ function currentStats(): Record<AchievementStat, number> {
     rouletteNumberWins: counters.rouletteNumberWins ?? 0,
     plinkoDrops: counters.plinkoDrops ?? 0,
     plinkoEdges: counters.plinkoEdges ?? 0,
+    diceLongShots: counters.diceLongShots ?? 0,
     tmSearches: counters.tmSearches ?? 0,
     legendaryTmsFound: counters.legendaryTmsFound ?? 0,
     tmAmbushes: counters.tmAmbushes ?? 0,
@@ -150,7 +156,7 @@ export function getAchievements(): AchievementsState {
     title: progress.title,
     disabled: progress.disabledTitles,
     titles: claimedTitles(),
-    dexComplete: stats.dexSpecies >= nationalDexSpecies().length
+    dexComplete: stats.dexComplete === 1
   }
 }
 
@@ -163,6 +169,7 @@ function rewardText(def: AchievementDef): string {
   const parts: string[] = []
   for (const { itemId, count } of def.reward.items ?? []) parts.push(`${count > 1 ? `${count}× ` : 'a '}${names.get(itemId) ?? itemId}`)
   for (const keyItem of def.reward.keyItems ?? []) parts.push(`the ${names.get(keyItem) ?? keyItem}`)
+  for (const { species, level, shiny } of def.reward.pokemon ?? []) parts.push(`${shiny ? 'a shiny' : 'a'} ${level ? `Lv. ${level} ` : ''}${species}`)
   if (def.reward.money) parts.push(`₽${def.reward.money.toLocaleString('en-US')}`)
   if (def.reward.coins) parts.push(`${def.reward.coins.toLocaleString('en-US')} coins`)
   if (def.reward.title) parts.push(`the title "${def.reward.title}"`)
@@ -186,6 +193,8 @@ export function claimAchievement(id: string): AchievementClaimResult {
   for (const { itemId, count } of def.reward.items ?? []) addItem(itemId, count)
   // A key item is kept for good - one is all anyone needs.
   for (const keyItem of def.reward.keyItems ?? []) if (!hasItem(keyItem)) addItem(keyItem, 1)
+  // A gift with no level of its own arrives a little under the level cap, like a fossil.
+  for (const { species, level, shiny } of def.reward.pokemon ?? []) addMonOfSpecies(species, level ?? restoredLevel(), !!shiny)
   if (def.reward.money) addMoney(def.reward.money)
   if (def.reward.coins) changeCoins(def.reward.coins)
   return { state: getAchievements(), rewardText: rewardText(def), money: getMoney() }

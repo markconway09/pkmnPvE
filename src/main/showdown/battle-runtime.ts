@@ -369,16 +369,19 @@ export interface OpponentConfig {
   // area's chance of weather) - lasting until a move or ability replaces them.
   // Trick Room lasts until someone uses Trick Room. Chaos drafts can add side conditions
   // to either side (Tailwind, screens, hazards - their usual turn counts), and drop a
-  // side's lead's Attack by one stage (0 = the player's side, 1 = the opponent's).
+  // side's lead's Attack, Sp. Atk and Speed by one stage (0 = the player's side, 1 = the
+  // opponent's).
   startField?: {
     weather?: string | null
     terrain?: string | null
     trickRoom?: boolean
     sideConditions?: { side: 0 | 1; id: string; layers?: number }[]
-    leadAtkDrop?: (0 | 1)[]
+    leadDrop?: (0 | 1)[]
   }
   // Chaos drafts: each side's Pokemon's stat multipliers, in team order.
   statMultipliers?: { p1?: StatBlock[]; p2?: StatBlock[] }
+  // Chaos drafts: each side's Pokemon's Lock-Ons, in team order.
+  lockOn?: { p1?: number[]; p2?: number[] }
   // Chaos drafts: the opponent's modifiers in words, for the tooltip on them.
   chaosModifiers?: OpponentModifiersView
   // An online match with a friend: they play the other side from their own copy of the
@@ -599,8 +602,13 @@ export class WildBattle {
       this.installStatMultipliers()
       this.applyStatMultipliers(0, opponent.statMultipliers.p1 ?? [])
     }
+    if (opponent?.lockOn) {
+      this.installLockOn()
+      this.applyLockOn(0, opponent.lockOn.p1 ?? [])
+    }
     void this.battleStream.write(`>player p2 ${JSON.stringify(p2spec)}`)
     if (opponent?.statMultipliers) this.applyStatMultipliers(1, opponent.statMultipliers.p2 ?? [])
+    if (opponent?.lockOn) this.applyLockOn(1, opponent.lockOn.p2 ?? [])
     // p2's Pokemon only exist once they've joined (and the battle has begun) - at full
     // HP, so a bigger max HP is simply full too.
     this.applyEverstones(1, this.everstone.p2)
@@ -616,13 +624,13 @@ export class WildBattle {
   private installStartField(field: NonNullable<OpponentConfig['startField']>): void {
     const battle = this.battleStream.battle
     if (!battle) return
-    for (const sideIndex of field.leadAtkDrop ?? []) {
-      // That side's first Pokemon out starts at -1 Attack.
+    for (const sideIndex of field.leadDrop ?? []) {
+      // That side's first Pokemon out starts at -1 Attack, Sp. Atk and Speed.
       let dropped = false
       const onSwitchIn = function (this: SimBattle, pokemon: SimPokemon): void {
         if (dropped || pokemon.side !== this.sides[sideIndex]) return
         dropped = true
-        this.boost({ atk: -1 }, pokemon, null, null)
+        this.boost({ atk: -1, spa: -1, spe: -1 }, pokemon, null, null)
       }
       battle.onEvent('SwitchIn', battle.format, onSwitchIn as never)
     }
@@ -827,6 +835,50 @@ export class WildBattle {
         if (multiplier && multiplier !== 1) this.chainModify([Math.round(multiplier * 4096), 4096])
       }
       battle.onEvent(`Modify${stat}`, battle.format, boost as never)
+    }
+  }
+
+  // Chaos Lock-On: a marked Pokemon's moves never miss - through evasion, Fly, Dig and the
+  // rest, like the move Lock-On - except one-hit KO moves, which keep their usual odds. A
+  // second Lock-On adds +1 critical-hit stage.
+  private installLockOn(): void {
+    const battle = this.battleStream.battle
+    if (!battle) return
+    const lockedOn = (source: SimPokemon | null, move: { ohko?: unknown } | null): boolean =>
+      !!source && !!move && !move.ohko && ((source.m?.lockOn as number | undefined) ?? 0) > 0
+    const accuracy = function (
+      this: SimBattle,
+      value: number | true,
+      _target: SimPokemon,
+      source: SimPokemon | null,
+      move: { ohko?: unknown } | null
+    ): number | true {
+      return lockedOn(source, move) ? true : value
+    }
+    battle.onEvent('Accuracy', battle.format, accuracy as never)
+    // Runs ahead of Fly, Dig and the like turning the move away (as Lock-On's own does).
+    const invulnerability = function (
+      this: SimBattle,
+      _target: SimPokemon,
+      source: SimPokemon | null,
+      move: { ohko?: unknown } | null
+    ): number | undefined {
+      return lockedOn(source, move) ? 0 : undefined
+    }
+    battle.onEvent('Invulnerability', battle.format, 1, invulnerability as never)
+    const critRatio = function (this: SimBattle, ratio: number, source: SimPokemon | null): number {
+      return ((source?.m?.lockOn as number | undefined) ?? 0) >= 2 ? ratio + 1 : ratio
+    }
+    battle.onEvent('ModifyCritRatio', battle.format, critRatio as never)
+  }
+
+  // Marks each of this side's Pokemon with its Lock-Ons (by its place in the team).
+  private applyLockOn(sideIndex: 0 | 1, lockOns: number[]): void {
+    const side = this.battleStream.battle?.sides[sideIndex]
+    if (!side) return
+    for (const mon of side.pokemon) {
+      const count = lockOns[side.team.indexOf(mon.set)]
+      if (count) mon.m.lockOn = count
     }
   }
 

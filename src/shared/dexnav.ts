@@ -30,12 +30,17 @@ export function dexNavShinyMultiplier(chain: number, maxChain: number): number {
   return 1 + (DEXNAV_MAX_SHINY_MULTIPLIER - 1) * chainProgress(chain, maxChain)
 }
 
-/** A species the DexNav can hunt: registered, and found in the wild. */
+/**
+ * A species the DexNav can hunt: registered, and found in the wild - or, with the Pokedex
+ * Diploma, any Pokedex entry (forms too), the ones never met in the wild only in the Lab.
+ */
 export interface DexNavCandidate {
   species: string
   num: number
-  // The wild areas it lives in ('all' - Anywhere - always counts too).
+  // The wild areas it lives in ('all' - Anywhere - always counts too, unless it's Lab-only).
   locations: WildLocationId[]
+  // Only met in the Lab (with the Pokedex Diploma): not a Pokemon a wild roll brings up.
+  labOnly: boolean
   // The lowest wild level it can be met at (its evolution stage, and how strong it is).
   minLevel: number
   rarityTier: RarityTier
@@ -44,6 +49,8 @@ export interface DexNavCandidate {
 export interface DexNavState {
   // Whether the player has the DexNav at all.
   owned: boolean
+  // The Pokedex Diploma is owned: any Pokemon can be hunted, registered or not.
+  diploma: boolean
   target: DexNavCandidate | null
   chain: number
   // Where the chain stops counting (sooner with the Professor title).

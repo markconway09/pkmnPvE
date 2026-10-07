@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { BrowserWindow } from 'electron'
 import type {
   BoxPokemonView,
   BoxState,
@@ -11,6 +12,7 @@ import type {
   CompanionSize,
   CompanionSizeChoice,
   PokedexEntry,
+  PokedexRegistration,
   RaidBossPreview
 } from '../../shared/battle-types'
 import {
@@ -212,18 +214,29 @@ function companionMon(): StoredMon | null {
 
 function registerOwnedSpecies(): void {
   const box = getState()
+  // A save from before forms were tracked is catching up, not registering anything new.
+  const announce = !!box.registeredForms
   const registered = new Set(box.registered ?? [])
   const forms = new Set(box.registeredForms ?? box.registered ?? [])
   const looks = new Set(box.registeredLooks ?? [])
+  const fresh: PokedexRegistration[] = []
   for (const mon of ownedMons()) {
-    registered.add(dexBaseSpecies(mon.set.species))
-    forms.add(dexFormOf(mon.set.species))
+    const species = dexBaseSpecies(mon.set.species)
+    const form = dexFormOf(mon.set.species)
+    // A form of a species already registered pops up as a new form, anything else as a new Pokemon.
+    if (!forms.has(form)) fresh.push({ species: form, form: registered.has(species) })
+    registered.add(species)
+    forms.add(form)
     const look = cosmeticLookOf(mon.set.species)
     if (look) looks.add(look)
   }
   box.registered = [...registered].sort()
   box.registeredForms = [...forms].sort()
   box.registeredLooks = [...looks].sort()
+  // The window pops each new entry up, wherever the player is.
+  if (announce && fresh.length > 0) {
+    for (const window of BrowserWindow.getAllWindows()) window.webContents.send('pokedex:registered', fresh)
+  }
 }
 
 /**
@@ -521,6 +534,8 @@ function toView(mon: StoredMon, arrival: number, groups?: Map<string, StoredMon[
 
 // The Reveal Glass's four: any one of them unlocks it.
 const FORCES_OF_NATURE = new Set(['Tornadus', 'Thundurus', 'Landorus', 'Enamorus'])
+// Keldeo's three mentors - all registered gifts a Resolute Keldeo.
+const SWORDS_OF_JUSTICE = new Set(['Cobalion', 'Terrakion', 'Virizion'])
 
 /** What the box holds, for achievements: its shiny and legendary Pokemon, and the Pokedex. */
 export function boxAchievementStats(): {
@@ -533,6 +548,9 @@ export function boxAchievementStats(): {
   shaymin: number
   deoxys: number
   zygarde: number
+  swordsOfJustice: number
+  shinyCelebi: number
+  magearnaFiveStar: number
   shiny: number
   // How many Gigantamax species it holds.
   gmaxSpecies: number
@@ -560,6 +578,9 @@ export function boxAchievementStats(): {
     shaymin: mons.filter((m) => baseSpeciesOf(m.set.species) === 'Shaymin').length,
     deoxys: mons.filter((m) => baseSpeciesOf(m.set.species) === 'Deoxys').length,
     zygarde: mons.filter((m) => baseSpeciesOf(m.set.species) === 'Zygarde').length,
+    swordsOfJustice: box.registered!.filter((s) => SWORDS_OF_JUSTICE.has(s)).length,
+    shinyCelebi: mons.filter((m) => m.set.shiny && baseSpeciesOf(m.set.species) === 'Celebi').length,
+    magearnaFiveStar: mons.filter((m) => baseSpeciesOf(m.set.species) === 'Magearna' && mergeStarsFor(m.copies) >= 5).length,
     shiny: mons.filter((m) => m.set.shiny).length,
     gmaxSpecies: new Set(mons.filter((m) => m.set.gigantamax).map((m) => dexFormOf(m.set.species))).size,
     legendaryClass: tiers.filter((t) => t === 'epic' || t === 'legendary').length,
@@ -646,8 +667,8 @@ export function addRandomMon(): BoxState {
   return getBoxState()
 }
 
-// Debug: a Pokemon of the admin's choosing, straight into the box - a basic set of that
-// species at the level asked (1-100), shiny if asked.
+// A Pokemon of a chosen species straight into the box (the debug tool, and achievement
+// gifts) - a basic set of that species at the level asked (1-100), shiny if asked.
 export function addMonOfSpecies(species: string, level: number, shiny: boolean): BoxState {
   const set = { ...buildBasicSet(species, Math.max(1, Math.min(100, Math.round(level) || 1))), happiness: 0, shiny }
   const exp = totalExpForSpeciesLevel(set.species, set.level)

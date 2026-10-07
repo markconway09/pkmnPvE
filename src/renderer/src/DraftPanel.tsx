@@ -97,7 +97,7 @@ function modifierText(modifier: ChaosModifier): { icon: string; title: string; t
           ? { icon: '✱', title: 'Sticky Web', text: "Sticky Web on the opponent's side from the start of every battle (-1 Speed on switch-in)" }
           : { icon: '⋀', title: 'Spikes', text: "A layer of Spikes on the opponent's side from the start of every battle (up to 3)" }
     case 'intimidate':
-      return { icon: '☠', title: 'Intimidating Aura', text: "The opponent's lead starts every battle at -1 Attack" }
+      return { icon: '☠', title: 'Intimidating Aura', text: "The opponent's lead starts every battle at -1 Attack, Sp. Atk and Speed" }
     case 'ability':
       return { icon: '✦', title: 'Ability Change', text: 'Give one of your Pokémon any ability' }
     case 'stat':
@@ -108,6 +108,8 @@ function modifierText(modifier: ChaosModifier): { icon: string; title: string; t
       return { icon: '⛨', title: 'Fortress', text: '+50% HP, Defense and Sp. Def, -30% Attack, Sp. Atk and Speed' }
     case 'glasscannon':
       return { icon: '✸', title: 'Glass Cannon', text: '+50% Attack, Sp. Atk and Speed, -30% Defense and Sp. Def' }
+    case 'lockon':
+      return { icon: '◎', title: 'Lock-On', text: 'Its moves never miss (not one-hit KO moves) - take it twice for +1 crit stage too' }
     case 'wildcard':
       return { icon: '⁇', title: 'Wild Card', text: 'Swap it for a random Pokémon from the tier above (its stat modifiers stay)' }
   }
@@ -200,7 +202,7 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
   const [coins, setCoins] = useState<number | null>(null)
   // What a draft costs to enter (less with the Grand Drafter title).
   const [entryFee, setEntryFee] = useState<number | null>(null)
-  // Today's first Draft win already gave its Shiny Patch.
+  // Today's first full gauntlet already gave its Shiny Patch.
   const [dailyWinClaimed, setDailyWinClaimed] = useState<boolean | null>(null)
   const [working, setWorking] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -477,14 +479,14 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
                 </div>
               ))}
             </div>
-            {/* The first battle won each day gives a Shiny Patch. */}
+            {/* The first full gauntlet each day gives a Shiny Patch. */}
             {dailyWinClaimed !== null && (
               <div className={`draft-daily-win${dailyWinClaimed ? ' draft-daily-win-claimed' : ''}`}>
                 <ItemSprite spritenum={SHINY_PATCH_SPRITENUM} className="draft-daily-win-icon" />
                 <span className="draft-daily-win-text">
                   <span className="draft-daily-win-name">Daily reward: Shiny Patch</span>
                   <span className="draft-daily-win-note">
-                    {dailyWinClaimed ? 'Claimed today - back tomorrow' : 'For your first Draft win today'}
+                    {dailyWinClaimed ? 'Claimed today - back tomorrow' : `For your first ${DRAFT_MAX_WINS}-win gauntlet today`}
                   </span>
                 </span>
                 {dailyWinClaimed && <span className="draft-daily-win-check">✓ Claimed</span>}
