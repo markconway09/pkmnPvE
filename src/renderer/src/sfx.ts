@@ -200,16 +200,6 @@ export function installMenuSounds(): void {
     true
   )
 
-  // A buy button greyed out for lack of money or coins buzzes when pressed.
-  document.addEventListener(
-    'pointerdown',
-    (e) => {
-      const target = e.target instanceof Element ? e.target : null
-      if (target?.closest('.buy-button-short')) playSfx('error')
-    },
-    true
-  )
-
   const windowSound = (nodes: NodeList, name: SfxName): boolean => {
     for (const node of nodes) {
       if (node instanceof Element && node.matches('.modal-overlay') && !node.closest('[data-sfx="none"]')) {

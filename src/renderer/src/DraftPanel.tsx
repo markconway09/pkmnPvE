@@ -30,6 +30,9 @@ import CoinIcon from './CoinIcon'
 import { DraftPackOpening, OpponentReveal } from './DraftPackOpening'
 import { trainerSpriteUrl } from './trainerSprite'
 import ItemSprite from './ItemSprite'
+import { CLICK, CLICK_LC } from './platform'
+import { ONLINE_CHAOS_BATTLES, ONLINE_CHAOS_WINS } from '../../shared/online'
+import { leaveOnlineDraft, pickOnlineDraftLead, showDraftView, type OnlineDraftState } from './online'
 
 // The Shiny Patch's icon (see ItemSprite).
 const SHINY_PATCH_SPRITENUM = -8
@@ -41,6 +44,11 @@ interface Props {
   onBattle: (view: BattleView) => Promise<void>
   // Bumped by the menu when a window that can change coins (Game Corner, shops) closes.
   refreshKey?: number
+  // An online chaos draft with a friend (see online.ts): its screens come from the room,
+  // its steps go to the online draft, and each battle waits for both players' leads.
+  online?: OnlineDraftState & { friendName: string }
+  // Connected with a friend online: the gauntlet's battles can't start (the draft itself goes on).
+  battleLocked?: boolean
 }
 
 // The four brought last time (by pick index, in order) - kept while the game runs, so
@@ -196,9 +204,28 @@ function Pips({ count, max, kind }: { count: number; max: number; kind: 'win' | 
 
 // Draft mode's half of the main menu: starting a draft, picking from packs, then the
 // gauntlet - who's next, and which four of the six to bring against them.
-function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
-  const [draft, setDraft] = useState<DraftView | null>(null)
-  const [loaded, setLoaded] = useState(false)
+function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props): React.JSX.Element {
+  const [soloDraft, setSoloDraft] = useState<DraftView | null>(null)
+  const [soloLoaded, setLoaded] = useState(false)
+  const draft = online ? online.view : soloDraft
+  const loaded = !!online || soloLoaded
+  // Online, every step goes to the online draft and its screen back to the room.
+  const setDraft = (view: DraftView): void => (online ? showDraftView(view) : setSoloDraft(view))
+  const draftApi = online
+    ? {
+        pick: window.api.pickOnlineDraftMon,
+        reroll: window.api.rerollOnlineDraft,
+        swapItem: window.api.swapOnlineDraftItem,
+        tutorMoves: window.api.getOnlineDraftTutorMoves,
+        modifier: window.api.chooseOnlineDraftModifier
+      }
+    : {
+        pick: window.api.pickDraftMon,
+        reroll: window.api.rerollDraftPack,
+        swapItem: window.api.swapChaosItem,
+        tutorMoves: window.api.getChaosTutorMoves,
+        modifier: window.api.chooseChaosModifier
+      }
   const [coins, setCoins] = useState<number | null>(null)
   // What a draft costs to enter (less with the Grand Drafter title).
   const [entryFee, setEntryFee] = useState<number | null>(null)
@@ -229,10 +256,11 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
   const [chaosItems, setChaosItems] = useState<{ id: string; name: string; description: string; spritenum: number }[]>([])
 
   function refresh(): void {
+    if (online) return
     window.api
       .getDraft()
       .then((d) => {
-        setDraft(d)
+        setSoloDraft(d)
         setLoaded(true)
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
@@ -289,10 +317,11 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
   const tutorFor = draft?.status === 'modifier' && modifierIndex !== null && draft.modifierOffer?.[modifierIndex]?.kind === 'tutor' ? modifierMon : null
   useEffect(() => {
     if (tutorFor === null) return
-    window.api
-      .getChaosTutorMoves(tutorFor)
+    draftApi
+      .tutorMoves(tutorFor)
       .then(setTutorMoves)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tutorFor])
 
   // Every draft action goes through here: one at a time, and a failure is shown.
@@ -321,6 +350,31 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
 
   const disabled = busy || working
   if (!loaded) return <div className="run-panel">{error && <p className="editor-error">{error}</p>}</div>
+
+  // ---- Online: the match is over ----
+  if (online && draft?.status === 'finished') {
+    const ties = draft.ties ?? 0
+    const outcome = draft.wins > draft.losses ? 'won' : draft.wins < draft.losses ? 'lost' : 'drew'
+    return (
+      <div className="run-panel draft-panel online-draft-over">
+        <p className={`run-result ${outcome === 'won' ? 'run-result-won' : 'run-result-lost'}`}>
+          {outcome === 'won' ? 'You won the match' : outcome === 'lost' ? `${online.friendName} won the match` : 'The match is a draw'}:{' '}
+          {draft.wins}-{draft.losses}
+          {ties > 0 ? ` (${ties} tie${ties > 1 ? 's' : ''})` : ''}
+        </p>
+        <div className="draft-team-row">
+          {draft.picks.map((mon, i) => (
+            <div key={i}>
+              <DraftMonIcon mon={mon} />
+            </div>
+          ))}
+        </div>
+        <button className="run-start-button draft-start-button" onClick={leaveOnlineDraft}>
+          Back to the room
+        </button>
+      </div>
+    )
+  }
 
   // ---- No draft going: how it works, and the button to start one ----
   if (!draft || draft.status === 'finished') {
@@ -508,6 +562,10 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
           return
         }
         setConfirmingAbandon(false)
+        if (online) {
+          leaveOnlineDraft()
+          return
+        }
         void act(async () => {
           setDraft(await window.api.abandonDraft())
           setCoins(await window.api.getCoins())
@@ -515,9 +573,13 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
       }}
       onMouseLeave={() => setConfirmingAbandon(false)}
     >
-      {confirmingAbandon ? 'Abandon? Click again' : 'Abandon draft'}
+      {confirmingAbandon ? `${online ? 'Leave' : 'Abandon'}? ${CLICK} again` : online ? 'Leave match' : 'Abandon draft'}
     </button>
   )
+  // Online: whether the friend is done picking for the next battle.
+  const friendReady = online && draft.opponent ? (
+    <span className="draft-tier-chip online-draft-ready">{online.friendName} is ready</span>
+  ) : null
 
   // ---- Drafting: one from the pack ----
   if (draft.status === 'drafting') {
@@ -525,8 +587,10 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
       <div className="run-panel draft-panel">
         <div className="run-status-row">
           <span>
-            {formatLabel(draft.format)} draft · Pick <strong>{draft.round}</strong> of {draft.pickTarget ?? DRAFT_ROUNDS}
+            {formatLabel(draft.format)} draft{online ? ` vs ${online.friendName}` : ''} · Pick <strong>{draft.round}</strong> of{' '}
+            {draft.pickTarget ?? DRAFT_ROUNDS}
           </span>
+          {friendReady}
           <TierChips tiers={draft.tiers} />
           <ChaosFieldChips field={draft.chaosField} />
           {/* Chaos: one fresh pack per drafting stretch. */}
@@ -537,7 +601,7 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
               title={draft.canReroll ? 'Swap this pack for a new one - once per draft phase' : 'Already rerolled this draft phase'}
               onClick={() =>
                 void act(async () => {
-                  setDraft(await window.api.rerollDraftPack())
+                  setDraft(await draftApi.reroll())
                 })
               }
             >
@@ -554,7 +618,7 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
           slotFor={() => slotRefs.current[draft.picks.length] ?? null}
           requestPick={(i) => {
             setError(null)
-            return window.api.pickDraftMon(i)
+            return draftApi.pick(i)
           }}
           onPicked={(view) => {
             setJustPicked(view.picks.length - 1)
@@ -580,7 +644,18 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
     )
   }
 
-  const recordPips = (
+  const recordPips = online ? (
+    <>
+      {/* First to ONLINE_CHAOS_WINS, over ONLINE_CHAOS_BATTLES battles at most. */}
+      <span className="draft-record" title={`First to ${ONLINE_CHAOS_WINS} wins - ${ONLINE_CHAOS_BATTLES} battles at most`}>
+        You <Pips count={draft.wins} max={ONLINE_CHAOS_WINS} kind="win" />
+      </span>
+      <span className="draft-record">
+        {online.friendName} <Pips count={draft.losses} max={ONLINE_CHAOS_WINS} kind="loss" />
+      </span>
+      {(draft.ties ?? 0) > 0 && <span className="draft-record">Ties {draft.ties}</span>}
+    </>
+  ) : (
     <>
       <span className="draft-record">
         Wins <Pips count={draft.wins} max={DRAFT_MAX_WINS} kind="win" />
@@ -659,7 +734,8 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
     return (
       <div className="run-panel draft-panel">
         <div className="run-status-row">
-          <span>Chaos · Pick a modifier</span>
+          <span>Chaos{online ? ` vs ${online.friendName}` : ''} · Pick a modifier</span>
+          {friendReady}
           <TierChips tiers={draft.tiers} />
           <ChaosFieldChips field={draft.chaosField} />
           {/* One fresh offer per modifier step. */}
@@ -819,7 +895,7 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
             void act(async () => {
               // The item swap leaves the modifier step open; a modifier moves on to the battle.
               if (swapping) {
-                setDraft(await window.api.swapChaosItem(modifierMon!, modifierItem!))
+                setDraft(await draftApi.swapItem(modifierMon!, modifierItem!))
                 setSwapping(false)
                 setModifierMon(null)
                 resetModifierChoices()
@@ -835,7 +911,7 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
                       newMove: tutorMove ?? undefined
                     }
                   : undefined
-              setDraft(await window.api.chooseChaosModifier(modifierIndex!, target))
+              setDraft(await draftApi.modifier(modifierIndex!, target))
               lastBring = []
               setBring([])
             })
@@ -853,6 +929,34 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
   const bringCount = draftBring(draft.format, draft.picks.length)
   const leads = draftLeads(draft.format)
   const validBring = bring.filter((i) => i < draft.picks.length).slice(0, bringCount)
+  const battleNumber = draft.wins + draft.losses + (draft.ties ?? 0) + 1
+  // Online: the friend is still picking - a standby until their team arrives.
+  if (online && !opponent) {
+    return (
+      <div className="run-panel draft-panel">
+        <div className="run-status-row">
+          <span>Chaos vs {online.friendName}</span>
+          <TierChips tiers={draft.tiers} />
+          <ChaosFieldChips field={draft.chaosField} />
+          {recordPips}
+          {abandonButton}
+        </div>
+        <div className="online-draft-standby">
+          <span className="online-draft-spinner" aria-hidden="true" />
+          <span>Waiting for {online.friendName} to pick their Pokémon and modifier...</span>
+        </div>
+        <p className="box-empty-hint">Your team</p>
+        <div className="draft-team-row">
+          {draft.picks.map((mon, i) => (
+            <div key={i}>
+              <DraftMonIcon mon={mon} />
+            </div>
+          ))}
+        </div>
+        {error && <p className="editor-error">{error}</p>}
+      </div>
+    )
+  }
   return (
     <div className="run-panel draft-panel">
       <div className="run-status-row">
@@ -870,9 +974,13 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
           <img data-reveal="trainer" className="draft-opponent-sprite" src={trainerSpriteUrl(opponent.spriteId)} alt="" />
           <div className="draft-opponent-side">
             <span className="draft-opponent-name">
-              Battle {draft.wins + draft.losses + 1}: <strong>{opponent.name}</strong>
+              Battle {battleNumber}: <strong>{opponent.name}</strong>
               <span className="box-empty-hint">
-                {draft.format === 'chaos' ? ` - a hard trainer, bringing all ${bringCount}` : ` - brings ${bringCount} of these`}
+                {online
+                  ? ` - bringing all ${opponent.team.length}`
+                  : draft.format === 'chaos'
+                    ? ` - a hard trainer, bringing all ${bringCount}`
+                    : ` - brings ${bringCount} of these`}
               </span>
               <ChaosFieldChips field={opponent.chaosField} />
             </span>
@@ -887,8 +995,12 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
         </OpponentReveal>
       )}
       <p className="box-empty-hint">
-        {draft.format === 'chaos'
-          ? `All ${bringCount} go in - click one to lead and start the battle.`
+        {online
+          ? online.leadPicked
+            ? ''
+            : `All ${bringCount} go in - ${CLICK_LC} one to lead.${online.friendLeadPicked ? ` ${online.friendName} has picked their lead.` : ''}`
+          : draft.format === 'chaos'
+          ? `All ${bringCount} go in - ${CLICK_LC} one to lead and start the battle.`
           : `Pick ${bringCount} to bring, in order - ${leadText(draft.format)}.`}
       </p>
       <div className="draft-team-row">
@@ -901,13 +1013,20 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
                 key={i}
                 type="button"
                 className="draft-bring-button draft-chaos-lead-button"
-                disabled={disabled}
-                onClick={() =>
+                disabled={disabled || !!online?.leadPicked || (!online && battleLocked)}
+                title={!online && battleLocked ? 'Leave the online room first' : undefined}
+                onClick={() => {
+                  const order = [i, ...draft.picks.map((_, j) => j).filter((j) => j !== i)]
+                  // Online: the lead goes to the room; the battle starts once both have picked.
+                  if (online) {
+                    setError(null)
+                    pickOnlineDraftLead(order)
+                    return
+                  }
                   void act(async () => {
-                    const order = [i, ...draft.picks.map((_, j) => j).filter((j) => j !== i)]
                     await onBattle(await window.api.startDraftBattle(order))
                   })
-                }
+                }}
               >
                 <DraftMonIcon mon={mon} />
               </button>
@@ -932,10 +1051,19 @@ function DraftPanel({ busy, onBattle, refreshKey }: Props): React.JSX.Element {
           )
         })}
       </div>
+      {online?.leadPicked && (
+        <div className="online-draft-standby">
+          <span className="online-draft-spinner" aria-hidden="true" />
+          <span>
+            {online.friendLeadPicked ? 'Starting the battle...' : `Lead picked - waiting for ${online.friendName} to pick theirs...`}
+          </span>
+        </div>
+      )}
       {draft.format !== 'chaos' && (
         <button
           className="run-start-button draft-start-button"
-          disabled={disabled || validBring.length !== bringCount}
+          disabled={disabled || validBring.length !== bringCount || battleLocked}
+          title={battleLocked ? 'Leave the online room first' : undefined}
           onClick={() =>
             void act(async () => {
               await onBattle(await window.api.startDraftBattle(validBring))

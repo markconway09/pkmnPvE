@@ -122,14 +122,18 @@ function MenuRail({
         )
       })}
       <span className="menu-rail-spacer" />
-      {tools.map((t) => (
-        <div key={t.label} className="menu-rail-slot" {...tipHandlers(t.label, locked)}>
-          <button className="menu-rail-item menu-rail-tool" aria-label={t.label} disabled={locked} onClick={t.action}>
-            {t.icon}
-            {!!t.badge && <span className="menu-rail-badge menu-rail-badge-pulse">{t.badge}</span>}
-          </button>
-        </div>
-      ))}
+      {/* Wrapped so the phone layout can move them to the top bar (on desktop the
+          wrapper is invisible to the layout). */}
+      <div className="menu-rail-tools">
+        {tools.map((t) => (
+          <div key={t.label} className="menu-rail-slot" {...tipHandlers(t.label, locked)}>
+            <button className="menu-rail-item menu-rail-tool" aria-label={t.label} disabled={locked} onClick={t.action}>
+              {t.icon}
+              {!!t.badge && <span className="menu-rail-badge menu-rail-badge-pulse">{t.badge}</span>}
+            </button>
+          </div>
+        ))}
+      </div>
       {tip &&
         createPortal(
           <div className="menu-rail-tip" style={{ top: tip.top, left: tip.left }}>

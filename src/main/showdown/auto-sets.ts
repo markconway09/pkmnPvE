@@ -1,14 +1,12 @@
-import { createRequire } from 'node:module'
 import type { AutoSetOption, AutoSetResult, StatBlock } from '../../shared/battle-types'
 import smogonSets from './data/smogon-sets.json'
 import { learnableMoveIds } from './sim-access'
 import { hasItem } from './bag-store'
 import { lockedTmMoves } from './tm-store'
+import { gen9RandomSets, sim } from './ps'
 
-// pokemon-showdown is CommonJS - loaded the same way sim-access.ts does.
-const require = createRequire(import.meta.url)
-const { Dex, toID } = require('pokemon-showdown') as typeof import('pokemon-showdown')
-const randomSets = require('pokemon-showdown/dist/data/random-battles/gen9/sets.json') as Record<
+const { Dex, toID } = sim
+const randomSets = gen9RandomSets() as Record<
   string,
   { sets: { role: string; movepool: string[]; abilities: string[]; teraTypes?: string[] }[] }
 >

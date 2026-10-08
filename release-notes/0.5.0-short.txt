@@ -1,0 +1,8 @@
+pkmnPvE on your phone
+
+- New Android app: get pkmnPvE-0.5.0.apk from the release page and install it on your phone
+- New Save file option: export your save to a file and import it on your PC or phone
+- New Online Chaos Draft: draft with a friend at the same time, first to 4 wins
+- New game icon
+- A brand-new save now opens the starter picker straight away
+- Greyed-out buy buttons no longer buzz when pressed

@@ -1,5 +1,4 @@
-import { randomUUID } from 'node:crypto'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readText, writeText, randomUUID } from '../platform'
 import type { BoxState, LoadoutView } from '../../shared/battle-types'
 import { getBoxState, setTeam } from './box-store'
 import { playerPathFor } from './save-paths'
@@ -7,7 +6,7 @@ import { onPlayerChange } from './player-session'
 
 function load(): LoadoutView[] {
   try {
-    const raw = readFileSync(playerPathFor('loadouts.json'), 'utf8')
+    const raw = readText(playerPathFor('loadouts.json'))
     const parsed = JSON.parse(raw) as LoadoutView[]
     return Array.isArray(parsed) ? parsed : []
   } catch (e) {
@@ -31,7 +30,7 @@ function getState(): LoadoutView[] {
 }
 
 function persist(): void {
-  writeFileSync(playerPathFor('loadouts.json'), JSON.stringify(getState()), 'utf8')
+  writeText(playerPathFor('loadouts.json'), JSON.stringify(getState()))
 }
 
 function requireName(name: string): string {

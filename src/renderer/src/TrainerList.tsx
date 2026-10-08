@@ -20,6 +20,7 @@ import TrainerEditor from './TrainerEditor'
 import RogueliteBossEditor from './RogueliteBossEditor'
 import { TeamIcons } from './TrainerTeamsSection'
 import ItemSprite from './ItemSprite'
+import { IS_MOBILE } from './platform'
 
 interface Props {
   onBack: () => void
@@ -703,7 +704,7 @@ function TrainerList({ onBack, onPremadeTeams, roguelite = false }: Props): Reac
             Clear filters
           </button>
         )}
-        <span className="trainer-list-tip">Double-click a row to edit it</span>
+        <span className="trainer-list-tip">{IS_MOBILE ? 'Double-tap' : 'Double-click'} a row to edit it</span>
       </div>
 
       <div className="trainer-list trainer-list-wide">

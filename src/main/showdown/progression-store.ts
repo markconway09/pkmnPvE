@@ -1,5 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs'
-import { randomUUID } from 'node:crypto'
+import { readText, writeText, randomUUID } from '../platform'
 import type { BossStep, ProgressionState } from '../../shared/battle-types'
 import { playerPathFor, savePathFor } from './save-paths'
 import { onPlayerChange } from './player-session'
@@ -23,7 +22,7 @@ function loadProgress(): PlayerProgress {
   // Outside the try: not being logged in is a bug to surface, not an empty save.
   const path = playerPathFor('progression.json')
   try {
-    const parsed = JSON.parse(readFileSync(path, 'utf8')) as PlayerProgress
+    const parsed = JSON.parse(readText(path)) as PlayerProgress
     if (typeof parsed.levelCap !== 'number' || !Array.isArray(parsed.bossesDefeated)) return emptyProgress()
     return {
       levelCap: parsed.levelCap,
@@ -39,7 +38,7 @@ function loadProgress(): PlayerProgress {
 
 function readBossOrderFile(filename: string): BossStep[] | null {
   try {
-    const parsed = JSON.parse(readFileSync(savePathFor(filename), 'utf8')) as { bossOrder?: BossStep[] }
+    const parsed = JSON.parse(readText(savePathFor(filename))) as { bossOrder?: BossStep[] }
     return Array.isArray(parsed.bossOrder) ? parsed.bossOrder : null
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code
@@ -54,7 +53,7 @@ function loadBossOrder(): BossStep[] {
   // Before there were players the boss order lived in progression.json next to
   // the progress: take it from there the first time.
   const legacy = readBossOrderFile('progression.json') ?? []
-  writeFileSync(savePathFor('bossOrder.json'), JSON.stringify({ bossOrder: legacy }), 'utf8')
+  writeText(savePathFor('bossOrder.json'), JSON.stringify({ bossOrder: legacy }))
   return legacy
 }
 
@@ -77,11 +76,11 @@ function getBossOrder(): BossStep[] {
 }
 
 function persistProgress(): void {
-  writeFileSync(playerPathFor('progression.json'), JSON.stringify(getProgress()), 'utf8')
+  writeText(playerPathFor('progression.json'), JSON.stringify(getProgress()))
 }
 
 function persistBossOrder(): void {
-  writeFileSync(savePathFor('bossOrder.json'), JSON.stringify({ bossOrder: getBossOrder() }), 'utf8')
+  writeText(savePathFor('bossOrder.json'), JSON.stringify({ bossOrder: getBossOrder() }))
 }
 
 export function getProgression(): ProgressionState {

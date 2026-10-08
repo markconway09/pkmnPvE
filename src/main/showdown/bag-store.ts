@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readText, writeText } from '../platform'
 import type { BagItemView, EvolutionItemUse, ItemOptionEntry, RarityTier } from '../../shared/battle-types'
 import { COIN_PRIZES } from '../../shared/slots'
 import { coinPrizeRarityTier, priceRarityTier } from '../../shared/rarity'
@@ -21,10 +21,10 @@ function load(): StoredBag {
   // Outside the try: not being logged in is a bug to surface, not an empty save.
   const path = playerPathFor('bag.json')
   try {
-    const raw = readFileSync(path, 'utf8')
+    const raw = readText(path)
     const parsed = JSON.parse(raw) as StoredBag
     if (!parsed.items || typeof parsed.items !== 'object') return emptyBag()
-    if (retireItems(parsed)) writeFileSync(path, JSON.stringify(parsed), 'utf8')
+    if (retireItems(parsed)) writeText(path, JSON.stringify(parsed))
     return parsed
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code
@@ -81,7 +81,7 @@ function getState(): StoredBag {
 }
 
 function persist(): void {
-  writeFileSync(playerPathFor('bag.json'), JSON.stringify(getState()), 'utf8')
+  writeText(playerPathFor('bag.json'), JSON.stringify(getState()))
 }
 
 /**

@@ -1,4 +1,4 @@
-import { randomInt } from 'node:crypto'
+import { randomInt } from '../platform'
 import type { RouletteBetResult, RouletteSpin } from '../../shared/roulette'
 import { ROULETTE_MAX_FULL_BETS, ROULETTE_NUMBERS, betOdds, betWins, isRouletteBet } from '../../shared/roulette'
 import { betCap, hasTitle } from './title-perks'

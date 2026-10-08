@@ -5,6 +5,7 @@ import type { TmSearchProgress, TmSearchStart } from '../../shared/tms'
 import { SkillCheckRing, type SkillCheckResult } from './SkillCheck'
 import { TmFindCard } from './TmBits'
 import { locationIconUrl } from './battleScenery'
+import { IS_MOBILE } from './platform'
 
 const TIER_LABELS: Record<RarityTier, string> = {
   common: 'Common',
@@ -137,7 +138,7 @@ function TmSearchModal({ location, onClose, onAmbush }: Props): React.JSX.Elemen
 
             {!done && (
               <p className="tm-search-note">
-                {waiting ? 'Searching... get ready' : 'Space / click on the zone'}
+                {waiting ? 'Searching... get ready' : IS_MOBILE ? 'Tap on the zone' : 'Space / click on the zone'}
               </p>
             )}
           </>

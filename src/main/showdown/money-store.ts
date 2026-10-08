@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readText, writeText } from '../platform'
 import { playerPathFor } from './save-paths'
 import { onPlayerChange } from './player-session'
 
@@ -16,7 +16,7 @@ function load(): StoredMoney {
   // Outside the try: not being logged in is a bug to surface, not an empty save.
   const path = playerPathFor('money.json')
   try {
-    const raw = readFileSync(path, 'utf8')
+    const raw = readText(path)
     const parsed = JSON.parse(raw) as StoredMoney
     if (typeof parsed.amount !== 'number') return defaultMoney()
     return parsed
@@ -40,7 +40,7 @@ function getState(): StoredMoney {
 }
 
 function persist(): void {
-  writeFileSync(playerPathFor('money.json'), JSON.stringify(getState()), 'utf8')
+  writeText(playerPathFor('money.json'), JSON.stringify(getState()))
 }
 
 export function getMoney(): number {

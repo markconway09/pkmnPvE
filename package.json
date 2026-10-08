@@ -1,6 +1,6 @@
 {
   "name": "pkmnpve",
-  "version": "0.4.9",
+  "version": "0.5.0",
   "private": true,
   "description": "A menu-driven, single-player Pokemon PvE game built on the Pokemon Showdown battle engine",
   "main": "./out/main/index.js",
@@ -9,11 +9,20 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.mobile.json",
     "dist": "electron-vite build && electron-builder --win",
-    "release": "npm run dist && node scripts/release.mjs"
+    "release": "npm run dist && node scripts/release.mjs",
+    "build:sim-browser": "node scripts/build-sim-browser.mjs",
+    "dev:mobile": "vite -c vite.mobile.config.ts",
+    "build:mobile": "npm run build:sim-browser && vite build -c vite.mobile.config.ts && cap sync android",
+    "apk": "npm run build:mobile && node scripts/build-apk.mjs"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/filesystem": "^8.1.4",
+    "@capacitor/share": "^8.0.3",
     "@dnd-kit/core": "^6.3.1",
     "peerjs": "^1.5.5",
     "pokemon-showdown": "^0.11.11",
@@ -21,6 +30,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
@@ -48,6 +58,7 @@
       "!**/*.map",
       "!node_modules/pokemon-showdown/{data,sim,lib,server,tools,translations,config,databases,build}/**",
       "!node_modules/pokemon-showdown/*.md",
+      "!node_modules/@capacitor/**",
       "!node_modules/{better-sqlite3,sqlite3,sqlite,pg,pg-*,mysql2,esbuild,@esbuild,sockjs,nodemailer,githubhook,probe-image-size,cloud-env,permessage-deflate,sql-template-strings}/**"
     ],
     "extraFiles": [

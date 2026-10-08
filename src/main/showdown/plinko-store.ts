@@ -1,4 +1,4 @@
-import { randomInt } from 'node:crypto'
+import { randomInt } from '../platform'
 import type { PlinkoDrop, PlinkoRisk } from '../../shared/plinko'
 import { PLINKO_RISKS, PLINKO_ROWS, PLINKO_SLOTS, plinkoSlotMultiplier } from '../../shared/plinko'
 import { betCap, getGameCornerPerks } from './title-perks'

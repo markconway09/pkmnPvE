@@ -4,12 +4,10 @@ import { createPortal } from 'react-dom'
 import {
   DndContext,
   DragOverlay,
-  PointerSensor,
-  useSensor,
-  useSensors,
   type DragEndEvent,
   type DragStartEvent
 } from '@dnd-kit/core'
+import { useDragSensors } from './dragSensors'
 import {
   CONFIRM_SELL_TIERS,
   FRIENDSHIP_PETAL_ITEM_ID,
@@ -77,6 +75,8 @@ import { formatMoney } from './money'
 import ShinyIcon from './ShinyIcon'
 import ItemSprite from './ItemSprite'
 import MusicPlayer from './MusicPlayer'
+import { CLICK, CLICK_LC, IS_MOBILE } from './platform'
+import { useOnlineState } from './online'
 
 interface Props {
   // A wild battle - in that location, or the one last picked.
@@ -345,6 +345,14 @@ function MainMenu({
   // The entry to open the Pokedex at - from a clicked "registered" pop-up.
   const [pokedexFocus, setPokedexFocus] = useState<string | null>(null)
   const [starterOpen, setStarterOpen] = useState(false)
+  // A new save (nothing in the box yet) opens the starter picker straight away - once; after
+  // a Cancel the Choose Starter button is still there.
+  const starterOffered = useRef(false)
+  useEffect(() => {
+    if (!boxState || starterOffered.current) return
+    starterOffered.current = true
+    if (boxState.mons.length === 0) setStarterOpen(true)
+  }, [boxState])
   // The Items window (the bag and the shop together, the Key Items and the TMs).
   const [itemsOpen, setItemsOpen] = useState(false)
   // Sent from the Items window to an item's daily deal in the Coin Shop (the petals, the
@@ -380,13 +388,25 @@ function MainMenu({
     const rect = card.getBoundingClientRect()
     setPlayerMenu((open) => open ?? { right: window.innerWidth - rect.right, top: rect.bottom + 4 })
   }
+  // A touch screen can't hover: a tap on the card opens and closes the menu instead (its
+  // Trainer Card entry does what the tap does with a mouse), and a tap anywhere else closes it.
+  const playerCardPointer = useRef('mouse')
+  useEffect(() => {
+    if (!playerMenu) return
+    const closeOutside = (e: PointerEvent): void => {
+      const target = e.target as Element | null
+      if (!target?.closest('.nav-player-menu, .nav-player-card')) setPlayerMenu(null)
+    }
+    window.addEventListener('pointerdown', closeOutside, true)
+    return () => window.removeEventListener('pointerdown', closeOutside, true)
+  }, [playerMenu])
   useEffect(() => cancelPlayerMenuClose, [])
   // Notes that float up from the box (a Pokemon sold, or why it couldn't be).
   const notes = useFloatingNotes()
   const unclaimedAchievements = achievements?.achievements.filter((a) => a.unlocked && !a.claimed).length ?? 0
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<{ mon: BoxPokemonView; x: number; y: number } | null>(null)
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+  const sensors = useDragSensors()
 
   function refreshBox(): void {
     window.api
@@ -957,6 +977,12 @@ function MainMenu({
     .filter((m) => !boxRarity || (m.rarityTier ?? 'common') === boxRarity)
   const teamCount = team.filter(Boolean).length
   const teamEmpty = teamCount === 0
+  // Connected with a friend online: nothing else starts a battle until the room is left
+  // (a battle from the room would take over the screen mid-fight). During a chaos draft
+  // the trainer and boss battles are hidden altogether.
+  const online = useOnlineState()
+  const onlineLocked = online.friend !== null
+  const battleBusy = fightBusy || onlineLocked
   const boxEmpty = (boxState?.mons.length ?? 0) === 0
   const activeDragMon = activeDragId ? monsById.get(activeDragId) : undefined
 
@@ -1111,13 +1137,33 @@ function MainMenu({
         <MusicPlayer />
         <div className="menu-nav">
           {/* The player: their trainer, name, title and money. A click anywhere on it opens
-              the Trainer Card; hovering it opens a menu with the rarer things. */}
+              the Trainer Card; hovering it opens a menu with the rarer things (on a touch
+              screen, a tap opens that menu). */}
           <button
             className={`nav-player-card${playerMenu ? ' nav-player-card-open' : ''}`}
             title="Trainer Card"
-            onMouseEnter={(e) => openPlayerMenu(e.currentTarget)}
-            onMouseLeave={schedulePlayerMenuClose}
-            onClick={() => {
+            onPointerDown={(e) => {
+              playerCardPointer.current = e.pointerType
+            }}
+            onPointerEnter={(e) => {
+              if (e.pointerType === 'mouse') openPlayerMenu(e.currentTarget)
+            }}
+            onPointerLeave={(e) => {
+              if (e.pointerType === 'mouse') schedulePlayerMenuClose()
+            }}
+            // On the phone a tap goes straight to the Trainer Card (Options has its own
+            // button); only an admin gets the menu, from a long press, for Debug.
+            onContextMenu={(e) => {
+              if (!IS_MOBILE || !isAdmin) return
+              e.preventDefault()
+              openPlayerMenu(e.currentTarget)
+            }}
+            onClick={(e) => {
+              if (playerCardPointer.current !== 'mouse' && !IS_MOBILE) {
+                if (playerMenu) setPlayerMenu(null)
+                else openPlayerMenu(e.currentTarget)
+                return
+              }
               setPlayerMenu(null)
               setPlayerTrainerOpen(true)
             }}
@@ -1198,7 +1244,7 @@ function MainMenu({
           bestFloor={bestFloor}
           boxCount={boxState ? boxState.mons.length : null}
           missions={missions}
-          fightBusy={fightBusy}
+          fightBusy={battleBusy}
           onGo={goTo}
           onOpenMissions={() => {
             refreshMissions()
@@ -1215,7 +1261,7 @@ function MainMenu({
           eligibility={eligibility}
           teamSize={team.filter(Boolean).length}
           levelCap={levelCap}
-          fightBusy={fightBusy}
+          fightBusy={battleBusy}
           onStart={onRaidFight}
           onOpenShop={() => setItemsOpen(true)}
           onOpenCoinShop={() => {
@@ -1245,7 +1291,7 @@ function MainMenu({
       >
         {mode === 'draft' ? (
           <div className="battle-section-inner">
-            <DraftPanel busy={fightBusy} onBattle={(view) => onRunBattle(view)} refreshKey={draftRefreshKey} />
+            <DraftPanel busy={fightBusy} battleLocked={onlineLocked} onBattle={(view) => onRunBattle(view)} refreshKey={draftRefreshKey} />
           </div>
         ) : mode === 'roguelite' ? (
           <div className="battle-section-inner">
@@ -1253,6 +1299,7 @@ function MainMenu({
               run={run}
               picked={runPickId ? monsById.get(runPickId) : undefined}
               busy={runBusy || fightBusy}
+              battleLocked={onlineLocked}
               bestFloor={bestFloor}
               onStart={(difficulty, generation) =>
                 void runAction(async () => {
@@ -1360,7 +1407,7 @@ function MainMenu({
               <div key={loc.id} className={`classic-wild-cell classic-wild-${loc.id}`}>
                 <button
                   className={`classic-wild-tile${wildLocation === loc.id ? ' classic-wild-tile-last' : ''}`}
-                  disabled={fightBusy || teamEmpty}
+                  disabled={battleBusy || teamEmpty}
                   title={wildLocation === loc.id ? `${loc.label} - where you last searched` : `Find a wild Pokémon: ${loc.label}`}
                   style={{ backgroundImage: `url(${backdropUrl(LOCATION_BUTTON_BACKDROP[loc.id])})` }}
                   onClick={() => onFight(loc.id)}
@@ -1374,7 +1421,7 @@ function MainMenu({
                 <TmSearchStrip
                   location={loc}
                   state={tmSearch.state}
-                  disabled={fightBusy}
+                  disabled={battleBusy}
                   onSearch={() => tmSearch.open(loc)}
                 />
               </div>
@@ -1450,11 +1497,14 @@ function MainMenu({
           {tmSearch.modal}
 
           {/* The DexNav (once owned): the Pokemon being hunted, its chain, and where to look. */}
-          <DexNavPanel wildLevel={effectiveWildLevelCap} disabled={fightBusy || teamEmpty} labOpen={allBossesDefeated} onHunt={(id) => onFight(id)} />
+          <DexNavPanel wildLevel={effectiveWildLevelCap} disabled={battleBusy || teamEmpty} labOpen={allBossesDefeated} onHunt={(id) => onFight(id)} />
           </>
           ) : (
           <>
-          {/* Trainers: the next trainer, and the next boss (or a rematch once all are beaten). */}
+          {/* Trainers: the next trainer, and the next boss (or a rematch once all are beaten) -
+              hidden while an online chaos draft is going. */}
+          {!online.draft && (
+          <>
           <div className="classic-section-head">
             <img className="classic-section-icon" src="./icons/nav/trainercard.png" alt="" />
             <span className="run-hud-label">Trainer battles</span>
@@ -1462,7 +1512,7 @@ function MainMenu({
           <div className="classic-trainer-row">
             <button
               className={`classic-trainer-tile${eligibility?.rocketEvent ? ' classic-trainer-rocket' : ''}`}
-              disabled={fightBusy || teamEmpty || !eligibility?.hasTrainer}
+              disabled={battleBusy || teamEmpty || !eligibility?.hasTrainer}
               onClick={onTrainerFight}
             >
               <img
@@ -1480,7 +1530,7 @@ function MainMenu({
             </button>
             <button
               className="classic-trainer-tile classic-boss-tile"
-              disabled={fightBusy || teamEmpty || !(eligibility?.hasBoss || allBossesDefeated)}
+              disabled={battleBusy || teamEmpty || !(eligibility?.hasBoss || allBossesDefeated)}
               title={bossHint}
               onClick={allBossesDefeated ? () => setRematchOpen(true) : onBossFight}
             >
@@ -1492,6 +1542,8 @@ function MainMenu({
               <span className="classic-wild-go">{allBossesDefeated ? 'Pick ▸' : 'Battle ▸'}</span>
             </button>
           </div>
+          </>
+          )}
 
           {/* A battle with a friend on another computer. */}
           <OnlineSection disabled={fightBusy || teamEmpty} />
@@ -1613,7 +1665,7 @@ function MainMenu({
                 disabled={busy || mergePlan().mergedAway === 0}
                 onClick={(e) => void mergeSelectedMons(e)}
               >
-                {confirmingBoxSell ? 'Merge them? Click again' : 'Merge selected'}
+                {confirmingBoxSell ? `Merge them? ${CLICK} again` : 'Merge selected'}
               </button>
             ) : (
               <button
@@ -1621,7 +1673,7 @@ function MainMenu({
                 disabled={busy || boxSelection.size === 0}
                 onClick={(e) => void sellSelectedMons(e)}
               >
-                {confirmingBoxSell ? 'Includes rare or shiny Pokemon - click again' : 'Sell selected'}
+                {confirmingBoxSell ? `Includes rare or shiny Pokemon - ${CLICK_LC} again` : 'Sell selected'}
               </button>
             )}
           </div>

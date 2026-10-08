@@ -75,7 +75,10 @@ export interface DraftView {
   round: number
   wins: number
   losses: number
-  // Battling: who's next, whole team on show.
+  // Online chaos draft with a friend (see shared/online.ts): battles that ended in a tie.
+  online?: boolean
+  ties?: number
+  // Battling: who's next, whole team on show (online: null until the friend is done picking).
   opponent: DraftOpponentView | null
   // Finished: the coins it paid.
   reward: number

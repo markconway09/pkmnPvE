@@ -1,4 +1,5 @@
 import showdownSpriteNames from './showdownSpriteNames.json'
+import { IS_MOBILE } from './platform'
 
 export type SpriteStyle = '2d-static' | '2d-animated' | '3d-static' | '3d-animated'
 
@@ -15,6 +16,8 @@ export const SPRITE_STYLE_LABELS: Record<SpriteStyle, string> = {
 }
 
 export function loadSpriteStyle(): SpriteStyle {
+  // The phone app only ships the 3D stills (and the 2D ones they fall back on).
+  if (IS_MOBILE) return '3d-static'
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (SPRITE_STYLES.includes(stored as SpriteStyle)) return stored as SpriteStyle
@@ -50,12 +53,17 @@ const SHINY_CDN_DIR: Record<SpriteStyle, { front: string; back: string }> = {
 // and lack most of their own art: they show that one's pictures in every style.
 const SAME_LOOK_SPRITES: Record<string, string> = { rockruffdusk: 'rockruff' }
 
+// On the phone, an animated style asks for its still version - the animated
+// sprites aren't in the app (they'd make it ~400 MB).
+const MOBILE_STILL: Partial<Record<SpriteStyle, SpriteStyle>> = { '2d-animated': '2d-static', '3d-animated': '3d-static' }
+
 export function spriteUrl(
-  style: SpriteStyle,
+  requestedStyle: SpriteStyle,
   facing: 'front' | 'back',
   rawSpriteId: string,
   shiny = false
 ): string {
+  const style = (IS_MOBILE && MOBILE_STILL[requestedStyle]) || requestedStyle
   const spriteId = SAME_LOOK_SPRITES[rawSpriteId] ?? rawSpriteId
   const ext = style === '2d-static' || style === '3d-static' ? 'png' : 'gif'
   // Pokemon HOME art (3D static) has no official back view, so the front

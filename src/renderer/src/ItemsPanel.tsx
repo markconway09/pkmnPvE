@@ -25,6 +25,7 @@ import { errorMessage, pointOf, useFloatingNotes, type NotePoint } from './Float
 import ModalSpinner from './ModalSpinner'
 import CategoryJumpBar from './CategoryJumpBar'
 import RarityOddsTooltip from './RarityOddsTooltip'
+import { CLICK, IS_MOBILE } from './platform'
 
 // The bulk buttons joined onto an item's own buy button.
 const BULK_AMOUNTS = [5, 10]
@@ -487,6 +488,7 @@ function ItemsPanel({ onChanged, onMoneyChange, onOpenCoinShop }: Props): React.
             onRestore={(item) => (item.fossil === 'galar' ? setGalarFossil(item) : void restoreSingle(item))}
             onOpenCoinShop={onOpenCoinShop}
             lockedUntil={lockedUntil}
+            onClose={() => setSelectedId(null)}
           />
         </div>
       )}
@@ -560,7 +562,7 @@ function ItemCard({ row, selected, picking, picked, onFocus, onActivate, onArrow
       ? "Can't be sold"
       : picked
         ? `✓ ${formatMoney((row.owned?.sellPrice ?? 0) * (row.owned?.quantity ?? 0))}`
-        : 'Click to pick'
+        : `${CLICK} to pick`
     : row.shop
       ? formatMoney(row.shop.price)
       : row.coinShop
@@ -614,6 +616,8 @@ interface ItemDetailProps {
   onOpenCoinShop: (itemId: string) => void
   // While the late game items are locked: the boss to beat (the Coin Shop's petals wait for it).
   lockedUntil: string | null
+  // Puts the pane away (on the phone, where it covers the bag).
+  onClose: () => void
 }
 
 // The pane beside the grid: the picked item large, what it does in words, then a section
@@ -630,7 +634,8 @@ function ItemDetail({
   onOpen,
   onRestore,
   onOpenCoinShop,
-  lockedUntil
+  lockedUntil,
+  onClose
 }: ItemDetailProps): React.JSX.Element {
   if (!row) {
     return (
@@ -703,6 +708,12 @@ function ItemDetail({
 
   return (
     <aside className="items-detail" aria-live="polite">
+      {/* On the phone: back to the bag (the back button does the same). */}
+      {IS_MOBILE && (
+        <button className="items-detail-close" aria-label="Back to the bag" data-back-close="" onClick={onClose}>
+          ×
+        </button>
+      )}
       <div className="items-detail-head">
         <RarityGlow tier={row.tier} size={88}>
           <ItemSprite spritenum={row.spritenum} className="items-detail-icon" />

@@ -1,4 +1,4 @@
-import { createRequire } from 'node:module'
+import { battleStream, gen9RandomSets, sim } from './ps'
 import type { PokemonSet as ShowdownPokemonSet } from 'pokemon-showdown/dist/sim/teams.js'
 import type { Battle } from 'pokemon-showdown/dist/sim/battle.js'
 import type { Pokemon } from 'pokemon-showdown/dist/sim/pokemon.js'
@@ -83,14 +83,8 @@ import {
   STARLIGHT_RAID_MULTIPLIER
 } from '../../shared/titles'
 
-// pokemon-showdown is CommonJS; Node's static named-export detection misses
-// some of these under ESM, so the package is loaded via require() instead.
-const require = createRequire(import.meta.url)
-const { BattleStream, getPlayerStreams, Teams, Dex, toID } =
-  require('pokemon-showdown') as typeof import('pokemon-showdown')
-const { BattlePlayer } = require('pokemon-showdown/dist/sim/battle-stream.js') as typeof import(
-  'pokemon-showdown/dist/sim/battle-stream.js'
-)
+const { BattleStream, getPlayerStreams, Teams, Dex, toID } = sim
+const { BattlePlayer } = battleStream
 
 // Meltan becomes Melmetal with candies in the real games, so the Dex lists no
 // evolution for it. Here it evolves at max friendship instead. Patched into the raw
@@ -648,7 +642,7 @@ let cachedWildExtraSpecies: string[] | null = null
 
 function wildExtraSpecies(): string[] {
   if (cachedWildExtraSpecies) return cachedWildExtraSpecies
-  const randomSets = require('pokemon-showdown/dist/data/random-battles/gen9/sets.json') as Record<string, unknown>
+  const randomSets = gen9RandomSets() as Record<string, unknown>
   // Every stage of every line the random sets already cover.
   const covered = new Set<string>()
   for (const id of Object.keys(randomSets)) {
@@ -680,7 +674,7 @@ function wildExtraSpecies(): string[] {
 let cachedRandomSetCount: number | null = null
 function randomSetCount(): number {
   if (cachedRandomSetCount === null) {
-    cachedRandomSetCount = Object.keys(require('pokemon-showdown/dist/data/random-battles/gen9/sets.json')).length
+    cachedRandomSetCount = Object.keys(gen9RandomSets()).length
   }
   return cachedRandomSetCount
 }
@@ -1596,7 +1590,7 @@ let randbatsSets: Record<string, RandbatsEntry> | null = null
 function getRandbatsSets(): Record<string, RandbatsEntry> {
   if (!randbatsSets) {
     try {
-      randbatsSets = require('pokemon-showdown/dist/data/random-battles/gen9/sets.json') as Record<string, RandbatsEntry>
+      randbatsSets = gen9RandomSets() as Record<string, RandbatsEntry>
     } catch (e) {
       console.error('[sim-access] could not load random-battle set data, moves stay alphabetical:', e)
       randbatsSets = {}
@@ -2334,7 +2328,7 @@ let cachedWildLineIds: Set<string> | null = null
 
 function wildLineIds(): Set<string> {
   if (!cachedWildLineIds) {
-    const randomSets = require('pokemon-showdown/dist/data/random-battles/gen9/sets.json') as Record<string, unknown>
+    const randomSets = gen9RandomSets() as Record<string, unknown>
     const ids = new Set<string>()
     for (const id of [...Object.keys(randomSets), ...wildExtraSpecies().map(toID)]) {
       let species = Dex.species.get(id)

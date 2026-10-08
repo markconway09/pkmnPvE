@@ -36,7 +36,8 @@ import {
 } from './effectiveness'
 import { loadLegacyTrainerSprite } from './trainerSprite'
 import Login from './Login'
-import { chooseOnline, forfeitOnline, leaveOnlineBattle, onOnlineBattleView } from './online'
+import { chooseOnline, forfeitOnline, leaveOnlineBattle, onOnlineBattleView, useOnlineState } from './online'
+import { CLICK } from './platform'
 
 type Screen = 'menu' | 'battle' | 'trainers' | 'rogueliteBosses' | 'premadeTeams'
 
@@ -237,6 +238,8 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
   // An online battle with a friend is on screen: its choices go to the friend's room (see
   // online.ts), and its screens arrive from there rather than as replies.
   const [onlineMode, setOnlineMode] = useState(false)
+  // Connected with a friend online: no other battle starts (not even a wild rebattle).
+  const onlineLocked = useOnlineState().friend !== null
 
   useEffect(
     () =>
@@ -1005,7 +1008,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
             draftResult={view.draftResult}
             tmQuickCheck={!!view.tmQuickCheck}
             tmRewards={view.tmRewards ?? []}
-            onRebattle={wildRebattle ? () => startBattle(wildRebattle.location, wildRebattle.levelCap) : undefined}
+            onRebattle={wildRebattle && !onlineLocked ? () => startBattle(wildRebattle.location, wildRebattle.levelCap) : undefined}
             onClose={() => {
               if (onlineMode) {
                 leaveOnlineBattle()
@@ -1104,13 +1107,13 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
                             : canForfeit
                               ? confirmingRun
                                 ? view?.runBattle
-                                  ? 'End the run? Click again'
-                                  : 'Lose this match? Click again'
+                                  ? `End the run? ${CLICK} again`
+                                  : `Lose this match? ${CLICK} again`
                                 : 'Forfeit'
                             : confirmingRun
                               ? (runCost ?? 0) > 0
-                                ? `Pay ₽${(runCost ?? 0).toLocaleString('en-US')} to run? Click again`
-                                : 'Run from the shiny? Click again'
+                                ? `Pay ₽${(runCost ?? 0).toLocaleString('en-US')} to run? ${CLICK} again`
+                                : `Run from the shiny? ${CLICK} again`
                               : (runCost ?? 0) > 0
                                 ? `Run (₽${(runCost ?? 0).toLocaleString('en-US')})`
                                 : 'Run'}

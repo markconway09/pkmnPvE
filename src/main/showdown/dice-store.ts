@@ -1,4 +1,4 @@
-import { randomInt } from 'node:crypto'
+import { randomInt } from '../platform'
 import type { DiceRoll } from '../../shared/dice'
 import { DICE_LONG_SHOT_CHANCE, DICE_MAX_TARGET, DICE_MIN_TARGET, diceMultiplier, diceWinChance } from '../../shared/dice'
 import { LONG_SHOT_DOUBLE_CHANCE, LONG_SHOT_REFUND_CHANCE } from '../../shared/titles'

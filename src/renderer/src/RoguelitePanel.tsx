@@ -46,6 +46,7 @@ import RunMonEditor from './RunMonEditor'
 import { useTapGuard } from './useTapGuard'
 import { trainerSpriteUrl } from './trainerSprite'
 import { LOCATION_BUTTON_BACKDROP, backdropUrl, locationIconUrl } from './battleScenery'
+import { CLICK, CLICK_LC } from './platform'
 
 // The whole run as a bar: a notch per floor, a bigger one for each boss (coloured by
 // Gym Leader / Elite Four / Champion), filled up to the floor the run is on.
@@ -94,6 +95,8 @@ interface Props {
   onStart: (difficulty: RunDifficulty, generation: number | null) => void
   // A floor option, by its place in run.choices.
   onChoose: (index: number) => void
+  // Connected with a friend online: the floors that start a battle can't be taken.
+  battleLocked?: boolean
   onGiveItem: (itemId: string, runMonId: string) => void
   onSkipItem: () => void
   onGiveAbility: (abilityId: string, runMonId: string) => void
@@ -113,6 +116,9 @@ interface Props {
 const statusLabel = (status: string): string => (status === 'tox' ? 'PSN' : status.toUpperCase())
 
 // Each floor kind's name, its tooltip, and the one-liner under it on its tile.
+// The floors that start a battle.
+const BATTLE_NODES: RunNodeKind[] = ['wild', 'trainer', 'boss', 'villain']
+
 const NODE_INFO: Record<RunNodeKind, { label: string; hint: string; short: string }> = {
   wild: { label: 'Wild Pokémon', hint: 'Beat it and you can add it to your team', short: 'Catch a new member' },
   trainer: {
@@ -386,6 +392,7 @@ function RoguelitePanel({
   bestFloor,
   onStart,
   onChoose,
+  battleLocked,
   onGiveItem,
   onSkipItem,
   onGiveAbility,
@@ -491,13 +498,14 @@ function RoguelitePanel({
       if (!canPickFloor || !run) return
       const n = Number(e.key)
       if (Number.isInteger(n) && n >= 1 && n <= run.choices.length) {
+        if (battleLocked && BATTLE_NODES.includes(run.choices[n - 1].kind)) return
         e.preventDefault()
         onChoose(n - 1)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [canPickFloor, run, onChoose])
+  }, [canPickFloor, run, onChoose, battleLocked])
 
   // On the setup screen: left/right step through the difficulties, Enter starts the run.
   useEffect(() => {
@@ -751,9 +759,11 @@ function RoguelitePanel({
             ...(location ? { backgroundImage: `url(${backdropUrl(LOCATION_BUTTON_BACKDROP[location.id])})` } : {})
           } as React.CSSProperties
         }
-        disabled={busy}
+        disabled={busy || (battleLocked && BATTLE_NODES.includes(choice.kind))}
         title={
-          corrupted
+          battleLocked && BATTLE_NODES.includes(choice.kind)
+            ? 'Leave the online room first'
+            : corrupted
             ? `${NODE_INFO[choice.kind].hint} - corrupted: costs ${cost} gem${cost === 1 ? '' : 's'}`
             : villain
               ? `${villain.classLabel} ${villain.villainName}: ${NODE_INFO.villain.hint}`
@@ -847,7 +857,7 @@ function RoguelitePanel({
           }}
           onBlur={() => setConfirmingForfeit(false)}
         >
-          {confirmingForfeit ? 'Give up the run? Click again' : 'Forfeit'}
+          {confirmingForfeit ? `Give up the run? ${CLICK} again` : 'Forfeit'}
         </button>
       </div>
       <RunProgressBar floor={run.floor} difficulty={run.difficulty} />
@@ -858,7 +868,7 @@ function RoguelitePanel({
           <p className="run-reward-heading">Villain defeated!</p>
           <p className="box-empty-hint">
             {rewardPick !== null
-              ? `Your team is full - click the Pokémon ${run.monOffer[rewardPick]?.species ?? 'it'} replaces (its held item then needs a new holder).`
+              ? `Your team is full - ${CLICK_LC} the Pokémon ${run.monOffer[rewardPick]?.species ?? 'it'} replaces (its held item then needs a new holder).`
               : 'Pick one Pokémon to join your team, held item and all.'}
           </p>
           <div className="run-item-row run-reward-mons">
@@ -912,7 +922,7 @@ function RoguelitePanel({
           <p className="run-reward-heading">Random Swap</p>
           <p className="box-empty-hint">
             {swapMode === 'one'
-              ? 'Now click the Pokémon to swap away - its replacement takes over its held item and its New Ability / New Move picks.'
+              ? `Now ${CLICK_LC} the Pokémon to swap away - its replacement takes over its held item and its New Ability / New Move picks.`
               : `Swapped-in Pokémon are completely random, at Lv ${run.swapLevel}, and take over the held items and New Ability / New Move picks of the ones they replace. Each has a 10% chance to be a legendary - and swapping the whole team has a 5% chance to be all restricted legendaries.`}
           </p>
           <div className="run-item-row">
@@ -936,7 +946,7 @@ function RoguelitePanel({
               }}
               onBlur={() => setConfirmingTeamSwap(false)}
             >
-              {confirmingTeamSwap ? 'Swap all of them? Click again' : 'Swap the whole team'}
+              {confirmingTeamSwap ? `Swap all of them? ${CLICK} again` : 'Swap the whole team'}
             </button>
             <button
               className="run-item-button run-item-skip"
@@ -1002,7 +1012,7 @@ function RoguelitePanel({
             <>
               <p className="box-empty-hint">
                 {chosenPick
-                  ? `Now click the Pokémon to ${pick.kind === 'ability' ? 'give' : 'teach'} ${pickName} to.`
+                  ? `Now ${CLICK_LC} the Pokémon to ${pick.kind === 'ability' ? 'give' : 'teach'} ${pickName} to.`
                   : `Pick one ${pick.kind === 'ability' ? 'ability' : 'move'}.`}
               </p>
               <div className="run-item-row">
@@ -1054,7 +1064,7 @@ function RoguelitePanel({
           {run.itemOfferReason === 'bonus' && <p className="run-reward-heading">Title bonus: a free item!</p>}
           {run.itemOfferReason === 'shop' && <p className="run-reward-heading">New Item</p>}
           <p className="box-empty-hint">
-            {chosenItem ? 'Now click the Pokémon to give it to (it replaces what it holds).' : 'Pick one item.'}
+            {chosenItem ? `Now ${CLICK_LC} the Pokémon to give it to (it replaces what it holds).` : 'Pick one item.'}
           </p>
           <div className="run-item-row">
             {offer.map((item) => (

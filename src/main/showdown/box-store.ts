@@ -1,7 +1,4 @@
-import { randomUUID } from 'node:crypto'
-import { readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { BrowserWindow } from 'electron'
+import { readText, writeText, joinPath, emitToUi, randomUUID } from '../platform'
 import type {
   BoxPokemonView,
   BoxState,
@@ -136,7 +133,7 @@ function load(): StoredBox {
   // Outside the try: not being logged in is a bug to surface, not an empty save.
   const path = playerPathFor('box.json')
   try {
-    const raw = readFileSync(path, 'utf8')
+    const raw = readText(path)
     const parsed = JSON.parse(raw) as StoredBox
     if (!Array.isArray(parsed.mons) || !Array.isArray(parsed.team)) return emptyBox()
     // Saved before companions had that name: the same Pokemon and size under the old fields.
@@ -195,7 +192,7 @@ function getState(): StoredBox {
 
 function persist(): void {
   registerOwnedSpecies()
-  writeFileSync(playerPathFor('box.json'), JSON.stringify(getState()), 'utf8')
+  writeText(playerPathFor('box.json'), JSON.stringify(getState()))
 }
 
 // Adds everything currently in the box to the registered species. Run on every
@@ -235,7 +232,7 @@ function registerOwnedSpecies(): void {
   box.registeredLooks = [...looks].sort()
   // The window pops each new entry up, wherever the player is.
   if (announce && fresh.length > 0) {
-    for (const window of BrowserWindow.getAllWindows()) window.webContents.send('pokedex:registered', fresh)
+    emitToUi('pokedex:registered', fresh)
   }
 }
 
@@ -1076,7 +1073,7 @@ export function readSavedTeamMergeStarsOf(playerSlug: string): number[] {
 function readSavedTeamMons(playerSlug: string): StoredMon[] {
   let saved: StoredBox
   try {
-    saved = JSON.parse(readFileSync(join(playerDirFor(playerSlug), 'box.json'), 'utf8')) as StoredBox
+    saved = JSON.parse(readText(joinPath(playerDirFor(playerSlug), 'box.json'))) as StoredBox
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return []
     throw new Error("That player's save couldn't be read")

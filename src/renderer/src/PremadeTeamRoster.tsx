@@ -3,12 +3,10 @@ import { createPortal } from 'react-dom'
 import {
   DndContext,
   DragOverlay,
-  PointerSensor,
-  useSensor,
-  useSensors,
   type DragEndEvent,
   type DragStartEvent
 } from '@dnd-kit/core'
+import { useDragSensors } from './dragSensors'
 import type { BoxPokemonView, ItemOptionEntry, PremadeTeamSummary } from '../../shared/battle-types'
 import TeamRow from './TeamRow'
 import PokemonIconVisual from './PokemonIconVisual'
@@ -34,7 +32,7 @@ function PremadeTeamRoster({ team, items, onClose, onTeamsChange }: Props): Reac
   const [dropItemId, setDropItemId] = useState<string | null>(team.drop.itemId)
   const [dropChance, setDropChance] = useState(team.drop.chance)
   const [isDoubleBattle, setIsDoubleBattle] = useState(team.isDoubleBattle)
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+  const sensors = useDragSensors()
   // "Add Specific Pokemon": the species being typed, and every species to pick from.
   const [adding, setAdding] = useState(false)
   const [speciesQuery, setSpeciesQuery] = useState('')

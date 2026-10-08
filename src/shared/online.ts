@@ -1,4 +1,5 @@
 import type { BattleView } from './battle-types'
+import type { ChaosField } from './draft'
 
 // Online battles with a friend: two copies of the game connect straight to each other
 // (WebRTC, found through the free public PeerJS server by a room code). The host's copy
@@ -31,6 +32,21 @@ export interface OnlineSelf {
   team: OnlineTeam
 }
 
+// Online chaos draft: both players draft at the same time from the same tiers (the host
+// rolls them), each with their own packs and modifiers, then battle each other with
+// everything brought - the same stages as a solo chaos draft (draft 2, a modifier, battle;
+// two more picks every other battle). First to ONLINE_CHAOS_WINS wins takes the match;
+// after ONLINE_CHAOS_BATTLES battles (ties can happen) the most wins does.
+export const ONLINE_CHAOS_WINS = 4
+export const ONLINE_CHAOS_BATTLES = 7
+
+// A player's chaos draft as their copy sends it once they're done picking for a battle:
+// their picks (sets with their stat modifiers) and battle-start modifiers.
+export interface OnlineDraftTeam {
+  picks: unknown[]
+  field: ChaosField
+}
+
 // Both players' screens of the host's battle (the host shows one, sends the other on).
 export interface OnlineViews {
   host: BattleView
@@ -59,5 +75,14 @@ export type OnlineMessage =
   | { type: 'chosen'; id: number; error?: string }
   // Friend -> host: giving up the battle.
   | { type: 'forfeit' }
+  // Host -> friend: an online chaos draft is starting, from these Smogon tiers.
+  | { type: 'draftStart'; setFormats: string[] }
+  // Either way: done picking for the battle after `stage` battles - here's the team.
+  | { type: 'draftTeam'; stage: number; team: OnlineDraftTeam }
+  // Either way: the lead picked for that battle (the whole team, in order - the first
+  // leads). The host starts the battle once it has both.
+  | { type: 'draftLead'; stage: number; order: number[] }
+  // Either way: leaving the chaos draft (back to the room).
+  | { type: 'draftLeave' }
   // Either way: leaving the room.
   | { type: 'bye' }

@@ -1,5 +1,7 @@
+import { useSyncExternalStore } from 'react'
 import { Peer, type DataConnection } from 'peerjs'
 import type { BattleView } from '../../shared/battle-types'
+import type { DraftView } from '../../shared/draft'
 import {
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
@@ -17,6 +19,14 @@ import {
 
 export type OnlinePhase = 'idle' | 'connecting' | 'waiting' | 'lobby' | 'battle'
 
+// An online chaos draft (see shared/online.ts): this player's side of it, and whether each
+// player has picked their lead for the next battle.
+export interface OnlineDraftState {
+  view: DraftView
+  leadPicked: boolean
+  friendLeadPicked: boolean
+}
+
 export interface OnlineState {
   phase: OnlinePhase
   role: 'host' | 'guest' | null
@@ -25,9 +35,11 @@ export interface OnlineState {
   // The host is asking for the friend's team / setting the battle up.
   starting: boolean
   error: string | null
+  // An online chaos draft is going (the room stays in the lobby between its battles).
+  draft: OnlineDraftState | null
 }
 
-const IDLE: OnlineState = { phase: 'idle', role: null, code: null, friend: null, starting: false, error: null }
+const IDLE: OnlineState = { phase: 'idle', role: null, code: null, friend: null, starting: false, error: null, draft: null }
 
 let state: OnlineState = IDLE
 let peer: Peer | null = null
@@ -44,6 +56,13 @@ let lastView: BattleView | null = null
 // Friend: choices sent and not yet answered.
 let nextChoiceId = 1
 const pendingChoices = new Map<number, { resolve: () => void; reject: (error: Error) => void }>()
+// Chaos draft: the battle (by battles played before it) this player's team was last sent
+// for, both players' leads (by battle too), and whether the battle on screen still has
+// to be counted once it ends.
+let sentTeamStage = -1
+let myLead: { stage: number; order: number[] } | null = null
+let friendLead: { stage: number; order: number[] } | null = null
+let draftResultPending = false
 
 const stateListeners = new Set<(state: OnlineState) => void>()
 const viewListeners = new Set<(view: BattleView, fresh: boolean) => void>()
@@ -60,6 +79,11 @@ export function getOnlineState(): OnlineState {
 export function subscribeOnline(listener: (state: OnlineState) => void): () => void {
   stateListeners.add(listener)
   return () => stateListeners.delete(listener)
+}
+
+/** The room's state, kept up to date (for screens that change while a friend is connected). */
+export function useOnlineState(): OnlineState {
+  return useSyncExternalStore(subscribeOnline, getOnlineState)
 }
 
 // Every screen of an online battle, for the battle page (`fresh` for a new battle's first).
@@ -95,6 +119,13 @@ function showView(next: BattleView, from: number): void {
   lastView = view
   if (state.phase !== 'battle') setState({ phase: 'battle', starting: false, error: null })
   for (const listener of viewListeners) listener(view, fresh)
+  // A chaos draft battle: each copy counts its own player's result (a tie for both).
+  if (fresh && state.draft) draftResultPending = true
+  if (view.ended && draftResultPending) {
+    draftResultPending = false
+    const result = view.winner === 'You' ? true : view.winner === null ? null : false
+    window.api.finishOnlineDraftBattle(result).then(showDraftView, () => {})
+  }
 }
 
 function send(message: OnlineMessage): void {
@@ -125,6 +156,8 @@ function reset(error: string | null = null): void {
   lastView = null
   for (const pending of pendingChoices.values()) pending.reject(new Error('Disconnected'))
   pendingChoices.clear()
+  if (state.draft) void window.api.endOnlineDraft()
+  resetDraftProgress()
   state = { ...IDLE, error }
   for (const listener of stateListeners) listener(state)
 }
@@ -225,8 +258,17 @@ function friendLeft(): void {
     if (state.phase === 'battle' && lastView && !lastView.ended) void window.api.forfeitOnline(1)
     conn = null
     guestSent = 0
+    // A chaos draft can't go on without them.
+    if (state.draft) void window.api.endOnlineDraft()
+    resetDraftProgress()
     // The room stays open for them to come back.
-    setState({ phase: state.phase === 'battle' ? 'battle' : 'waiting', friend: null, starting: false, error: `${name} left the room` })
+    setState({
+      phase: state.phase === 'battle' ? 'battle' : 'waiting',
+      friend: null,
+      starting: false,
+      draft: null,
+      error: `${name} left the room`
+    })
     return
   }
   // The friend's copy can't go on without the host's: an unfinished battle just stops.
@@ -285,7 +327,41 @@ async function receive(message: OnlineMessage): Promise<void> {
     }
     case 'teamError':
     case 'startError':
+      // A chaos draft battle that couldn't start: both pick their leads again.
+      if (state.draft) {
+        myLead = null
+        friendLead = null
+        showDraftView(state.draft.view)
+      }
       setState({ starting: false, error: message.reason })
+      return
+    case 'draftStart': {
+      if (state.role !== 'guest') return
+      try {
+        resetDraftProgress()
+        showDraftView((await window.api.startOnlineDraft(message.setFormats)).view)
+        setState({ error: null })
+      } catch (e) {
+        send({ type: 'draftLeave' })
+        setState({ draft: null, error: e instanceof Error ? e.message : String(e) })
+      }
+      return
+    }
+    case 'draftTeam': {
+      if (!state.draft || !state.friend) return
+      window.api.setOnlineDraftOpponent(message.stage, state.friend, message.team).then(showDraftView, (e) =>
+        setState({ error: e instanceof Error ? e.message : String(e) })
+      )
+      return
+    }
+    case 'draftLead':
+      if (!state.draft) return
+      friendLead = { stage: message.stage, order: message.order }
+      showDraftView(state.draft.view)
+      startDraftBattleIfReady()
+      return
+    case 'draftLeave':
+      if (state.draft) endDraft(`${state.friend?.name ?? 'Your friend'} left the chaos draft`)
       return
     case 'view':
       if (state.role === 'guest') showView(message.view, message.from)
@@ -326,11 +402,96 @@ window.api.onOnlineViews((views) => {
 
 /** Host: asks for the friend's team and starts a battle with it. */
 export function startOnlineBattle(doubles: boolean, stars: boolean): void {
-  if (state.role !== 'host' || state.phase !== 'lobby' || state.starting) return
+  if (state.role !== 'host' || state.phase !== 'lobby' || state.starting || state.draft) return
   pendingDoubles = doubles
   pendingStars = stars
   setState({ starting: true, error: null })
   send({ type: 'teamRequest', doubles, stars })
+}
+
+// ---- Online chaos draft (see shared/online.ts) ----
+
+function resetDraftProgress(): void {
+  sentTeamStage = -1
+  myLead = null
+  friendLead = null
+  draftResultPending = false
+}
+
+// Battles played so far in the draft (ties too) - the stage its messages are about.
+function draftStage(view: DraftView): number {
+  return view.wins + view.losses + (view.ties ?? 0)
+}
+
+/** This player's draft moved on: shown, and - once done picking for a battle - sent to the friend. */
+export function showDraftView(view: DraftView): void {
+  if (!state.friend && !state.draft) return
+  const stage = draftStage(view)
+  setState({ draft: { view, leadPicked: myLead?.stage === stage, friendLeadPicked: friendLead?.stage === stage } })
+  if (view.status === 'battling' && sentTeamStage !== stage) {
+    sentTeamStage = stage
+    window.api.getOnlineDraftTeam().then(
+      (team) => send({ type: 'draftTeam', stage, team }),
+      (e) => setState({ error: e instanceof Error ? e.message : String(e) })
+    )
+  }
+}
+
+function endDraft(error: string | null = null): void {
+  resetDraftProgress()
+  void window.api.endOnlineDraft()
+  setState({ draft: null, starting: false, error })
+}
+
+/** Host: starts an online chaos draft - the friend's copy starts one from the same tiers. */
+export async function startOnlineDraft(): Promise<void> {
+  if (state.role !== 'host' || state.phase !== 'lobby' || state.starting || state.draft) return
+  setState({ starting: true, error: null })
+  try {
+    resetDraftProgress()
+    const { view, setFormats } = await window.api.startOnlineDraft()
+    send({ type: 'draftStart', setFormats })
+    setState({ starting: false })
+    showDraftView(view)
+  } catch (e) {
+    setState({ starting: false, error: e instanceof Error ? e.message : String(e) })
+  }
+}
+
+/** The lead for the next draft battle (the whole team, in order). The host starts it once both have picked. */
+export function pickOnlineDraftLead(order: number[]): void {
+  const draft = state.draft
+  if (!draft || draft.view.status !== 'battling' || !draft.view.opponent) return
+  const stage = draftStage(draft.view)
+  if (myLead?.stage === stage) return
+  myLead = { stage, order }
+  send({ type: 'draftLead', stage, order })
+  showDraftView(draft.view)
+  startDraftBattleIfReady()
+}
+
+function startDraftBattleIfReady(): void {
+  if (state.role !== 'host' || !state.draft || !state.friend || state.starting || !myLead || !friendLead) return
+  const stage = draftStage(state.draft.view)
+  if (myLead.stage !== stage || friendLead.stage !== stage) return
+  setState({ starting: true, error: null })
+  guestSent = 0
+  lastView = null
+  window.api.startOnlineDraftBattle(state.friend, myLead.order, friendLead.order).then(hostViews, (e) => {
+    const reason = e instanceof Error ? e.message : String(e)
+    send({ type: 'startError', reason })
+    myLead = null
+    friendLead = null
+    if (state.draft) showDraftView(state.draft.view)
+    setState({ starting: false, error: reason })
+  })
+}
+
+/** Leaves the chaos draft (the friend's ends too, unless the match is already over). */
+export function leaveOnlineDraft(): void {
+  if (!state.draft) return
+  if (state.draft.view.status !== 'finished') send({ type: 'draftLeave' })
+  endDraft()
 }
 
 /** This player's choice for the turn. Resolves once it stands (rejects if the sim refused it). */

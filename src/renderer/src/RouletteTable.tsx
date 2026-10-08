@@ -16,6 +16,7 @@ import type { GameCornerGameProps } from './GameCornerTabs'
 import CoinIcon from './CoinIcon'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
 import { playCornerClunk, playCornerTick } from './ticks'
+import { IS_MOBILE } from './platform'
 
 const SPIN_MS = 4200
 const SEGMENT = 360 / WHEEL_ORDER.length
@@ -48,6 +49,17 @@ function boardPlace(key: RouletteBetKey): [number, number, number] {
   if (key.startsWith('dozen:')) return [2 + (Number(key.slice(6)) - 1) * 4, 4, 4]
   const i = (EVEN_MONEY_BETS as readonly string[]).indexOf(key)
   return [2 + i * 2, 5, 2]
+}
+
+/**
+ * A bet's grid placement. On a phone the board is turned on its side, like a real table
+ * read from its end: 0 across the top, the numbers in three columns (1-4-7 on the left)
+ * running down, the 2:1 bets along the bottom, the dozens and even-money bets down the right.
+ */
+function boardStyle(key: RouletteBetKey): React.CSSProperties {
+  const [column, row, span] = boardPlace(key)
+  if (!IS_MOBILE) return { gridColumn: `${column} / span ${span}`, gridRow: key === 'n:0' ? '1 / span 3' : row }
+  return { gridRow: `${column} / span ${span}`, gridColumn: key === 'n:0' ? '1 / span 3' : row <= 3 ? 4 - row : row }
 }
 
 const BOARD_KEYS: RouletteBetKey[] = [
@@ -304,7 +316,6 @@ function RouletteTable({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorn
 
       <div className="roulette-board" ref={boardRef}>
         {BOARD_KEYS.map((key) => {
-          const [column, row, span] = boardPlace(key)
           const n = key.startsWith('n:') ? Number(key.slice(2)) : null
           const color = n !== null ? pocketColor(n) : key === 'red' ? 'red' : key === 'black' ? 'black' : null
           const won = winningKeys?.has(key)
@@ -314,7 +325,7 @@ function RouletteTable({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorn
               key={key}
               type="button"
               className={`roulette-cell${color ? ` roulette-cell-${color}` : ''}${won ? ' roulette-cell-won' : ''}${landed ? ' roulette-cell-landed' : ''}`}
-              style={{ gridColumn: `${column} / span ${span}`, gridRow: key === 'n:0' ? '1 / span 3' : row }}
+              style={boardStyle(key)}
               title={`${betLabel(key)} - pays ${betOdds(key)} to 1`}
               disabled={spinning}
               onClick={(e) => place(key, e)}

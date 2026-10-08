@@ -7,10 +7,12 @@ import {
   joinRoom,
   leaveRoom,
   startOnlineBattle,
+  startOnlineDraft,
   subscribeOnline,
   type OnlineState
 } from './online'
 import { trainerSpriteUrl } from './trainerSprite'
+import DraftPanel from './DraftPanel'
 
 interface Props {
   // No team (or another fight starting): no hosting a battle.
@@ -98,36 +100,76 @@ function OnlineSection({ disabled }: Props): React.JSX.Element {
       )}
 
       {(online.phase === 'lobby' || online.phase === 'battle') && online.friend && (
-        <div className="online-row">
-          <img className="online-friend-sprite" src={trainerSpriteUrl(online.friend.spriteId)} alt="" />
-          <span className="online-friend-name">{online.friend.name}</span>
-          {online.role === 'host' ? (
+        <div className="online-row online-lobby">
+          {/* Who's in the room, and the way out. */}
+          <div className="online-lobby-head">
+            <img className="online-friend-sprite" src={trainerSpriteUrl(online.friend.spriteId)} alt="" />
+            <span className="online-friend-name">{online.friend.name}</span>
+            {online.draft ? (
+              <span className="online-status">Chaos draft</span>
+            ) : (
+              online.role !== 'host' && (
+                <span className="online-status">Waiting for {online.friend.name} to start a battle or a chaos draft...</span>
+              )
+            )}
+            <button className="online-leave" onClick={leaveRoom}>
+              Leave
+            </button>
+          </div>
+          {/* Host: the two games, one per line - a battle with its own options, or a chaos draft. */}
+          {!online.draft && online.role === 'host' && (
             <>
-              <label className="challenge-doubles">
-                <input type="checkbox" checked={doubles} onChange={(e) => setDoubles(e.target.checked)} /> Double battle
-              </label>
-              {/* Merge stars: each team member's +10% stats per star, on both sides. */}
-              <label className="challenge-doubles" title="Both teams get their merge star stat boosts">
-                <input type="checkbox" checked={stars} onChange={(e) => setStars(e.target.checked)} /> Use stars
-              </label>
-              <button
-                className="online-start"
-                disabled={disabled || online.starting || online.phase !== 'lobby'}
-                onClick={() => startOnlineBattle(doubles, stars)}
-              >
-                {online.starting ? 'Starting...' : 'Start battle'}
-              </button>
+              <div className="online-mode">
+                <span className="online-mode-text">
+                  <strong>Battle</strong>
+                  <span>Your current teams</span>
+                </span>
+                <span className="online-mode-options">
+                  <label className="challenge-doubles">
+                    <input type="checkbox" checked={doubles} onChange={(e) => setDoubles(e.target.checked)} /> Double battle
+                  </label>
+                  {/* Merge stars: each team member's +10% stats per star, on both sides. */}
+                  <label className="challenge-doubles" title="Both teams get their merge star stat boosts">
+                    <input type="checkbox" checked={stars} onChange={(e) => setStars(e.target.checked)} /> Use stars
+                  </label>
+                </span>
+                <button
+                  className="online-start"
+                  disabled={disabled || online.starting || online.phase !== 'lobby'}
+                  onClick={() => startOnlineBattle(doubles, stars)}
+                >
+                  {online.starting ? 'Starting...' : 'Start battle'}
+                </button>
+              </div>
+              {/* A game of its own: the doubles and stars options don't apply to it. */}
+              <div className="online-mode">
+                <span className="online-mode-text">
+                  <strong>Chaos draft</strong>
+                  <span>Both draft a chaos team at the same time, then battle - first to 4 wins</span>
+                </span>
+                <button
+                  className="online-start online-draft-start"
+                  disabled={online.starting || online.phase !== 'lobby'}
+                  onClick={() => void startOnlineDraft()}
+                >
+                  Start draft
+                </button>
+              </div>
             </>
-          ) : (
-            <span className="online-status">Waiting for {online.friend.name} to start the battle...</span>
           )}
-          <button className="online-leave" onClick={leaveRoom}>
-            Leave
-          </button>
         </div>
       )}
 
       {online.error && <p className="editor-error">{online.error}</p>}
+
+      {/* The chaos draft itself, between its battles. */}
+      {online.draft && online.friend && online.phase === 'lobby' && (
+        <DraftPanel
+          busy={online.starting}
+          onBattle={async () => {}}
+          online={{ ...online.draft, friendName: online.friend.name }}
+        />
+      )}
     </div>
   )
 }

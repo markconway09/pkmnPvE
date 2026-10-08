@@ -1,8 +1,7 @@
-import { createRequire } from 'node:module'
 import { EXP_DATA } from './exp-data'
+import { sim } from './ps'
 
-const require = createRequire(import.meta.url)
-const { Dex, toID } = require('pokemon-showdown') as typeof import('pokemon-showdown')
+const { Dex, toID } = sim
 
 // S=slow, M=medium (Medium Fast), F=fast, MS=medium-slow (Medium Slow),
 // E=erratic, L=fluctuating - the six standard growth rate curves.

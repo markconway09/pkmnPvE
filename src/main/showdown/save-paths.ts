@@ -1,29 +1,23 @@
-import { existsSync, mkdirSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { app } from 'electron'
+import { ensureDir as makeDir, joinPath, saveRoot } from '../platform'
 
+// Where the save folder sits is up to the platform (see platform/electron.ts).
 function saveDir(): string {
-  // Saves always sit in a plain 'save' folder the player can see: next to the
-  // project in dev, and next to pkmnPvE.exe in the packaged (portable) build -
-  // which ships with the game data in it - so moving the game to another
-  // computer, saves and all, is just copying its folder. (The OS userData folder
-  // has also been seen to be silently inaccessible to an unsigned electron.exe.)
-  return app.isPackaged ? join(dirname(app.getPath('exe')), 'save') : join(app.getAppPath(), 'save')
+  return saveRoot()
 }
 
 function ensureDir(dir: string): string {
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+  makeDir(dir)
   return dir
 }
 
 /** A file shared by every player: the trainers, premade teams, wild drops, boss order. */
 export function savePathFor(filename: string): string {
-  return join(ensureDir(saveDir()), filename)
+  return joinPath(ensureDir(saveDir()), filename)
 }
 
 /** The folder each player's own save lives under, one sub-folder per player. */
 export function playersDir(): string {
-  return ensureDir(join(saveDir(), 'players'))
+  return ensureDir(joinPath(saveDir(), 'players'))
 }
 
 // The player whose save the per-player stores read and write, as a folder name
@@ -41,11 +35,11 @@ export function setCurrentPlayerSlug(slug: string | null): void {
 
 /** The folder holding one player's save, created on first use. */
 export function playerDirFor(slug: string): string {
-  return ensureDir(join(playersDir(), slug))
+  return ensureDir(joinPath(playersDir(), slug))
 }
 
 /** A file in the logged-in player's own save. Throws if nobody is logged in. */
 export function playerPathFor(filename: string): string {
   if (!currentPlayerSlug) throw new Error('Not logged in')
-  return join(playerDirFor(currentPlayerSlug), filename)
+  return joinPath(playerDirFor(currentPlayerSlug), filename)
 }

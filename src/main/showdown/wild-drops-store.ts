@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readText, writeText } from '../platform'
 import { WILD_DROP_MAX_CHANCE, type ItemDropConfig, type WildDropEntry } from '../../shared/battle-types'
 import { toID } from './sim-access'
 import { savePathFor } from './save-paths'
@@ -8,7 +8,7 @@ type StoredWildDrops = Record<string, WildDropEntry>
 
 function load(): StoredWildDrops {
   try {
-    const raw = readFileSync(savePathFor('wildDrops.json'), 'utf8')
+    const raw = readText(savePathFor('wildDrops.json'))
     const parsed = JSON.parse(raw) as StoredWildDrops
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
   } catch (e) {
@@ -26,7 +26,7 @@ function getState(): StoredWildDrops {
 }
 
 function persist(): void {
-  writeFileSync(savePathFor('wildDrops.json'), JSON.stringify(getState()), 'utf8')
+  writeText(savePathFor('wildDrops.json'), JSON.stringify(getState()))
 }
 
 export function listWildDrops(): WildDropEntry[] {

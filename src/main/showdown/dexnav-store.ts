@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readText, writeText } from '../platform'
 import type { PokemonSet } from 'pokemon-showdown/dist/sim/teams.js'
 import { DEXNAV_ITEM_ID, DIPLOMA_ITEM_ID, type WildLocationConfig } from '../../shared/battle-types'
 import {
@@ -29,7 +29,7 @@ function defaultDexNav(): StoredDexNav {
 function load(): StoredDexNav {
   const path = playerPathFor('dexnav.json')
   try {
-    const parsed = JSON.parse(readFileSync(path, 'utf8')) as Partial<StoredDexNav>
+    const parsed = JSON.parse(readText(path)) as Partial<StoredDexNav>
     return {
       target: typeof parsed.target === 'string' ? parsed.target : null,
       chain: typeof parsed.chain === 'number' ? Math.max(0, Math.floor(parsed.chain)) : 0
@@ -54,7 +54,7 @@ function getState(): StoredDexNav {
 }
 
 function persist(): void {
-  writeFileSync(playerPathFor('dexnav.json'), JSON.stringify(getState()), 'utf8')
+  writeText(playerPathFor('dexnav.json'), JSON.stringify(getState()))
 }
 
 // With the Pokedex Diploma, any Pokemon can be hunted (see dexNavHuntInfo).

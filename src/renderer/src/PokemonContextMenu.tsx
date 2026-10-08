@@ -5,6 +5,7 @@ import ItemSprite from './ItemSprite'
 import ShinyIcon from './ShinyIcon'
 import { MenuIcon, PokemonMenuAction, PokemonMenuHeader, PokemonMenuSection } from './PokemonMenuParts'
 import type { BoxPokemonView, EvolutionItemUse } from '../../shared/battle-types'
+import { CLICK } from './platform'
 
 // The Poke Ball item icon - an evolution already in the Pokedex.
 const POKE_BALL_SPRITENUM = 345
@@ -202,7 +203,7 @@ function PokemonContextMenu({
             <PokemonMenuAction
               tone="shiny"
               icon={<ShinyIcon />}
-              label={confirmingPatch ? 'Click again to turn Shiny' : 'Turn Shiny'}
+              label={confirmingPatch ? `${CLICK} again to turn Shiny` : 'Turn Shiny'}
               detail={
                 <>
                   <ItemSprite spritenum={SHINY_PATCH_SPRITENUM} />
@@ -232,7 +233,7 @@ function PokemonContextMenu({
             <PokemonMenuAction
               tone="sell"
               icon={<MenuIcon name="sell" />}
-              label={confirmingSell ? 'Click again to sell' : 'Sell'}
+              label={confirmingSell ? `${CLICK} again to sell` : 'Sell'}
               detail={
                 confirmingSell
                   ? `This ${shiny ? 'shiny ' : ''}${species}, for ₽${sellPrice.toLocaleString('en-US')}`

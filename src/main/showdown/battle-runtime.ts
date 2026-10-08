@@ -387,7 +387,9 @@ export interface OpponentConfig {
   // An online match with a friend: they play the other side from their own copy of the
   // game (see online.ts in the renderer), so no AI drives it - this copy just runs the
   // battle for both. `name`/`spriteId` above are the friend's; these are the host's own.
-  online?: { hostName: string; hostSpriteId: string }
+  // Online chaos drafts: the host's modifiers in words, for the friend's tooltip on them
+  // (`chaosModifiers` above is the friend's, for the host).
+  online?: { hostName: string; hostSpriteId: string; guestChaosModifiers?: OpponentModifiersView }
 }
 
 // The friend's own copy of the battle log in an online match: the same lines told from
@@ -2112,7 +2114,7 @@ export class WildBattle {
       canForfeit: true,
       opponentRoster: this.opponentRoster(0),
       rewards: null,
-      chaosModifiers: null,
+      chaosModifiers: this.opponent?.online?.guestChaosModifiers ?? null,
       runBattle: false,
       runFainted: [],
       runItemReward: false,

@@ -9,6 +9,7 @@ import { trainerSpriteUrl } from './trainerSprite'
 import TitlePicker from './TitlePicker'
 import TrainerSpritePicker from './TrainerSpritePicker'
 import RarityCard from './RarityCard'
+import { CLICK } from './platform'
 
 interface Props {
   username: string
@@ -103,7 +104,7 @@ function PlayerTrainerModal({
             <img className="trainer-sprite-current-img" src={trainerSpriteUrl(trainerSprite)} alt={trainerSprite} />
             <div className="trainer-sprite-current-info">
               <span>{trainerSprite}</span>
-              <span className="trainer-sprite-change-hint">Click to change</span>
+              <span className="trainer-sprite-change-hint">{CLICK} to change</span>
             </div>
           </button>
           {/* The title shown beside the name - earned from achievements, just for show. */}

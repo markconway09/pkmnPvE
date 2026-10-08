@@ -1,5 +1,4 @@
-import { randomUUID } from 'node:crypto'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readText, writeText, randomUUID } from '../platform'
 import type {
   ExpGainResult,
   RunChoice,
@@ -348,7 +347,7 @@ function rollItemOffer(current: StoredRun, chances: SpecialItemChances): string[
 function load(): StoredRun | null {
   const path = playerPathFor('run.json')
   try {
-    const parsed = JSON.parse(readFileSync(path, 'utf8')) as StoredRun
+    const parsed = JSON.parse(readText(path)) as StoredRun
     if (!Array.isArray(parsed.team) || typeof parsed.floor !== 'number') return null
     // A run saved before floors had locations kept its choices as bare kinds.
     parsed.choices = (parsed.choices as (RunChoice | RunNodeKind)[]).map((c) => (typeof c === 'string' ? { kind: c } : c))
@@ -379,7 +378,7 @@ function activeRun(): StoredRun {
 }
 
 function persist(): void {
-  writeFileSync(playerPathFor('run.json'), JSON.stringify(getRun()), 'utf8')
+  writeText(playerPathFor('run.json'), JSON.stringify(getRun()))
 }
 
 function pickRandom<T>(list: T[], count: number): T[] {

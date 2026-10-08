@@ -1,8 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { MAX_BET } from '../../shared/slots'
 import { BLACKJACK_PAYOUT, BLACKJACK_WIN_PAYOUT, type GameCornerPerks } from '../../shared/titles'
 import CoinIcon from './CoinIcon'
 import Tooltip from './Tooltip'
+import { IS_MOBILE } from './platform'
 
 interface Props {
   // The bet as placed (already kept between 1 and max - see placedBet).
@@ -113,16 +115,21 @@ function BetSlider({ bet, max, disabled, step = 10, onChange, info }: Props): Re
   // below; + past the last stop, up to everything held).
   const lower = steps[bet === steps[stepIndex] ? Math.max(0, stepIndex - 1) : stepIndex]
   const higher = stepIndex < steps.length - 1 ? steps[stepIndex + 1] : max
-  return (
+  // On the phone the slider is too fiddly beside the game: the bet shows on a button, and
+  // the slider (with the rest) opens in a small window over the game.
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (disabled) setOpen(false)
+  }, [disabled])
+  const infoIcon = info && (
+    <Tooltip className="game-corner-info" placement="above" content={<div className="tooltip-panel game-corner-info-panel">{info}</div>}>
+      <span className="game-corner-info-icon" aria-label="How to play">
+        i
+      </span>
+    </Tooltip>
+  )
+  const controls = (
     <>
-      {info && (
-        <Tooltip className="game-corner-info" placement="above" content={<div className="tooltip-panel game-corner-info-panel">{info}</div>}>
-          <span className="game-corner-info-icon" aria-label="How to play">
-            i
-          </span>
-        </Tooltip>
-      )}
-      <span className="slots-bet-label">Bet</span>
       <button className="slots-bet-step" title="Bet less" disabled={disabled || bet <= 1} onClick={() => onChange(lower)}>
         −
       </button>
@@ -138,6 +145,60 @@ function BetSlider({ bet, max, disabled, step = 10, onChange, info }: Props): Re
       <button className="slots-bet-step" title="Bet more" disabled={disabled || bet >= max} onClick={() => onChange(higher)}>
         +
       </button>
+    </>
+  )
+  if (IS_MOBILE) {
+    return (
+      <>
+        {infoIcon}
+        <span className="slots-bet-label">Bet</span>
+        <button className="bet-open-button" disabled={disabled} onClick={() => setOpen(true)}>
+          <CoinIcon />
+          {bet.toLocaleString('en-US')}
+          <span className="bet-open-caret">▾</span>
+        </button>
+        {open &&
+          createPortal(
+            <div className="modal-overlay bet-modal-overlay"
+              onMouseDown={(e) => {
+                // Only this window closes, not one the game sits in.
+                e.stopPropagation()
+                setOpen(false)
+              }}
+            >
+              <div className="modal-panel bet-modal" onMouseDown={(e) => e.stopPropagation()}>
+                <h3 className="bet-modal-title">Your bet</h3>
+                <div className="bet-modal-value">
+                  <CoinIcon />
+                  {bet.toLocaleString('en-US')}
+                </div>
+                <div className="bet-modal-row">{controls}</div>
+                <div className="bet-modal-row">
+                  <button className="bet-modal-quick" disabled={disabled} onClick={() => onChange(1)}>
+                    Min
+                  </button>
+                  <button className="bet-modal-quick" disabled={disabled} onClick={() => onChange(Math.max(1, Math.floor(max / 2)))}>
+                    Half
+                  </button>
+                  <button className="bet-modal-quick slots-bet-max" disabled={disabled} onClick={() => onChange(max)}>
+                    Max
+                  </button>
+                </div>
+                <button className="bet-modal-done" onClick={() => setOpen(false)}>
+                  Done
+                </button>
+              </div>
+            </div>,
+            document.body
+          )}
+      </>
+    )
+  }
+  return (
+    <>
+      {infoIcon}
+      <span className="slots-bet-label">Bet</span>
+      {controls}
       <label className="slots-bet-value" title={`Type a bet (1 up to ${max.toLocaleString('en-US')})`}>
         <CoinIcon />
         <input

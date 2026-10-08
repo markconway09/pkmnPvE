@@ -47,6 +47,16 @@ function TabStrip<T extends string>({
       if (button) setHighlight({ left: button.offsetLeft, width: button.offsetWidth })
     }
     place()
+    // A strip too wide for its room scrolls sideways (the phone layout): bring the open tab into view.
+    const button = tabRefs.current[current]
+    const strip = stripRef.current
+    const bar = strip && strip.scrollWidth > strip.clientWidth ? strip : strip?.parentElement
+    if (button && bar && bar.scrollWidth > bar.clientWidth) {
+      const left = button.offsetLeft
+      const right = left + button.offsetWidth
+      if (left < bar.scrollLeft) bar.scrollLeft = left - 8
+      else if (right > bar.scrollLeft + bar.clientWidth) bar.scrollLeft = right - bar.clientWidth + 8
+    }
     // The tabs stretch with the window - keep it over the open one when they resize.
     const observer = new ResizeObserver(place)
     if (stripRef.current) observer.observe(stripRef.current)

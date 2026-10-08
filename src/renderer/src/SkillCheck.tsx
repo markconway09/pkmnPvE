@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RarityTier } from '../../shared/battle-types'
 import { DEFAULT_SKILL_CHECK, type SkillCheckResult, type SkillCheckSettings } from '../../shared/tms'
 import { playClunk, playTick } from './ticks'
+import { IS_MOBILE } from './platform'
 
 export type { SkillCheckResult }
 
@@ -133,18 +134,20 @@ export function SkillCheckRing({ runKey, settings = DEFAULT_SKILL_CHECK, tier, o
       e.preventDefault()
       press()
     }
-    // A click anywhere counts too - except on a button (Give up, Back to menu...).
-    const onClick = (e: MouseEvent): void => {
+    // A click (or a finger touching down) anywhere counts too - except on a button (Give up,
+    // Back to menu...). Pointer down rather than mouse down, which a touch screen only
+    // sends once the finger lifts - too late for a timing check.
+    const onClick = (e: PointerEvent): void => {
       if (e.button !== 0 || phaseRef.current !== 'spin') return
       if ((e.target as Element | null)?.closest?.('button, input, select, textarea, a')) return
       e.preventDefault()
       press()
     }
     window.addEventListener('keydown', onKey)
-    window.addEventListener('mousedown', onClick)
+    window.addEventListener('pointerdown', onClick)
     return () => {
       window.removeEventListener('keydown', onKey)
-      window.removeEventListener('mousedown', onClick)
+      window.removeEventListener('pointerdown', onClick)
     }
   }, [press])
 
@@ -166,7 +169,7 @@ export function SkillCheckRing({ runKey, settings = DEFAULT_SKILL_CHECK, tier, o
         {showZone && <line className="skill-check-needle" x1={C} y1={C - R + 16} x2={C} y2={C - R - 12} />}
       </g>
       <text className="skill-check-key" x={C} y={C + 5} textAnchor="middle">
-        {result ? RESULT_LABELS[result] : phase === 'idle' ? idleLabel : 'SPACE'}
+        {result ? RESULT_LABELS[result] : phase === 'idle' ? idleLabel : IS_MOBILE ? 'TAP' : 'SPACE'}
       </text>
     </svg>
   )

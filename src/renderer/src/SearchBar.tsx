@@ -1,10 +1,12 @@
 import { useRef } from 'react'
+import { IS_MOBILE } from './platform'
 
 interface Props {
   value: string
   onChange: (value: string) => void
   placeholder?: string
-  // Takes the keyboard as soon as it appears, so typing searches straight away.
+  // Takes the keyboard as soon as it appears, so typing searches straight away (not on the
+  // phone, where the keyboard popping up would cover half the screen).
   autoFocus?: boolean
   className?: string
 }
@@ -26,7 +28,7 @@ function SearchBar({ value, onChange, placeholder = 'Search...', autoFocus, clas
         type="text"
         value={value}
         placeholder={placeholder}
-        autoFocus={autoFocus}
+        autoFocus={autoFocus && !IS_MOBILE}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Escape' && value) {

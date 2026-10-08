@@ -5,6 +5,7 @@ import RarityCard, { RarityGlow } from './RarityCard'
 import { SkillCheckRing, type SkillCheckResult } from './SkillCheck'
 import { formatMoney } from './money'
 import ItemSprite from './ItemSprite'
+import { IS_MOBILE } from './platform'
 /** A TM's disc in its move's type colour (PokéSprite's TM icons). */
 export function tmIconUrl(type: string): string {
   return `./sprites/tms/${type.toLowerCase()}.png`
@@ -115,7 +116,7 @@ export function TmQuickCheck(): React.JSX.Element {
           ) : error ? (
             <span className="tm-quick-check-note">{error}</span>
           ) : (
-            <span className="tm-quick-check-note">Space / click on the zone</span>
+            <span className="tm-quick-check-note">{IS_MOBILE ? 'Tap on the zone' : 'Space / click on the zone'}</span>
           )}
         </>
       )}

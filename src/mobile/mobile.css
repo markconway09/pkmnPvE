@@ -1,0 +1,1540 @@
+/*
+ * The phone layout: the same screens as the desktop, rearranged for a portrait
+ * phone (360-430px wide). Loaded only by the mobile build (src/mobile/main.ts),
+ * after styles.css, and every rule is scoped to html[data-platform='mobile'] so
+ * nothing here can reach the desktop game.
+ *
+ * The menu: the page's title and the tool buttons along the top, the page in the
+ * middle (scrolling), the team dock above a bottom bar of the eight pages.
+ */
+html[data-platform='mobile'] {
+  --m-nav-h: 56px;
+  --m-top-h: 50px;
+  --m-gutter: 10px;
+  /* The screen width as a number (src/mobile/main.ts); 375 until it's set. */
+  --m-vw: 375;
+  /* Room left under a page for the team dock floating over its bottom. */
+  --m-dock-space: 84px;
+
+  & body {
+    /* No rubber-band scrolling of the whole page, and no grey flash on taps. */
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  & .screen {
+    height: 100vh;
+    height: 100dvh;
+    padding: var(--m-gutter);
+  }
+
+  /* ---- The menu shell ---- */
+  & .menu-shell {
+    flex-direction: column;
+    padding: 0;
+  }
+
+  /* The sidebar becomes the bottom bar: the eight pages, evenly spread. */
+  & .menu-rail {
+    order: 2;
+    width: auto;
+    align-self: stretch;
+    height: var(--m-nav-h);
+    flex-direction: row;
+    align-items: center;
+    gap: 0;
+    padding: 4px 2px calc(4px + env(safe-area-inset-bottom));
+    border-right: none;
+    border-top: 2px solid #2a3140;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.35);
+    overflow: visible;
+  }
+  & .menu-rail-logo,
+  & .menu-rail-spacer,
+  & .menu-rail-tip {
+    display: none;
+  }
+  & .menu-rail > .menu-rail-slot {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    justify-content: center;
+  }
+  & .menu-rail-page {
+    width: 44px;
+    height: 44px;
+  }
+  & .menu-rail-page .menu-rail-icon {
+    width: 34px;
+    height: 34px;
+  }
+
+  /* The four tools (Items, Pokédex, Achievements, Options) sit at the top right. */
+  & .menu-rail-tools {
+    position: fixed;
+    top: calc(6px + env(safe-area-inset-top));
+    right: 6px;
+    z-index: 30;
+    display: flex;
+    gap: 2px;
+  }
+  & .menu-rail-tool {
+    width: 38px;
+    height: 38px;
+  }
+  & .menu-rail-tool .menu-rail-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  & .menu-content {
+    order: 1;
+    flex: 1;
+    min-height: 0;
+    padding: calc(var(--m-top-h) + env(safe-area-inset-top)) var(--m-gutter) 0;
+  }
+
+  /* The top bar: the player's trainer and money, left of the tools. */
+  & .menu-content > .menu-header {
+    position: fixed;
+    top: env(safe-area-inset-top);
+    left: 0;
+    right: 172px;
+    height: var(--m-top-h);
+    padding: 0 0 0 var(--m-gutter);
+    gap: 8px;
+    z-index: 25;
+  }
+  /* The bottom bar already shows which page is open. */
+  & .menu-page-title {
+    display: none;
+  }
+  /* The music still plays (Options turns it on and off) - just no player in the bar. */
+  & .menu-header .music-player {
+    display: none;
+  }
+  /* Room after the money, so it isn't up against the card's edge. */
+  & .nav-player-card {
+    padding: 2px 12px 2px 2px;
+  }
+  & .nav-player-text {
+    display: none;
+  }
+  /* Its menu opens under the card, from the left (it's laid out for a card on the right). */
+  & .nav-player-menu {
+    left: var(--m-gutter) !important;
+    right: auto !important;
+  }
+
+  /* ---- Home ---- */
+  & .home-hub {
+    margin-top: 0;
+    padding: 4px 0 calc(var(--m-dock-space, 0px) + 8px);
+    gap: 10px;
+  }
+  /* A run or draft in progress: its Continue card across the screen, one under the other. */
+  & .home-continues {
+    flex-direction: column;
+    gap: 8px;
+  }
+  & .home-continue {
+    width: 100%;
+    padding: 10px 12px;
+    gap: 10px;
+  }
+  & .home-continue-text {
+    flex: 1;
+    min-width: 0;
+  }
+  & .home-continue-go {
+    flex: none;
+    width: auto;
+    padding: 0 10px;
+  }
+  /* Two columns: Battles and today's missions across both, the rest in pairs. */
+  & .home-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-auto-rows: auto;
+    gap: 10px;
+  }
+  & .home-card-classic,
+  & .home-grid .home-missions,
+  & .home-pair,
+  & .home-pair:last-child {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+  & .home-card {
+    padding: 12px;
+    gap: 6px;
+    min-height: 0;
+  }
+  & .home-card-key {
+    display: none;
+  }
+  & .home-card-head {
+    max-width: 100%;
+    gap: 8px;
+  }
+  & .home-card-icon,
+  & .home-card .home-card-head .home-card-icon {
+    width: 34px;
+    height: 34px;
+    flex: none;
+  }
+  & .home-card-title {
+    font-size: 15px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  & .home-card-sub,
+  & .home-card-stat {
+    font-size: 12px;
+  }
+  & .home-classic-body {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+  & .home-card-classic .home-classic-boss {
+    width: 84px;
+    height: 84px;
+  }
+  & .home-pair {
+    gap: 10px;
+  }
+  & .home-grid .home-mission {
+    grid-template-columns: minmax(0, 1fr) 60px 40px;
+    gap: 6px;
+  }
+
+  /* ---- The team dock: a full-width strip just above the bottom bar ---- */
+  & .team-dock {
+    left: var(--m-gutter);
+    right: var(--m-gutter);
+    bottom: 6px;
+    width: auto;
+    gap: 6px;
+    padding: 6px;
+    border-radius: 12px;
+  }
+  & .team-dock-side {
+    width: auto;
+    padding-right: 6px;
+    gap: 4px;
+  }
+  & .team-dock-slots {
+    flex: 1;
+    min-width: 0;
+    gap: 4px;
+  }
+  & .team-dock-slot {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+    height: 62px;
+  }
+
+  /* ---- Every menu page scrolls on its own, clear of the team dock ---- */
+  & .menu-page {
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-bottom: var(--m-dock-space);
+    box-sizing: border-box;
+  }
+  & .menu-page-home {
+    padding-bottom: 0;
+  }
+  /* Pages start at the top (the desktop centres them in a tall window). */
+  & .menu-page {
+    justify-content: flex-start;
+    /* The desktop leaves room up top for its header, which here sits above the page. */
+    padding-top: 0;
+  }
+  & .menu-page > :first-child,
+  & .home-hub > :first-child {
+    margin-top: 0;
+  }
+  & .menu-page > :last-child,
+  & .home-hub > :last-child {
+    margin-bottom: 0;
+  }
+  & .raid-page {
+    align-content: start;
+  }
+  /* A page's section never grows wider than the screen to fit what's in it. */
+  & .battle-section {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  & .battle-section-inner {
+    min-width: 0;
+  }
+  /* The cards that sit centred in a wide page take the whole width instead. */
+  & .classic-card {
+    width: 100%;
+    padding: 12px;
+  }
+
+  /* ---- Catch ---- */
+  & .classic-wild-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  & .classic-level-tile {
+    /* Over its inline span, worked out for the desktop's four columns. */
+    grid-column: 1 / -1 !important;
+    min-height: 0;
+  }
+  & .classic-section-head {
+    flex-wrap: wrap;
+  }
+  /* The level's −/+ and value, with Min / Half / Max wrapping under them on a narrow phone. */
+  & .classic-level-main {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  /* ---- Battle: one column - the trainers, the field, the moves, the team, the log ---- */
+  & .battle-screen {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: calc(6px + env(safe-area-inset-top)) 6px calc(6px + env(safe-area-inset-bottom));
+  }
+  & .battle-main {
+    order: 1;
+    flex: none;
+    overflow: visible;
+    gap: 6px;
+  }
+  & .switch-column {
+    order: 2;
+    flex: none;
+    overflow: visible;
+  }
+  & .log {
+    order: 3;
+    flex: 1;
+    min-height: 56px;
+    overflow-y: auto;
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+
+  /* The trainers: side by side, small. */
+  & .battle-huds-large {
+    gap: 6px;
+  }
+  & .battle-huds-large .trainer-hud {
+    flex: 1;
+    min-width: 0;
+    padding: 4px 8px;
+  }
+  & .battle-huds-large .trainer-hud-sprite {
+    width: 44px;
+    height: 44px;
+  }
+  & .battle-huds-large .trainer-hud-name {
+    font-size: 12px;
+  }
+  /* The player's panel, stacked on desktop, lies down too. */
+  & .battle-huds-large .trainer-hud-stacked {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+  & .battle-huds-large .trainer-hud-stacked > .trainer-hud-figure {
+    flex: none;
+    min-height: 0;
+    height: 44px;
+  }
+  & .battle-huds-large .trainer-hud-stacked > .trainer-hud-sprite,
+  & .battle-huds-large .trainer-hud-stacked .trainer-hud-figure .trainer-hud-sprite {
+    flex: none;
+    min-height: 0;
+    height: 44px;
+    width: 44px;
+  }
+  & .battle-huds-large .trainer-hud-stacked > .trainer-hud-name {
+    text-align: left;
+  }
+  & .battle-huds-large .trainer-hud-right {
+    padding-left: 8px;
+  }
+  /* The team's Poke Balls in one small row (their size comes from the sprite sheet, inline). */
+  & .battle-huds-large .trainer-hud-balls {
+    flex-wrap: nowrap;
+    gap: 2px;
+    margin-top: 4px;
+  }
+  & .battle-huds-large .pokeball-icon {
+    zoom: 0.3;
+  }
+  & .battle-huds-large .trainer-hud-right .trainer-hud-sprite {
+    width: 36px;
+    height: 36px;
+  }
+
+  /* The field: laid out at one fixed size - its sprites sit at fixed spots - and
+     zoomed to the screen's width (--m-vw is set by src/mobile/main.ts). */
+  & .battle-field {
+    flex: none;
+    width: 430px;
+    height: 300px;
+    min-height: 0;
+    box-sizing: border-box;
+    align-self: center;
+    zoom: calc((var(--m-vw, 375) - 12) / 430);
+  }
+
+  /* The moves: two by two across the screen. */
+  & .battle-action-slot .menu-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+  & .move-button-slot,
+  & .move-button {
+    min-width: 0;
+  }
+  /* Power and type along the top, effectiveness and STAB along the bottom, the name and PP between. */
+  & .move-button {
+    min-height: 82px;
+    padding: 22px 4px;
+    font-size: 14px;
+  }
+  & .move-pp {
+    margin-top: 2px;
+    font-size: 11px;
+  }
+  & .move-power-corner {
+    font-size: 11px;
+  }
+  & .move-type-corner,
+  & .move-stab-corner {
+    font-size: 10px;
+  }
+  & .move-stab-corner {
+    line-height: 16px;
+  }
+  & .battle-action-slot-header {
+    margin-bottom: 6px;
+  }
+
+  /* The team: a row of six - each card just the Pokemon and its HP. */
+  & .switch-column .team-panel,
+  & .switch-column .team-panel-doubles {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 4px;
+  }
+  & .switch-column .team-member {
+    padding: 4px 2px;
+    gap: 2px;
+    align-items: center;
+  }
+  & .switch-column .team-member-top {
+    justify-content: center;
+    gap: 0;
+  }
+  & .switch-column .team-member-info {
+    display: none;
+  }
+  & .switch-column .team-member-icon,
+  & .switch-column .team-panel-doubles .team-member-icon {
+    width: 40px;
+    height: 40px;
+  }
+  & .switch-column .rarity-glow {
+    width: 44px !important;
+    height: 44px !important;
+  }
+  & .switch-column .team-member-hp {
+    width: 100%;
+  }
+
+  /* ---- Box ---- */
+  & .box-summary {
+    width: 100%;
+    box-sizing: border-box;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 0;
+  }
+  /* The toolbar wraps: the title and search, then the filters, rarity, sort and select. */
+  & .box-toolbar-attached {
+    flex-wrap: wrap;
+    row-gap: 4px;
+    margin-top: 8px;
+    padding: 4px;
+  }
+  & .box-toolbar-search {
+    flex: 1 1 200px;
+    min-width: 0;
+  }
+  & .box-toolbar-attached .box-toolbar-section {
+    padding: 0;
+  }
+  & .box-search input {
+    min-width: 0;
+    width: 100%;
+  }
+  & .box-filters,
+  & .box-rarity-filter,
+  & .box-sort {
+    flex: none;
+  }
+  & .box-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    padding: 6px;
+  }
+  & .box-icon {
+    width: auto;
+    min-width: 0;
+  }
+
+  /* ---- Dialogs: as wide as the screen (less a small margin), as tall as they need up to
+     the screen's height, scrolling inside ---- */
+  & .modal-overlay {
+    padding: calc(6px + env(safe-area-inset-top)) 6px calc(6px + env(safe-area-inset-bottom));
+    box-sizing: border-box;
+  }
+  /* A dialog with a second panel beside it (the editor's move list...) stacks them. */
+  & .modal-row {
+    flex-direction: column;
+    width: 100%;
+    max-height: 100%;
+    gap: 6px;
+  }
+  & .modal-panel {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    max-height: 100%;
+    box-sizing: border-box;
+    padding: 12px;
+    border-radius: 14px;
+  }
+  /* A dialog's buttons along the bottom wrap onto more lines rather than squash. */
+  & .editor-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  & .editor-actions > button {
+    flex: 1 1 auto;
+  }
+  & .modal-row > .modal-panel {
+    flex: 0 1 auto;
+    min-height: 0;
+  }
+
+  /* ---- The Pokemon editor: one column ---- */
+  & .pokemon-editor-top {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  & .pokemon-editor-side {
+    width: 100%;
+  }
+  & .pokemon-editor-details {
+    width: 100%;
+    min-width: 0;
+  }
+  & .pokemon-editor-inline,
+  & .pokemon-editor-inline-pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px;
+  }
+  & .pokemon-editor-inline-pair .editor-field-with-icon input {
+    width: 100%;
+    min-width: 0;
+  }
+  & .editor-field {
+    min-width: 0;
+  }
+  & .editor-field select,
+  & .editor-field input {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  & .editor-moves-grid,
+  & .pokemon-editor-main .editor-moves-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  & .editor-move-slot {
+    min-width: 0;
+  }
+  & .editor-stats-header {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  & .editor-ev-row {
+    gap: 4px;
+  }
+  & .editor-ev-row input[type='range'] {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+  }
+  & .editor-actions-pinned {
+    margin: 0 -12px -12px;
+  }
+
+  /* ---- Battles ---- */
+  & .classic-trainer-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  & .classic-trainer-text {
+    flex: 1;
+    min-width: 0;
+  }
+  /* Online: Host on its own line, then the room code and Join. */
+  & .online-row {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  & .online-row > button {
+    flex: 1 1 100%;
+  }
+  & .online-or {
+    display: none;
+  }
+  & .online-join {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  & .online-join input {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+  }
+
+  /* ---- Roguelite: the setup ---- */
+  & .run-setup-card,
+  & .run-card,
+  & .run-hud {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  & .run-setup-card {
+    padding: 12px;
+  }
+  & .run-starter-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+  & .run-starter-column,
+  & .run-settings {
+    width: 100%;
+    min-width: 0;
+  }
+  & .run-starter-column {
+    align-items: center;
+  }
+  & .run-difficulty-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+  }
+  & .run-difficulty-button {
+    min-width: 0;
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+  & .run-difficulty-details {
+    max-height: none;
+  }
+  & .run-reward-group {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  & .run-reward-group-chips {
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  & .run-generation-row {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  & .run-generation-chips {
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  & .run-moves-columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+  & .run-moves-column {
+    min-width: 0;
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+  & .run-moves-row {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  /* ---- Roguelite: a run in progress ---- */
+  /* The run grows with what's in it - the page scrolls - rather than fitting the page's height. */
+  & .battle-section-run {
+    flex: none;
+    align-content: start;
+  }
+  & .battle-section-run > .battle-section-inner {
+    overflow: visible;
+  }
+  /* Classic too (an online chaos draft is tall): the page scrolls, not the card. */
+  & .menu-page-classic .battle-section:not(.battle-section-collapsed) {
+    flex: none;
+  }
+  & .menu-page-classic .battle-section:not(.battle-section-collapsed) > .battle-section-inner {
+    overflow: visible;
+  }
+  /* The floor, the tags and Forfeit on top, the stats (two by two) across the bottom. */
+  & .run-hud {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 8px 10px;
+    padding: 10px 12px;
+  }
+  & .run-hud-stats {
+    order: 5;
+    flex: 1 1 100%;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 10px;
+  }
+  & .run-hud-stat {
+    min-width: 0;
+  }
+  & .run-hud .run-forfeit-button {
+    margin-left: auto;
+  }
+
+  /* ---- Draft ---- */
+  & .draft-home-main,
+  & .draft-home-side,
+  & .draft-home-card {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  & .draft-format-picker,
+  & .draft-home-hero {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  & .draft-format-tile {
+    min-width: 0;
+  }
+  /* The gauntlet: the record and Abandon wrap; the opponent's trainer above their team. */
+  & .run-status-row {
+    flex-wrap: wrap;
+    gap: 6px 10px;
+  }
+  & .run-status-row .run-forfeit-button {
+    margin-left: auto;
+  }
+  & .draft-opponent {
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  & .draft-opponent-sprite {
+    width: 64px;
+    height: 64px;
+  }
+  & .draft-opponent-side {
+    width: 100%;
+    min-width: 0;
+  }
+  & .draft-team-row {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+  }
+  & .draft-start-row {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  /* ---- Max Raid: the crystal and Start, then the rules, the tally and the bosses ---- */
+  & .raid-page {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    overflow: visible;
+    margin-top: 0;
+    padding: 0;
+    gap: 10px;
+  }
+  & .raid-hero {
+    padding: 16px 12px;
+  }
+
+  /* ---- Game Corner ---- */
+  /* The Game Corner fills the page. */
+  & .menu-page-corner {
+    padding-bottom: 8px;
+  }
+  & .game-corner-page {
+    flex: 1;
+    min-height: 0;
+  }
+  /* The games' tabs scroll sideways; the coins sit under them, on the right. */
+  & .game-corner-topbar {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px;
+  }
+  & .game-corner-tabs {
+    flex: 1 1 100%;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  & .game-corner-tabs .tab-strip {
+    width: max-content;
+  }
+  & .game-corner-balance {
+    margin-left: auto;
+  }
+  & .game-corner-body {
+    padding: 8px;
+    min-width: 0;
+  }
+  & .game-corner-game {
+    width: 100%;
+    min-width: 0;
+  }
+  /* Slots: the machine is drawn at one size and zoomed to the screen. */
+  & .slots-machine {
+    zoom: calc((var(--m-vw, 375) - 56) / 520);
+    margin-left: auto;
+    margin-right: auto;
+  }
+  & .slots-controls {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  & .slots-paytable {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Roulette: the wheel, then the result under it, then the board on its side (RouletteTable). */
+  & .roulette-top {
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  & .roulette-wheel-wrap {
+    width: min(260px, 100%);
+    height: auto;
+  }
+  & .roulette-wheel {
+    width: 100%;
+    height: auto;
+  }
+  & .roulette-side {
+    width: 100%;
+    align-items: center;
+  }
+  & .roulette-board {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) 52px 52px;
+    grid-template-rows: 30px repeat(12, 30px) 30px;
+    padding: 6px;
+  }
+  & .roulette-cell {
+    min-width: 0;
+    padding: 0 2px;
+    font-size: 12px;
+  }
+
+  /* Dice: the session tally and the quick picks wrap, the stats go two by two. */
+  & .dice-session {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
+  }
+  & .dice-session-cell {
+    min-width: 0;
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+  & .dice-session-cell span {
+    font-size: 10px;
+  }
+  & .dice-board {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  & .dice-presets {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+  }
+  & .dice-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+  & .dice-stat {
+    min-width: 0;
+  }
+
+  /* Coin Shop: the daily offer wraps its price under the coins, the packs and prizes two by two. */
+  & .coin-daily-offer {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    padding-top: 22px;
+  }
+  & .coin-daily-offer-text {
+    flex: 1 1 140px;
+    min-width: 0;
+  }
+  & .coin-daily-offer-buy {
+    flex: 1 1 100%;
+    align-items: center;
+  }
+  & .coin-pack-grid,
+  & .coin-prize-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  & .coin-shop-section-head {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+
+  /* ---- Items, Key Items, TMs and the Shop ---- */
+  & .bag-shop-modal {
+    height: 100%;
+  }
+  & .bag-shop-tabs {
+    min-width: 0;
+  }
+  & .bag-shop-tabs .tab-strip {
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  /* The search on its own line, the sell buttons and money under it. */
+  & .bag-toolbar {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  & .bag-toolbar .search-bar {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  & .bag-toolbar .money-display {
+    margin-left: auto;
+  }
+  /* The list fills the window; the picked thing's details sit under it. */
+  & .items-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+  & .items-list {
+    min-width: 0;
+    min-height: 0;
+  }
+  & .items-detail {
+    max-height: 42vh;
+    overflow-y: auto;
+    min-width: 0;
+  }
+  & .items-detail-empty {
+    display: none;
+  }
+  /* The categories: one row of chips, scrolling sideways. */
+  & .category-jump-bar {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    flex: none;
+    max-height: none;
+    gap: 4px;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+  & .category-jump-bar > button {
+    flex: none;
+    width: auto;
+    white-space: nowrap;
+  }
+  & .item-card-grid,
+  & .items-grid {
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  }
+  /* TMs: the count and filter, the search under them. */
+  & .tms-toolbar {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  & .tms-search {
+    flex: 1 1 100%;
+    min-width: 0;
+    height: 30px;
+  }
+
+  /* ---- Pokedex: the title and count, then the progress bar, then the legend and search ---- */
+  & .pokedex-header {
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    padding: 10px 12px;
+  }
+  & .pokedex-progress {
+    flex: 1 1 100%;
+    order: 3;
+  }
+  & .pokedex-legend {
+    order: 4;
+  }
+  & .pokedex-search {
+    order: 5;
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  /* ---- Daily Missions and Achievements ---- */
+  & .missions-summary {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px;
+  }
+  & .achievements-summary-bar {
+    flex: 1 1 100%;
+    order: 3;
+  }
+  & .achievements-summary .tms-filter {
+    order: 4;
+  }
+  & .achievements-claim-all {
+    order: 5;
+    margin-left: auto;
+  }
+  & .achievement-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* The three missions one under another, each as tall as it needs. */
+  & .mission-grid {
+    flex: none;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  & .mission-col {
+    gap: 8px;
+    padding: 12px;
+  }
+
+  /* Blackjack: a long hand fans out, each card overlapping the last. */
+  & .blackjack-felt {
+    padding: 10px;
+    min-height: 0;
+  }
+  & .blackjack-cards {
+    gap: 0;
+  }
+  & .blackjack-cards .playing-card + .playing-card {
+    margin-left: -36px;
+  }
+
+  /* ---- A battle's result: the EXP list, then the catch and the buttons under it ---- */
+  & .modal-panel.battle-result-modal.battle-result-wild {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+  /* A case opening's result: its four buttons two by two. */
+  & .case-result-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  /* The missions' bonus banner: what it's for and what it gives, its button under them. */
+  & .mission-bonus {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  & .mission-bonus > :last-child {
+    grid-column: 1 / -1;
+  }
+  /* Admin: a boss's fields and a trainer's teams, fewer to a row. */
+  & .trainer-boss-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  & .trainer-team-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  & .draft-modifier-groups {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  & .battle-result-main,
+  & .battle-result-side {
+    width: 100%;
+    min-width: 0;
+    border-left: none;
+    padding-left: 0;
+  }
+  & .battle-result-side .catch-row,
+  & .battle-result-actions {
+    width: 100%;
+  }
+
+  /* ---- DexNav: the target and its chain, the buttons in a row under them ---- */
+  & .dexnav-panel {
+    flex-wrap: wrap;
+  }
+  & .dexnav-actions {
+    flex: 1 1 100%;
+    flex-direction: row;
+  }
+
+  /* ---- Merge: the keeper over its candidates, smaller cards ---- */
+  & .merge-keeper {
+    gap: 10px;
+  }
+  & .merge-keeper-info {
+    min-width: 0;
+  }
+  & .merge-candidates {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    max-height: 40vh;
+  }
+
+  /* ---- Admin editors: one column ---- */
+  & .trainer-editor-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  & .trainer-editor-identity {
+    flex-wrap: wrap;
+  }
+  & .trainer-list-row {
+    flex-wrap: wrap;
+  }
+
+  /* ---- Options: the volume sliders fill their row, easier to drag with a finger ---- */
+  & .options-volume input[type='range'] {
+    width: 100%;
+  }
+
+  /* ---- Trainer Card ---- */
+  & .trainer-card-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  & .trainer-card-title {
+    min-width: 0;
+  }
+  /* The road to the League: thirteen trainers in a row, zoomed to fit across. */
+  & .league-bar {
+    zoom: min(1, calc((var(--m-vw, 375) - 68) / 480));
+  }
+  /* Its sprite picker: the title and count, the search under them, three sprites across. */
+  & .trainer-picker-header {
+    flex-wrap: wrap;
+    gap: 6px 10px;
+  }
+  & .trainer-picker-search {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  & .trainer-picker-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow-x: hidden;
+  }
+  & .trainer-picker-option {
+    min-width: 0;
+  }
+
+  /* ---- The bottom bar's open page: its marker along the button's bottom edge (the
+     desktop's sits down the left of the sidebar) ---- */
+  & .menu-rail-active::before {
+    left: 10px;
+    right: 10px;
+    top: auto;
+    bottom: -4px;
+    width: auto;
+    height: 3px;
+    border-radius: 3px 3px 0 0;
+  }
+
+  /* ---- The top bar's trainer opens the Trainer Card on a tap - no menu, no caret ---- */
+  & .nav-player-caret {
+    display: none;
+  }
+  /* Home: the bag, Pokédex, rewards and options are already in the top bar. */
+  & .home-tools {
+    display: none;
+  }
+
+  /* ---- The team dock: the companion stands on top of it, at its left end ---- */
+  & .team-dock .companion-slot {
+    right: auto;
+    left: 4px;
+    bottom: calc(100% + 2px);
+    max-width: none;
+    width: 96px;
+    height: 96px;
+    padding-bottom: 2px;
+  }
+  & .team-dock .companion-slot.companion-size-m {
+    width: 116px;
+    height: 116px;
+  }
+  & .team-dock .companion-slot.companion-size-l,
+  & .team-dock .companion-slot.companion-size-xl {
+    width: 136px;
+    height: 136px;
+  }
+  /* A third smaller than on the desktop, at every size - sprite, shadow and hearts too. */
+  & .team-dock .companion-slot:not(.companion-slot-empty) {
+    zoom: 0.67;
+  }
+  /* Empty, it's a small drop target rather than a big dashed box over the page. */
+  & .team-dock .companion-slot-empty {
+    width: 96px;
+    height: 30px;
+  }
+  /* Each slot as tall as the dock's buttons: the sprite, the name and the EXP bar. */
+  & .team-dock-slot {
+    height: auto;
+    align-self: stretch;
+  }
+  & .team-dock-slot .box-icon-draggable {
+    gap: 2px;
+    padding: 4px 3px 5px;
+    justify-content: flex-end;
+  }
+  & .team-dock-slot .box-icon-fill .box-icon-glow {
+    width: 40px;
+  }
+  & .team-dock-slot .box-icon-img {
+    width: 40px;
+    height: 40px;
+  }
+  & .team-dock-slot .box-icon-name {
+    flex: none;
+    width: 100%;
+    font-size: 10px;
+  }
+  & .team-dock-slot .exp-bar-track {
+    flex: none;
+    height: 4px;
+    margin-top: 0;
+    box-sizing: border-box;
+  }
+
+  /* ---- A dialog's picker beside it (the editor's moves, abilities...): under it, with
+     the dialog cut down so the list gets the room - and scrolls ---- */
+  & .modal-row:has(> .selector-panel) {
+    height: 100%;
+  }
+  & .modal-row:has(> .selector-panel) > .modal-panel {
+    flex: 0 0 auto;
+    max-height: 42%;
+  }
+  & .modal-row > .selector-panel {
+    flex: 1 1 0;
+    min-height: 0;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  & .selector-list {
+    overscroll-behavior: contain;
+  }
+
+  /* ---- Roguelite: the floor's tiles three to a row, small ---- */
+  & .run-choice-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    max-width: none;
+  }
+  & .run-choice-grid .run-node-button {
+    flex: 0 0 calc((100% - 16px) / 3);
+    width: auto;
+    height: auto;
+    min-height: 92px;
+    min-width: 0;
+    gap: 3px;
+    padding: 8px 4px;
+    font-size: 12px;
+    border-radius: 12px;
+  }
+  & .run-choice-grid .big-battle-icon {
+    width: 44px;
+    height: 44px;
+  }
+  & .run-choice-grid .run-node-emoji {
+    font-size: 32px;
+    line-height: 44px;
+  }
+  & .run-choice-grid .run-node-tr {
+    zoom: 0.6;
+  }
+  & .run-choice-grid .run-node-label {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
+  & .run-choice-grid .run-node-button .run-node-sub {
+    font-size: 10px;
+    text-align: center;
+  }
+  /* No keyboard to press the numbers on. */
+  & .run-choice-grid .run-node-button > .run-node-key {
+    display: none;
+  }
+  & .run-choice-grid .run-node-button > .run-node-cost {
+    font-size: 11px;
+  }
+
+  /* A boss floor: the shop's items two by two, then the boss, then the shop's tiles. */
+  & .run-boss-floor {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  & .run-boss-shop-items {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    padding: 0;
+  }
+  & .run-boss-shop-items > * {
+    width: auto;
+    min-width: 0;
+  }
+  & .run-boss-shop-items .run-reward-heading {
+    grid-column: 1 / -1;
+  }
+  & .run-boss-shop-items .run-shop-button {
+    gap: 4px;
+    padding: 6px;
+    font-size: 12px;
+  }
+  & .run-boss-shop-items .run-shop-button > span:not(.run-shop-price) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  & .run-boss-shop-items .run-shop-button .run-consumable-icon {
+    width: 20px;
+    height: 20px;
+    flex: none;
+  }
+  & .run-choice-grid.run-boss-shop-tiles {
+    display: flex;
+  }
+
+  /* The run's team: three to a row, two rows. */
+  & .run-team-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    width: 100%;
+  }
+  & .run-team-row .run-mon-card-wrap,
+  & .run-team-row .run-mon-card {
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* Draft: the team three to a row too. */
+  & .draft-team-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    justify-items: center;
+    width: 100%;
+  }
+
+  /* ---- Battle: the opponent's team as one ball and a count ---- */
+  & .battle-huds-large .trainer-hud-balls-count {
+    align-items: center;
+    gap: 4px;
+  }
+  & .trainer-hud-ball-count {
+    font-size: 13px;
+    font-weight: bold;
+    color: #d5dbe6;
+  }
+
+  /* ---- Items: the picked item's pane, with a × back to the bag in its corner ---- */
+  & .items-detail {
+    position: relative;
+  }
+  & .items-detail-close {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 1;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  /* ---- Game Corner: the bet on a button, its slider in a small window ---- */
+  & .bet-open-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 84px;
+    padding: 4px 10px;
+    font-weight: bold;
+    color: #ffd76b;
+  }
+  & .bet-open-caret {
+    margin-left: auto;
+    font-size: 10px;
+    color: #8a94a6;
+  }
+  & .modal-overlay.bet-modal-overlay {
+    align-items: center;
+    justify-content: center;
+  }
+  & .modal-panel.bet-modal {
+    width: min(340px, 100%) !important;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 16px;
+  }
+  & .bet-modal-title {
+    margin: 0;
+    font-size: 15px;
+    text-align: center;
+  }
+  & .bet-modal-value {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 26px;
+    font-weight: bold;
+    color: #ffd76b;
+  }
+  & .bet-modal-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  & .bet-modal-row .slots-bet-step {
+    width: 40px;
+    height: 40px;
+    flex: none;
+  }
+  & .bet-modal-row .slots-bet-slider {
+    height: 32px;
+  }
+  & .bet-modal-quick {
+    flex: 1;
+    padding: 8px 0;
+  }
+  & .bet-modal-done {
+    padding: 10px;
+    font-weight: bold;
+  }
+
+  /* ---- Options: each volume on a button that opens its slider (the bet window's look) ---- */
+  & .options-volume {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  & .options-volume-open {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 92px;
+    padding: 6px 10px;
+    font-weight: bold;
+  }
+
+  /* ---- Draft: the pack's four cards two by two, smaller ---- */
+  & .draft-pack-stage {
+    min-height: 0;
+  }
+  & .draft-pack {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+  }
+  & .draft-card,
+  & .draft-offer-wrap {
+    min-width: 0;
+  }
+  & .draft-offer-card {
+    width: 100%;
+    gap: 3px;
+    padding: 6px 6px 8px;
+  }
+  & .draft-offer-card .rarity-glow {
+    width: 56px !important;
+    height: 56px !important;
+  }
+  & .draft-offer-sprite {
+    width: 52px;
+    height: 52px;
+  }
+  & .draft-offer-species {
+    font-size: 13px;
+  }
+  & .draft-offer-set,
+  & .draft-offer-line {
+    font-size: 10px;
+  }
+  & .draft-offer-types .type-badge {
+    font-size: 9px;
+  }
+  & .draft-offer-moves {
+    gap: 2px;
+  }
+  & .draft-move {
+    padding: 1px 2px;
+    font-size: 9px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  & .draft-card-emblem {
+    width: 48px;
+    height: 48px;
+  }
+
+  /* The modifiers on offer: three to a row, short. */
+  & .draft-modifier-cards {
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 6px;
+  }
+  & .draft-modifier-card {
+    min-height: 0;
+    gap: 4px;
+    padding: 8px 6px 10px;
+  }
+  & .draft-modifier-card .draft-modifier-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 20px;
+  }
+  & .draft-modifier-card-title {
+    font-size: 12px;
+  }
+  & .draft-modifier-card-text {
+    font-size: 10px;
+  }
+  & .draft-modifier-card-group {
+    font-size: 9px;
+  }
+}

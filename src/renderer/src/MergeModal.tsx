@@ -15,6 +15,7 @@ import PokemonIconVisual from './PokemonIconVisual'
 import ShinyIcon from './ShinyIcon'
 import { errorMessage } from './FloatingNotes'
 import ItemSprite from './ItemSprite'
+import { CLICK } from './platform'
 
 interface Props {
   keeper: BoxPokemonView
@@ -234,7 +235,7 @@ function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
             onClick={() => void merge()}
             onBlur={() => setConfirming(false)}
           >
-            {confirming ? 'Merge a favorite / team member? Click again' : `Merge ${chosen.length || ''}`.trim()}
+            {confirming ? `Merge a favorite / team member? ${CLICK} again` : `Merge ${chosen.length || ''}`.trim()}
           </button>
         </div>
       </div>

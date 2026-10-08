@@ -8,6 +8,7 @@ import { loadSpriteStyle } from './spriteStyle'
 import { toSpriteId } from '../../shared/battle-types'
 import type { CompanionSize } from '../../shared/battle-types'
 import RarityCard from './RarityCard'
+import { IS_MOBILE } from './platform'
 
 interface Props {
   name: string
@@ -68,6 +69,7 @@ function ballTitle(slot: RosterSlotView | undefined): string | undefined {
 
 function TrainerHud({ name, title, gold, spriteId, roster, align, size = 'small', rewards, modifiers, companion, hideBalls }: Props): React.JSX.Element {
   const slots = Array.from({ length: TEAM_SIZE }, (_, i) => roster[i])
+  const alive = slots.filter((slot) => slot && !slot.fainted).length
   const sprite =
     modifiers || rewards !== undefined ? (
       <Tooltip
@@ -127,6 +129,13 @@ function TrainerHud({ name, title, gold, spriteId, roster, align, size = 'small'
       {figure}
       <div className="trainer-hud-info">
         {nameRow}
+        {IS_MOBILE ? (
+          // On the phone, one ball and how many Pokemon are still standing (the six don't fit).
+          <div className="trainer-hud-balls trainer-hud-balls-count" title={slots.filter(Boolean).map(ballTitle).join(', ')}>
+            <span className="pokeball-icon" style={pokeballStyle(alive > 0 ? 'healthy' : 'fainted', BALL_SCALE[size])} />
+            <span className="trainer-hud-ball-count">×{alive}</span>
+          </div>
+        ) : (
         <div className="trainer-hud-balls">
           {slots.map((slot, i) => (
             <span
@@ -137,6 +146,7 @@ function TrainerHud({ name, title, gold, spriteId, roster, align, size = 'small'
             />
           ))}
         </div>
+        )}
       </div>
     </div>
   )

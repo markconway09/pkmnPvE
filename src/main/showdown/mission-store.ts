@@ -1,5 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs'
-import { BrowserWindow } from 'electron'
+import { readText, writeText, emitToUi } from '../platform'
 import type { MissionClaimResult, MissionReward, MissionStat, MissionsState, MissionTemplate } from '../../shared/missions'
 import { DAILY_BONUS_REWARD, DAILY_REROLLS, MISSION_TEMPLATES, MISSION_TIERS } from '../../shared/missions'
 import { DILIGENT_EXTRA_REROLLS } from '../../shared/titles'
@@ -90,7 +89,7 @@ function rollDay(day: string): StoredMissions {
 
 function load(): StoredMissions | null {
   try {
-    const parsed = JSON.parse(readFileSync(playerPathFor('missions.json'), 'utf8')) as StoredMissions
+    const parsed = JSON.parse(readText(playerPathFor('missions.json'))) as StoredMissions
     return Array.isArray(parsed.missions) && typeof parsed.day === 'string' ? parsed : null
   } catch {
     return null
@@ -98,7 +97,7 @@ function load(): StoredMissions | null {
 }
 
 function persist(): void {
-  if (state) writeFileSync(playerPathFor('missions.json'), JSON.stringify(state), 'utf8')
+  if (state) writeText(playerPathFor('missions.json'), JSON.stringify(state))
 }
 
 // Today's missions, rolled if the stored ones are from an earlier day. A clock set back
@@ -165,7 +164,7 @@ export function recordMission(stat: MissionStat, amount = 1): void {
   }
   if (!changed) return
   persist()
-  for (const window of BrowserWindow.getAllWindows()) window.webContents.send('missions:changed', finished)
+  emitToUi('missions:changed', finished)
 }
 
 function pay(reward: MissionReward): string {

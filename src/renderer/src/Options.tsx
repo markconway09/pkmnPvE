@@ -4,6 +4,7 @@ import { SPRITE_STYLES, SPRITE_STYLE_LABELS, spriteUrl, type SpriteStyle } from 
 import UpdatesSection from './UpdatesSection'
 import BackgroundSection from './BackgroundSection'
 import CloudSavesSection from './CloudSavesSection'
+import SaveFileSection from './SaveFileSection'
 import { playSfx, setSfxOn, setSfxVolume, sfxLevel, sfxOn } from './sfx'
 import { cryOn, cryVolume, playCry, setCryOn, setCryVolume } from './cries'
 import {
@@ -21,6 +22,7 @@ import {
 import TabStrip from './TabStrip'
 import { cornerSoundsOn, setCornerSoundsOn } from './ticks'
 import { ANIM_SPEEDS, ANIM_SPEED_LABELS, animSpeed, setAnimSpeed, type AnimSpeed } from './animSpeed'
+import { IS_MOBILE } from './platform'
 import { UI_SCALE_CHOICES, UI_SCALE_LABELS, type UiScaleState } from '../../shared/ui-scale'
 
 interface Props {
@@ -35,7 +37,8 @@ interface Props {
 
 const PREVIEW_SPECIES_ID = 'pikachu'
 
-const MUSIC_SOURCES: MusicSource[] = ['freetouse', 'links', 'folder']
+// The phone app can't look through folders, so it has no folder source.
+const MUSIC_SOURCES: MusicSource[] = IS_MOBILE ? ['freetouse', 'links'] : ['freetouse', 'links', 'folder']
 
 /** Where the music comes from (see music.ts): Free To Use's lofi, the player's own links, or a folder. */
 function MusicSourceSettings(): React.JSX.Element {
@@ -183,6 +186,65 @@ function VolumeRow({
   onChange: (value: number) => void
   onRelease?: () => void
 }): React.JSX.Element {
+  // On the phone the slider is too small to drag: the volume shows on a button that opens
+  // the slider in a small window (like the Game Corner's bet).
+  const [open, setOpen] = useState(false)
+  const shown = !on ? 'Off' : value === 0 ? 'Muted' : `${value}%`
+  if (IS_MOBILE) {
+    const nudge = (by: number): void => {
+      onChange(Math.min(100, Math.max(0, value + by)))
+      onRelease?.()
+    }
+    return (
+      <>
+        <SoundSwitch label={label} on={on} onToggle={onToggle} />
+        <span className={`options-volume-label${on ? '' : ' options-volume-off'}`}>{label}</span>
+        <button className="options-volume-open" disabled={!on} onClick={() => setOpen(true)}>
+          {shown}
+          <span className="bet-open-caret">▾</span>
+        </button>
+        {open &&
+          createPortal(
+            <div
+              className="modal-overlay bet-modal-overlay"
+              onMouseDown={(e) => {
+                // Only this window closes, not Options under it.
+                e.stopPropagation()
+                setOpen(false)
+              }}
+            >
+              <div className="modal-panel bet-modal" onMouseDown={(e) => e.stopPropagation()}>
+                <h3 className="bet-modal-title">{label} volume</h3>
+                <div className="bet-modal-value">{shown}</div>
+                <div className="bet-modal-row">
+                  <button className="slots-bet-step" disabled={value <= 0} onClick={() => nudge(-5)}>
+                    −
+                  </button>
+                  <input
+                    type="range"
+                    className="slots-bet-slider"
+                    min={0}
+                    max={100}
+                    step={5}
+                    value={value}
+                    aria-label={`${label} volume`}
+                    onChange={(e) => onChange(Number(e.target.value))}
+                    onPointerUp={onRelease}
+                  />
+                  <button className="slots-bet-step" disabled={value >= 100} onClick={() => nudge(5)}>
+                    +
+                  </button>
+                </div>
+                <button className="bet-modal-done" onClick={() => setOpen(false)}>
+                  Done
+                </button>
+              </div>
+            </div>,
+            document.body
+          )}
+      </>
+    )
+  }
   return (
     <>
       <SoundSwitch label={label} on={on} onToggle={onToggle} />
@@ -198,9 +260,7 @@ function VolumeRow({
         onChange={(e) => onChange(Number(e.target.value))}
         onPointerUp={onRelease}
       />
-      <span className={`options-volume-value${on ? '' : ' options-volume-off'}`}>
-        {!on ? 'Off' : value === 0 ? 'Muted' : `${value}%`}
-      </span>
+      <span className={`options-volume-value${on ? '' : ' options-volume-off'}`}>{shown}</span>
     </>
   )
 }
@@ -243,9 +303,11 @@ function Options({
           </button>
         </div>
         <div className="options-modal-body">
-          <section className="options-section">
-            <UpdatesSection />
-          </section>
+          {!IS_MOBILE && (
+            <section className="options-section">
+              <UpdatesSection />
+            </section>
+          )}
 
           <section className="options-section">
             <h2 className="options-heading">Sound</h2>
@@ -305,7 +367,7 @@ function Options({
             {musicOn && <MusicSourceSettings />}
           </section>
 
-          <ScreenSizeSection />
+          {!IS_MOBILE && <ScreenSizeSection />}
 
           <section className="options-section">
             <h2 className="options-heading">Move animations</h2>
@@ -320,6 +382,8 @@ function Options({
             />
           </section>
 
+          {/* The phone app only ships the 3D stills. */}
+          {!IS_MOBILE && (
           <section className="options-section">
           <h2 className="options-heading">Sprite style</h2>
           <div className="sprite-style-grid">
@@ -339,13 +403,20 @@ function Options({
             ))}
           </div>
           </section>
+          )}
 
           <section className="options-section">
             <BackgroundSection background={background} onChange={onChangeBackground} />
           </section>
 
+          {!IS_MOBILE && (
+            <section className="options-section">
+              <CloudSavesSection />
+            </section>
+          )}
+
           <section className="options-section">
-            <CloudSavesSection />
+            <SaveFileSection />
           </section>
 
           <section className="options-section">

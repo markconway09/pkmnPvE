@@ -24192,3 +24192,124 @@ img.battle-result-icon {
 .plinko-game > :not(.plinko-board) {
   flex-shrink: 0;
 }
+
+/* The sidebar's tool buttons' wrapper (MenuRail) - only the phone layout gives it a box. */
+.menu-rail-tools {
+  display: contents;
+}
+
+/* A tooltip shown by a tap or a hold on a touch screen stays up until it is tapped (see touchTip.ts). */
+.tooltip-portal-pinned {
+  pointer-events: auto;
+}
+
+/* A hover hint (an element's title), shown the same way on a touch screen. */
+.touch-title .tooltip-panel {
+  max-width: 260px;
+  font-size: 12px;
+}
+
+/* Online chaos draft: the draft panel inside the Online battle section. */
+.online-section .draft-panel {
+  margin-top: 10px;
+}
+
+/* The Chaos draft button, apart from the regular battle's options. */
+.online-section .online-row .online-draft-start:not(:disabled) {
+  background: linear-gradient(180deg, #7a3fb8, #4f2380);
+  border-color: #b48ae6;
+  color: #fff;
+}
+
+/* "Friend is ready" in the draft's status row. */
+.online-draft-ready {
+  background: rgba(80, 200, 120, 0.18);
+  border-color: rgba(80, 200, 120, 0.6);
+  color: #9ff0b8;
+}
+
+/* A standby while the friend picks (their Pokemon and modifier, or their lead). */
+.online-draft-standby {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 14px 0;
+  padding: 14px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  color: #e8e0c8;
+  font-size: 14px;
+}
+
+.online-draft-spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 215, 90, 0.25);
+  border-top-color: #ffd75a;
+  animation: modal-spin 0.9s linear infinite;
+  flex-shrink: 0;
+}
+
+.online-draft-over {
+  text-align: center;
+}
+
+/* Online lobby: the friend on top, then each game on its own line below - stacked, so
+   nothing runs off the side. */
+.online-section .online-row.online-lobby {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.online-section .online-lobby-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.online-section .online-mode {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding: 6px 6px 6px 12px;
+  border-top: 1px solid #2c3442;
+}
+
+.online-section .online-mode-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.online-section .online-mode-text span {
+  color: #9aa6b8;
+  font-size: 0.85em;
+}
+
+.online-section .online-mode-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.online-section .online-mode .online-start {
+  min-width: 130px;
+}
+
+/* Classic page: the battle card fits the window and scrolls when it outgrows it (an online
+   chaos draft is much taller than the battle buttons). */
+.menu-page-classic .battle-section:not(.battle-section-collapsed) {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+
+.menu-page-classic .battle-section:not(.battle-section-collapsed) > .battle-section-inner {
+  overflow-y: auto;
+  overflow-x: hidden;
+}

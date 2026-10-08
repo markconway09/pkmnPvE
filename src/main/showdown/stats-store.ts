@@ -1,6 +1,6 @@
+import { readText, writeText } from '../platform'
 import type { MissionStat } from '../../shared/missions'
 import { recordMission } from './mission-store'
-import { readFileSync, writeFileSync } from 'node:fs'
 import type { PlayerStats, RunDifficulty } from '../../shared/battle-types'
 import { RUN_DIFFICULTIES } from '../../shared/battle-types'
 import { playerPathFor } from './save-paths'
@@ -21,7 +21,7 @@ function load(): StoredStats {
   // Outside the try: not being logged in is a bug to surface, not an empty save.
   const path = playerPathFor('stats.json')
   try {
-    const parsed = JSON.parse(readFileSync(path, 'utf8')) as Partial<StoredStats>
+    const parsed = JSON.parse(readText(path)) as Partial<StoredStats>
     const stats = emptyStats()
     for (const key of COUNTERS) if (typeof parsed[key] === 'number') stats[key] = parsed[key]
     if (RUN_DIFFICULTIES.some((d) => d.id === parsed.bestFloorDifficulty)) stats.bestFloorDifficulty = parsed.bestFloorDifficulty!
@@ -46,7 +46,7 @@ function getState(): StoredStats {
 }
 
 function persist(): void {
-  writeFileSync(playerPathFor('stats.json'), JSON.stringify(getState()), 'utf8')
+  writeText(playerPathFor('stats.json'), JSON.stringify(getState()))
 }
 
 export function getStats(): StoredStats {

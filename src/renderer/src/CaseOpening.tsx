@@ -8,6 +8,7 @@ import ShinyIcon from './ShinyIcon'
 import { formatMoney } from './money'
 import { playCornerTick } from './ticks'
 import RarityOddsTooltip from './RarityOddsTooltip'
+import { CLICK } from './platform'
 
 interface Props {
   // What the Random Pokemon / Random Legendary was, and what it gave.
@@ -242,7 +243,7 @@ function CaseOpening({ itemId, itemName, result, onClose, onOpenAnother }: Props
                 onBlur={() => setConfirmingSell(false)}
               >
                 {confirmingSell
-                  ? `Sell ${result.shiny ? 'this shiny' : TIER_LABELS[winner.tier]} ${result.name} for ${formatMoney(result.sellPrice!)}? Click again`
+                  ? `Sell ${result.shiny ? 'this shiny' : TIER_LABELS[winner.tier]} ${result.name} for ${formatMoney(result.sellPrice!)}? ${CLICK} again`
                   : canSell
                     ? `Sell (${formatMoney(result.sellPrice!)})`
                     : 'Sell'}
@@ -285,7 +286,7 @@ function CaseOpening({ itemId, itemName, result, onClose, onOpenAnother }: Props
             </div>
           </div>
         ) : (
-          <p className="box-empty-hint case-skip-hint">Click to skip</p>
+          <p className="box-empty-hint case-skip-hint">{CLICK} to skip</p>
         )}
         </div>
       </div>

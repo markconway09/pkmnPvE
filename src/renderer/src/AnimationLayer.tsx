@@ -76,7 +76,14 @@ function slotElement(field: HTMLDivElement, slot: string): HTMLElement | null {
 function boxOf(el: HTMLElement, field: HTMLDivElement): Box {
   const r = el.getBoundingClientRect()
   const fr = field.getBoundingClientRect()
-  return { x: r.left + r.width / 2 - fr.left, y: r.top + r.height / 2 - fr.top, halfW: r.width / 2, halfH: r.height / 2 }
+  // The phone layout draws the field shrunk (CSS zoom): screen pixels back to the field's own.
+  const scale = field.offsetWidth ? fr.width / field.offsetWidth : 1
+  return {
+    x: (r.left + r.width / 2 - fr.left) / scale,
+    y: (r.top + r.height / 2 - fr.top) / scale,
+    halfW: r.width / 2 / scale,
+    halfH: r.height / 2 / scale
+  }
 }
 
 function centerOf(el: HTMLElement, field: HTMLDivElement): Point {

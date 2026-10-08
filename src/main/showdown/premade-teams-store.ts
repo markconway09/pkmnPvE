@@ -1,5 +1,4 @@
-import { randomUUID } from 'node:crypto'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readText, writeText, randomUUID } from '../platform'
 import { MERGE_MAX_STARS, type EditablePokemonSet, type ItemDropConfig, type PremadeTeamSummary } from '../../shared/battle-types'
 import {
   applyEditableSet,
@@ -54,7 +53,7 @@ interface StoredPremadeTeam {
 
 function load(): StoredPremadeTeam[] {
   try {
-    const raw = readFileSync(savePathFor('premadeTeams.json'), 'utf8')
+    const raw = readText(savePathFor('premadeTeams.json'))
     const parsed = JSON.parse(raw) as StoredPremadeTeam[]
     if (!Array.isArray(parsed)) return []
     // Saves from before item drops/double battles existed are missing those fields.
@@ -103,7 +102,7 @@ function getState(): StoredPremadeTeam[] {
 }
 
 function persist(): void {
-  writeFileSync(savePathFor('premadeTeams.json'), JSON.stringify(getState()), 'utf8')
+  writeText(savePathFor('premadeTeams.json'), JSON.stringify(getState()))
 }
 
 function findTeam(teamId: string): StoredPremadeTeam {

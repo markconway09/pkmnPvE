@@ -8,6 +8,7 @@ import Tooltip from './Tooltip'
 import PokemonTooltipContent from './PokemonTooltipContent'
 import SpriteImage from './SpriteImage'
 import ItemSprite from './ItemSprite'
+import { CLICK } from './platform'
 
 // The box's rarity colours (grey, blue, purple, pink, gold) - a card back glows in its own.
 const RARITY_COLORS: Record<RarityTier, string> = {
@@ -296,7 +297,7 @@ export function DraftPackOpening({ pack, round, disabled, slotFor, requestPick, 
     <div
       ref={stageRef}
       className={`draft-pack-stage${phase === 'opening' ? ' draft-pack-stage-opening' : ''}`}
-      title={phase === 'opening' ? 'Click to skip' : undefined}
+      title={phase === 'opening' ? `${CLICK} to skip` : undefined}
       onClick={() => phase === 'opening' && skip()}
     >
       {intro && (
@@ -316,6 +317,8 @@ export function DraftPackOpening({ pack, round, disabled, slotFor, requestPick, 
               cardRefs.current[i] = el
             }}
             className={`draft-card${intro ? ' draft-card-pending' : ''}${phase === 'ready' && !disabled ? ' draft-card-pickable' : ''}`}
+            // A tap picks it, so on a touch screen its tooltip takes a hold.
+            data-tap-action=""
             onClick={() => void pick(i)}
           >
             <div

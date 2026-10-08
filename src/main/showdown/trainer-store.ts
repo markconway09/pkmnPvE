@@ -1,5 +1,4 @@
-import { randomUUID } from 'node:crypto'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readText, writeText, randomUUID } from '../platform'
 import type { ItemDropConfig, Trainer } from '../../shared/battle-types'
 import { MAX_TRAINER_DROPS } from '../../shared/battle-types'
 import { savePathFor } from './save-paths'
@@ -15,7 +14,7 @@ function cleanDrops(drops: ItemDropConfig[] | undefined): ItemDropConfig[] {
 
 function load(): Trainer[] {
   try {
-    const raw = readFileSync(savePathFor('trainers.json'), 'utf8')
+    const raw = readText(savePathFor('trainers.json'))
     const parsed = JSON.parse(raw) as Trainer[]
     if (!Array.isArray(parsed)) return []
     for (const trainer of parsed) {
@@ -67,7 +66,7 @@ function getState(): Trainer[] {
 }
 
 function persist(): void {
-  writeFileSync(savePathFor('trainers.json'), JSON.stringify(getState()), 'utf8')
+  writeText(savePathFor('trainers.json'), JSON.stringify(getState()))
 }
 
 export function listTrainers(): Trainer[] {

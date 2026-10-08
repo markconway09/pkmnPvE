@@ -10,6 +10,7 @@ import SpriteImage from './SpriteImage'
 import { formatMoney } from './money'
 import { TmCard, TmQuickCheck } from './TmBits'
 import type { TmInfo } from '../../shared/tms'
+import { CLICK } from './platform'
 
 // The Poke Ball's icon on Showdown's item sheet.
 const POKE_BALL_SPRITENUM = 345
@@ -311,7 +312,7 @@ function BattleResultModal({
           }}
         >
           <img className="battle-result-icon" src="./icons/tall-grass.png" alt="" />
-          {leaveNeedsConfirm && confirmingLeave === 'rebattle' ? 'Leave the shiny uncaught? Click again' : 'Find another'}
+          {leaveNeedsConfirm && confirmingLeave === 'rebattle' ? `Leave the shiny uncaught? ${CLICK} again` : 'Find another'}
         </button>
       )}
       <button
@@ -326,7 +327,7 @@ function BattleResultModal({
           <path d="M2 8 8 2.5 14 8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           <path d="M4 7.2V13.5h3V10h2v3.5h3V7.2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
         </svg>
-        {leaveNeedsConfirm && confirmingLeave === 'menu' ? 'Leave the shiny uncaught? Click again' : 'Back to menu'}
+        {leaveNeedsConfirm && confirmingLeave === 'menu' ? `Leave the shiny uncaught? ${CLICK} again` : 'Back to menu'}
       </button>
     </div>
   )

@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readText, writeText } from '../platform'
 import { savePathFor } from './save-paths'
 
 // Shop prices an admin has changed, by item id. Shared by every player, like the trainers;
@@ -9,7 +9,7 @@ const MAX_PRICE = 10_000_000
 
 function load(): StoredPrices {
   try {
-    const parsed = JSON.parse(readFileSync(savePathFor('shopPrices.json'), 'utf8')) as StoredPrices
+    const parsed = JSON.parse(readText(savePathFor('shopPrices.json'))) as StoredPrices
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
     const clean: StoredPrices = {}
     for (const [id, price] of Object.entries(parsed)) {
@@ -44,5 +44,5 @@ export function setShopPriceOverride(itemId: string, price: number | null): void
     }
     getState()[itemId] = price
   }
-  writeFileSync(savePathFor('shopPrices.json'), JSON.stringify(getState()), 'utf8')
+  writeText(savePathFor('shopPrices.json'), JSON.stringify(getState()))
 }

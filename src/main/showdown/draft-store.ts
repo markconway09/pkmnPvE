@@ -1,5 +1,4 @@
-import { createRequire } from 'node:module'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readText, writeText } from '../platform'
 import {
   FIELD_START_TERRAINS,
   FIELD_START_WEATHERS,
@@ -38,6 +37,7 @@ import {
   type DraftMonView,
   type DraftView
 } from '../../shared/draft'
+import { ONLINE_CHAOS_BATTLES, ONLINE_CHAOS_WINS, type OnlineDraftTeam } from '../../shared/online'
 import smogonSets from './data/smogon-sets.json'
 import {
   abilityInfo,
@@ -56,10 +56,9 @@ import { GRAND_DRAFTER_FEE_MULTIPLIER } from '../../shared/titles'
 import { listTrainers } from './trainer-store'
 import { playerPathFor } from './save-paths'
 import { onPlayerChange } from './player-session'
+import { sim } from './ps'
 
-// pokemon-showdown is CommonJS - loaded the same way sim-access.ts does.
-const require = createRequire(import.meta.url)
-const { Dex } = require('pokemon-showdown') as typeof import('pokemon-showdown')
+const { Dex } = sim
 
 /**
  * Draft mode (see shared/draft.ts): the picks, the gauntlet's record and the next
@@ -143,6 +142,11 @@ interface StoredDraft {
   // Chaos: the field modifiers taken, and the modifiers on offer.
   chaosField?: ChaosField
   modifierOffer?: ChaosModifier[]
+  // An online chaos draft with a friend (never saved): battles tied, and the battle
+  // (by battles played before it) the friend's team in `opponent` is for.
+  online?: boolean
+  ties?: number
+  opponentStage?: number
 }
 
 function list<T>(value: T | T[] | undefined): T[] {
@@ -259,12 +263,13 @@ let draft: StoredDraft | null | undefined
 
 onPlayerChange(() => {
   draft = undefined
+  onlineDraft = null
 })
 
 function getDraft(): StoredDraft | null {
   if (draft === undefined) {
     try {
-      draft = JSON.parse(readFileSync(playerPathFor('draft.json'), 'utf8')) as StoredDraft
+      draft = JSON.parse(readText(playerPathFor('draft.json'))) as StoredDraft
     } catch {
       draft = null
     }
@@ -280,7 +285,24 @@ function getDraft(): StoredDraft | null {
 }
 
 function persist(): void {
-  writeFileSync(playerPathFor('draft.json'), JSON.stringify(draft ?? null), 'utf8')
+  writeText(playerPathFor('draft.json'), JSON.stringify(draft ?? null))
+}
+
+// The online chaos draft with a friend (see shared/online.ts): kept in memory only - it
+// lasts as long as the room, and never touches the player's own draft.
+let onlineDraft: StoredDraft | null = null
+
+function draftOf(online: boolean): StoredDraft | null {
+  return online ? onlineDraft : getDraft()
+}
+
+function save(current: StoredDraft): void {
+  if (!current.online) persist()
+}
+
+// Battles played so far (online, ties count too).
+function playedOf(current: StoredDraft): number {
+  return current.wins + current.losses + (current.ties ?? 0)
 }
 
 // The first full Draft gauntlet (all DRAFT_MAX_WINS wins) each day gives a Shiny Patch. The day
@@ -288,7 +310,7 @@ function persist(): void {
 /** Whether today's full-gauntlet Shiny Patch has already been given. */
 export function draftDailyWinClaimed(): boolean {
   try {
-    return (JSON.parse(readFileSync(playerPathFor('draft-daily.json'), 'utf8')) as { firstWinDay?: string }).firstWinDay === today()
+    return (JSON.parse(readText(playerPathFor('draft-daily.json'))) as { firstWinDay?: string }).firstWinDay === today()
   } catch {
     return false
   }
@@ -296,12 +318,12 @@ export function draftDailyWinClaimed(): boolean {
 
 function firstWinToday(): boolean {
   if (draftDailyWinClaimed()) return false
-  writeFileSync(playerPathFor('draft-daily.json'), JSON.stringify({ firstWinDay: today() }), 'utf8')
+  writeText(playerPathFor('draft-daily.json'), JSON.stringify({ firstWinDay: today() }))
   return true
 }
 
-function activeDraft(status: DraftView['status']): StoredDraft {
-  const current = getDraft()
+function activeDraft(status: DraftView['status'], online = false): StoredDraft {
+  const current = draftOf(online)
   if (!current || current.status !== status) {
     throw new Error(status === 'drafting' ? "You're not drafting right now" : 'No draft gauntlet in progress')
   }
@@ -347,14 +369,15 @@ function recordResult(current: StoredDraft, won: boolean): void {
 // After a chaos battle: always a modifier - with two more picks before it after the 1st,
 // 3rd, 5th... battle while the team isn't full.
 function nextChaosStage(current: StoredDraft): void {
-  current.opponent = null
-  const played = current.wins + current.losses
+  const played = playedOf(current)
+  // Online, the friend may already have sent their team for the next battle.
+  if (!(current.online && current.opponentStage === played)) current.opponent = null
   if (played % 2 === 1 && current.picks.length < DRAFT_ROUNDS) {
     current.status = 'drafting'
     current.pickTarget = Math.min(DRAFT_ROUNDS, current.picks.length + CHAOS_PICKS_PER_STAGE)
     current.afterDraft = 'modifier'
     current.rerolled = false
-    current.pack = offerPack(setFormatsOf(current), current.picks)
+    current.pack = offerPack(setFormatsOf(current), current.picks, !current.online)
   } else {
     offerModifiers(current)
   }
@@ -409,6 +432,11 @@ function startChaosBattleStage(current: StoredDraft): void {
   current.status = 'battling'
   current.pack = []
   current.modifierOffer = []
+  // Online, the opponent is the friend - their team arrives when they're done picking.
+  if (current.online) {
+    if (current.opponentStage !== playedOf(current)) current.opponent = null
+    return
+  }
   current.opponent = rollOpponent(setFormatsOf(current), current.picks.length)
   giveOpponentModifiers(current, current.opponent)
 }
@@ -514,8 +542,8 @@ function isTutorMove(id: string): boolean {
 }
 
 /** Every move the Move Tutor can teach this Pokemon (any move in the game it doesn't know). */
-export function chaosTutorMoves(pickIndex: number): ChaosTutorMove[] {
-  const current = activeDraft('modifier')
+export function chaosTutorMoves(pickIndex: number, online = false): ChaosTutorMove[] {
+  const current = activeDraft('modifier', online)
   const pick = current.picks[pickIndex]
   if (!pick) throw new Error("That Pokémon isn't on your team")
   const known = new Set(pick.set.moves.map((m) => Dex.moves.get(m).id))
@@ -535,21 +563,21 @@ function wildCardTier(current: StoredDraft): string {
 }
 
 /** Chaos: a fresh pack, or a fresh modifier offer, in place of this one - once per step. */
-export function rerollDraftPack(): DraftView {
-  const current = getDraft()
+export function rerollDraftPack(online = false): DraftView {
+  const current = draftOf(online)
   if (!current || (current.status !== 'drafting' && current.status !== 'modifier')) throw new Error("There's nothing to reroll right now")
   if (formatOf(current) !== 'chaos') throw new Error('Only chaos drafts can reroll')
   if (current.rerolled) throw new Error(current.status === 'modifier' ? 'Already rerolled these modifiers' : 'Already rerolled this draft phase')
   current.rerolled = true
   if (current.status === 'modifier') current.modifierOffer = rollModifierOffer(current)
-  else current.pack = offerPack(setFormatsOf(current), current.picks)
-  persist()
-  return getDraftView()!
+  else current.pack = offerPack(setFormatsOf(current), current.picks, !current.online)
+  save(current)
+  return viewOf(current)
 }
 
 /** Chaos: any useful held item on one of the team - once per modifier step, not a modifier. */
-export function swapChaosItem(pickIndex: number, itemId: string): DraftView {
-  const current = activeDraft('modifier')
+export function swapChaosItem(pickIndex: number, itemId: string, online = false): DraftView {
+  const current = activeDraft('modifier', online)
   if (current.itemSwapped) throw new Error('Already swapped an item this round')
   const pick = current.picks[pickIndex]
   if (!pick) throw new Error('Pick one of your Pokémon')
@@ -557,13 +585,13 @@ export function swapChaosItem(pickIndex: number, itemId: string): DraftView {
   if (!isUsefulHeldItem(item.id)) throw new Error('Pick an item')
   pick.set.item = item.name
   current.itemSwapped = true
-  persist()
-  return getDraftView()!
+  save(current)
+  return viewOf(current)
 }
 
 /** Takes one of the offered chaos modifiers (an Ability or Stat one on the chosen Pokemon). */
-export function chooseChaosModifier(index: number, target?: ChaosModifierTarget): DraftView {
-  const current = activeDraft('modifier')
+export function chooseChaosModifier(index: number, target?: ChaosModifierTarget, online = false): DraftView {
+  const current = activeDraft('modifier', online)
   const modifier = current.modifierOffer?.[index]
   if (!modifier) throw new Error("That modifier isn't on offer")
   const field = chaosFieldOf(current)
@@ -618,8 +646,8 @@ export function chooseChaosModifier(index: number, target?: ChaosModifierTarget)
   }
   current.chaosField = field
   startChaosBattleStage(current)
-  persist()
-  return getDraftView()!
+  save(current)
+  return viewOf(current)
 }
 
 // A pick's stat multipliers from its chaos boosts and Glass Cannons (1 where there are none).
@@ -739,9 +767,12 @@ function toView(pick: DraftPick): DraftMonView {
 }
 
 /** The player's draft, or null before their first one. */
-export function getDraftView(): DraftView | null {
-  const current = getDraft()
-  if (!current) return null
+export function getDraftView(online = false): DraftView | null {
+  const current = draftOf(online)
+  return current ? viewOf(current) : null
+}
+
+function viewOf(current: StoredDraft): DraftView {
   return {
     status: current.status,
     format: formatOf(current),
@@ -751,7 +782,9 @@ export function getDraftView(): DraftView | null {
     round: current.picks.length + 1,
     wins: current.wins,
     losses: current.losses,
-    opponent: current.opponent
+    online: current.online,
+    ties: current.online ? (current.ties ?? 0) : undefined,
+    opponent: current.opponent && (!current.online || current.opponentStage === playedOf(current))
       ? {
           name: current.opponent.name,
           spriteId: current.opponent.spriteId,
@@ -775,9 +808,9 @@ function tierLabel(setFormat: string): string {
 }
 
 // A new pack for the player: one with a legendary-rarity card counts for Lucky Pack.
-function offerPack(setFormats: string[], taken: DraftPick[]): DraftPick[] {
+function offerPack(setFormats: string[], taken: DraftPick[], counts = true): DraftPick[] {
   const pack = rollMons(setFormats, DRAFT_PACK_SIZE, taken)
-  if (pack.some((p) => speciesRarityTier(p.set.species) === 'legendary')) countAchievement('luckyPacks')
+  if (counts && pack.some((p) => speciesRarityTier(p.set.species) === 'legendary')) countAchievement('luckyPacks')
   return pack
 }
 
@@ -813,21 +846,24 @@ export function startDraft(format: DraftFormat): DraftView {
 }
 
 /** Takes one Pokemon from the pack; the sixth pick starts the gauntlet. */
-export function pickDraftMon(index: number): DraftView {
-  const current = activeDraft('drafting')
+export function pickDraftMon(index: number, online = false): DraftView {
+  const current = activeDraft('drafting', online)
   const pick = current.pack[index]
   if (!pick) throw new Error("That Pokémon isn't in the pack")
   current.picks.push(pick)
-  recordAchievementBest(
-    'draftBestLegendaries',
-    current.picks.filter((p) => speciesRarityTier(p.set.species) === 'legendary').length
-  )
+  // A friendly online draft costs nothing, so it doesn't count for achievements.
+  if (!current.online) {
+    recordAchievementBest(
+      'draftBestLegendaries',
+      current.picks.filter((p) => speciesRarityTier(p.set.species) === 'legendary').length
+    )
+  }
   if (formatOf(current) === 'chaos') {
     if (current.picks.length >= (current.pickTarget ?? DRAFT_ROUNDS)) {
       if (current.afterDraft === 'modifier') offerModifiers(current)
       else startChaosBattleStage(current)
     } else {
-      current.pack = offerPack(setFormatsOf(current), current.picks)
+      current.pack = offerPack(setFormatsOf(current), current.picks, !current.online)
     }
   } else if (current.picks.length >= DRAFT_ROUNDS) {
     current.status = 'battling'
@@ -836,8 +872,8 @@ export function pickDraftMon(index: number): DraftView {
   } else {
     current.pack = offerPack(setFormatsOf(current), current.picks)
   }
-  persist()
-  return getDraftView()!
+  save(current)
+  return viewOf(current)
 }
 
 /** Ends the draft now - paid for the wins it has (nothing while still drafting). */
@@ -926,3 +962,170 @@ export function finishDraftBattle(won: boolean, flawless = false): DraftBattleRe
   return { wins: current.wins, losses: current.losses, over: current.status === 'finished', reward: current.reward, shinyPatch }
 }
 
+
+// ---- Online chaos draft with a friend (see shared/online.ts) ----
+// Each player's copy runs their own side of it - their packs, their modifiers - and sends
+// the friend their team once they're done picking for a battle. The host's copy then runs
+// the battle with both teams. Nothing is paid in or out, and no achievements count.
+
+/** Starts an online chaos draft: the host's copy rolls the tiers, the friend's is given them. */
+export function startOnlineDraft(setFormats?: string[]): { view: DraftView; setFormats: string[] } {
+  const formats = setFormats === undefined ? rollSinglesTiers() : setFormats.filter((f) => SINGLES_TIERS.includes(f))
+  if (formats.length === 0) throw new Error("The draft's tiers didn't come through")
+  onlineDraft = {
+    status: 'drafting',
+    format: 'chaos',
+    setFormats: formats,
+    picks: [],
+    pack: offerPack(formats, [], false),
+    wins: 0,
+    losses: 0,
+    ties: 0,
+    opponent: null,
+    reward: 0,
+    online: true,
+    pickTarget: CHAOS_PICKS_PER_STAGE,
+    afterDraft: 'modifier',
+    chaosField: { weather: null, terrain: null, trickRoom: false }
+  }
+  return { view: viewOf(onlineDraft), setFormats: formats }
+}
+
+/** The online chaos draft is over (or the room closed). */
+export function endOnlineDraft(): void {
+  onlineDraft = null
+}
+
+/** This player's team for the friend, once they're done picking for the next battle. */
+export function onlineDraftTeam(): OnlineDraftTeam {
+  const current = activeDraft('battling', true)
+  return { picks: current.picks, field: chaosFieldOf(current) }
+}
+
+// The friend's picks as their copy sent them - checked over, since they came over the network.
+function readFriendPicks(input: unknown): DraftPick[] {
+  const raw = Array.isArray(input) ? input.slice(0, DRAFT_ROUNDS) : []
+  const count = (n: unknown): number => Math.max(0, Math.min(CHAOS_MON_MODIFIER_CAP, Math.floor(Number(n) || 0)))
+  const picks = raw.flatMap((entry): DraftPick[] => {
+    const pick = (entry ?? {}) as Partial<DraftPick>
+    const set = pick.set
+    if (!set || typeof set !== 'object' || typeof set.species !== 'string' || !Array.isArray(set.moves)) return []
+    if (!Dex.species.get(set.species).exists) return []
+    const boosts: Partial<Record<keyof StatBlock, number>> = {}
+    for (const stat of Object.keys(CHAOS_STAT_LABELS) as (keyof StatBlock)[]) {
+      const n = count(pick.boosts?.[stat])
+      if (n > 0) boosts[stat] = n
+    }
+    return [
+      {
+        set: { ...set, moves: set.moves.slice(0, 4).map(String), level: DRAFT_LEVEL },
+        setName: String(pick.setName ?? ''),
+        boosts,
+        glassCannon: count(pick.glassCannon),
+        fortress: count(pick.fortress),
+        lockOn: count(pick.lockOn),
+        modifiers: count(pick.modifiers)
+      }
+    ]
+  })
+  if (picks.length === 0) throw new Error("Your friend's team didn't come through")
+  return picks
+}
+
+function readFriendField(input: unknown): ChaosField {
+  const field = (input ?? {}) as Partial<ChaosField>
+  return {
+    weather: FIELD_START_WEATHERS.some((o) => o.id === field.weather) ? field.weather! : null,
+    terrain: FIELD_START_TERRAINS.some((o) => o.id === field.terrain) ? field.terrain! : null,
+    trickRoom: field.trickRoom === true,
+    tailwind: field.tailwind === true,
+    screens: field.screens === true,
+    stealthRock: field.stealthRock === true,
+    stickyWeb: field.stickyWeb === true,
+    spikes: Math.max(0, Math.min(CHAOS_MAX_SPIKES, Math.floor(Number(field.spikes) || 0))),
+    intimidate: field.intimidate === true
+  }
+}
+
+/**
+ * The friend's team for the battle after `stage` battles. It can arrive before this player
+ * is done picking - or even before this copy has counted the last battle - so it's kept
+ * with its stage, and only shown once this player reaches that battle.
+ */
+export function setOnlineDraftOpponent(stage: number, name: string, spriteId: string, team: OnlineDraftTeam): DraftView {
+  const current = onlineDraft
+  if (!current) throw new Error('No online draft going')
+  const played = playedOf(current)
+  if (stage !== played && stage !== played + 1) throw new Error('That team is for another battle')
+  current.opponent = {
+    name: String(name || 'Friend').slice(0, 24),
+    spriteId: String(spriteId || 'red'),
+    team: readFriendPicks(team?.picks),
+    field: readFriendField(team?.field)
+  }
+  current.opponentStage = stage
+  return viewOf(current)
+}
+
+/**
+ * Host: both teams for the online battle, each in the order picked (the whole team, the
+ * lead first) - with both sides' chaos modifiers. When both bring a weather (or a
+ * terrain), a coin flip picks whose it is.
+ */
+export function beginOnlineDraftBattle(
+  hostOrder: number[],
+  guestOrder: number[]
+): {
+  p1team: PokemonSet[]
+  p2team: PokemonSet[]
+  field: ReturnType<typeof chaosStartField>
+  boosts: { p1: StatBlock[]; p2: StatBlock[] }
+  lockOn: { p1: number[]; p2: number[] }
+  // Each side's modifiers in words, as the other player sees them.
+  hostModifiers: OpponentModifiersView
+  guestModifiers: OpponentModifiersView
+} {
+  const current = activeDraft('battling', true)
+  const foe = current.opponent
+  if (!foe || current.opponentStage !== playedOf(current)) throw new Error("Your friend's team hasn't arrived yet")
+  const check = (order: number[], size: number): void => {
+    if (!Array.isArray(order) || order.length !== size || new Set(order).size !== size || order.some((i) => !(i >= 0 && i < size))) {
+      throw new Error('Both teams go in whole - pick a lead')
+    }
+  }
+  check(hostOrder, current.picks.length)
+  check(guestOrder, foe.team.length)
+  const mine = hostOrder.map((i) => current.picks[i])
+  const theirs = guestOrder.map((i) => foe.team[i])
+  const myField = chaosFieldOf(current)
+  const theirField = foe.field ?? { weather: null, terrain: null, trickRoom: false }
+  const field = chaosStartField(myField, theirField)
+  if (myField.weather && theirField.weather && Math.random() < 0.5) field.weather = theirField.weather
+  if (myField.terrain && theirField.terrain && Math.random() < 0.5) field.terrain = theirField.terrain
+  return {
+    p1team: mine.map((p) => ({ ...p.set })),
+    p2team: theirs.map((p) => ({ ...p.set })),
+    field,
+    boosts: { p1: mine.map(boostMultipliers), p2: theirs.map(boostMultipliers) },
+    lockOn: { p1: mine.map((p) => p.lockOn ?? 0), p2: theirs.map((p) => p.lockOn ?? 0) },
+    hostModifiers: opponentModifiersView(theirField, myField, mine),
+    guestModifiers: opponentModifiersView(myField, theirField, theirs)
+  }
+}
+
+/** An online draft battle's end for this player: true won, false lost, null a tie. */
+export function finishOnlineDraftBattle(result: boolean | null): DraftView {
+  const current = activeDraft('battling', true)
+  if (result === true) current.wins++
+  else if (result === false) current.losses++
+  else current.ties = (current.ties ?? 0) + 1
+  if (current.wins >= ONLINE_CHAOS_WINS || current.losses >= ONLINE_CHAOS_WINS || playedOf(current) >= ONLINE_CHAOS_BATTLES) {
+    current.status = 'finished'
+    current.pack = []
+    current.opponent = null
+    current.modifierOffer = []
+  } else {
+    nextChaosStage(current)
+  }
+  return viewOf(current)
+}

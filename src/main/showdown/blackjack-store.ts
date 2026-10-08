@@ -1,4 +1,4 @@
-import { randomInt } from 'node:crypto'
+import { randomInt } from '../platform'
 import type { BlackjackOutcome, BlackjackView, Card } from '../../shared/blackjack'
 import { CARD_RANKS, CARD_SUITS, RESHUFFLE_BELOW, SHOE_DECKS, handValue, isBlackjack } from '../../shared/blackjack'
 import { changeCoins, getCoins } from './game-corner-store'

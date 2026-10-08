@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">pkmnPvE</string>
+    <string name="title_activity_main">pkmnPvE</string>
+    <string name="package_name">com.pkmnpve.game</string>
+    <string name="custom_url_scheme">com.pkmnpve.game</string>
+</resources>

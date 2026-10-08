@@ -1,5 +1,4 @@
-import { randomInt } from 'node:crypto'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readText, writeText, randomInt } from '../platform'
 import type { CoinBalance, DailyCoinMon, DailyCoinMonPurchase, DailyCoinOffer, DailyPetalDeals, SlotRules, SlotSpinResult, SlotSymbol } from '../../shared/slots'
 import {
   CHERRY_ONE,
@@ -69,7 +68,7 @@ onPlayerChange(() => {
 function getState(): StoredCoins {
   if (!state) {
     try {
-      const parsed = JSON.parse(readFileSync(playerPathFor('coins.json'), 'utf8')) as StoredCoins
+      const parsed = JSON.parse(readText(playerPathFor('coins.json'))) as StoredCoins
       state = {
         coins: typeof parsed.coins === 'number' ? parsed.coins : 0,
         dailyOfferDay: typeof parsed.dailyOfferDay === 'string' ? parsed.dailyOfferDay : undefined,
@@ -89,7 +88,7 @@ function getState(): StoredCoins {
 }
 
 function persist(): void {
-  writeFileSync(playerPathFor('coins.json'), JSON.stringify(getState()), 'utf8')
+  writeText(playerPathFor('coins.json'), JSON.stringify(getState()))
 }
 
 export function getCoins(): number {

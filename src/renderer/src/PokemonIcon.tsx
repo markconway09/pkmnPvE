@@ -47,6 +47,8 @@ function PokemonIcon({
         onDoubleClick={() => onEdit?.(mon.id)}
         onContextMenu={onContextMenu ? (e) => onContextMenu(e, mon) : undefined}
         onClick={onClick}
+        // Picking Pokemon to sell: a tap picks it rather than showing its tooltip.
+        data-tap-action={onClick ? '' : undefined}
         {...attributes}
         {...listeners}
       >

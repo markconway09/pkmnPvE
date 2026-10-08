@@ -1,6 +1,4 @@
-import { copyFileSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { app } from 'electron'
+import { readText, writeText, pathExists, copyFile, joinPath, isDevBuild, listDirs } from '../platform'
 import type { SessionInfo } from '../../shared/battle-types'
 import { normalizeUsername, usernameProblem } from '../../shared/battle-types'
 import {
@@ -57,7 +55,7 @@ function slugFor(name: string): string {
 
 function readJson<T>(path: string): T | null {
   try {
-    return JSON.parse(readFileSync(path, 'utf8')) as T
+    return JSON.parse(readText(path)) as T
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== 'ENOENT') console.error(`[player-session] failed to read ${path}:`, e)
     return null
@@ -70,11 +68,11 @@ function readSession(): SessionFile {
 }
 
 function writeSession(session: SessionFile): void {
-  writeFileSync(savePathFor('session.json'), JSON.stringify(session), 'utf8')
+  writeText(savePathFor('session.json'), JSON.stringify(session))
 }
 
 function profilePath(slug: string): string {
-  return join(playerDirFor(slug), 'profile.json')
+  return joinPath(playerDirFor(slug), 'profile.json')
 }
 
 function readProfile(slug: string): Profile | null {
@@ -84,20 +82,18 @@ function readProfile(slug: string): Profile | null {
 }
 
 function writeProfile(slug: string, profile: Profile): void {
-  writeFileSync(profilePath(slug), JSON.stringify(profile), 'utf8')
+  writeText(profilePath(slug), JSON.stringify(profile))
 }
 
 function playerSlugs(): string[] {
-  return readdirSync(playersDir(), { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
+  return listDirs(playersDir())
 }
 
 /** The folder name of an existing player, or null. Never creates anything. */
 export function findPlayerSlug(username: string): string | null {
   if (usernameProblem(username)) return null
   const slug = slugFor(username)
-  return existsSync(join(playersDir(), slug)) ? slug : null
+  return pathExists(joinPath(playersDir(), slug)) ? slug : null
 }
 
 // A save from before there were players lives loose in the shared folder. The
@@ -109,20 +105,19 @@ function adoptLegacySave(slug: string): void {
   const dir = playerDirFor(slug)
   for (const file of ['box.json', 'bag.json', 'money.json']) {
     const source = savePathFor(file)
-    if (existsSync(source)) copyFileSync(source, join(dir, file))
+    if (pathExists(source)) copyFile(source, joinPath(dir, file))
   }
   const legacy = readJson<{ levelCap?: number; bossesDefeated?: string[]; trainerWinsSinceLastBoss?: number }>(
     savePathFor('progression.json')
   )
   if (legacy && typeof legacy.levelCap === 'number') {
-    writeFileSync(
-      join(dir, 'progression.json'),
+    writeText(
+      joinPath(dir, 'progression.json'),
       JSON.stringify({
         levelCap: legacy.levelCap,
         bossesDefeated: legacy.bossesDefeated ?? [],
         trainerWinsSinceLastBoss: legacy.trainerWinsSinceLastBoss ?? 0
-      }),
-      'utf8'
+      })
     )
   }
 }
@@ -142,7 +137,7 @@ export function getSessionInfo(): SessionInfo {
       .sort((a, b) => a.localeCompare(b)),
     trainerSprite: profile?.trainerSprite ?? null,
     isAdmin: profile?.admin === true,
-    rememberByDefault: !app.isPackaged
+    rememberByDefault: isDevBuild()
   }
 }
 
@@ -163,7 +158,7 @@ export function login(username: string, remember: boolean): SessionInfo {
   const slug = slugFor(username)
 
   const isFirstPlayerEver = playerSlugs().length === 0
-  const isNewPlayer = !existsSync(join(playersDir(), slug))
+  const isNewPlayer = !pathExists(joinPath(playersDir(), slug))
   playerDirFor(slug)
   if (isNewPlayer && isFirstPlayerEver) adoptLegacySave(slug)
 

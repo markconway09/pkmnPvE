@@ -58,6 +58,18 @@ export function installLongPress(): void {
     if (timer && Math.hypot(e.clientX - startX, e.clientY - startY) > MOVE_TOLERANCE) cancel()
   }
 
+  // A touch screen's browser makes its own right click from a long press, on top of the
+  // one above - only ours counts (it's a plain MouseEvent; the browser's is a touch PointerEvent).
+  window.addEventListener(
+    'contextmenu',
+    (e) => {
+      if (e instanceof PointerEvent && e.pointerType === 'touch') {
+        e.preventDefault()
+        e.stopImmediatePropagation()
+      }
+    },
+    true
+  )
   window.addEventListener('pointerdown', onDown, true)
   window.addEventListener('pointermove', onMove, true)
   window.addEventListener('pointerup', cancel, true)

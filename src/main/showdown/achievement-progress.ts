@@ -1,6 +1,6 @@
+import { readText, writeText } from '../platform'
 import type { MissionStat } from '../../shared/missions'
 import { recordMission } from './mission-store'
-import { readFileSync, writeFileSync } from 'node:fs'
 import type { AchievementStat } from '../../shared/achievements'
 import { ACHIEVEMENTS } from '../../shared/achievements'
 import { startingDisabledTitles } from '../../shared/titles'
@@ -33,7 +33,7 @@ onPlayerChange(() => {
 export function getAchievementProgress(): StoredAchievements {
   if (!state) {
     try {
-      const parsed = JSON.parse(readFileSync(playerPathFor('achievements.json'), 'utf8')) as Partial<StoredAchievements>
+      const parsed = JSON.parse(readText(playerPathFor('achievements.json'))) as Partial<StoredAchievements>
       state = {
         counters: parsed.counters ?? {},
         unlocked: parsed.unlocked ?? [],
@@ -57,7 +57,7 @@ export function claimedTitlesOf(claimed: string[]): string[] {
 }
 
 export function persistAchievementProgress(): void {
-  writeFileSync(playerPathFor('achievements.json'), JSON.stringify(getAchievementProgress()), 'utf8')
+  writeText(playerPathFor('achievements.json'), JSON.stringify(getAchievementProgress()))
 }
 
 /** Raises one of the achievement-only tallies to this value, if it's a new best. */

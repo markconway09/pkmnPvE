@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readText, writeText } from '../platform'
 import { SCANNER_ITEM_ID, WILD_LOCATIONS, type RarityTier, type SpeciesEditInfo, type WildLocationId } from '../../shared/battle-types'
 import {
   TM_COIN_ONLY_COUNT,
@@ -110,7 +110,7 @@ function defaultState(): StoredTms {
 function load(): StoredTms {
   const path = playerPathFor('tms.json')
   try {
-    const parsed = JSON.parse(readFileSync(path, 'utf8')) as Partial<StoredTms>
+    const parsed = JSON.parse(readText(path)) as Partial<StoredTms>
     return {
       owned: Array.isArray(parsed.owned) ? parsed.owned : [],
       day: typeof parsed.day === 'string' ? parsed.day : today(),
@@ -138,7 +138,7 @@ function getState(): StoredTms {
 }
 
 function persist(): void {
-  writeFileSync(playerPathFor('tms.json'), JSON.stringify(state), 'utf8')
+  writeText(playerPathFor('tms.json'), JSON.stringify(state))
 }
 
 // A small seeded random number generator (mulberry32), seeded from a string.

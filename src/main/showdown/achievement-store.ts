@@ -1,4 +1,4 @@
-import { BrowserWindow } from 'electron'
+import { emitToUi } from '../platform'
 import type {
   AchievementClaimResult,
   AchievementDef,
@@ -137,7 +137,7 @@ export function checkAchievements(): void {
   persistAchievementProgress()
   if (firstCheck || fresh.length === 0) return
   const names = fresh.map((a) => a.name)
-  for (const window of BrowserWindow.getAllWindows()) window.webContents.send('achievements:unlocked', names)
+  emitToUi('achievements:unlocked', names)
 }
 
 export function getAchievements(): AchievementsState {
