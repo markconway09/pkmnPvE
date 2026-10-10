@@ -931,7 +931,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
           </div>
         )}
 
-        <div ref={battleFieldRef} className={`battle-field${isDoubles ? ' battle-field-doubles' : ''}`}>
+        <div ref={battleFieldRef} className={`battle-field${isDoubles ? ' battle-field-doubles' : ''}${view?.raid ? ' battle-field-raid' : ''}`}>
           <div className="field-backdrop" style={{ backgroundImage: `url(${backdropUrl(backdrop)})` }} />
           <FieldEffectsOverlay effects={field.effects} />
           <BattleSprite

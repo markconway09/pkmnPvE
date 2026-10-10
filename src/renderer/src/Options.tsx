@@ -3,8 +3,7 @@ import { createPortal } from 'react-dom'
 import { SPRITE_STYLES, SPRITE_STYLE_LABELS, spriteUrl, type SpriteStyle } from './spriteStyle'
 import UpdatesSection from './UpdatesSection'
 import BackgroundSection from './BackgroundSection'
-import CloudSavesSection from './CloudSavesSection'
-import SaveFileSection from './SaveFileSection'
+import SavesModal from './SavesModal'
 import { playSfx, setSfxOn, setSfxVolume, sfxLevel, sfxOn } from './sfx'
 import { cryOn, cryVolume, playCry, setCryOn, setCryVolume } from './cries'
 import {
@@ -275,6 +274,7 @@ function Options({
   onClose
 }: Props): React.JSX.Element {
   const [loggingOut, setLoggingOut] = useState(false)
+  const [savesOpen, setSavesOpen] = useState(false)
   const [volume, setVolume] = useState(() => Math.round(sfxLevel() * 100))
   const [menuSoundsOn, setMenuSoundsOn] = useState(sfxOn)
   const [cries, setCries] = useState(() => Math.round(cryVolume() * 100))
@@ -409,14 +409,13 @@ function Options({
             <BackgroundSection background={background} onChange={onChangeBackground} />
           </section>
 
-          {!IS_MOBILE && (
-            <section className="options-section">
-              <CloudSavesSection />
-            </section>
-          )}
-
           <section className="options-section">
-            <SaveFileSection />
+            <h2 className="options-heading">Saves</h2>
+            <p className="editor-hint">Move this save to another device, or back it up.</p>
+            <div>
+              <button onClick={() => setSavesOpen(true)}>Saves…</button>
+            </div>
+            {savesOpen && <SavesModal onClose={() => setSavesOpen(false)} />}
           </section>
 
           <section className="options-section">

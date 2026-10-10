@@ -10,8 +10,10 @@ export const TOUCH_HOLD_MS = 350
 export const TOUCH_MOVE_TOLERANCE = 8
 
 /** What counts as doing something on a tap: a tap on these (or in them) is theirs. */
+// A button marked [data-tap-none] is one a tap does nothing for right now (a run's team
+// card when nothing is being given), so a tap shows its tooltip.
 const TAP_ACTION = [
-  'button:not(:disabled)',
+  'button:not(:disabled):not([data-tap-none])',
   'a[href]',
   'input',
   'select',

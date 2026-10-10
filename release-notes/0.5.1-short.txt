@@ -1,0 +1,8 @@
+Send your save by code
+
+- New Saves window in Options with every way to move or back up your save
+- New Send to another device: type a 5-letter code to move your save between PC and phone
+- The PC shows a QR code too, and the phone can scan it with its camera
+- You see what's in a save before it replaces yours, and yours is backed up first
+- Doubles and Max Raids fit the phone screen better
+- Long-press tooltips and Roguelite team cards behave better on the phone

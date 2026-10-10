@@ -9,7 +9,7 @@ function errorText(e: unknown): string {
 }
 
 /**
- * Options → Save file: the save as one .pkmnsave file, to carry between the PC and the
+ * Options → Saves → Save file: the save as one .pkmnsave file, to carry between the PC and the
  * phone (through the Google Drive app, a cable, a chat...). Importing one replaces the
  * save (backed up first), then reloads the game. A cloud save downloaded from Drive
  * imports the same way.
@@ -53,7 +53,7 @@ function SaveFileSection(): React.JSX.Element {
 
   return (
     <>
-      <h2 className="options-heading">Save file</h2>
+      <h3 className="saves-subheading">Save file</h3>
       <p className="editor-hint">
         Move this player&apos;s save between your PC and your phone: export it as a file, put it on the other device
         (the Google Drive app works), and import it there. Importing replaces the current save - it&apos;s backed up

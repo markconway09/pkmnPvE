@@ -26,15 +26,23 @@ function Tooltip({ content, placement = 'above', className, children }: Props): 
   const [pinned, setPinned] = useState(false)
   const press = useRef<{ timer: number; x: number; y: number; target: Element | null; held: boolean; moved: boolean } | null>(null)
   const shown = hovering || pinned
+  // A long press's menu that opened with it: the tooltip sits just above that menu (it's
+  // the menu that was held for, so it stays where it is) and goes when anything is tapped.
+  const menuRef = useRef<Element | null>(null)
+  const [menuRect, setMenuRect] = useState<DOMRect | null>(null)
 
-  const unpin = useRef(() => setPinned(false)).current
+  const unpin = useRef(() => {
+    menuRef.current = null
+    setMenuRect(null)
+    setPinned(false)
+  }).current
   const pin = (): void => {
     openTouchTip(unpin)
     setPinned(true)
   }
   const close = (): void => {
     forgetTouchTip(unpin)
-    setPinned(false)
+    unpin()
   }
 
   const endPress = (): typeof press.current => {
@@ -49,6 +57,11 @@ function Tooltip({ content, placement = 'above', className, children }: Props): 
     if (!pinned) return
     const outside = (e: PointerEvent): void => {
       const target = e.target as Node | null
+      // A tap on the menu's buttons counts as elsewhere, even when the menu sits inside the trigger.
+      if (target && menuRef.current?.contains(target)) {
+        close()
+        return
+      }
       if (target && (triggerRef.current?.contains(target) || tooltipRef.current?.contains(target))) return
       close()
     }
@@ -56,6 +69,16 @@ function Tooltip({ content, placement = 'above', className, children }: Props): 
     return () => window.removeEventListener('pointerdown', outside, true)
   }, [pinned])
   useEffect(() => () => forgetTouchTip(unpin), [])
+
+  // The menu closed some other way (the back button, Escape) - the tooltip goes with it.
+  useEffect(() => {
+    if (!menuRect) return
+    const observer = new MutationObserver(() => {
+      if (menuRef.current && !menuRef.current.isConnected) close()
+    })
+    observer.observe(document.body, { childList: true, subtree: true })
+    return () => observer.disconnect()
+  }, [menuRect])
 
   const [pos, setPos] = useState<{ top: number; left: number }>({ top: -9999, left: -9999 })
 
@@ -66,7 +89,8 @@ function Tooltip({ content, placement = 'above', className, children }: Props): 
     if (!trigger || !tooltip) return
 
     const reposition = (): void => {
-      const triggerRect = trigger.getBoundingClientRect()
+      // Over a long press's menu: placed against the menu rather than the trigger.
+      const triggerRect = menuRect ?? trigger.getBoundingClientRect()
       const width = tooltip.offsetWidth
       const height = tooltip.offsetHeight
 
@@ -77,12 +101,12 @@ function Tooltip({ content, placement = 'above', className, children }: Props): 
       const belowTop = triggerRect.bottom + MARGIN
       const fitsAbove = aboveTop >= MARGIN
       const fitsBelow = belowTop + height <= window.innerHeight - MARGIN
-      let goAbove = placement === 'above'
+      let goAbove = placement === 'above' || !!menuRect
       if (goAbove && !fitsAbove) goAbove = fitsBelow ? false : triggerRect.top > window.innerHeight - triggerRect.bottom
       else if (!goAbove && !fitsBelow) goAbove = fitsAbove ? true : triggerRect.top > window.innerHeight - triggerRect.bottom
       let top = goAbove ? aboveTop : belowTop
       let left = triggerRect.left
-      if (placement === 'right') {
+      if (placement === 'right' && !menuRect) {
         top = triggerRect.top
         left = triggerRect.right + MARGIN
         // No room on the right - flip to the trigger's left side instead.
@@ -106,7 +130,7 @@ function Tooltip({ content, placement = 'above', className, children }: Props): 
       observer.disconnect()
       window.removeEventListener('resize', reposition)
     }
-  }, [shown, placement])
+  }, [shown, placement, menuRect])
 
   return (
     <div
@@ -156,13 +180,30 @@ function Tooltip({ content, placement = 'above', className, children }: Props): 
         else pin()
       }}
       onPointerCancel={() => endPress()}
-      // A long press's menu opened (every menu calls preventDefault) - it replaces the tooltip.
+      // A menu opened (every menu calls preventDefault). From a right click it replaces the
+      // tooltip; from a finger's long press the tooltip stays up, above the menu.
       onContextMenuCapture={(e) => {
         const menu = e.nativeEvent
+        const touch = !!press.current
         setTimeout(() => {
           if (!menu.defaultPrevented) return
           endPress()
-          close()
+          if (!touch) {
+            close()
+            return
+          }
+          // The menu is placed before it's painted - find it once it's on screen.
+          requestAnimationFrame(() => {
+            const menus = document.querySelectorAll('.context-menu')
+            const opened = menus[menus.length - 1]
+            if (!opened) {
+              close()
+              return
+            }
+            menuRef.current = opened
+            pin()
+            setMenuRect(opened.getBoundingClientRect())
+          })
         }, 0)
       }}
     >
@@ -171,7 +212,7 @@ function Tooltip({ content, placement = 'above', className, children }: Props): 
         createPortal(
           <div
             ref={tooltipRef}
-            className={`tooltip-portal${pinned ? ' tooltip-portal-pinned' : ''}`}
+            className={`tooltip-portal${pinned ? ' tooltip-portal-pinned' : ''}${menuRect ? ' tooltip-portal-over-menu' : ''}`}
             style={{ top: pos.top, left: pos.left }}
             // A tap on it puts it away. (It's in a portal, but React still bubbles its
             // events up to whatever holds the trigger - they stop here.)

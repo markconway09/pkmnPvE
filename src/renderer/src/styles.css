@@ -24313,3 +24313,96 @@ img.battle-result-icon {
   overflow-y: auto;
   overflow-x: hidden;
 }
+
+/* A tooltip shown with a long press's menu: above the menu's dimmed overlay, and see-through
+   to taps - a tap on it lands on the overlay, closing the menu and the tooltip together. */
+.tooltip-portal.tooltip-portal-over-menu {
+  z-index: 1310;
+  pointer-events: none;
+}
+
+/* Options → Saves: the moving / backing-up options, in PC & phone and PC only groups. */
+.saves-modal .saves-subheading {
+  margin: 14px 0 6px;
+  font-size: 14px;
+  color: #e6e6e6;
+}
+
+.saves-modal .options-heading + .saves-subheading {
+  margin-top: 4px;
+}
+
+.saves-modal .cloud-actions {
+  flex-wrap: wrap;
+}
+
+.saves-modal .options-modal-body button.cloud-confirm {
+  border-color: #a8413a;
+  color: #ff9a8f;
+}
+
+/* Send to another device: the room code (big, to read off a screen) and the PC's QR code. */
+.save-transfer-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #2c3340;
+  border-radius: 10px;
+  background: #151a22;
+  text-align: center;
+}
+
+.save-transfer-box .cloud-save {
+  align-self: stretch;
+  text-align: left;
+}
+
+.save-transfer-code {
+  font-family: monospace;
+  font-size: 34px;
+  font-weight: bold;
+  letter-spacing: 8px;
+  color: #f2c94c;
+}
+
+.save-transfer-qr {
+  width: 180px;
+  height: 180px;
+  border-radius: 8px;
+}
+
+.save-transfer-entry {
+  align-items: center;
+}
+
+.save-transfer-input {
+  width: 110px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid #2f3746;
+  border-radius: 8px;
+  background: #10141a;
+  color: #e6e6e6;
+  font-family: monospace;
+  font-size: 18px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+
+.save-transfer-scanner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.save-transfer-scanner video {
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 10px;
+  background: #000;
+}

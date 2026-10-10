@@ -339,6 +339,8 @@ function RunMonCard({ mon, index, onClick, onContextMenu, onEdit, selectable, mo
         }}
         {...drag.attributes}
         {...drag.listeners}
+        // On a touch screen a tap shows its tooltip, unless it's picking a target.
+        data-tap-none={selectable ? undefined : ''}
         style={
           {
             '--i': index,

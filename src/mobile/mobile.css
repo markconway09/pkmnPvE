@@ -387,6 +387,104 @@ html[data-platform='mobile'] {
     zoom: calc((var(--m-vw, 375) - 12) / 430);
   }
 
+  /* Doubles and Max Raids: more on the field, so smaller sprites and compact HP boxes -
+     the name, level and bar (the stat changes are in the tooltip). */
+  & .battle-field-doubles .sprite-slot,
+  & .battle-field-raid .sprite-slot {
+    width: 132px;
+    gap: 3px;
+  }
+  & .battle-field-doubles .sprite-slot.right,
+  & .battle-field-raid .sprite-slot.right {
+    top: 6px;
+    right: 12px;
+  }
+  & .battle-field-doubles .sprite-slot.left,
+  & .battle-field-raid .sprite-slot.left {
+    bottom: 6px;
+    left: 12px;
+  }
+  & .battle-field-doubles .sprite-slot.right.sprite-slot-second {
+    right: 150px;
+  }
+  & .battle-field-doubles .sprite-slot.left.sprite-slot-second {
+    left: 150px;
+  }
+  & .battle-field-doubles .sprite-slot.right .sprite-image-wrap {
+    width: 70px;
+    height: 70px;
+  }
+  & .battle-field-doubles .sprite-slot.left .sprite-image-wrap {
+    width: 90px;
+    height: 90px;
+  }
+  & .battle-field-raid .sprite-slot.right .sprite-image-wrap {
+    width: 96px;
+    height: 96px;
+  }
+  & .battle-field-raid .sprite-slot.left .sprite-image-wrap {
+    width: 112px;
+    height: 112px;
+  }
+  & .battle-field-raid .sprite-slot.right.sprite-slot-dynamax {
+    width: auto;
+  }
+  & .battle-field-raid .sprite-slot.right.sprite-slot-dynamax .sprite-image-wrap {
+    width: 150px;
+    height: 150px;
+  }
+  & .battle-field-doubles .sprite-info,
+  & .battle-field-raid .sprite-info {
+    width: 124px;
+    padding: 2px 4px;
+  }
+  & .battle-field-doubles .sprite-name-row,
+  & .battle-field-raid .sprite-name-row {
+    flex-wrap: nowrap;
+    gap: 3px;
+    overflow: hidden;
+  }
+  & .battle-field-doubles .sprite-name,
+  & .battle-field-raid .sprite-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+  }
+  & .battle-field-doubles .sprite-name-row > :not(.sprite-name),
+  & .battle-field-raid .sprite-name-row > :not(.sprite-name) {
+    flex: none;
+  }
+  & .battle-field-doubles .sprite-level,
+  & .battle-field-raid .sprite-level,
+  & .battle-field-doubles .status-badge,
+  & .battle-field-raid .status-badge {
+    font-size: 9px;
+  }
+  & .battle-field-doubles .sprite-merge-stars,
+  & .battle-field-raid .sprite-merge-stars,
+  & .battle-field-doubles .sprite-caught,
+  & .battle-field-raid .sprite-caught,
+  & .battle-field-doubles .boost-row,
+  & .battle-field-raid .boost-row {
+    display: none;
+  }
+  & .battle-field-doubles .sprite-types,
+  & .battle-field-raid .sprite-types {
+    margin-top: 1px;
+    zoom: 0.8;
+  }
+  & .battle-field-doubles .hp-bar-track,
+  & .battle-field-raid .hp-bar-track {
+    height: 8px;
+    margin-top: 1px;
+  }
+  & .battle-field-doubles .hp-bar-text,
+  & .battle-field-raid .hp-bar-text {
+    font-size: 7px;
+  }
+
   /* The moves: two by two across the screen. */
   & .battle-action-slot .menu-panel {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1347,6 +1445,18 @@ html[data-platform='mobile'] {
   & .run-team-row .run-mon-card {
     width: 100%;
     min-width: 0;
+  }
+  /* The name kept to the card: as wide as it (so a long one shrinks, then cuts off) and smaller. */
+  & .run-team-row .box-icon-draggable,
+  & .run-starter-slot .box-icon-draggable {
+    min-width: 0;
+    padding: 6px 3px;
+  }
+  & .run-team-row .box-icon-name,
+  & .run-starter-slot .box-icon-name {
+    flex: none;
+    width: 100%;
+    font-size: 11px;
   }
 
   /* Draft: the team three to a row too. */

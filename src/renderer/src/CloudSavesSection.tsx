@@ -13,7 +13,7 @@ function formatDate(iso: string): string {
 }
 
 /**
- * Options → Cloud saves: connect this player's Google Drive, export the save there, and
+ * Options → Saves → Google Drive backup: connect this player's Google Drive, export the save there, and
  * bring one back. Importing replaces the save (backed up first), then reloads the game.
  */
 function CloudSavesSection(): React.JSX.Element | null {
@@ -54,11 +54,19 @@ function CloudSavesSection(): React.JSX.Element | null {
     }
   }
 
-  if (!status || !status.available) return null
+  if (!status) return null
+  if (!status.available) {
+    return (
+      <>
+        <h3 className="saves-subheading">Google Drive backup</h3>
+        <p className="editor-hint">Google Drive backups aren&apos;t set up in this copy of the game.</p>
+      </>
+    )
+  }
 
   return (
     <>
-      <h2 className="options-heading">Cloud saves</h2>
+      <h3 className="saves-subheading">Google Drive backup</h3>
       {!status.connected ? (
         <>
           <p className="editor-hint">
