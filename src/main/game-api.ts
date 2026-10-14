@@ -4,10 +4,11 @@
  * straight from the page. A handler's first argument is the caller - only used to
  * push the online battle's screens back to the one that started it.
  */
-import { appVersion } from './platform'
+import { appVersion, randomUUID } from './platform'
 import type {
   BattleEligibility,
   BossRematchInfo,
+  CoopBattleResult,
   RunChoiceResult,
   RunDifficulty,
   RunConsumableId,
@@ -27,6 +28,7 @@ import type {
   WildLocationId
 } from '../shared/battle-types'
 import {
+  COOP_MAX_TEAM,
   WILD_LOCATIONS,
   rollWildWeather,
   WILD_RANDOM_DROP_CHANCE,
@@ -39,6 +41,8 @@ import {
 import { WildBattle, getMoveInfo } from './showdown/battle-runtime'
 import { exportSaveFile, importSaveFile } from './showdown/save-file'
 import type {
+  CoopSetup,
+  OnlineCoopTeam,
   OnlinePlayer,
   OnlineSelf,
   OnlineDraftTeam,
@@ -246,9 +250,14 @@ import {
   updateRunMon,
   giveRunAbility,
   teachRunMove,
-  skipRunPick
+  skipRunPick,
+  applyCoopBattle,
+  currentRunSlot,
+  inRunSlot,
+  lastCoopBattle,
+  runBattleTeam
 } from './showdown/run-store'
-import { createRunBattle } from './showdown/run-battles'
+import { createCoopRunBattle, createRunBattle } from './showdown/run-battles'
 import { getWildDropFor, listWildDrops, setWildDrop } from './showdown/wild-drops-store'
 import {
   getDexNavState,
@@ -487,7 +496,7 @@ handle('battle:run', () => {
   activeBattle = null
 })
 
-// Gives up a draft match or a Roguelite fight - it plays out as a loss, end screen and all.
+// Gives up a draft match or a Battle Tower fight - it plays out as a loss, end screen and all.
 handle('battle:forfeit', () => {
   if (!activeBattle) throw new Error('No active battle')
   return activeBattle.forfeit()
@@ -739,7 +748,7 @@ function allBossesDefeated(): boolean {
   return getProgression().bossOrder.length > 0 && !getNextBoss()
 }
 
-// ---- Roguelite runs (see run-store.ts) ----
+// ---- Battle Tower runs (see run-store.ts) ----
 handle('run:get', (): RunView | null => getRunView())
 handle('run:generations', () => completeRunGenerations())
 handle('run:start', (_event, boxMonId: string, difficulty: RunDifficulty, generation: number | null, keepMoves = false) =>
@@ -794,8 +803,105 @@ handle('run:choose', async (_event, index: number): Promise<RunChoiceResult> => 
   if (choice.kind === 'item') return { run: takeItemNode() }
   if (choice.kind === 'ability' || choice.kind === 'move') return { run: takePickNode(choice.kind) }
   if (choice.kind === 'swap') return { run: takeSwapNode() }
+  // A co-op run's boss or villain is fought together: the two meet up first (the host's
+  // copy starts the fight once both are there - see coop:battle).
+  if (currentRunSlot() === 'coop' && (choice.kind === 'boss' || choice.kind === 'villain')) {
+    return { run: getRunView()!, meetup: choice.kind }
+  }
   activeBattle = createRunBattle(choice)
   return { battle: await activeBattle.getInitialView(), location: choice.location }
+})
+
+// The run of the battle on screen (the solo run or the co-op one) - for a catch's "team full".
+handle('battle:runView', (): RunView | null => {
+  const slot = activeBattle?.runSlot()
+  return slot ? inRunSlot(slot, getRunView) : null
+})
+
+// ---- Co-op runs (see shared/online.ts): every run call again as coop:..., on the co-op run ----
+for (const [channel, handler] of [...gameHandlers]) {
+  if (!channel.startsWith('run:')) continue
+  handle(`coop:${channel.slice('run:'.length)}`, (caller, ...args) => inRunSlot('coop', () => handler(caller, ...args)))
+}
+
+// A co-op run's start: this player's starter, with the room's settings and shared seed.
+handle('coop:startCoopRun', (_event, boxMonId: string, keepMoves: boolean, setup: CoopSetup, partner: OnlinePlayer, role: 'host' | 'guest') =>
+  inRunSlot('coop', () =>
+    startRun(String(boxMonId), setup.difficulty, setup.generation ?? null, !!keepMoves, {
+      seed: String(setup.seed),
+      partnerName: String(partner?.name ?? 'Friend').slice(0, 24),
+      partnerSpriteId: String(partner?.spriteId ?? 'red'),
+      role: role === 'host' ? 'host' : 'guest'
+    })
+  )
+)
+
+// This player's run team for a fight taken on together (sent to the host's copy).
+handle('coop:team', (): OnlineCoopTeam => inRunSlot('coop', () => runBattleTeam()))
+
+// The host's copy: its last fight fought together, sent again when the two meet up again.
+handle('coop:lastBattle', (): CoopBattleResult | null => inRunSlot('coop', () => lastCoopBattle()))
+
+// The friend's copy: a fight fought together, as the host's copy says it went.
+handle('coop:applyBattle', (_event, result: CoopBattleResult) =>
+  inRunSlot('coop', () => {
+    const outcome = Array.isArray(result?.guestOutcome) ? result.guestOutcome : []
+    return applyCoopBattle({
+      battleId: String(result?.battleId ?? ''),
+      floor: Number(result?.floor) || 0,
+      kind: result?.kind === 'villain' ? 'villain' : 'boss',
+      trainerId: String(result?.trainerId ?? ''),
+      won: result?.won === true,
+      guestOutcome: outcome.map((mon) => ({
+        hp: Math.max(0, Math.min(1, Number(mon?.hp) || 0)),
+        status: readStatus(mon?.status),
+        fainted: mon?.fainted === true
+      }))
+    })
+  })
+)
+
+const STATUSES = new Set(['brn', 'par', 'slp', 'frz', 'psn', 'tox'])
+const readStatus = (status: unknown): string | null => (typeof status === 'string' && STATUSES.has(status) ? status : null)
+
+// The host's copy: both players are at the boss (or villain) - the fight, with the
+// friend's run team as their copy sent it, on the host's co-op run.
+handle('coop:battle', async (event, friend: OnlinePlayer, guestTeam: OnlineCoopTeam): Promise<OnlineViews> => {
+  const session = getSessionInfo()
+  if (!session.username) throw new Error('Log in first')
+  const sets = (Array.isArray(guestTeam?.sets) ? guestTeam.sets : []).slice(0, COOP_MAX_TEAM).filter(
+    (set): set is PokemonSet =>
+      !!set && typeof set === 'object' && typeof (set as PokemonSet).species === 'string' && Array.isArray((set as PokemonSet).moves)
+  )
+  if (sets.length === 0) throw new Error("Your friend's run team is empty")
+  const conditions = sets.map((_, i) => {
+    const condition = guestTeam.conditions?.[i]
+    return { hp: Math.max(0, Math.min(1, Number(condition?.hp ?? 1))), status: readStatus(condition?.status) }
+  })
+  const guest = {
+    sets: sets.map((set) => ({ ...set, level: Math.max(1, Math.min(100, Math.floor(Number(set.level) || 100))) })),
+    conditions
+  }
+  onlineBattle?.forfeitSide(0)
+  const battle = inRunSlot('coop', () => {
+    const run = getRunView()
+    const choice = run?.status === 'active' ? run.choices[0] : undefined
+    if (!choice || (choice.kind !== 'boss' && choice.kind !== 'villain')) throw new Error('Your run isn\'t at a boss or villain')
+    return createCoopRunBattle(choice.kind, guest, {
+      battleId: randomUUID(),
+      hostName: session.username!,
+      hostSpriteId: session.trainerSprite ?? 'red',
+      guestName: String(friend?.name ?? 'Friend').slice(0, 24) || 'Friend',
+      guestSpriteId: String(friend?.spriteId ?? 'red')
+    })
+  })
+  return runOnlineBattle(event, battle)
+})
+
+// The connection dropped mid-fight: it stops, counting for neither run.
+handle('coop:abandonBattle', () => {
+  onlineBattle?.abandon()
+  onlineBattle = null
 })
 
 // ---- Draft mode (see draft-store.ts) ----

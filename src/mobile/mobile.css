@@ -1,13 +1,14 @@
 /*
  * The phone layout: the same screens as the desktop, rearranged for a portrait
  * phone (360-430px wide). Loaded only by the mobile build (src/mobile/main.ts),
- * after styles.css, and every rule is scoped to html[data-platform='mobile'] so
- * nothing here can reach the desktop game.
+ * after styles.css, and every rule is scoped to html[data-platform='mobile'] (or
+ * data-layout='mobile': the PC's Options → Screen size → Mobile) so nothing here can
+ * reach the desktop layout.
  *
  * The menu: the page's title and the tool buttons along the top, the page in the
  * middle (scrolling), the team dock above a bottom bar of the eight pages.
  */
-html[data-platform='mobile'] {
+html:is([data-platform='mobile'], [data-layout='mobile']) {
   --m-nav-h: 56px;
   --m-top-h: 50px;
   --m-gutter: 10px;
@@ -709,7 +710,7 @@ html[data-platform='mobile'] {
     width: auto;
   }
 
-  /* ---- Roguelite: the setup ---- */
+  /* ---- Battle Tower: the setup ---- */
   & .run-setup-card,
   & .run-card,
   & .run-hud {
@@ -775,7 +776,7 @@ html[data-platform='mobile'] {
     padding-right: 4px;
   }
 
-  /* ---- Roguelite: a run in progress ---- */
+  /* ---- Battle Tower: a run in progress ---- */
   /* The run grows with what's in it - the page scrolls - rather than fitting the page's height. */
   & .battle-section-run {
     flex: none;
@@ -1326,6 +1327,24 @@ html[data-platform='mobile'] {
     margin-top: 0;
     box-sizing: border-box;
   }
+  /* Merge stars as "3★" - a row of six doesn't fit the narrow slot. */
+  & .team-dock-slot .box-icon-stars {
+    top: 2px;
+    right: 3px;
+    letter-spacing: 0;
+  }
+  & .team-dock-slot .box-icon-stars-full {
+    display: none;
+  }
+  & .team-dock-slot .box-icon-stars-short {
+    display: inline;
+  }
+  /* The held item smaller and tucked in at the sprite's corner, inside the slot. */
+  & .team-dock-slot .box-icon-item {
+    right: -3px;
+    bottom: -1px;
+    transform: scale(0.6);
+  }
 
   /* ---- A dialog's picker beside it (the editor's moves, abilities...): under it, with
      the dialog cut down so the list gets the room - and scrolls ---- */
@@ -1346,7 +1365,7 @@ html[data-platform='mobile'] {
     overscroll-behavior: contain;
   }
 
-  /* ---- Roguelite: the floor's tiles three to a row, small ---- */
+  /* ---- Battle Tower: the floor's tiles three to a row, small ---- */
   & .run-choice-grid {
     display: flex;
     flex-wrap: wrap;

@@ -76,7 +76,9 @@ import ShinyIcon from './ShinyIcon'
 import ItemSprite from './ItemSprite'
 import MusicPlayer from './MusicPlayer'
 import { CLICK, CLICK_LC, IS_MOBILE } from './platform'
-import { useOnlineState } from './online'
+import { leaveCoopRun, reportCoopProgress, setCoopReady, useOnlineState } from './online'
+import CoopRunPanel from './CoopRunPanel'
+import type { RunApi } from '../../shared/api'
 
 interface Props {
   // A wild battle - in that location, or the one last picked.
@@ -101,7 +103,7 @@ interface Props {
   onChangeTrainerSprite: (id: string) => void
   username: string
   isAdmin: boolean
-  // A Roguelite floor's fight has started - App takes it from here like any battle.
+  // A Battle Tower floor's fight has started - App takes it from here like any battle.
   onRunBattle: (view: BattleView, location?: WildLocationId) => Promise<void>
 }
 
@@ -183,7 +185,7 @@ const PAGE_TITLES: Record<MenuPage, string> = {
   classic: 'Battles',
   catch: 'Catch',
   box: 'Box',
-  roguelite: 'Roguelite',
+  roguelite: 'Battle Tower',
   draft: 'Draft',
   raid: 'Max Raid',
   corner: 'Game Corner'
@@ -262,6 +264,8 @@ function MainMenu({
   const [runPickId, setRunPickId] = useState<string | null>(null)
   const [runBusy, setRunBusy] = useState(false)
   const [runError, setRunError] = useState<string | null>(null)
+  // This player's co-op run (see CoopRunPanel), while one is going in the online room.
+  const [coopRun, setCoopRun] = useState<RunView | null>(null)
   const [bestFloor, setBestFloor] = useState<{ floor: number; difficulty: RunDifficulty | null } | null>(null)
   // Keep moves or take new ones - asked when a run starts and when a run Pokemon evolves.
   const [movesChoice, setMovesChoice] = useState<{
@@ -269,10 +273,17 @@ function MainMenu({
     preview: RunMovesPreview
     decide: (keep: boolean) => Promise<void>
   } | null>(null)
+  // Connected with a friend online: nothing else starts a battle until the room is left
+  // (a battle from the room would take over the screen mid-fight). During a chaos draft
+  // or a co-op run the trainer and boss battles are hidden altogether.
+  const online = useOnlineState()
   // A run in progress takes the whole menu: the regular team and box are hidden.
   const runInProgress = mode === 'roguelite' && run?.status === 'active'
+  // ...and so does a co-op run under way, on the Battle page.
+  const coopRunInProgress =
+    mode === 'classic' && !!online.coop && coopRun?.status === 'active' && coopRun.coop?.seed === online.coop.setup.seed
   // Draft mode never uses the box, so it always has the whole menu too.
-  const fullPanel = runInProgress || mode === 'draft'
+  const fullPanel = runInProgress || mode === 'draft' || coopRunInProgress
   // A small box pulled up under the team dock (its PC button), to drag Pokemon from it
   // without going to the Box page. It closes again on changing page, and has its own search.
   const [dockBoxOpen, setDockBoxOpen] = useState(false)
@@ -464,18 +475,77 @@ function MainMenu({
     }
   }
 
-  // Moves a run Pokemon to another place in the run's team (shown straight away).
+  // Moves a run Pokemon to another place in the run's team (shown straight away) - the
+  // co-op run's on the Battle page (not while waiting at a boss), the solo run's elsewhere.
   function reorderRun(runMonId: string, toIndex: number): void {
-    if (!run) return
-    const ids = run.team.map((m) => m.id)
+    const coop = mode === 'classic' && !!online.coop
+    if (coop && online.coop?.ready) return
+    const current = coop ? coopRun : run
+    const set = coop ? setCoopRun : setRun
+    const api: RunApi = coop ? window.api.coopRun : window.api
+    if (!current) return
+    const ids = current.team.map((m) => m.id)
     const from = ids.indexOf(runMonId)
     if (from === -1 || from === toIndex) return
     ids.splice(toIndex, 0, ...ids.splice(from, 1))
-    const byId = new Map(run.team.map((m) => [m.id, m]))
-    setRun({ ...run, team: ids.map((id) => byId.get(id)!) })
+    const byId = new Map(current.team.map((m) => [m.id, m]))
+    set({ ...current, team: ids.map((id) => byId.get(id)!) })
     void runAction(async () => {
-      setRun(await window.api.reorderRunTeam(ids))
+      set(await api.reorderRunTeam(ids))
     })
+  }
+
+  // The run screen's handlers for a run: the solo run (window.api) or the co-op one.
+  function runHandlers(api: RunApi, current: RunView | null, set: (run: RunView) => void, refresh: () => void) {
+    return {
+      onRunUpdated: set,
+      onGiveItem: (itemId: string, runMonId: string) =>
+        void runAction(async () => {
+          set(await api.giveRunItem(itemId, runMonId))
+        }),
+      onEvolve: (runMonId: string, target: string) =>
+        void runAction(async () => {
+          const from = current?.team.find((m) => m.id === runMonId)?.species ?? 'It'
+          setMovesChoice({
+            title: `${from} evolves into ${target}`,
+            preview: await api.previewEvolutionMoves(runMonId, target),
+            decide: async (keep) => set(await api.evolveRunMon(runMonId, target, !keep))
+          })
+        }),
+      onMoveItem: (fromMonId: string, toMonId: string) =>
+        void runAction(async () => {
+          set(await api.moveRunItem(fromMonId, toMonId))
+        }),
+      onPlaceDisplacedItem: (runMonId: string | null) =>
+        void runAction(async () => {
+          set(await api.placeDisplacedItem(runMonId))
+        }),
+      onRerollItems: () =>
+        void runAction(async () => {
+          set(await api.rerollRunItems())
+        }),
+      onGiveAbility: (abilityId: string, runMonId: string) =>
+        void runAction(async () => {
+          set(await api.giveRunAbility(abilityId, runMonId))
+        }),
+      onTeachMove: (moveId: string, runMonId: string, replaceMoveId: string | null) =>
+        void runAction(async () => {
+          set(await api.teachRunMove(moveId, runMonId, replaceMoveId))
+        }),
+      onSkipPick: () =>
+        void runAction(async () => {
+          set(await api.skipRunPick())
+        }),
+      onSkipItem: () =>
+        void runAction(async () => {
+          set(await api.skipRunItem())
+        }),
+      onForfeit: () =>
+        void runAction(async () => {
+          set(await api.forfeitRun())
+          refresh()
+        })
+    }
   }
 
   // Opens a page of the menu, from a sidebar button, a Home card or a number key.
@@ -977,11 +1047,26 @@ function MainMenu({
     .filter((m) => !boxRarity || (m.rarityTier ?? 'common') === boxRarity)
   const teamCount = team.filter(Boolean).length
   const teamEmpty = teamCount === 0
-  // Connected with a friend online: nothing else starts a battle until the room is left
-  // (a battle from the room would take over the screen mid-fight). During a chaos draft
-  // the trainer and boss battles are hidden altogether.
-  const online = useOnlineState()
   const onlineLocked = online.friend !== null
+
+  // A co-op run in the online room: this player's run, read again whenever one starts, the
+  // room changed it (see OnlineCoopState.version) or the friend shows up - and reported to
+  // the friend each time it changes.
+  const coopSeed = online.coop?.setup.seed ?? null
+  const coopVersion = online.coop?.version ?? 0
+  const coopPartnerHere = !!online.coop?.partner
+  function refreshCoopRun(): void {
+    window.api.coopRun
+      .getRun()
+      .then(setCoopRun)
+      .catch(() => setCoopRun(null))
+  }
+  useEffect(() => {
+    if (coopSeed) refreshCoopRun()
+  }, [coopSeed, coopVersion])
+  useEffect(() => {
+    if (coopSeed) reportCoopProgress(coopRun)
+  }, [coopSeed, coopRun, coopPartnerHere])
   const battleBusy = fightBusy || onlineLocked
   const boxEmpty = (boxState?.mons.length ?? 0) === 0
   const activeDragMon = activeDragId ? monsById.get(activeDragId) : undefined
@@ -1034,10 +1119,10 @@ function MainMenu({
     }
   }
   // The team dock shows on Home, Classic, Catch, the Box and Max Raid pages and while setting
-  // up a Roguelite run (drag a team member onto the starter slot); it stays loaded elsewhere.
+  // up a Battle Tower run (drag a team member onto the starter slot); it stays loaded elsewhere.
   const dockShown =
     mode === 'home' ||
-    mode === 'classic' ||
+    (mode === 'classic' && !coopRunInProgress) ||
     mode === 'catch' ||
     mode === 'box' ||
     mode === 'raid' ||
@@ -1231,7 +1316,7 @@ function MainMenu({
 
       {fightError && <p style={{ color: '#ff6b6b' }}>{fightError}</p>}
       {loadError && <p style={{ color: '#ff6b6b' }}>Failed to load your box: {loadError}</p>}
-      {mode === 'roguelite' && runError && <p style={{ color: '#ff6b6b' }}>{runError}</p>}
+      {(mode === 'roguelite' || (mode === 'classic' && online.coop)) && runError && <p style={{ color: '#ff6b6b' }}>{runError}</p>}
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div ref={sectionRef} className={`menu-page menu-page-${mode}`}>
@@ -1315,7 +1400,6 @@ function MainMenu({
                   })
                 })
               }
-              onRunUpdated={setRun}
               onChoose={(index) =>
                 void runAction(async () => {
                   const result = await window.api.chooseRunNode(index)
@@ -1323,67 +1407,58 @@ function MainMenu({
                   else setRun(result.run)
                 })
               }
-              onGiveItem={(itemId, runMonId) =>
+              {...runHandlers(window.api, run, setRun, refreshRun)}
+            />
+          </div>
+        ) : mode === 'classic' && online.coop && online.friend ? (
+          // A co-op Battle Tower run in the online room: the room's bar, then the run itself.
+          <div className="battle-section-inner">
+            <OnlineSection disabled={fightBusy || teamEmpty} />
+            {/* Dressed as the Battle Tower page. */}
+            <div className="menu-page-roguelite coop-run-page">
+            <CoopRunPanel
+              coop={online.coop}
+              friend={online.friend}
+              run={coopRun}
+              picked={runPickId ? monsById.get(runPickId) : undefined}
+              busy={runBusy || fightBusy}
+              starting={online.starting}
+              onStart={() =>
                 void runAction(async () => {
-                  setRun(await window.api.giveRunItem(itemId, runMonId))
-                })
-              }
-              onEvolve={(runMonId, target) =>
-                void runAction(async () => {
-                  const from = run?.team.find((m) => m.id === runMonId)?.species ?? 'It'
+                  if (!runPickId || !online.coop || !online.friend) return
+                  const starter = runPickId
+                  const setup = online.coop.setup
+                  const friend = online.friend
+                  const role = online.role === 'host' ? 'host' : 'guest'
                   setMovesChoice({
-                    title: `${from} evolves into ${target}`,
-                    preview: await window.api.previewEvolutionMoves(runMonId, target),
-                    decide: async (keep) => setRun(await window.api.evolveRunMon(runMonId, target, !keep))
+                    title: `${monsById.get(starter)?.species ?? 'Your starter'} starts the climb`,
+                    preview: await window.api.coopRun.previewStarterMoves(starter),
+                    decide: async (keep) => {
+                      setCoopRun(await window.api.startCoopRun(starter, keep, setup, friend, role))
+                      setRunPickId(null)
+                    }
                   })
                 })
               }
-              onMoveItem={(fromMonId, toMonId) =>
+              onChoose={(index) =>
                 void runAction(async () => {
-                  setRun(await window.api.moveRunItem(fromMonId, toMonId))
+                  const result = await window.api.coopRun.chooseRunNode(index)
+                  if ('battle' in result) await onRunBattle(result.battle, result.location)
+                  else {
+                    setCoopRun(result.run)
+                    if (result.meetup) await setCoopReady({ floor: result.run.floor, kind: result.meetup }, result.run)
+                  }
                 })
               }
-              onPlaceDisplacedItem={(runMonId) =>
-                void runAction(async () => {
-                  setRun(await window.api.placeDisplacedItem(runMonId))
-                })
-              }
-              onRerollItems={() =>
-                void runAction(async () => {
-                  setRun(await window.api.rerollRunItems())
-                })
-              }
-              onGiveAbility={(abilityId, runMonId) =>
-                void runAction(async () => {
-                  setRun(await window.api.giveRunAbility(abilityId, runMonId))
-                })
-              }
-              onTeachMove={(moveId, runMonId, replaceMoveId) =>
-                void runAction(async () => {
-                  setRun(await window.api.teachRunMove(moveId, runMonId, replaceMoveId))
-                })
-              }
-              onSkipPick={() =>
-                void runAction(async () => {
-                  setRun(await window.api.skipRunPick())
-                })
-              }
-              onSkipItem={() =>
-                void runAction(async () => {
-                  setRun(await window.api.skipRunItem())
-                })
-              }
-              onForfeit={() =>
-                void runAction(async () => {
-                  setRun(await window.api.forfeitRun())
-                  refreshRun()
-                })
-              }
+              onCancelReady={() => void setCoopReady(null, coopRun)}
+              onLeave={leaveCoopRun}
+              handlers={runHandlers(window.api.coopRun, coopRun, setCoopRun, refreshCoopRun)}
             />
+            </div>
           </div>
         ) : (
         <div className="battle-section-inner">
-          {/* One framed card like the Roguelite and Draft setups, in Classic's blue: the
+          {/* One framed card like the Battle Tower and Draft setups, in Classic's blue: the
               trainer and boss battles on the Classic page, the wild ones on Catch. */}
           <div className="run-panel classic-panel">
           <div className="classic-card">
@@ -1503,7 +1578,7 @@ function MainMenu({
           <>
           {/* Trainers: the next trainer, and the next boss (or a rematch once all are beaten) -
               hidden while an online chaos draft is going. */}
-          {!online.draft && (
+          {!online.draft && !online.coop && (
           <>
           <div className="classic-section-head">
             <img className="classic-section-icon" src="./icons/nav/trainercard.png" alt="" />
@@ -1798,14 +1873,21 @@ function MainMenu({
                         >
                           Select to sell
                         </button>
+                        {/* Merging is late game - it opens with Max Raids. */}
                         <button
                           className="context-menu-item"
+                          disabled={!eligibility?.raidsUnlocked}
+                          title={
+                            eligibility?.raidsUnlocked
+                              ? undefined
+                              : `Merging opens with Max Raids - beat ${eligibility?.raidUnlockBoss ?? 'more bosses'}`
+                          }
                           onClick={() => {
                             setSelectMenuOpen(false)
                             startBoxSelection('merge')
                           }}
                         >
-                          Select to merge
+                          {eligibility?.raidsUnlocked ? 'Select to merge' : '🔒 Select to merge'}
                         </button>
                       </div>
                     </>

@@ -25,7 +25,7 @@ import { errorMessage, pointOf, useFloatingNotes, type NotePoint } from './Float
 import ModalSpinner from './ModalSpinner'
 import CategoryJumpBar from './CategoryJumpBar'
 import RarityOddsTooltip from './RarityOddsTooltip'
-import { CLICK, IS_MOBILE } from './platform'
+import { CLICK, IS_MOBILE_LAYOUT } from './platform'
 
 // The bulk buttons joined onto an item's own buy button.
 const BULK_AMOUNTS = [5, 10]
@@ -709,7 +709,7 @@ function ItemDetail({
   return (
     <aside className="items-detail" aria-live="polite">
       {/* On the phone: back to the bag (the back button does the same). */}
-      {IS_MOBILE && (
+      {IS_MOBILE_LAYOUT && (
         <button className="items-detail-close" aria-label="Back to the bag" data-back-close="" onClick={onClose}>
           ×
         </button>

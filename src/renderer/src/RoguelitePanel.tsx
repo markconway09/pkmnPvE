@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import type { RunApi } from '../../shared/api'
 import FitName from './FitName'
 import { createPortal } from 'react-dom'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
@@ -19,7 +20,6 @@ import {
   runBossCount,
   ROGUELITE_BOSS_EVERY,
   runFinalFloor,
-  ROGUELITE_MAX_TEAM,
   ROGUELITE_START_LEVEL,
   RUN_CONSUMABLES,
   RUN_CONSUMABLE_PRICES,
@@ -107,9 +107,17 @@ interface Props {
   onRerollItems: () => void
   onEvolve: (runMonId: string, targetSpecies: string) => void
   onMoveItem: (fromMonId: string, toMonId: string) => void
-  // The item a new one replaced: give it to this Pokemon, or let it go (null).
+  // The place of the item a new one replaced: give it to this Pokemon, or let it go (null).
   onPlaceDisplacedItem: (runMonId: string | null) => void
   onForfeit: () => void
+  // The run's calls: the solo run's (window.api), or the co-op one's.
+  api?: RunApi
+  // A co-op run: the partner's strip under the progress bar, and - while waiting at a boss
+  // or villain for them - the waiting room in place of the floor.
+  hudExtra?: ReactNode
+  floorOverride?: ReactNode
+  // What giving up does, for its confirm click (a co-op run ends for both).
+  forfeitConfirm?: string
 }
 
 // Badly poisoned reads as PSN, the same as the battle screen shows it.
@@ -283,7 +291,7 @@ function starterPreview(mon: BoxPokemonView): BoxPokemonView {
   return { ...mon, level: ROGUELITE_START_LEVEL, item: '', itemSpritenum: null, expPercent: undefined, favorite: false }
 }
 
-function StarterSlot({ picked }: { picked: BoxPokemonView | undefined }): React.JSX.Element {
+export function StarterSlot({ picked }: { picked: BoxPokemonView | undefined }): React.JSX.Element {
   const { setNodeRef, isOver } = useDroppable({ id: RUN_STARTER_SLOT_ID })
   const classes = [
     'team-slot',
@@ -385,7 +393,7 @@ function RunMonCard({ mon, index, onClick, onContextMenu, onEdit, selectable, mo
   )
 }
 
-// Roguelite mode's half of the main menu: picking a starter before a run, and the
+// Battle Tower mode's half of the main menu: picking a starter before a run, and the
 // run itself - its floor, its team and what this floor offers.
 function RoguelitePanel({
   run,
@@ -405,7 +413,11 @@ function RoguelitePanel({
   onEvolve,
   onMoveItem,
   onPlaceDisplacedItem,
-  onForfeit
+  onForfeit,
+  api = window.api,
+  hudExtra,
+  floorOverride,
+  forfeitConfirm
 }: Props): React.JSX.Element {
   const [confirmingForfeit, setConfirmingForfeit] = useState(false)
   // A New Ability / New Move floor: the choice made, then (for a move) who learns it.
@@ -700,19 +712,19 @@ function RoguelitePanel({
     if (busy || swapBusy || itemBusy) return null
     // A villain's reward Pokemon picked with a full team: whoever's clicked makes room.
     if (run.monOffer && rewardPick !== null) {
-      return () => void runItemAction(() => window.api.takeRunRewardMon(rewardPick, mon.id))
+      return () => void runItemAction(() => api.takeRunRewardMon(rewardPick, mon.id))
     }
     if (candyMode && run.consumables.bossShop) {
       return mon.level < 100 && run.consumables.gems >= RUN_RARE_CANDY_PRICE
-        ? () => void runItemAction(() => window.api.buyRunRareCandy(mon.id))
+        ? () => void runItemAction(() => api.buyRunRareCandy(mon.id))
         : null
     }
     if (using === 'fullrestore') {
-      return mon.hpPercent < 100 || mon.status ? () => void runItemAction(() => window.api.useRunFullRestore(mon.id)) : null
+      return mon.hpPercent < 100 || mon.status ? () => void runItemAction(() => api.useRunFullRestore(mon.id)) : null
     }
     if (using === 'abilitycapsule') return () => setCapsuleMon(mon)
     if (using) return null
-    if (run.swapOffer && swapMode === 'one') return () => void doSwap(() => window.api.swapRunMon(mon.id))
+    if (run.swapOffer && swapMode === 'one') return () => void doSwap(() => api.swapRunMon(mon.id))
     if (offer && chosenItem) {
       return () => {
         onGiveItem(chosenItem, mon.id)
@@ -859,12 +871,15 @@ function RoguelitePanel({
           }}
           onBlur={() => setConfirmingForfeit(false)}
         >
-          {confirmingForfeit ? `Give up the run? ${CLICK} again` : 'Forfeit'}
+          {confirmingForfeit ? (forfeitConfirm ?? `Give up the run? ${CLICK} again`) : 'Forfeit'}
         </button>
       </div>
       <RunProgressBar floor={run.floor} difficulty={run.difficulty} />
+      {hudExtra}
 
-      {run.monOffer ? (
+      {floorOverride ? (
+        floorOverride
+      ) : run.monOffer ? (
         // A beaten villain's reward: one of three Pokemon, each holding an item.
         <div className="run-item-offer">
           <p className="run-reward-heading">Villain defeated!</p>
@@ -881,7 +896,7 @@ function RoguelitePanel({
                   style={{ '--i': i } as React.CSSProperties}
                   disabled={busy || itemBusy}
                   onClick={() => {
-                    if (run.team.length < ROGUELITE_MAX_TEAM) void runItemAction(() => window.api.takeRunRewardMon(i))
+                    if (run.team.length < run.maxTeam) void runItemAction(() => api.takeRunRewardMon(i))
                     else setRewardPick(rewardPick === i ? null : i)
                   }}
                 >
@@ -913,7 +928,7 @@ function RoguelitePanel({
             <button
               className="run-item-button run-item-skip"
               disabled={busy || itemBusy}
-              onClick={() => void runItemAction(() => window.api.skipRunRewardMon())}
+              onClick={() => void runItemAction(() => api.skipRunRewardMon())}
             >
               Skip
             </button>
@@ -944,7 +959,7 @@ function RoguelitePanel({
               onClick={() => {
                 setSwapMode(null)
                 if (!confirmingTeamSwap) setConfirmingTeamSwap(true)
-                else void doSwap(() => window.api.swapRunTeam())
+                else void doSwap(() => api.swapRunTeam())
               }}
               onBlur={() => setConfirmingTeamSwap(false)}
             >
@@ -953,7 +968,7 @@ function RoguelitePanel({
             <button
               className="run-item-button run-item-skip"
               disabled={busy || swapBusy}
-              onClick={() => void doSwap(() => window.api.skipRunSwap())}
+              onClick={() => void doSwap(() => api.skipRunSwap())}
             >
               Skip
             </button>
@@ -1154,7 +1169,7 @@ function RoguelitePanel({
                   <button
                     className="run-item-button run-shop-button"
                     disabled={busy || itemBusy || locked || run.consumables.gems < RUN_CONSUMABLE_PRICES[c.id]}
-                    onClick={() => void runItemAction(() => window.api.buyRunConsumable(c.id))}
+                    onClick={() => void runItemAction(() => api.buyRunConsumable(c.id))}
                   >
                     <img className="run-consumable-icon" src={c.icon} alt="" />
                     <span>{c.name}</span>
@@ -1203,7 +1218,7 @@ function RoguelitePanel({
                   style={{ '--i': i + run.choices.length } as React.CSSProperties}
                   disabled={busy || itemBusy || used || run.consumables.gems < price}
                   title={used ? 'Already bought on this floor' : NODE_INFO[tile].hint}
-                  onClick={() => void runItemAction(() => window.api.buyRunShopTile(tile))}
+                  onClick={() => void runItemAction(() => api.buyRunShopTile(tile))}
                 >
                   <NodeIcon choice={{ kind: tile }} />
                   <span className="run-node-label">{SHOP_TILE_LABELS[tile]}</span>
@@ -1241,7 +1256,7 @@ function RoguelitePanel({
       )}
 
       <h2 className="options-heading run-team-heading">
-        Run Team <span className="run-team-count">{run.team.length}/{ROGUELITE_MAX_TEAM}</span>
+        Run Team <span className="run-team-count">{run.team.length}/{run.maxTeam}</span>
       </h2>
       <div className="team-row run-team-row">
         {run.team.map((mon, index) => {
@@ -1324,7 +1339,7 @@ function RoguelitePanel({
                       : reviving
                         ? 'Your team is full - pick who leaves. They join the fainted, and can be revived later.'
                         : `Comes back at half HP, at Lv ${run.consumables.reviveLevel}.${
-                            run.team.length >= ROGUELITE_MAX_TEAM ? ' Your team is full, so someone will leave to make room.' : ''
+                            run.team.length >= run.maxTeam ? ' Your team is full, so someone will leave to make room.' : ''
                           }`}
                   </p>
                 </div>
@@ -1338,9 +1353,9 @@ function RoguelitePanel({
                     style={{ '--i': i } as React.CSSProperties}
                     disabled={busy || itemBusy}
                     onClick={() => {
-                      if (reviving) void runItemAction(() => window.api.useRunRevive(reviving.id, mon.id))
-                      else if (run.team.length >= ROGUELITE_MAX_TEAM) setReviving(mon)
-                      else void runItemAction(() => window.api.useRunRevive(mon.id))
+                      if (reviving) void runItemAction(() => api.useRunRevive(reviving.id, mon.id))
+                      else if (run.team.length >= run.maxTeam) setReviving(mon)
+                      else void runItemAction(() => api.useRunRevive(mon.id))
                     }}
                   >
                     {/* The sprite with its held item tucked in the corner, then name and ability. */}
@@ -1415,7 +1430,7 @@ function RoguelitePanel({
                   <button
                     className="run-item-button"
                     disabled={busy || itemBusy || current}
-                    onClick={() => void runItemAction(() => window.api.useRunAbilityCapsule(capsuleMon.id, a.id))}
+                    onClick={() => void runItemAction(() => api.useRunAbilityCapsule(capsuleMon.id, a.id))}
                   >
                     {a.name}
                     {current && <span className="run-shop-price">Current</span>}
@@ -1436,6 +1451,7 @@ function RoguelitePanel({
           mon={run.team.find((m) => m.id === editingMonId)}
           onClose={() => setEditingMonId(null)}
           onSaved={onRunUpdated}
+          api={api}
         />
       )}
 

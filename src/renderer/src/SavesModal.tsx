@@ -1,13 +1,11 @@
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import CloudSavesSection from './CloudSavesSection'
 import SaveFileSection from './SaveFileSection'
 import SaveTransferSection from './SaveTransferSection'
-import { IS_MOBILE } from './platform'
 
 /**
  * Options → Saves: every way to move or back up this player's save, grouped by where it
- * works - PC & phone (send by room code, save file) and PC only (Google Drive backup).
+ * works on the PC and the phone alike: send by room code, or a save file.
  */
 function SavesModal({ onClose }: { onClose: () => void }): React.JSX.Element {
   // Esc closes just this window, not the Options under it.
@@ -36,13 +34,6 @@ function SavesModal({ onClose }: { onClose: () => void }): React.JSX.Element {
             <SaveTransferSection />
             <SaveFileSection />
           </section>
-
-          {!IS_MOBILE && (
-            <section className="options-section">
-              <h2 className="options-heading">PC only</h2>
-              <CloudSavesSection />
-            </section>
-          )}
         </div>
 
         <div className="editor-actions">

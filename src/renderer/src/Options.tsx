@@ -4,6 +4,7 @@ import { SPRITE_STYLES, SPRITE_STYLE_LABELS, spriteUrl, type SpriteStyle } from 
 import UpdatesSection from './UpdatesSection'
 import BackgroundSection from './BackgroundSection'
 import SavesModal from './SavesModal'
+import SpriteCreditsModal from './SpriteCreditsModal'
 import { playSfx, setSfxOn, setSfxVolume, sfxLevel, sfxOn } from './sfx'
 import { cryOn, cryVolume, playCry, setCryOn, setCryVolume } from './cries'
 import {
@@ -133,7 +134,9 @@ function ScreenSizeSection(): React.JSX.Element {
           <p className="editor-hint">
             {state.choice === 'auto'
               ? `Fits the game to this screen - ${Math.round(state.zoom * 100)}% here.`
-              : 'The game always draws at this size; the window is never bigger than the screen.'}
+              : state.choice === 'mobile'
+                ? 'The phone layout, in a phone-shaped window fitted to this screen. Switching reloads the game.'
+                : 'The game always draws at this size; the window is never bigger than the screen.'}
           </p>
         </>
       )}
@@ -275,6 +278,7 @@ function Options({
 }: Props): React.JSX.Element {
   const [loggingOut, setLoggingOut] = useState(false)
   const [savesOpen, setSavesOpen] = useState(false)
+  const [creditsOpen, setCreditsOpen] = useState(false)
   const [volume, setVolume] = useState(() => Math.round(sfxLevel() * 100))
   const [menuSoundsOn, setMenuSoundsOn] = useState(sfxOn)
   const [cries, setCries] = useState(() => Math.round(cryVolume() * 100))
@@ -416,6 +420,15 @@ function Options({
               <button onClick={() => setSavesOpen(true)}>Saves…</button>
             </div>
             {savesOpen && <SavesModal onClose={() => setSavesOpen(false)} />}
+          </section>
+
+          <section className="options-section">
+            <h2 className="options-heading">Credits</h2>
+            <p className="editor-hint">The artists behind the trainer sprites.</p>
+            <div>
+              <button onClick={() => setCreditsOpen(true)}>Sprite credits…</button>
+            </div>
+            {creditsOpen && <SpriteCreditsModal onClose={() => setCreditsOpen(false)} />}
           </section>
 
           <section className="options-section">

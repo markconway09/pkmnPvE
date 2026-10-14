@@ -23,6 +23,8 @@ interface TeamMemberProps {
   disabled: boolean
   onClick: () => void
   matchup?: TeamMatchup
+  // A co-op fight: the partner's Pokemon (their name) - only they can send it in.
+  partner?: string
 }
 
 // Same shorthand BattleSprite flashes on the active Pokemon's HP bar.
@@ -35,7 +37,7 @@ const STATUS_LABELS: Record<string, string> = {
   frz: 'FRZ'
 }
 
-function TeamMember({ mon, isActive, disabled, onClick, matchup }: TeamMemberProps): React.JSX.Element {
+function TeamMember({ mon, isActive, disabled, onClick, matchup, partner }: TeamMemberProps): React.JSX.Element {
   const spriteId = toSpriteId(mon.species)
   const hpClass = mon.hpPercent > 50 ? 'hp-high' : mon.hpPercent > 20 ? 'hp-mid' : 'hp-low'
   const classes = [
@@ -43,7 +45,8 @@ function TeamMember({ mon, isActive, disabled, onClick, matchup }: TeamMemberPro
     'rarity-card',
     `rarity-tier-${mon.rarityTier ?? 'common'}`,
     isActive && 'team-member-active',
-    mon.fainted && 'team-member-fainted'
+    mon.fainted && 'team-member-fainted',
+    partner && 'team-member-partner'
   ]
     .filter(Boolean)
     .join(' ')
@@ -78,6 +81,11 @@ function TeamMember({ mon, isActive, disabled, onClick, matchup }: TeamMemberPro
           <div className="team-member-info">
             <div className="team-member-name-row">
               <FitName className="team-member-name" text={mon.species} />
+              {partner && (
+                <span className="team-member-owner" title={`${partner}'s Pokémon - they pick for it`}>
+                  {partner}
+                </span>
+              )}
               {mon.status && (
                 <span className={`status-badge status-${mon.status}`}>{STATUS_LABELS[mon.status] ?? mon.status.toUpperCase()}</span>
               )}
@@ -141,10 +149,25 @@ interface Props {
   lockedNote?: string
   // Revival Blessing: only the fainted can be picked, to bring one back.
   reviveMode?: boolean
+  // A co-op fight: parallel to team, the partner's name on each of their Pokemon (never
+  // pickable here) - undefined on this player's own.
+  partnerOf?: (string | undefined)[]
   onSwitch: (slot: number) => void
 }
 
-function TeamPanel({ team, activeFlags, selectable, disabled, reservedSlots, matchups, locked, lockedNote, reviveMode, onSwitch }: Props): React.JSX.Element {
+function TeamPanel({
+  team,
+  activeFlags,
+  selectable,
+  disabled,
+  reservedSlots,
+  matchups,
+  locked,
+  lockedNote,
+  reviveMode,
+  partnerOf,
+  onSwitch
+}: Props): React.JSX.Element {
   // Doubles: two matchup chips a group (one per foe), so the cards go compact to keep them on one line.
   const doubles = !!matchups?.some((m) => m.offense.length > 1 || m.defense.length > 1)
   return (
@@ -155,9 +178,12 @@ function TeamPanel({ team, activeFlags, selectable, disabled, reservedSlots, mat
           key={i}
           mon={mon}
           isActive={!!activeFlags[i]}
-          disabled={disabled || !selectable || mon.fainted !== !!reviveMode || !!activeFlags[i] || !!reservedSlots?.has(i + 1)}
+          disabled={
+            disabled || !selectable || mon.fainted !== !!reviveMode || !!activeFlags[i] || !!reservedSlots?.has(i + 1) || !!partnerOf?.[i]
+          }
           onClick={() => onSwitch(i + 1)}
           matchup={matchups?.[i]}
+          partner={partnerOf?.[i]}
         />
       ))}
     </div>

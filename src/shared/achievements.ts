@@ -59,7 +59,7 @@ export type AchievementStat =
   | 'shinyRaidCatches'
   // Days all three daily missions were finished (and the bonus claimed).
   | 'dailySetsCompleted'
-  // Roguelite.
+  // Battle Tower.
   | 'bestFloor'
   | 'runsWon'
   | 'hardRunsWon'
@@ -112,12 +112,12 @@ export type AchievementStat =
   | 'bestGreatStreak'
   | 'skillTimeouts'
 
-export type AchievementCategory = 'Battle' | 'Collection' | 'Merges & Raids' | 'Roguelite' | 'Draft' | 'TMs' | 'Game Corner' | 'Secret'
+export type AchievementCategory = 'Battle' | 'Collection' | 'Merges & Raids' | 'Battle Tower' | 'Draft' | 'TMs' | 'Game Corner' | 'Secret'
 export const ACHIEVEMENT_CATEGORIES: AchievementCategory[] = [
   'Battle',
   'Collection',
   'Merges & Raids',
-  'Roguelite',
+  'Battle Tower',
   'Draft',
   'TMs',
   'Game Corner',
@@ -554,12 +554,12 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     reward: { title: 'Tycoon' }
   },
 
-  // Roguelite
+  // Battle Tower
   {
     id: 'floor10',
     name: 'Delver',
-    description: 'Reach floor 10 in a Roguelite run',
-    category: 'Roguelite',
+    description: 'Reach floor 10 in a Battle Tower run',
+    category: 'Battle Tower',
     stat: 'bestFloor',
     goal: 10,
     reward: { items: [item('rarecandy', 3)] }
@@ -567,8 +567,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'runwin1',
     name: 'Run Cleared',
-    description: 'Clear a Roguelite run',
-    category: 'Roguelite',
+    description: 'Clear a Battle Tower run',
+    category: 'Battle Tower',
     stat: 'runsWon',
     goal: 1,
     reward: { items: [item('randompokemon')], title: 'Survivor' }
@@ -576,8 +576,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'runwin5',
     name: 'Speedrunner',
-    description: 'Clear 5 Roguelite runs',
-    category: 'Roguelite',
+    description: 'Clear 5 Battle Tower runs',
+    category: 'Battle Tower',
     stat: 'runsWon',
     goal: 5,
     reward: { items: [item('randomlegendary')] }
@@ -585,8 +585,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'hardrun',
     name: 'Daredevil',
-    description: 'Clear a Roguelite run on Hard or Extreme',
-    category: 'Roguelite',
+    description: 'Clear a Battle Tower run on Hard or Extreme',
+    category: 'Battle Tower',
     stat: 'hardRunsWon',
     goal: 1,
     reward: { items: [item('shinypatch')], title: 'Daredevil' }
@@ -1064,7 +1064,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'earlyloss',
     name: 'Try Again',
-    description: 'Lose a Roguelite run before floor 5',
+    description: 'Lose a Battle Tower run before floor 5',
     category: 'Secret',
     stat: 'earlyRunLosses',
     goal: 1,

@@ -43,7 +43,7 @@ export function TeamIcons({ team }: { team: PremadeTeamSummary }): React.JSX.Ele
 }
 
 /**
- * The trainer editors' Team section (classic and Roguelite alike): how the trainer's team
+ * The trainer editors' Team section (classic and Battle Tower alike): how the trainer's team
  * is picked, and for premade teams each one with its Pokemon at a glance - renamed in
  * place, copied, deleted, or opened to edit its roster.
  */

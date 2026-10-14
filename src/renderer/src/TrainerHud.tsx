@@ -8,7 +8,7 @@ import { loadSpriteStyle } from './spriteStyle'
 import { toSpriteId } from '../../shared/battle-types'
 import type { CompanionSize } from '../../shared/battle-types'
 import RarityCard from './RarityCard'
-import { IS_MOBILE } from './platform'
+import { IS_MOBILE_LAYOUT } from './platform'
 
 interface Props {
   name: string
@@ -129,7 +129,7 @@ function TrainerHud({ name, title, gold, spriteId, roster, align, size = 'small'
       {figure}
       <div className="trainer-hud-info">
         {nameRow}
-        {IS_MOBILE ? (
+        {IS_MOBILE_LAYOUT ? (
           // On the phone, one ball and how many Pokemon are still standing (the six don't fit).
           <div className="trainer-hud-balls trainer-hud-balls-count" title={slots.filter(Boolean).map(ballTitle).join(', ')}>
             <span className="pokeball-icon" style={pokeballStyle(alive > 0 ? 'healthy' : 'fainted', BALL_SCALE[size])} />

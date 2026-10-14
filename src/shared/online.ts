@@ -1,4 +1,4 @@
-import type { BattleView } from './battle-types'
+import type { BattleView, CoopBattleResult, RunDifficulty, RunMonView } from './battle-types'
 import type { ChaosField } from './draft'
 
 // Online battles with a friend: two copies of the game connect straight to each other
@@ -47,6 +47,36 @@ export interface OnlineDraftTeam {
   field: ChaosField
 }
 
+// Co-op Battle Tower: the host starts a run for both - each player picks their own starter
+// and plays their own floors (the same ones: both runs share the seed), with their own team
+// of up to 3, gems and shop. Bosses and villains are met together: once both are there,
+// the host's copy runs the fight - both teams on one doubles side. If either player's team
+// is wiped, the run is over for both. Each copy keeps its run saved, to carry on later.
+export interface CoopSetup {
+  seed: string
+  difficulty: RunDifficulty
+  generation: number | null
+}
+
+// A player's run team for a fight taken on together, as their copy sends it: the sets as
+// saved, with each one's HP (0..1) and status, in their run team's order.
+export interface OnlineCoopTeam {
+  sets: unknown[]
+  conditions: { hp: number; status: string | null }[]
+}
+
+// Where a player's co-op run stands, for the friend's screen (sent each time it changes).
+export interface CoopProgress {
+  // Their co-op run's seed - null with none.
+  seed: string | null
+  status: 'none' | 'active' | 'lost' | 'won'
+  floor: number
+  bossesBeaten: number
+  team: RunMonView[]
+  // Waiting at a boss or villain for the friend.
+  ready: { floor: number; kind: 'boss' | 'villain' } | null
+}
+
 // Both players' screens of the host's battle (the host shows one, sends the other on).
 export interface OnlineViews {
   host: BattleView
@@ -84,5 +114,16 @@ export type OnlineMessage =
   | { type: 'draftLead'; stage: number; order: number[] }
   // Either way: leaving the chaos draft (back to the room).
   | { type: 'draftLeave' }
+  // Host -> friend: a co-op Battle Tower run - a new one, or carrying on the one with this
+  // seed (with the host's last fight fought together, in case the friend's copy missed it).
+  | { type: 'coopStart'; setup: CoopSetup; resume: boolean; lastBattle: CoopBattleResult | null }
+  // Friend -> host: the friend's copy can't (another run of theirs, no save of this one...).
+  | { type: 'coopRefuse'; reason: string }
+  // Either way: where this player's co-op run stands now.
+  | { type: 'coopProgress'; progress: CoopProgress }
+  // Friend -> host: waiting at the boss or villain on this floor, with their run team.
+  | { type: 'coopTeam'; floor: number; team: OnlineCoopTeam }
+  // Either way: leaving the co-op run (back to the room - it stays saved).
+  | { type: 'coopLeave' }
   // Either way: leaving the room.
   | { type: 'bye' }

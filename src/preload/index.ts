@@ -12,5 +12,7 @@ const api = createApi({
 })
 
 contextBridge.exposeInMainWorld('api', api)
+// Options → Screen size → Mobile: the phone layout on the PC (see src/renderer/src/platform.ts).
+contextBridge.exposeInMainWorld('desktopLayout', ipcRenderer.sendSync('uiScale:layout'))
 
 export type { Api } from '../shared/api'

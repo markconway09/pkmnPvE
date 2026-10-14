@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react'
 import { ROOM_CODE_LENGTH } from '../../shared/online'
+import { RUN_DIFFICULTIES, runDifficultyInfo, type RunDifficulty, type RunView } from '../../shared/battle-types'
 import {
   clearOnlineError,
   getOnlineState,
   hostRoom,
   joinRoom,
   leaveRoom,
+  resumeCoopRun,
+  startCoopRun,
   startOnlineBattle,
   startOnlineDraft,
   subscribeOnline,
   type OnlineState
 } from './online'
+import { CLICK } from './platform'
 import { trainerSpriteUrl } from './trainerSprite'
 import DraftPanel from './DraftPanel'
 
@@ -29,8 +33,30 @@ function OnlineSection({ disabled }: Props): React.JSX.Element {
   const [doubles, setDoubles] = useState(false)
   const [stars, setStars] = useState(false)
   const [copied, setCopied] = useState(false)
+  // Co-op Battle Tower, for the host: the settings for a new run, the generations a run can
+  // be set to, and the host's own saved co-op run (carried on with the same friend).
+  const [coopDifficulty, setCoopDifficulty] = useState<RunDifficulty>('normal')
+  const [coopGeneration, setCoopGeneration] = useState<number | null>(null)
+  const [coopGenerations, setCoopGenerations] = useState<number[]>([])
+  const [savedCoop, setSavedCoop] = useState<RunView | null>(null)
+  const [confirmingCoopForfeit, setConfirmingCoopForfeit] = useState(false)
 
   useEffect(() => subscribeOnline(setOnline), [])
+
+  const hostLobby = online.role === 'host' && online.phase === 'lobby' && !online.draft && !online.coop
+  useEffect(() => {
+    if (!hostLobby) return
+    window.api.coopRun
+      .getRun()
+      .then(setSavedCoop)
+      .catch(() => setSavedCoop(null))
+    window.api
+      .getRunGenerations()
+      .then(setCoopGenerations)
+      .catch(() => setCoopGenerations([]))
+  }, [hostLobby])
+  const savedActive = savedCoop?.status === 'active' ? savedCoop : null
+  const savedWithFriend = !!savedActive && savedActive.coop?.partnerName === online.friend?.name
 
   function copyCode(): void {
     if (!online.code) return
@@ -107,9 +133,13 @@ function OnlineSection({ disabled }: Props): React.JSX.Element {
             <span className="online-friend-name">{online.friend.name}</span>
             {online.draft ? (
               <span className="online-status">Chaos draft</span>
+            ) : online.coop ? (
+              <span className="online-status">Co-op Battle Tower</span>
             ) : (
               online.role !== 'host' && (
-                <span className="online-status">Waiting for {online.friend.name} to start a battle or a chaos draft...</span>
+                <span className="online-status">
+                  Waiting for {online.friend.name} to start a battle, a chaos draft or a co-op Battle Tower run...
+                </span>
               )
             )}
             <button className="online-leave" onClick={leaveRoom}>
@@ -117,7 +147,7 @@ function OnlineSection({ disabled }: Props): React.JSX.Element {
             </button>
           </div>
           {/* Host: the two games, one per line - a battle with its own options, or a chaos draft. */}
-          {!online.draft && online.role === 'host' && (
+          {!online.draft && !online.coop && online.role === 'host' && (
             <>
               <div className="online-mode">
                 <span className="online-mode-text">
@@ -154,6 +184,80 @@ function OnlineSection({ disabled }: Props): React.JSX.Element {
                 >
                   Start draft
                 </button>
+              </div>
+              {/* Co-op Battle Tower: carry on the run saved with this friend, or start one. */}
+              <div className="online-mode">
+                <span className="online-mode-text">
+                  <strong>Co-op Battle Tower</strong>
+                  <span>
+                    {savedWithFriend && savedActive
+                      ? `Carry on: floor ${savedActive.floor}, ${runDifficultyInfo(savedActive.difficulty).label}`
+                      : savedActive
+                        ? `Your co-op run with ${savedActive.coop?.partnerName ?? 'someone else'} is still going`
+                        : 'Climb together - your own teams of 3, every boss fought side by side'}
+                  </span>
+                </span>
+                {!savedActive && (
+                  <span className="online-mode-options">
+                    <select
+                      className="coop-select"
+                      value={coopDifficulty}
+                      title="Difficulty"
+                      onChange={(e) => setCoopDifficulty(e.target.value as RunDifficulty)}
+                    >
+                      {RUN_DIFFICULTIES.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.label}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      className="coop-select"
+                      value={coopGeneration ?? ''}
+                      title="Where the bosses come from"
+                      onChange={(e) => setCoopGeneration(e.target.value ? Number(e.target.value) : null)}
+                    >
+                      <option value="">Any generation</option>
+                      {coopGenerations.map((g) => (
+                        <option key={g} value={g}>
+                          Generation {g}
+                        </option>
+                      ))}
+                    </select>
+                  </span>
+                )}
+                {savedActive && !savedWithFriend ? (
+                  // Another friend's run: given up (a loss, with its rewards) before a new one.
+                  <button
+                    className={`online-start${confirmingCoopForfeit ? ' confirm-button' : ''}`}
+                    disabled={online.starting}
+                    onBlur={() => setConfirmingCoopForfeit(false)}
+                    onClick={() => {
+                      if (!confirmingCoopForfeit) {
+                        setConfirmingCoopForfeit(true)
+                        return
+                      }
+                      setConfirmingCoopForfeit(false)
+                      window.api.coopRun
+                        .forfeitRun()
+                        .then(setSavedCoop)
+                        .catch(() => {})
+                    }}
+                  >
+                    {confirmingCoopForfeit ? `Give it up? ${CLICK} again` : 'Forfeit it'}
+                  </button>
+                ) : (
+                  <button
+                    className="online-start online-coop-start"
+                    disabled={online.starting || online.phase !== 'lobby'}
+                    onClick={() => {
+                      if (savedWithFriend && savedActive) void resumeCoopRun(savedActive)
+                      else startCoopRun(coopDifficulty, coopGeneration)
+                    }}
+                  >
+                    {savedWithFriend ? 'Continue' : 'Start co-op'}
+                  </button>
+                )}
               </div>
             </>
           )}

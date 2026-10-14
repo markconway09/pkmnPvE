@@ -6,7 +6,7 @@
 export type MissionTier = 'easy' | 'medium' | 'hard'
 export const MISSION_TIERS: MissionTier[] = ['easy', 'medium', 'hard']
 
-// What a mission counts. Classic battles and Roguelite runs are counted separately.
+// What a mission counts. Classic battles and Battle Tower runs are counted separately.
 export type MissionStat =
   | 'wildWins'
   | 'trainerWins'
@@ -52,7 +52,7 @@ export const MISSION_TEMPLATES: MissionTemplate[] = [
   { id: 'roulette10', tier: 'easy', text: 'Spin the roulette wheel 10 times', stat: 'rouletteSpins', goal: 10, reward: { coins: 200 } },
   { id: 'plinko25', tier: 'easy', text: 'Drop 25 Plinko balls', stat: 'plinkoDrops', goal: 25, reward: { coins: 200 } },
   { id: 'tmsearch5', tier: 'easy', text: 'Search for TMs 5 times', stat: 'tmSearches', goal: 5, reward: { money: 2000 } },
-  { id: 'runfloors5', tier: 'easy', text: 'Clear 5 Roguelite floors', stat: 'runFloors', goal: 5, reward: { money: 2000 } },
+  { id: 'runfloors5', tier: 'easy', text: 'Clear 5 Battle Tower floors', stat: 'runFloors', goal: 5, reward: { money: 2000 } },
 
   // Medium
   { id: 'trainers3', tier: 'medium', text: 'Beat 3 trainers', stat: 'trainerWins', goal: 3, reward: { items: [item('expcandym', 2)] } },
@@ -61,14 +61,14 @@ export const MISSION_TEMPLATES: MissionTemplate[] = [
   { id: 'merge1', tier: 'medium', text: 'Merge a Pokémon', stat: 'merges', goal: 1, reward: { items: [item('rarecandy', 3)] } },
   { id: 'wild15', tier: 'medium', text: 'Win 15 wild battles', stat: 'wildWins', goal: 15, reward: { items: [item('expcandym', 2)] } },
   { id: 'greats3', tier: 'medium', text: 'Hit 3 Great skill checks (in a search or a quick check)', stat: 'skillGreats', goal: 3, reward: { coins: 500 } },
-  { id: 'runtrainers3', tier: 'medium', text: 'Beat 3 trainers in Roguelite runs', stat: 'runTrainerWins', goal: 3, reward: { coins: 500 } },
+  { id: 'runtrainers3', tier: 'medium', text: 'Beat 3 trainers in Battle Tower runs', stat: 'runTrainerWins', goal: 3, reward: { coins: 500 } },
 
   // Hard
-  { id: 'boss1', tier: 'hard', text: 'Beat a Roguelite boss', stat: 'runBossWins', goal: 1, reward: { items: [item('randompokemon')] } },
+  { id: 'boss1', tier: 'hard', text: 'Beat a Battle Tower boss', stat: 'runBossWins', goal: 1, reward: { items: [item('randompokemon')] } },
   { id: 'raid1', tier: 'hard', text: 'Win a Max Raid', stat: 'raidsWon', goal: 1, reward: { items: [item('randompokemon')] }, needsRaids: true },
   { id: 'trainers10', tier: 'hard', text: 'Beat 10 trainers', stat: 'trainerWins', goal: 10, reward: { items: [item('lockcapsule', 2)] } },
   { id: 'draft1', tier: 'hard', text: 'Win a match in Draft mode', stat: 'draftWins', goal: 1, reward: { items: [item('randompokemon')] } },
-  { id: 'runfloors15', tier: 'hard', text: 'Clear 15 Roguelite floors', stat: 'runFloors', goal: 15, reward: { items: [item('expcandyl')] } }
+  { id: 'runfloors15', tier: 'hard', text: 'Clear 15 Battle Tower floors', stat: 'runFloors', goal: 15, reward: { items: [item('expcandyl')] } }
 ]
 
 // Finishing all three of the day's missions.

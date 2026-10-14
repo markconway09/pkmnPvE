@@ -68,7 +68,7 @@ function DebugMenu({
         <h2>Debug</h2>
         <div className="debug-menu-options">
           <button onClick={onTrainers}>Edit Trainers</button>
-          <button onClick={onRogueliteBosses}>Edit Roguelite Bosses</button>
+          <button onClick={onRogueliteBosses}>Edit Battle Tower Bosses</button>
           <button onClick={onWildDrops}>Wild Item Drops</button>
           <button onClick={onShopPrices}>Shop Prices</button>
           <button onClick={onAddPokemon}>Add Pokémon…</button>

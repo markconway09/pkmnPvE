@@ -15,9 +15,12 @@ import type {
   RunView,
   RunConsumableId,
   RunShopTile,
-  RogueliteBossClass
+  RogueliteBossClass,
+  CoopBattleResult,
+  CoopRunInfo
 } from '../../shared/battle-types'
 import {
+  COOP_MAX_TEAM,
   ROGUELITE_BOSS_COUNT,
   ROGUELITE_BOSS_EVERY,
   ROGUELITE_FINAL_FLOOR,
@@ -83,11 +86,14 @@ import { onPlayerChange } from './player-session'
 import { listTrainers } from './trainer-store'
 
 /**
- * Roguelite mode: a run is a string of floors fought with copies of the player's
+ * Battle Tower mode: a run is a string of floors fought with copies of the player's
  * Pokemon, kept in its own file (save/players/<name>/run.json) so nothing in the
  * box, bag or progression is ever touched. It lasts until the whole team is beaten
  * (lost) or the last boss falls (won). Switching the menu between modes doesn't
  * affect it - it's only read and written here.
+ *
+ * A co-op run (with a friend online) is kept apart in coop-run.json, so it never touches
+ * the solo one: the 'coop' slot (see inRunSlot) makes every call here work on it instead.
  */
 
 interface RunMon {
@@ -151,6 +157,9 @@ interface StoredRun {
   takeover?: { villainId: string } | null
   // A beaten villain's reward, until one is taken (or all turned down).
   monOffer?: PokemonSet[] | null
+  // A co-op run: who it's with, and the last fight fought together - the host keeps its
+  // result to send again if the friend's copy missed it (a dropped connection).
+  coop?: CoopRunInfo & { lastBattle?: CoopBattleResult | null; lastBattleId?: string }
 }
 
 // The run's level cap only goes up by beating a boss - a ceiling, not something to
@@ -344,8 +353,29 @@ function rollItemOffer(current: StoredRun, chances: SpecialItemChances): string[
   return offer
 }
 
+// The solo run and the co-op run, each in its own file. Every call works on the slot
+// inRunSlot puts in place - the solo run unless told otherwise.
+export type RunSlot = 'solo' | 'coop'
+const RUN_FILES: Record<RunSlot, string> = { solo: 'run.json', coop: 'coop-run.json' }
+let slot: RunSlot = 'solo'
+
+/** Runs `action` against the given run (its synchronous part - nothing awaited inside it). */
+export function inRunSlot<T>(which: RunSlot, action: () => T): T {
+  const before = slot
+  slot = which
+  try {
+    return action()
+  } finally {
+    slot = before
+  }
+}
+
+export function currentRunSlot(): RunSlot {
+  return slot
+}
+
 function load(): StoredRun | null {
-  const path = playerPathFor('run.json')
+  const path = playerPathFor(RUN_FILES[slot])
   try {
     const parsed = JSON.parse(readText(path)) as StoredRun
     if (!Array.isArray(parsed.team) || typeof parsed.floor !== 'number') return null
@@ -354,21 +384,44 @@ function load(): StoredRun | null {
     return parsed
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code
-    if (code !== 'ENOENT') console.error('[run-store] failed to load run.json:', e)
+    if (code !== 'ENOENT') console.error(`[run-store] failed to load ${RUN_FILES[slot]}:`, e)
     return null
   }
 }
 
 // undefined = not read yet for this player; null = no run file.
-let run: StoredRun | null | undefined
+const runs: Record<RunSlot, StoredRun | null | undefined> = { solo: undefined, coop: undefined }
 
 onPlayerChange(() => {
-  run = undefined
+  runs.solo = undefined
+  runs.coop = undefined
 })
 
 function getRun(): StoredRun | null {
-  if (run === undefined) run = load()
-  return run
+  if (runs[slot] === undefined) runs[slot] = load()
+  return runs[slot] ?? null
+}
+
+// How many Pokemon the team can hold: a co-op run's player has half a doubles side.
+function teamLimit(current: StoredRun): number {
+  return current.coop ? COOP_MAX_TEAM : ROGUELITE_MAX_TEAM
+}
+
+// A co-op run's floors are rolled from its seed and the floor number, so both players'
+// copies get the same paths (mulberry32, seeded from a hash of the text).
+function seededRandom(text: string): () => number {
+  let h = 1779033703 ^ text.length
+  for (let i = 0; i < text.length; i++) {
+    h = Math.imul(h ^ text.charCodeAt(i), 3432918353)
+    h = (h << 13) | (h >>> 19)
+  }
+  let a = h >>> 0
+  return () => {
+    a = (a + 0x6d2b79f5) | 0
+    let t = Math.imul(a ^ (a >>> 15), 1 | a)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
 }
 
 function activeRun(): StoredRun {
@@ -378,13 +431,13 @@ function activeRun(): StoredRun {
 }
 
 function persist(): void {
-  writeText(playerPathFor('run.json'), JSON.stringify(getRun()))
+  writeText(playerPathFor(RUN_FILES[slot]), JSON.stringify(getRun()))
 }
 
-function pickRandom<T>(list: T[], count: number): T[] {
+function pickRandom<T>(list: T[], count: number, rng: () => number = Math.random): T[] {
   const pool = [...list]
   const picked: T[] = []
-  while (picked.length < count && pool.length > 0) picked.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0])
+  while (picked.length < count && pool.length > 0) picked.push(pool.splice(Math.floor(rng() * pool.length), 1)[0])
   return picked
 }
 
@@ -441,13 +494,13 @@ const LAB_CHANCE = 0.05
 // The wild locations a floor can roll: all the regular ones, not "All" or the Lab.
 const RUN_WILD_LOCATIONS = WILD_LOCATIONS.filter((l) => l.id !== 'all' && !l.requiresAllBosses).map((l) => l.id)
 
-function rollChoice(hurt: boolean): RunChoice {
+function rollChoice(hurt: boolean, rng: () => number): RunChoice {
   const weights = { ...CHOICE_WEIGHTS, heal: hurt ? CHOICE_WEIGHTS.heal : 0 }
-  let roll = Math.random() * Object.values(weights).reduce((a, b) => a + b, 0)
+  let roll = rng() * Object.values(weights).reduce((a, b) => a + b, 0)
   for (const [kind, weight] of Object.entries(weights) as [keyof typeof weights, number][]) {
     roll -= weight
     if (roll >= 0) continue
-    return kind === 'wild' ? { kind, location: pickRandom(RUN_WILD_LOCATIONS, 1)[0] } : { kind }
+    return kind === 'wild' ? { kind, location: pickRandom(RUN_WILD_LOCATIONS, 1, rng)[0] } : { kind }
   }
   return { kind: 'trainer' }
 }
@@ -456,12 +509,14 @@ const choiceKey = (c: RunChoice): string => `${c.kind}:${c.location ?? ''}`
 
 // FLOOR_OPTIONS different options - an option already on the floor is rolled again,
 // so there's at most one trainer, item and rest. A boss floor offers only the boss.
-// A regular floor may be taken over by a villain (see rollTakeover).
+// A regular floor may be taken over by a villain (see rollTakeover). A co-op run rolls
+// from its seed, so both players see the same floor.
 function rollChoices(current: StoredRun): RunChoice[] {
   current.takeover = null
   if (isBossFloor(current.floor)) return [{ kind: 'boss' }]
-  const choices = rollRegularChoices(current)
-  rollTakeover(current, choices)
+  const rng = current.coop ? seededRandom(`${current.coop.seed}:${current.floor}`) : Math.random
+  const choices = rollRegularChoices(current, rng)
+  rollTakeover(current, choices, rng)
   return choices
 }
 
@@ -480,14 +535,16 @@ function villainPool(current: StoredRun): string[] {
 // A Villain Takeover, RUN_TAKEOVER_CHANCE of the time: the floor's trainer (if it rolled
 // one) becomes the villain, otherwise the villain takes a random tile's place - so the
 // villain is the floor's one and only trainer. A villain not met yet this run if possible.
-function rollTakeover(current: StoredRun, choices: RunChoice[]): void {
-  if (Math.random() >= RUN_TAKEOVER_CHANCE) return
+// In a co-op run there's no way round: the villain is the only path, fought together.
+function rollTakeover(current: StoredRun, choices: RunChoice[], rng: () => number): void {
+  if (rng() >= RUN_TAKEOVER_CHANCE) return
   const pool = villainPool(current)
   if (pool.length === 0) return
   const fresh = pool.filter((id) => !current.usedBossIds.includes(id))
-  const villainId = pickRandom(fresh.length > 0 ? fresh : pool, 1)[0]
+  const villainId = pickRandom(fresh.length > 0 ? fresh : pool, 1, rng)[0]
   const trainerAt = choices.findIndex((c) => c.kind === 'trainer')
-  choices[trainerAt >= 0 ? trainerAt : Math.floor(Math.random() * choices.length)] = { kind: 'villain' }
+  choices[trainerAt >= 0 ? trainerAt : Math.floor(rng() * choices.length)] = { kind: 'villain' }
+  if (current.coop) choices.splice(0, choices.length, { kind: 'villain' })
   current.takeover = { villainId }
 }
 
@@ -497,15 +554,17 @@ function takeoverTileCost(current: StoredRun): number {
   return current.takeover ? Math.min(RUN_TAKEOVER_TILE_COST, current.gems ?? 0) : 0
 }
 
-function rollRegularChoices(current: StoredRun): RunChoice[] {
-  // No Pokémon Center floors at all on a no-healing difficulty.
-  const hurt = !runDifficultyInfo(current.difficulty).noHealing && current.team.some((m) => m.hp < 1 || m.status)
+function rollRegularChoices(current: StoredRun, rng: () => number): RunChoice[] {
+  // No Pokémon Center floors at all on a no-healing difficulty. A co-op floor can always
+  // roll one - the two teams' health is never the same, and the floor has to be.
+  const hurt =
+    !runDifficultyInfo(current.difficulty).noHealing && (!!current.coop || current.team.some((m) => m.hp < 1 || m.status))
   const choices: RunChoice[] = []
   for (let tries = 0; choices.length < FLOOR_OPTIONS && tries < 200; tries++) {
-    const choice = rollChoice(hurt)
+    const choice = rollChoice(hurt, rng)
     if (!choices.some((c) => choiceKey(c) === choiceKey(choice))) choices.push(choice)
   }
-  if (Math.random() < LAB_CHANCE) {
+  if (rng() < LAB_CHANCE) {
     const wildIndex = choices.findIndex((c) => c.kind === 'wild')
     choices[wildIndex >= 0 ? wildIndex : choices.length - 1] = { kind: 'wild', location: 'lab' }
   }
@@ -625,12 +684,21 @@ export function getRunView(): RunView | null {
       reviveLevel: reviveLevel(current),
       bossShop:
         current.status === 'active' && isBossFloor(current.floor) ? { usedTiles: current.shopTilesUsed ?? [] } : null
-    }
+    },
+    maxTeam: teamLimit(current),
+    coop: current.coop
+      ? {
+          seed: current.coop.seed,
+          partnerName: current.coop.partnerName,
+          partnerSpriteId: current.coop.partnerSpriteId,
+          role: current.coop.role
+        }
+      : null
   }
 }
 
 /**
- * The generations a run can be set to: those with at least one Roguelite boss of every
+ * The generations a run can be set to: those with at least one Battle Tower boss of every
  * class (a Gym Leader, an Elite Four member and a Champion) - anything less and the run
  * would have to borrow bosses from other generations. Villains aren't needed: without
  * any, the generation's runs just never have a Villain Takeover.
@@ -657,7 +725,9 @@ export function startRun(
   boxMonId: string,
   difficulty: RunDifficulty = 'normal',
   generation: number | null = null,
-  keepMoves = false
+  keepMoves = false,
+  // A co-op run's partner and shared seed (the 'coop' slot's run).
+  coop?: CoopRunInfo
 ): RunView {
   if (getRun()?.status === 'active') throw new Error('A run is already in progress')
   if (generation !== null && !completeRunGenerations().includes(generation)) {
@@ -667,7 +737,7 @@ export function startRun(
   const set: PokemonSet = { ...source, level: ROGUELITE_START_LEVEL, item: '' }
   // The copy gets a run moveset straight away, unless the player keeps its own moves.
   if (!keepMoves) refreshMoves(set)
-  run = {
+  const run: StoredRun = {
     status: 'active',
     floor: 1,
     bossesBeaten: 0,
@@ -681,8 +751,10 @@ export function startRun(
     gems: 0,
     // Easy starts with a Full Restore in hand.
     consumables: difficulty === 'easy' ? { fullrestore: 1 } : {},
-    fainted: []
+    fainted: [],
+    ...(coop ? { coop: { ...coop } } : {})
   }
+  runs[slot] = run
   run.choices = rollChoices(run)
   // The titles' free picks before the first floor: Survivor an item, Daredevil a move and
   // an ability (both together give all three).
@@ -1184,7 +1256,7 @@ export function takeRunRewardMon(index: number, replaceRunMonId?: string): RunVi
   const current = activeRun()
   const set = current.monOffer?.[index]
   if (!set) throw new Error("That Pokémon isn't on offer")
-  const full = current.team.length >= ROGUELITE_MAX_TEAM
+  const full = current.team.length >= teamLimit(current)
   const replaceAt = replaceRunMonId ? current.team.findIndex((m) => m.id === replaceRunMonId) : -1
   if (full && replaceAt === -1) throw new Error('Your run team is full - choose who to replace')
   const newcomer: RunMon = { ...offeredMon(structuredClone(set), index), id: randomUUID() }
@@ -1483,7 +1555,7 @@ export function addRunCatch(set: PokemonSet, replaceRunMonId?: string): void {
   const current = getRun()
   // The battle's win already moved the run on (or ended it, if that was the last floor).
   if (!current) throw new Error('No run is in progress')
-  const full = current.team.length >= ROGUELITE_MAX_TEAM
+  const full = current.team.length >= teamLimit(current)
   const replaceAt = replaceRunMonId ? current.team.findIndex((m) => m.id === replaceRunMonId) : -1
   if (full && replaceAt === -1) throw new Error(`Your run team is full - choose who to replace`)
   const caught: PokemonSet = { ...structuredClone(set), item: '' }
@@ -1503,7 +1575,44 @@ export function addRunCatch(set: PokemonSet, replaceRunMonId?: string): void {
 }
 
 export function runTeamIsFull(): boolean {
-  return (getRun()?.team.length ?? 0) >= ROGUELITE_MAX_TEAM
+  const current = getRun()
+  return !!current && current.team.length >= teamLimit(current)
+}
+
+// ---- Co-op runs (see shared/online.ts) ----
+
+/** The host's copy: the fight fought together is over - kept to send the friend's copy again if it missed it. */
+export function recordCoopBattle(result: CoopBattleResult): void {
+  const current = activeRun()
+  if (!current.coop) return
+  current.coop.lastBattle = result
+  current.coop.lastBattleId = result.battleId
+  persist()
+}
+
+/** The host's copy: its last fight fought together (sent again when the two meet up again). */
+export function lastCoopBattle(): CoopBattleResult | null {
+  return getRun()?.coop?.lastBattle ?? null
+}
+
+/**
+ * The friend's copy: a fight fought together, as the host's copy says it went - applied to
+ * this player's run like their own battle (each result only once, and only on its floor).
+ * Null when it was already applied (or belongs to another floor).
+ */
+export function applyCoopBattle(result: CoopBattleResult): { expGains: ExpGainResult[]; fainted: string[]; itemReward: boolean } | null {
+  const current = activeRun()
+  if (!current.coop || current.coop.lastBattleId === result.battleId || current.floor !== result.floor) return null
+  current.coop.lastBattleId = result.battleId
+  if (result.trainerId && !current.usedBossIds.includes(result.trainerId)) current.usedBossIds.push(result.trainerId)
+  if (result.kind === 'boss') current.currentBossId = result.trainerId
+  if (!result.won) {
+    const fainted = current.team.map((m) => m.set.species)
+    endRun(current, 'lost')
+    return { expGains: [], fainted, itemReward: false }
+  }
+  persist()
+  return finishRunBattleWon(result.guestOutcome, result.kind)
 }
 
 // ---- Consumables and the boss floor shop ----
@@ -1547,7 +1656,7 @@ export function useRunFullRestore(runMonId: string): RunView {
  */
 export function useRunRevive(faintedId: string, replaceId?: string): RunView {
   const current = activeRun()
-  const full = current.team.length >= ROGUELITE_MAX_TEAM
+  const full = current.team.length >= teamLimit(current)
   if (full && !replaceId) throw new Error('Your run team is full - pick who leaves to make room')
   const replaceAt = full ? current.team.findIndex((m) => m.id === replaceId) : -1
   if (full && replaceAt === -1) throw new Error("That Pokemon isn't on your run team")

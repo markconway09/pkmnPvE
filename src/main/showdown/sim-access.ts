@@ -1924,21 +1924,21 @@ export function pickRandomUnevolvedAnySpecies(): string {
 }
 
 /**
- * A roguelite Random Swap's Pokemon, from any stage of any line: an ordinary one, a
+ * A Battle Tower Random Swap's Pokemon, from any stage of any line: an ordinary one, a
  * legendary-class one (legendary, mythical, ultra beast or paradox - short of the
  * restricted ones), or a restricted legendary (Mewtwo, Kyogre, Koraidon...).
  */
 /**
  * A Max Raid's boss: a Pokemon with a Gigantamax form (RAID_GIGANTAMAX_CHANCE), or else
  * a red one (legendary-class) - now and then a gold one (a restricted legendary). Fully
- * evolved only.
+ * evolved only, bar the Gigantamax ones that still evolve.
  */
 // Formes with a Gigantamax of their own that a raid can bring too, though they're not
 // ordinary forms (Urshifu's Rapid Strike Style, Toxtricity's Low Key Form).
 const RAID_EXTRA_FORMES = new Set(['Urshifu-Rapid-Strike', 'Toxtricity-Low-Key'])
 
-// Fully evolved, ordinary-form species from current games (or Past) - what a raid
-// boss is drawn from.
+// Fully evolved (or Gigantamax-capable), ordinary-form species from current games (or
+// Past) - what a raid boss is drawn from.
 function raidSpeciesPool(): ReturnType<typeof Dex.species.get>[] {
   return Dex.species
     .all()
@@ -1949,7 +1949,8 @@ function raidSpeciesPool(): ReturnType<typeof Dex.species.get>[] {
         (!s.isNonstandard || s.isNonstandard === 'Past') &&
         !isBattleOnlyForme(s) &&
         (isPlainSpecies(s) || RAID_EXTRA_FORMES.has(s.name)) &&
-        s.evos.length === 0
+        // Gigantamax ones come even if they still evolve (Pikachu, Eevee, Meowth, Duraludon).
+        (s.evos.length === 0 || !!s.canGigantamax)
     )
 }
 
@@ -2643,7 +2644,7 @@ export function evolutionPathsFor(set: PokemonSet): { species: string; method: s
 }
 
 /**
- * Roguelite: what a run Pokemon can evolve into. There's no bag in a run, so an
+ * Battle Tower: what a run Pokemon can evolve into. There's no bag in a run, so an
  * evolution needs no item, trade or friendship - only the level the wild generator
  * would plausibly meet that stage at (its own level for a level-up evolution; 30, or
  * 10 after the previous stage, for anything else - see stageReachLevel).

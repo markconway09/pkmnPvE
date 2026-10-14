@@ -52,7 +52,9 @@ function PokemonIconVisual({ mon }: Props): React.JSX.Element {
       )}
       {!!mon.mergeStars && (
         <span className="box-icon-stars" title={`Merged ★${mon.mergeStars}: ${mergeBonusText(mon.mergeStars, mon.rarityTier)} to all stats but HP in classic battles`}>
-          {'★'.repeat(mon.mergeStars)}
+          {/* A star each - or, where that doesn't fit (the phone's team dock), "3★". */}
+          <span className="box-icon-stars-full">{'★'.repeat(mon.mergeStars)}</span>
+          <span className="box-icon-stars-short">{mon.mergeStars}★</span>
         </span>
       )}
       {mon.eligibleEvolutions && mon.eligibleEvolutions.length > 0 && (

@@ -33,7 +33,7 @@ const BACKDROP_IDS = [
   'terrace'
 ]
 
-// Every boss fights in the gym (Classic and Roguelite alike), and every Max Raid in the
+// Every boss fights in the gym (Classic and Battle Tower alike), and every Max Raid in the
 // frost cavern.
 const BOSS_BACKDROP = 'gym'
 const RAID_BACKDROP = 'frostcavern'

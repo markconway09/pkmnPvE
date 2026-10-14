@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { RarityGlow } from './RarityCard'
 import { createPortal } from 'react-dom'
-import { DEFAULT_POKEBALL_ID, POKEBALL_PRICE, ROGUELITE_MAX_TEAM, toSpriteId } from '../../shared/battle-types'
+import { DEFAULT_POKEBALL_ID, POKEBALL_PRICE, toSpriteId } from '../../shared/battle-types'
 import type { ExpGainResult, ItemDropResult, RunMonView } from '../../shared/battle-types'
 import type { DraftBattleResult } from '../../shared/draft'
 import { DRAFT_MAX_WINS } from '../../shared/draft'
@@ -23,7 +23,7 @@ interface Props {
   canCatch: boolean
   isWildBattle: boolean
   opponentShiny: boolean
-  // A Roguelite run's battle: catching is free and joins the run's team, and the
+  // A Battle Tower run's battle: catching is free and joins the run's team, and the
   // Pokemon that fainted have left the run.
   runBattle?: boolean
   runFainted?: string[]
@@ -97,8 +97,10 @@ function BattleResultModal({
     setError(null)
     try {
       if (runBattle && !replaceRunMonId) {
-        const team = (await window.api.getRun())?.team ?? []
-        if (team.length >= ROGUELITE_MAX_TEAM) {
+        // The battle's own run - the solo run or the co-op one.
+        const run = await window.api.getBattleRun()
+        const team = run?.team ?? []
+        if (run && team.length >= run.maxTeam) {
           setReplacing(team)
           return
         }

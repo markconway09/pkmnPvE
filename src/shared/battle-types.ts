@@ -787,22 +787,22 @@ export interface Trainer {
   // waits until every member is within the stat ceiling for the cap, which keeps a
   // late-game team from showing up at level 15.
   alwaysAvailable?: boolean
-  // One of the Roguelite mode's bosses: picked at random for a run's boss floors, and
+  // One of the Battle Tower mode's bosses: picked at random for a run's boss floors, and
   // never fought in the normal game (neither as a boss nor as a random trainer).
   rogueliteBoss?: boolean
-  // What kind of boss a Roguelite boss is: a run meets 8 Gym Leaders, the Elite Four,
+  // What kind of boss a Battle Tower boss is: a run meets 8 Gym Leaders, the Elite Four,
   // then the Champion.
   rogueliteClass?: RogueliteBossClass
-  // A Roguelite boss's reward: beating it offers this ability (id) to one of the run's
+  // A Battle Tower boss's reward: beating it offers this ability (id) to one of the run's
   // Pokemon, instead of the usual item pick.
   rogueliteRewardAbility?: string
-  // The generation a Roguelite boss is from (1-9) - a run set to a generation only
+  // The generation a Battle Tower boss is from (1-9) - a run set to a generation only
   // meets that generation's bosses.
   rogueliteGeneration?: number
   // Bosses only: while this boss is the next one queued, the Trainer Battle button
   // only fights Team Rocket members, and shows a grunt. On for Giovanni's fights.
   rocketEvent?: boolean
-  // Bosses only (classic and Roguelite): weather and terrain up from the start of the
+  // Bosses only (classic and Battle Tower): weather and terrain up from the start of the
   // fight, lasting until a move or ability replaces them. Off (none) by default.
   fieldWeather?: string | null
   fieldTerrain?: string | null
@@ -1207,7 +1207,7 @@ export interface PlayerStats {
   wildCaught: number
   // Max Raids won (every one a catch too - not counted as wild).
   raidsWon: number
-  // Roguelite: the furthest floor any run has reached (0 before the first run).
+  // Battle Tower: the furthest floor any run has reached (0 before the first run).
   bestFloor: number
   // The difficulty that floor was reached on (null before the first run, or for a best
   // set before difficulties were recorded).
@@ -1271,7 +1271,7 @@ export const POKEMON_SELL_PRICES: Record<RarityTier, number> = {
 // ---- Merging duplicates ----
 // Merging a duplicate into a Pokemon adds its copies to it: stars go up each time the
 // copies double (2 = 1 star, 4 = 2 stars ... 32 = 5 stars, 64 = 6 stars), and each star is +10% to all
-// its stats but HP in classic battles (never in a Roguelite run or a friendly match) - less for
+// its stats but HP in classic battles (never in a Battle Tower run or a friendly match) - less for
 // the strongest: +7.5% a star for a red Pokemon and +5% for a gold one. The same for one that
 // isn't fully evolved (an Everstone-locked one). A stat at 0 IVs
 // takes no bonus (kept low on purpose - a Trick Room team's Speed, Foul Play's Attack).
@@ -1504,15 +1504,15 @@ export interface BattleView {
   teamDefense: (number | null)[][]
   opponentTrainer: TrainerBattleInfo | null
   // What running away costs: 0 from a wild Pokemon, TRAINER_RUN_COST from an ordinary
-  // trainer, null when it isn't allowed at all (a boss, a Roguelite trainer or boss).
+  // trainer, null when it isn't allowed at all (a boss, a Battle Tower trainer or boss).
   runCost: number | null
   // Whether the player has the money to run (always, when it's free).
   canAffordRun: boolean
-  // A draft match or a Roguelite fight: no running, but it can be forfeited (a lost match
-  // in a draft, the end of the run in a Roguelite).
+  // A draft match or a Battle Tower fight: no running, but it can be forfeited (a lost match
+  // in a draft, the end of the run in a Battle Tower).
   canForfeit: boolean
   opponentRoster: RosterSlotView[]
-  // A Roguelite run's battle: catching is free and fills the run's team, and there's
+  // A Battle Tower run's battle: catching is free and fills the run's team, and there's
   // no money or items. Set with the Pokemon that fainted - they leave the run's team.
   runBattle: boolean
   runFainted: string[]
@@ -1520,7 +1520,7 @@ export interface BattleView {
   runItemReward: boolean
   // A Draft mode battle, once it has ended: the draft's record after it.
   draftResult?: DraftBattleResult | null
-  // Against a boss (Classic or Roguelite) - it's fought in the gym.
+  // Against a boss (Classic or Battle Tower) - it's fought in the gym.
   bossBattle?: boolean
   // A Max Raid (see RaidView) - null for any other battle.
   raid?: RaidView | null
@@ -1529,6 +1529,8 @@ export interface BattleView {
   rewards: BattleRewardsView | null
   // A chaos draft battle: the opponent's modifiers, shown in that same tooltip instead.
   chaosModifiers?: OpponentModifiersView | null
+  // A co-op Battle Tower fight with a friend (see CoopBattleView).
+  coop?: CoopBattleView | null
 }
 
 // A chaos draft opponent's modifiers in words: their battle-start ones ("Stealth Rock on
@@ -1538,7 +1540,7 @@ export interface OpponentModifiersView {
   mons: { species: string; boosts: string[] }[]
 }
 
-// ---- Roguelite mode ----
+// ---- Battle Tower mode ----
 
 // A run's floors: every ROGUELITE_BOSS_EVERY-th one is a boss - 8 Gym Leaders, then
 // the Elite Four, then the Champion on the final floor, whose defeat wins the run. Those
@@ -1553,6 +1555,46 @@ export const ROGUELITE_BOSS_COUNT = ROGUELITE_GYM_LEADERS + ROGUELITE_ELITE_FOUR
 export const ROGUELITE_FINAL_FLOOR = ROGUELITE_BOSS_EVERY * ROGUELITE_BOSS_COUNT
 export const ROGUELITE_START_LEVEL = 5
 export const ROGUELITE_MAX_TEAM = 6
+// A co-op run (two players online, see shared/online.ts): each player's team holds up to
+// 3, so the two together fill a doubles side of 6 in the fights they take on together.
+export const COOP_MAX_TEAM = 3
+
+// Who a co-op run is with. Both players' runs share the seed, so every floor offers both
+// of them the same paths; the host's copy runs the fights they take on together.
+export interface CoopRunInfo {
+  seed: string
+  partnerName: string
+  partnerSpriteId: string
+  role: 'host' | 'guest'
+}
+
+// How a co-op fight (a boss or a villain, fought together) went - the host's copy works
+// it out and sends it to the friend's, which applies it to its own run.
+export interface CoopBattleResult {
+  battleId: string
+  floor: number
+  kind: 'boss' | 'villain'
+  trainerId: string
+  // Won with both teams still standing - a player whose whole team fainted ends the run
+  // for both, even in a won fight.
+  won: boolean
+  // The friend's Pokemon, in their run team's order.
+  guestOutcome: { hp: number; status: string | null; fainted: boolean }[]
+}
+
+// A co-op fight's screen extras: each player picks only for their own Pokemon.
+export interface CoopBattleView {
+  partnerName: string
+  partnerSpriteId: string
+  // Per active slot of the request: whether this player picks for it.
+  mySlots: boolean[]
+  // Per team member (in the order of `team`): whether it's this player's.
+  myMons: boolean[]
+  // The sim turned down the turn the two of them picked - both pick again.
+  error: string | null
+  // Once it's over: how it went (see CoopBattleResult).
+  result: CoopBattleResult | null
+}
 
 export type RunNodeKind = 'wild' | 'trainer' | 'item' | 'heal' | 'boss' | 'ability' | 'move' | 'swap' | 'villain'
 
@@ -1801,11 +1843,19 @@ export interface RunView {
   rewards: RunRewardLine[]
   // Gems, consumables, fainted Pokemon to revive and the boss floor's shop.
   consumables: RunConsumablesView
+  // The most Pokemon the team can hold (ROGUELITE_MAX_TEAM, or COOP_MAX_TEAM in a co-op run).
+  maxTeam: number
+  // A co-op run: who it's with (null for a solo run).
+  coop: CoopRunInfo | null
 }
 
-export type RunChoiceResult = { run: RunView } | { battle: BattleView; location?: WildLocationId }
+// A floor's choice: the run as it now stands, a battle started - or, in a co-op run, a
+// boss or villain to meet the friend for (the host's copy starts it once both are there).
+export type RunChoiceResult =
+  | { run: RunView; meetup?: 'boss' | 'villain' }
+  | { battle: BattleView; location?: WildLocationId }
 
-// ---- Roguelite consumables and gems ----
+// ---- Battle Tower consumables and gems ----
 // Items used from the run screen (never in battle), bought with gems - the run's own
 // currency - in the shop on every boss floor.
 export type RunConsumableId = 'fullrestore' | 'revive' | 'abilitycapsule'

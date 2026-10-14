@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { TRAINER_SPRITE_IDS, trainerSpriteUrl } from './trainerSprite'
 import SearchBar from './SearchBar'
+import SpriteCreditsModal from './SpriteCreditsModal'
 
 interface Props {
   value: string
@@ -11,6 +12,7 @@ interface Props {
 
 function TrainerSpritePicker({ value, onChange, onClose }: Props): React.JSX.Element {
   const [query, setQuery] = useState('')
+  const [creditsOpen, setCreditsOpen] = useState(false)
   const trimmed = query.trim().toLowerCase()
   const filtered = trimmed ? TRAINER_SPRITE_IDS.filter((id) => id.includes(trimmed)) : TRAINER_SPRITE_IDS
 
@@ -45,8 +47,12 @@ function TrainerSpritePicker({ value, onChange, onClose }: Props): React.JSX.Ele
           ))}
         </div>
         <div className="editor-actions">
+          <button className="trainer-picker-credits" onClick={() => setCreditsOpen(true)}>
+            Sprite credits
+          </button>
           <button onClick={onClose}>Cancel</button>
         </div>
+        {creditsOpen && <SpriteCreditsModal onClose={() => setCreditsOpen(false)} />}
       </div>
     </div>,
     document.body

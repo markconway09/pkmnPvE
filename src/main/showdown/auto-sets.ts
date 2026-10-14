@@ -66,7 +66,7 @@ export function listAutoSets(speciesName: string): AutoSetOption[] {
 /**
  * Every move Smogon's sets give a species, best set first and in each set's slot
  * order (Showdown's Random Battle movepools for a species Smogon has no sets for).
- * Roguelite's "Update moves" takes the first of these it can learn.
+ * Battle Tower's "Update moves" takes the first of these it can learn.
  */
 export function recommendedMoveIds(speciesName: string): string[] {
   const species = Dex.species.get(speciesName)

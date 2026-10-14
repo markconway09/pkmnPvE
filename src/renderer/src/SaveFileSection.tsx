@@ -11,8 +11,7 @@ function errorText(e: unknown): string {
 /**
  * Options → Saves → Save file: the save as one .pkmnsave file, to carry between the PC and the
  * phone (through the Google Drive app, a cable, a chat...). Importing one replaces the
- * save (backed up first), then reloads the game. A cloud save downloaded from Drive
- * imports the same way.
+ * save (backed up first), then reloads the game.
  */
 function SaveFileSection(): React.JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null)

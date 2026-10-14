@@ -71,7 +71,10 @@ import {
   finishRunBattleFled,
   finishRunBattleLost,
   finishRunBattleWon,
-  type RunBattleOutcome
+  inRunSlot,
+  recordCoopBattle,
+  type RunBattleOutcome,
+  type RunSlot
 } from './run-store'
 import { finishDraftBattle } from './draft-store'
 import { breakDexNavChain, extendDexNavChain } from './dexnav-store'
@@ -118,6 +121,8 @@ import type {
   MoveEvent,
   RosterSlotView,
   RunNodeKind,
+  CoopBattleResult,
+  CoopBattleView,
   TrainerBattleInfo
 } from '../../shared/battle-types'
 
@@ -350,10 +355,14 @@ export interface OpponentConfig {
   // A friendly match (another player's saved team) or a boss rematch: winning gives no
   // exp, money, friendship, item drops, TMs or boss progress.
   noRewards?: boolean
-  // A Roguelite run's battle (see run-store): the run's team goes in with the HP and
+  // A Battle Tower run's battle (see run-store): the run's team goes in with the HP and
   // status it had (one entry per team member, in order), and how it ends goes back
   // to the run - never to the box, bag, money, stats or boss progress.
-  run?: { conditions: { hp: number; status: string | null }[]; kind: RunNodeKind }
+  // `slot`: which run it goes back to - the solo run or the co-op one (see run-store).
+  run?: { conditions: { hp: number; status: string | null }[]; kind: RunNodeKind; slot?: RunSlot }
+  // A co-op run's boss or villain, fought by two players online on one doubles side (see
+  // CoopFighters) - the host's copy runs it, and each player picks for their own Pokemon.
+  coop?: CoopFighters
   // A Draft mode battle (see draft-store): no running, and the win or loss goes to the
   // draft's record - never to exp, money, drops or boss progress.
   draft?: boolean
@@ -390,6 +399,26 @@ export interface OpponentConfig {
   // Online chaos drafts: the host's modifiers in words, for the friend's tooltip on them
   // (`chaosModifiers` above is the friend's, for the host).
   online?: { hostName: string; hostSpriteId: string; guestChaosModifiers?: OpponentModifiersView }
+}
+
+export type CoopRole = 'host' | 'guest'
+
+// The two players of a co-op fight, and whose each Pokemon on their shared side is.
+export interface CoopFighters {
+  // Tells this fight's result apart from any other (the friend's copy applies each once).
+  battleId: string
+  hostName: string
+  hostSpriteId: string
+  guestName: string
+  guestSpriteId: string
+  // Whose each team member is, in the side's team order.
+  owners: CoopRole[]
+  // Where each player's own Pokemon are in the side's team, in their run team's order.
+  hostIndices: number[]
+  guestIndices: number[]
+  kind: 'boss' | 'villain'
+  trainerId: string
+  floor: number
 }
 
 // The friend's own copy of the battle log in an online match: the same lines told from
@@ -525,12 +554,23 @@ export class WildBattle {
   private tmRewards: TmInfo[] = []
   private moneyGained = 0
   private caught = false
-  // Roguelite: the run Pokemon that fainted in this battle, and so left the run's team.
+  // Battle Tower: the run Pokemon that fainted in this battle, and so left the run's team.
   private runFainted: string[] = []
-  // Roguelite: a won trainer or boss battle left an item to pick back on the run menu.
+  // Battle Tower: a won trainer or boss battle left an item to pick back on the run menu.
   private runItemReward = false
   // Draft mode: the draft's record once this battle has counted.
   private draftResult: DraftBattleResult | null = null
+  // Co-op: each player's part of the turn so far (by active slot), for the request it was
+  // picked for - sent to the sim as one turn once both have chosen. A turn the sim turned
+  // down says why (to both, until the next request), and the fight's result once it's over.
+  private coopPending: { seq: number; parts: (string | null)[] } = { seq: -1, parts: [] }
+  private coopError: string | null = null
+  private coopErrorSeq = -1
+  private coopResult: CoopBattleResult | null = null
+  // Co-op: the connection dropped mid-fight - it's dropped without counting for either run.
+  private abandoned = false
+  // Co-op: which player has used their Z-Move (each has their own - see installCoopGimmicks).
+  private readonly coopZUsed: Record<CoopRole, boolean> = { host: false, guest: false }
 
   constructor(
     p1team: PokemonSet[],
@@ -554,7 +594,7 @@ export class WildBattle {
         this.wake()
         this.changed()
       },
-      !!online
+      !!online || !!opponent?.coop
     )
     if (online) {
       this.remote = new HumanPlayer(this.streams.p2, () => this.changed(), true)
@@ -616,6 +656,7 @@ export class WildBattle {
     this.applyEverstones(1, this.everstone.p2)
     this.applyMergeBoosts(1, this.mergeStars.p2)
     if (opponent?.raid) this.setUpRaid(opponent.raid)
+    if (opponent?.coop) this.installCoopGimmicks()
   }
 
   // Weather and terrain put on the field as the battle starts, before anyone is sent out
@@ -958,17 +999,50 @@ export class WildBattle {
     })
   }
 
-  // A run battle's end goes to the run instead of the regular rewards.
+  // A run battle's end goes to the run instead of the regular rewards - the run it was
+  // fought for (the solo run or the co-op one). A co-op fight also works out how it went
+  // for the friend's run, for their copy to apply to it.
   private finishRunBattle(): void {
-    if (this.winner === this.p1Name) {
-      const { expGains, fainted, itemReward } = finishRunBattleWon(this.p1Outcome(), this.opponent!.run!.kind)
-      this.expGains = expGains
-      this.runFainted = fainted
-      this.runItemReward = itemReward
-    } else {
-      this.runFainted = this.p1team.map((mon) => mon.species)
-      finishRunBattleLost()
+    if (this.abandoned) return
+    const run = this.opponent!.run!
+    const coop = this.opponent?.coop
+    try {
+      this.applyRunResult(run, coop)
+    } catch (e) {
+      // The run ended while this battle was on (a co-op partner's run ending theirs).
+      console.error('[battle] run result not applied:', e)
     }
+  }
+
+  private applyRunResult(run: NonNullable<OpponentConfig['run']>, coop: CoopFighters | undefined): void {
+    inRunSlot(run.slot ?? 'solo', () => {
+      const outcome = this.p1Outcome()
+      const mine = coop ? coop.hostIndices.map((i) => outcome[i]) : outcome
+      const theirs = coop ? coop.guestIndices.map((i) => outcome[i]) : []
+      const wiped = (list: RunBattleOutcome[]): boolean => list.length > 0 && list.every((mon) => mon.fainted)
+      // A co-op fight only counts as won with both teams still standing.
+      const won = this.winner === this.p1Name && !wiped(mine) && !wiped(theirs)
+      if (coop) {
+        this.coopResult = {
+          battleId: coop.battleId,
+          floor: coop.floor,
+          kind: coop.kind,
+          trainerId: coop.trainerId,
+          won,
+          guestOutcome: theirs
+        }
+        recordCoopBattle(this.coopResult)
+      }
+      if (won) {
+        const { expGains, fainted, itemReward } = finishRunBattleWon(mine, run.kind)
+        this.expGains = expGains
+        this.runFainted = fainted
+        this.runItemReward = itemReward
+      } else {
+        this.runFainted = (coop ? coop.hostIndices.map((i) => this.p1team[i]) : this.p1team).map((mon) => mon.species)
+        finishRunBattleLost()
+      }
+    })
   }
 
   private async drainOmniscient(): Promise<void> {
@@ -990,6 +1064,12 @@ export class WildBattle {
           p2b: this.active.p2b?.hpPercent ?? null
         }
         this.applyStateLine(line)
+        // A co-op fight: the Z-Move used is its user's player's own (see installCoopGimmicks).
+        if (this.opponent?.coop && line.startsWith('|-zpower|')) {
+          const slot = slotKeyFromIdent(line.split('|')[2])
+          const owner = slot?.startsWith('p1') ? this.coopOwnerOf(this.battleStream.battle?.sides[0].active[slot.charCodeAt(2) - 97]) : null
+          if (owner) this.coopZUsed[owner] = true
+        }
         this.applyFieldEffectLine(line, liveEffects, index < lastUpkeepIndex ? 1 : 0)
 
         const { args, kwArgs } = BattleTextParser.parseBattleLine(line)
@@ -1511,7 +1591,8 @@ export class WildBattle {
     if (this.caught) throw new Error('This Pokemon has already been caught')
     if (this.opponent?.run) {
       // A run catch is free and joins the run's team, not the box.
-      addRunCatch(this.p2team[0], replaceRunMonId)
+      const run = this.opponent.run
+      inRunSlot(run.slot ?? 'solo', () => addRunCatch(this.p2team[0], replaceRunMonId))
       this.caught = true
       return { money: getMoney(), pokeballs: getItemQuantity(DEFAULT_POKEBALL_ID) }
     }
@@ -1537,7 +1618,7 @@ export class WildBattle {
 
   // What running costs here, or null if it isn't allowed: a wild encounter is free, an
   // ordinary trainer battle costs TRAINER_RUN_COST, and there's no running from a boss
-  // or from a Roguelite run's trainers. There's no reward, exp or catch for a battle
+  // or from a Battle Tower run's trainers. There's no reward, exp or catch for a battle
   // you walked away from - it's simply abandoned. A wild Pokemon an ambush woke can't
   // be run from either.
   private runCost(): number | null {
@@ -1567,12 +1648,13 @@ export class WildBattle {
     if (cost > 0 && !this.ended && !spendMoney(cost)) {
       throw new Error(`Running from a trainer costs ₽${cost.toLocaleString('en-US')} - you don't have enough`)
     }
-    if (this.opponent?.run && !this.ended) finishRunBattleFled(this.p1Outcome())
+    const run = this.opponent?.run
+    if (run && !this.ended) inRunSlot(run.slot ?? 'solo', () => finishRunBattleFled(this.p1Outcome()))
     // Fleeing the DexNav's hunted Pokemon loses the chain.
     if (this.opponent?.dexNavHunt && !this.ended) breakDexNavChain()
   }
 
-  // A draft match or a Roguelite fight can't be run from, but it can be given up: the
+  // A draft match or a Battle Tower fight can't be run from, but it can be given up: the
   // player simply loses, so a draft match counts as lost and a run is over.
   private canForfeit(): boolean {
     return !!(this.opponent?.run || this.opponent?.draft || this.opponent?.online)
@@ -1581,7 +1663,19 @@ export class WildBattle {
   // Online: either player giving up (or the friend's connection dropping) - the sim
   // declares that side beaten, and both screens catch up through onChange.
   forfeitSide(side: 0 | 1): void {
-    if (!this.ended) void this.streams.omniscient.write(`>forcelose p${side + 1}`)
+    // A co-op fight's two players share p1: either giving up loses it for both.
+    if (!this.ended) void this.streams.omniscient.write(`>forcelose p${this.opponent?.coop ? 1 : side + 1}`)
+  }
+
+  /** Which run this battle is fought for (null: not a Battle Tower battle). */
+  runSlot(): RunSlot | null {
+    return this.opponent?.run ? (this.opponent.run.slot ?? 'solo') : null
+  }
+
+  /** Co-op: the connection dropped mid-fight - it stops here, counting for neither run. */
+  abandon(): void {
+    this.abandoned = true
+    this.onChange = null
   }
 
   /**
@@ -1590,8 +1684,14 @@ export class WildBattle {
    * through onChange once the other player has chosen too.
    */
   async chooseFor(side: 0 | 1, choice: string): Promise<void> {
+    if (this.opponent?.coop) return this.coopChoose(side === 0 ? 'host' : 'guest', choice)
     const player = this.playerOn(side)
     if (!player || this.ended) return
+    await this.sendChoice(player, choice)
+  }
+
+  // Hands a choice to the sim and waits a moment for it to be turned down.
+  private async sendChoice(player: HumanPlayer, choice: string): Promise<void> {
     player.lastError = null
     const seq = player.requestSeq
     player.choose(choice)
@@ -1602,6 +1702,183 @@ export class WildBattle {
     if (refused) {
       player.lastError = null
       throw new Error(refused.message.replace(/^\[[^\]]*\]\s*/, ''))
+    }
+  }
+
+  // ---- Co-op fights: two players on one doubles side ----
+
+  // Whose a Pokemon on the shared side is.
+  private coopOwnerOf(mon: SimPokemon | null | undefined): CoopRole | null {
+    const side = this.battleStream.battle?.sides[0]
+    if (!mon || !side || !this.opponent?.coop) return null
+    return this.opponent.coop.owners[side.team.indexOf(mon.set)] ?? null
+  }
+
+  /**
+   * Who picks for each slot of the side's current request (null: nobody - it passes). Each
+   * player picks for their own Pokemon out on the field. A fainted one's replacement comes
+   * from its owner's bench - or, with nobody left there, the partner's.
+   */
+  private coopControllers(): (CoopRole | null)[] {
+    const request = this.human.latestRequest
+    const side = this.battleStream.battle?.sides[0]
+    if (!request || !side || request.wait) return []
+    if ('forceSwitch' in request && request.forceSwitch) {
+      const bench: Record<CoopRole, number> = { host: 0, guest: 0 }
+      for (const mon of side.pokemon) {
+        const owner = this.coopOwnerOf(mon)
+        if (owner && !mon.isActive && !mon.fainted) bench[owner]++
+      }
+      return request.forceSwitch.map((mustSwitch, i) => {
+        if (!mustSwitch) return null
+        const owner = this.coopOwnerOf(side.active[i]) ?? 'host'
+        // Revival Blessing: its user brings back one of its owner's own fainted.
+        if (request.side.pokemon[i]?.reviving) return owner
+        const partner: CoopRole = owner === 'host' ? 'guest' : 'host'
+        for (const who of [owner, partner]) {
+          if (bench[who] > 0) {
+            bench[who]--
+            return who
+          }
+        }
+        return null
+      })
+    }
+    if ('active' in request && request.active) {
+      return request.active.map((_, i) => {
+        const mon = side.active[i]
+        return mon && !mon.fainted ? this.coopOwnerOf(mon) : null
+      })
+    }
+    return []
+  }
+
+  /**
+   * One player's part of a co-op turn: the whole turn as their screen put it together
+   * (the partner's slots say "partner"), of which only their own slots count. Once both
+   * have picked, the turn goes to the sim; if it's turned down, both pick again.
+   */
+  private async coopChoose(who: CoopRole, choice: string): Promise<void> {
+    const request = this.human.latestRequest
+    const side = this.battleStream.battle?.sides[0]
+    if (this.ended || !request || request.wait || !side) return
+    const controllers = this.coopControllers()
+    if (this.coopPending.seq !== this.human.requestSeq) {
+      this.coopPending = { seq: this.human.requestSeq, parts: controllers.map(() => null) }
+    }
+    const parts = choice.split(',').map((part) => part.trim())
+    const pending = [...this.coopPending.parts]
+    for (const [i, controller] of controllers.entries()) {
+      if (controller !== who) continue
+      const part = parts[i]
+      if (!part || part === 'partner') throw new Error('Pick for each of your Pokémon')
+      // Only their own Pokemon can be sent in (or brought back).
+      const switchTo = /^switch (\d+)$/.exec(part)
+      if (switchTo && this.coopOwnerOf(side.pokemon[Number(switchTo[1]) - 1]) !== who) {
+        throw new Error("That's your partner's Pokémon")
+      }
+      pending[i] = part
+    }
+    this.coopPending.parts = pending
+    if (!controllers.every((controller, i) => controller === null || pending[i] !== null)) {
+      this.changed()
+      return
+    }
+    const turn = controllers.map((controller, i) => (controller === null ? 'pass' : pending[i])).join(', ')
+    this.coopPending = { seq: -1, parts: [] }
+    this.coopError = null
+    try {
+      await this.sendChoice(this.human, turn)
+    } catch (e) {
+      // Turned down (two Terastallizations at once...): a fresh request for both to pick again.
+      this.coopError = e instanceof Error ? e.message : String(e)
+      this.human.requestSeq++
+      this.coopErrorSeq = this.human.requestSeq
+      this.changed()
+      throw e
+    }
+  }
+
+  /**
+   * A co-op fight: each player gets their own Mega Evolution, Z-Move and Terastallization,
+   * as if their team were a side of its own - the sim allows one of each per side. Using
+   * one locks out only its player's team, and both players can use theirs in the same turn.
+   */
+  private installCoopGimmicks(): void {
+    const battle = this.battleStream.battle
+    const side = battle?.sides[0]
+    if (!battle || !side) return
+    const owner = (mon: SimPokemon | null | undefined): CoopRole | null => this.coopOwnerOf(mon)
+    // Runs a gimmick, then gives the partner's team back what it locked them out of.
+    const keepPartnerFlags = <T>(user: SimPokemon, keys: string[], run: () => T): T => {
+      const who = owner(user)
+      const saved = side.pokemon
+        .filter((mon) => owner(mon) !== who)
+        .map((mon) => [mon as unknown as Record<string, unknown>, keys.map((key) => (mon as unknown as Record<string, unknown>)[key])] as const)
+      const result = run()
+      for (const [mon, values] of saved) keys.forEach((key, i) => (mon[key] = values[i]))
+      return result
+    }
+    const actions = battle.actions
+    const megaKeys = ['canMegaEvo', 'canMegaEvoX', 'canMegaEvoY', 'canUltraBurst']
+    const runMegaEvo = actions.runMegaEvo.bind(actions)
+    actions.runMegaEvo = (pokemon) => keepPartnerFlags(pokemon, megaKeys, () => runMegaEvo(pokemon))
+    const withMegaVariant = actions as unknown as Record<string, ((pokemon: SimPokemon) => unknown) | undefined>
+    for (const name of ['runMegaEvoX', 'runMegaEvoY']) {
+      const original = withMegaVariant[name]?.bind(actions)
+      if (original) withMegaVariant[name] = (pokemon: SimPokemon) => keepPartnerFlags(pokemon, megaKeys, () => original(pokemon))
+    }
+    const terastallize = actions.terastallize.bind(actions)
+    actions.terastallize = (pokemon) => keepPartnerFlags(pokemon, ['canTerastallize'], () => terastallize(pokemon))
+    // The side has one Z-Move flag: read as the Pokemon's own player's.
+    const withOwnZ = <T>(pokemon: SimPokemon, run: () => T): T => {
+      const before = side.zMoveUsed
+      const who = owner(pokemon)
+      side.zMoveUsed = who ? this.coopZUsed[who] : before
+      try {
+        return run()
+      } finally {
+        side.zMoveUsed = before
+      }
+    }
+    const getZMove = actions.getZMove.bind(actions)
+    actions.getZMove = (move, pokemon, skipChecks) => withOwnZ(pokemon, () => getZMove(move, pokemon, skipChecks))
+    const canZMove = actions.canZMove.bind(actions)
+    actions.canZMove = (pokemon) => withOwnZ(pokemon, () => canZMove(pokemon))
+    // One of each a turn, per player: the turn's choice remembers each player's own.
+    type TurnGimmicks = Pick<typeof side.choice, 'mega' | 'ultra' | 'zMove' | 'terastallize'>
+    let turn: Partial<Record<CoopRole, TurnGimmicks>> = {}
+    const clearChoice = side.clearChoice.bind(side)
+    side.clearChoice = () => {
+      turn = {}
+      clearChoice()
+    }
+    const chooseMove = side.chooseMove.bind(side)
+    side.chooseMove = (moveText, targetLoc, event) => {
+      // The slot this move is for (the sim skips fainted and commanding ones).
+      let index = side.choice.actions.length
+      while (index < side.active.length && (side.active[index].fainted || side.active[index].volatiles['commanding'])) index++
+      const who = owner(side.active[index]) ?? 'host'
+      Object.assign(side.choice, turn[who] ?? { mega: false, ultra: false, zMove: false, terastallize: false })
+      const result = chooseMove(moveText, targetLoc, event)
+      const { mega, ultra, zMove, terastallize: tera } = side.choice
+      turn[who] = { mega, ultra, zMove, terastallize: tera }
+      return result
+    }
+  }
+
+  // A co-op fight's extras for one player's screen (`team`: the screen's team list).
+  private coopView(who: CoopRole, team: ActivePokemonView[]): CoopBattleView | null {
+    const coop = this.opponent?.coop
+    if (!coop) return null
+    const controllers = this.ended ? [] : this.coopControllers()
+    return {
+      partnerName: who === 'host' ? coop.guestName : coop.hostName,
+      partnerSpriteId: who === 'host' ? coop.guestSpriteId : coop.hostSpriteId,
+      mySlots: controllers.map((controller) => controller === who),
+      myMons: team.map((mon) => mon.rosterIndex !== undefined && coop.owners[mon.rosterIndex] === who),
+      error: this.coopErrorSeq === this.human.requestSeq ? this.coopError : null,
+      result: this.coopResult
     }
   }
 
@@ -2081,6 +2358,16 @@ export class WildBattle {
 
   /** Online: the battle as one of the two players sees it (side 1, the friend's, flipped round). */
   onlineView(side: 0 | 1): BattleView {
+    // A co-op fight: both players see the shared side as their own - the friend's screen
+    // just leaves the run's results to their copy (see CoopBattleView.result).
+    if (this.opponent?.coop) {
+      const view = this.view()
+      // Won, but with one team wiped out: the run is over all the same.
+      if (this.coopResult && !this.coopResult.won && view.winner === 'You') view.winner = this.opponent.name
+      return side === 0
+        ? { ...view, coop: this.coopView('host', view.team) }
+        : { ...view, coop: this.coopView('guest', view.team), expGains: [], runFainted: [], runItemReward: false }
+    }
     const guest = this.guestLog
     if (side === 0 || !guest) return this.view()
     const team = this.buildTeamView(1)

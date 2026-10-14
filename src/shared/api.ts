@@ -4,7 +4,7 @@
  * direct function call inside the page on mobile.
  */
 import type { MissionClaimResult, MissionsState } from './missions'
-import type { OnlineDraftTeam, OnlinePlayer, OnlineSelf, OnlineTeam, OnlineViews } from './online'
+import type { CoopSetup, OnlineCoopTeam, OnlineDraftTeam, OnlinePlayer, OnlineSelf, OnlineTeam, OnlineViews } from './online'
 import type { RarityOddsReport, RarityOddsSource } from './rarity'
 import type { LocalMusicFile } from './music'
 import type { UiScaleChoice, UiScaleState } from './ui-scale'
@@ -12,7 +12,6 @@ import type { CoinBalance, DailyCoinMon, DailyCoinMonPurchase, DailyCoinOffer, D
 import type { BlackjackView } from './blackjack'
 import type { DiceRoll } from './dice'
 import type { AchievementClaimResult, AchievementsState } from './achievements'
-import type { CloudSave, CloudStatus } from './cloud'
 import type { RouletteSpin } from './roulette'
 import type { GameCornerPerks } from './titles'
 import type { DexNavCandidate, DexNavState } from './dexnav'
@@ -28,6 +27,7 @@ import type {
   BossStep,
   BoxState,
   CatchResult,
+  CoopBattleResult,
   EditablePokemonSet,
   EditorOptions,
   ExpGainResult,
@@ -88,7 +88,6 @@ export function createApi(transport: ApiTransport) {
     startTrainerBattle: (boss: boolean, rematchTrainerId?: string): Promise<BattleView> =>
       transport.invoke('battle:startTrainer', boss, rematchTrainerId),
     getBossRematchList: (): Promise<BossRematchInfo[]> => transport.invoke('battle:bossRematchList'),
-    getRun: (): Promise<RunView | null> => transport.invoke('run:get'),
     getDraft: (): Promise<DraftView | null> => transport.invoke('draft:get'),
     getDraftDailyWinClaimed: (): Promise<boolean> => transport.invoke('draft:dailyWinClaimed'),
     getDraftEntryFee: (): Promise<number> => transport.invoke('draft:entryFee'),
@@ -105,54 +104,28 @@ export function createApi(transport: ApiTransport) {
     chooseChaosModifier: (index: number, target?: ChaosModifierTarget): Promise<DraftView> =>
       transport.invoke('draft:chaosModifier', index, target),
     startDraftBattle: (bring: number[]): Promise<BattleView> => transport.invoke('draft:battle', bring),
-    // Generations with a Roguelite boss of every class - the ones a run can be set to.
-    getRunGenerations: (): Promise<number[]> => transport.invoke('run:generations'),
-    startRun: (boxMonId: string, difficulty: RunDifficulty, generation: number | null, keepMoves: boolean): Promise<RunView> =>
-      transport.invoke('run:start', boxMonId, difficulty, generation, keepMoves),
-    previewStarterMoves: (boxMonId: string): Promise<RunMovesPreview> => transport.invoke('run:previewStarterMoves', boxMonId),
-    previewEvolutionMoves: (runMonId: string, targetSpecies: string): Promise<RunMovesPreview> =>
-      transport.invoke('run:previewEvolution', runMonId, targetSpecies),
-    getRunMonEditInfo: (runMonId: string): Promise<RunMonEditInfo> => transport.invoke('run:editInfo', runMonId),
-    runSmogonSet: (runMonId: string, optionId: string): Promise<string[]> =>
-      transport.invoke('run:smogonSet', runMonId, optionId),
-    updateRunMon: (runMonId: string, input: RunMonEdit): Promise<RunView> => transport.invoke('run:updateMon', runMonId, input),
-    forfeitRun: (): Promise<RunView> => transport.invoke('run:forfeit'),
-    // A floor's option, by its place in the run's list of choices.
-    chooseRunNode: (index: number): Promise<RunChoiceResult> => transport.invoke('run:choose', index),
-    giveRunItem: (itemId: string, runMonId: string): Promise<RunView> => transport.invoke('run:giveItem', itemId, runMonId),
-    skipRunItem: (): Promise<RunView> => transport.invoke('run:skipItem'),
-    giveRunAbility: (abilityId: string, runMonId: string): Promise<RunView> =>
-      transport.invoke('run:giveAbility', abilityId, runMonId),
-    teachRunMove: (moveId: string, runMonId: string, replaceMoveId: string | null): Promise<RunView> =>
-      transport.invoke('run:teachMove', moveId, runMonId, replaceMoveId),
-    skipRunPick: (): Promise<RunView> => transport.invoke('run:skipPick'),
-    swapRunMon: (runMonId: string): Promise<RunView> => transport.invoke('run:swapMon', runMonId),
-    swapRunTeam: (): Promise<RunView> => transport.invoke('run:swapTeam'),
-    skipRunSwap: (): Promise<RunView> => transport.invoke('run:skipSwap'),
-    // A beaten villain's reward: one of its Pokemon by place, in someone's place on a full team.
-    takeRunRewardMon: (index: number, replaceRunMonId?: string): Promise<RunView> =>
-      transport.invoke('run:takeRewardMon', index, replaceRunMonId),
-    skipRunRewardMon: (): Promise<RunView> => transport.invoke('run:skipRewardMon'),
-    // Roguelite consumables (outside battle) and a boss floor's shop.
-    useRunFullRestore: (runMonId: string): Promise<RunView> => transport.invoke('run:fullRestore', runMonId),
-    // With a full team, replaceId is the team member who leaves (to the fainted) to make room.
-    useRunRevive: (faintedId: string, replaceId?: string): Promise<RunView> =>
-      transport.invoke('run:revive', faintedId, replaceId),
-    useRunAbilityCapsule: (runMonId: string, abilityId: string): Promise<RunView> =>
-      transport.invoke('run:abilityCapsule', runMonId, abilityId),
-    // Undoes a New Ability pick, back to the ability it came with.
-    resetRunAbility: (runMonId: string): Promise<RunView> => transport.invoke('run:resetAbility', runMonId),
-    buyRunConsumable: (id: RunConsumableId): Promise<RunView> => transport.invoke('run:buyConsumable', id),
-    // A boss shop's Rare Candy, used on the spot on this team member (past the cap).
-    buyRunRareCandy: (runMonId: string): Promise<RunView> => transport.invoke('run:buyRareCandy', runMonId),
-    buyRunShopTile: (tile: RunShopTile): Promise<RunView> => transport.invoke('run:buyShopTile', tile),
+    // The Battle Tower run's calls (see runCalls), on the solo run.
+    ...runCalls(transport, 'run'),
+    // ...and the same again on the co-op run (see shared/online.ts).
+    coopRun: runCalls(transport, 'coop'),
+    // A co-op run's start: this player's starter, with the room's settings and seed.
+    startCoopRun: (boxMonId: string, keepMoves: boolean, setup: CoopSetup, partner: OnlinePlayer, role: 'host' | 'guest'): Promise<RunView> =>
+      transport.invoke('coop:startCoopRun', boxMonId, keepMoves, setup, partner, role),
+    // This player's co-op run team, for a fight taken on together.
+    getCoopTeam: (): Promise<OnlineCoopTeam> => transport.invoke('coop:team'),
+    // The host's copy: its last fight fought together.
+    getLastCoopBattle: (): Promise<CoopBattleResult | null> => transport.invoke('coop:lastBattle'),
+    // The friend's copy: a fight fought together, applied to its run (null if it already was).
+    applyCoopBattle: (result: CoopBattleResult): Promise<{ expGains: ExpGainResult[]; fainted: string[]; itemReward: boolean } | null> =>
+      transport.invoke('coop:applyBattle', result),
+    // The host's copy: the fight together, once both players are at the boss (or villain).
+    startCoopBattle: (friend: OnlinePlayer, friendTeam: OnlineCoopTeam): Promise<OnlineViews> =>
+      transport.invoke('coop:battle', friend, friendTeam),
+    // The connection dropped mid-fight: it stops, counting for neither run.
+    abandonCoopBattle: (): Promise<void> => transport.invoke('coop:abandonBattle'),
+    // The run of the battle on screen (the solo or co-op run), or null for any other battle.
+    getBattleRun: (): Promise<RunView | null> => transport.invoke('battle:runView'),
     listAllAbilities: (): Promise<{ id: string; name: string }[]> => transport.invoke('dex:abilities'),
-    rerollRunItems: (): Promise<RunView> => transport.invoke('run:rerollItems'),
-    evolveRunMon: (runMonId: string, targetSpecies: string, newMoves: boolean): Promise<RunView> =>
-      transport.invoke('run:evolve', runMonId, targetSpecies, newMoves),
-    placeDisplacedItem: (runMonId: string | null): Promise<RunView> => transport.invoke('run:placeDisplacedItem', runMonId),
-    moveRunItem: (fromMonId: string, toMonId: string): Promise<RunView> => transport.invoke('run:moveItem', fromMonId, toMonId),
-    reorderRunTeam: (runMonIds: string[]): Promise<RunView> => transport.invoke('run:reorder', runMonIds),
     submitChoice: (choice: string): Promise<BattleView> => transport.invoke('battle:choose', choice),
     // replaceRunMonId: in a run with a full team, who the new Pokemon replaces.
     catchWildPokemon: (replaceRunMonId?: string): Promise<CatchResult> => transport.invoke('battle:catch', replaceRunMonId),
@@ -170,7 +143,7 @@ export function createApi(transport: ApiTransport) {
     // Every Pokemon a Max Raid can bring, registered or not (the Max Raid page's carousel).
     getRaidBosses: (): Promise<RaidBossPreview[]> => transport.invoke('raid:bosses'),
     runFromBattle: (): Promise<void> => transport.invoke('battle:run'),
-    // Gives up a draft match or a Roguelite fight; the view comes back already ended.
+    // Gives up a draft match or a Battle Tower fight; the view comes back already ended.
     forfeitBattle: (): Promise<BattleView> => transport.invoke('battle:forfeit'),
     getBattleEligibility: (): Promise<BattleEligibility> => transport.invoke('battle:eligibility'),
     // Online battles with a friend: who this player is (and their team), and - on the
@@ -260,13 +233,6 @@ export function createApi(transport: ApiTransport) {
       transport.invoke('box:sellMany', ids),
     getCoins: (): Promise<number> => transport.invoke('coins:get'),
     getAchievements: (): Promise<AchievementsState> => transport.invoke('achievements:get'),
-    // Cloud saves on Google Drive, for the logged-in player.
-    getCloudStatus: (): Promise<CloudStatus> => transport.invoke('cloud:status'),
-    connectCloud: (): Promise<CloudStatus> => transport.invoke('cloud:connect'),
-    disconnectCloud: (): Promise<CloudStatus> => transport.invoke('cloud:disconnect'),
-    listCloudSaves: (): Promise<CloudSave[]> => transport.invoke('cloud:list'),
-    exportToCloud: (): Promise<CloudSave[]> => transport.invoke('cloud:export'),
-    importFromCloud: (fileId: string): Promise<void> => transport.invoke('cloud:import', fileId),
     // The save as a .pkmnsave file, to carry between the PC and the phone.
     exportSaveFile: (): Promise<{ name: string; data: Uint8Array }> => transport.invoke('save:exportFile'),
     importSaveFile: (data: Uint8Array): Promise<void> => transport.invoke('save:importFile', data),
@@ -431,3 +397,61 @@ export function createApi(transport: ApiTransport) {
 }
 
 export type Api = ReturnType<typeof createApi>
+
+// The Battle Tower run's calls, on the solo run ('run:...') or the co-op one ('coop:...') -
+// the main process answers both the same way, each on its own run.
+function runCalls(transport: ApiTransport, prefix: 'run' | 'coop') {
+  const call = (channel: string, ...args: unknown[]) => transport.invoke(`${prefix}:${channel}`, ...args)
+  return {
+    getRun: (): Promise<RunView | null> => call('get'),
+    // Generations with a Battle Tower boss of every class - the ones a run can be set to.
+    getRunGenerations: (): Promise<number[]> => call('generations'),
+    startRun: (boxMonId: string, difficulty: RunDifficulty, generation: number | null, keepMoves: boolean): Promise<RunView> =>
+      call('start', boxMonId, difficulty, generation, keepMoves),
+    previewStarterMoves: (boxMonId: string): Promise<RunMovesPreview> => call('previewStarterMoves', boxMonId),
+    previewEvolutionMoves: (runMonId: string, targetSpecies: string): Promise<RunMovesPreview> =>
+      call('previewEvolution', runMonId, targetSpecies),
+    getRunMonEditInfo: (runMonId: string): Promise<RunMonEditInfo> => call('editInfo', runMonId),
+    runSmogonSet: (runMonId: string, optionId: string): Promise<string[]> =>
+      call('smogonSet', runMonId, optionId),
+    updateRunMon: (runMonId: string, input: RunMonEdit): Promise<RunView> => call('updateMon', runMonId, input),
+    forfeitRun: (): Promise<RunView> => call('forfeit'),
+    // A floor's option, by its place in the run's list of choices.
+    chooseRunNode: (index: number): Promise<RunChoiceResult> => call('choose', index),
+    giveRunItem: (itemId: string, runMonId: string): Promise<RunView> => call('giveItem', itemId, runMonId),
+    skipRunItem: (): Promise<RunView> => call('skipItem'),
+    giveRunAbility: (abilityId: string, runMonId: string): Promise<RunView> =>
+      call('giveAbility', abilityId, runMonId),
+    teachRunMove: (moveId: string, runMonId: string, replaceMoveId: string | null): Promise<RunView> =>
+      call('teachMove', moveId, runMonId, replaceMoveId),
+    skipRunPick: (): Promise<RunView> => call('skipPick'),
+    swapRunMon: (runMonId: string): Promise<RunView> => call('swapMon', runMonId),
+    swapRunTeam: (): Promise<RunView> => call('swapTeam'),
+    skipRunSwap: (): Promise<RunView> => call('skipSwap'),
+    // A beaten villain's reward: one of its Pokemon by place, in someone's place on a full team.
+    takeRunRewardMon: (index: number, replaceRunMonId?: string): Promise<RunView> =>
+      call('takeRewardMon', index, replaceRunMonId),
+    skipRunRewardMon: (): Promise<RunView> => call('skipRewardMon'),
+    // Battle Tower consumables (outside battle) and a boss floor's shop.
+    useRunFullRestore: (runMonId: string): Promise<RunView> => call('fullRestore', runMonId),
+    // With a full team, replaceId is the team member who leaves (to the fainted) to make room.
+    useRunRevive: (faintedId: string, replaceId?: string): Promise<RunView> =>
+      call('revive', faintedId, replaceId),
+    useRunAbilityCapsule: (runMonId: string, abilityId: string): Promise<RunView> =>
+      call('abilityCapsule', runMonId, abilityId),
+    // Undoes a New Ability pick, back to the ability it came with.
+    resetRunAbility: (runMonId: string): Promise<RunView> => call('resetAbility', runMonId),
+    buyRunConsumable: (id: RunConsumableId): Promise<RunView> => call('buyConsumable', id),
+    // A boss shop's Rare Candy, used on the spot on this team member (past the cap).
+    buyRunRareCandy: (runMonId: string): Promise<RunView> => call('buyRareCandy', runMonId),
+    buyRunShopTile: (tile: RunShopTile): Promise<RunView> => call('buyShopTile', tile),
+    rerollRunItems: (): Promise<RunView> => call('rerollItems'),
+    evolveRunMon: (runMonId: string, targetSpecies: string, newMoves: boolean): Promise<RunView> =>
+      call('evolve', runMonId, targetSpecies, newMoves),
+    placeDisplacedItem: (runMonId: string | null): Promise<RunView> => call('placeDisplacedItem', runMonId),
+    moveRunItem: (fromMonId: string, toMonId: string): Promise<RunView> => call('moveItem', fromMonId, toMonId),
+    reorderRunTeam: (runMonIds: string[]): Promise<RunView> => call('reorder', runMonIds)
+  }
+}
+
+export type RunApi = ReturnType<typeof runCalls>

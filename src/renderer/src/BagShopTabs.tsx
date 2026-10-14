@@ -27,7 +27,7 @@ function BagShopTabs({ current, onSwitch, onClose }: Props): React.JSX.Element {
         { id: 'keys', label: label('Key Items', './sprites/misc/shinycharm.png') },
         {
           id: 'tms',
-          // The TR from the item sheet, as on a Roguelite run's new-move floor.
+          // The TR from the item sheet, as on a Battle Tower run's new-move floor.
           label: (
             <>
               <span className="bag-shop-tab-icon bag-shop-tab-sheet-icon">

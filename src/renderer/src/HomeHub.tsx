@@ -155,7 +155,7 @@ function HomeHub({
           <span className="home-card-key">4</span>
           <span className="home-card-head">
             <img className="home-card-icon" src="./icons/nav/roguelite.png" alt="" />
-            <span className="home-card-title">Roguelite</span>
+            <span className="home-card-title">Battle Tower</span>
           </span>
           <span className="home-card-sub">
             {runActive && run

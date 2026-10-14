@@ -4,7 +4,7 @@ import { MAX_BET } from '../../shared/slots'
 import { BLACKJACK_PAYOUT, BLACKJACK_WIN_PAYOUT, type GameCornerPerks } from '../../shared/titles'
 import CoinIcon from './CoinIcon'
 import Tooltip from './Tooltip'
-import { IS_MOBILE } from './platform'
+import { IS_MOBILE_LAYOUT } from './platform'
 
 interface Props {
   // The bet as placed (already kept between 1 and max - see placedBet).
@@ -147,7 +147,7 @@ function BetSlider({ bet, max, disabled, step = 10, onChange, info }: Props): Re
       </button>
     </>
   )
-  if (IS_MOBILE) {
+  if (IS_MOBILE_LAYOUT) {
     return (
       <>
         {infoIcon}

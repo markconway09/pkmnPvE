@@ -25,7 +25,7 @@ import { IS_MOBILE } from './platform'
 interface Props {
   onBack: () => void
   onPremadeTeams: () => void
-  // The Roguelite bosses' own list (Debug → Edit Roguelite Bosses) instead of the
+  // The Battle Tower bosses' own list (Debug → Edit Battle Tower Bosses) instead of the
   // normal game's trainers - each list only ever shows its own.
   roguelite?: boolean
 }
@@ -496,11 +496,11 @@ function TrainerList({ onBack, onPremadeTeams, roguelite = false }: Props): Reac
   return (
     <div className="screen trainer-screen">
       <div className="trainer-screen-header">
-        <h1>{roguelite ? 'Roguelite Bosses' : 'Trainers'}</h1>
+        <h1>{roguelite ? 'Battle Tower Bosses' : 'Trainers'}</h1>
         <div className="trainer-screen-buttons">
           <button onClick={onBack}>Back</button>
           <button onClick={onPremadeTeams}>Premade Teams</button>
-          <button onClick={() => setEditingTrainer('new')}>{roguelite ? 'Add Roguelite Boss' : 'Add Trainer'}</button>
+          <button onClick={() => setEditingTrainer('new')}>{roguelite ? 'Add Battle Tower Boss' : 'Add Trainer'}</button>
         </div>
       </div>
       {error && <p className="editor-error">{error}</p>}
@@ -542,7 +542,7 @@ function TrainerList({ onBack, onPremadeTeams, roguelite = false }: Props): Reac
         </div>
       )}
 
-      {/* The Roguelite bosses by generation: how close each is to a whole run's worth. */}
+      {/* The Battle Tower bosses by generation: how close each is to a whole run's worth. */}
       {roguelite && (
         <div className="trainer-coverage">
           {coverage.map(({ g, total, count, complete }) => (
@@ -715,7 +715,7 @@ function TrainerList({ onBack, onPremadeTeams, roguelite = false }: Props): Reac
           </button>
         )}
         {trainers && listed.length === 0 && (
-          <p className="box-empty-hint">{roguelite ? 'No Roguelite bosses yet.' : 'No trainers yet.'}</p>
+          <p className="box-empty-hint">{roguelite ? 'No Battle Tower bosses yet.' : 'No trainers yet.'}</p>
         )}
         {trainers && listed.length > 0 && visible.length === 0 && category !== 'order' && (
           <p className="box-empty-hint">No trainers match these filters.</p>

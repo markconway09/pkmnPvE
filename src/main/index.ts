@@ -5,14 +5,6 @@ import { join } from 'node:path'
 import { installMusicFolder } from './music-folder'
 import { initialWindowSize, installUiScale, installUiScaleIpc } from './ui-scale'
 import { checkForUpdate, installUpdate } from './updater'
-import {
-  connectCloud,
-  disconnectCloud,
-  exportToCloud,
-  getCloudStatus,
-  importFromCloud,
-  listCloudSaves
-} from './cloud/google-drive'
 import { chooseBackground, clearBackground, getBackground } from './showdown/background-store'
 import { restoreRememberedSession } from './showdown/player-session'
 import { gameHandlers, scheduleAchievementCheck } from './game-api'
@@ -81,13 +73,7 @@ function createWindow(): void {
 // The game itself (game-api.ts) - the same calls the mobile build makes directly.
 for (const [channel, handler] of gameHandlers) ipcMain.handle(channel, handler)
 
-// Desktop only: Google Drive saves, self-updating and the custom background.
-ipcMain.handle('cloud:status', () => getCloudStatus())
-ipcMain.handle('cloud:connect', () => connectCloud())
-ipcMain.handle('cloud:disconnect', () => disconnectCloud())
-ipcMain.handle('cloud:list', () => listCloudSaves())
-ipcMain.handle('cloud:export', () => exportToCloud())
-ipcMain.handle('cloud:import', (_event, fileId: string) => importFromCloud(fileId))
+// Desktop only: self-updating and the custom background.
 ipcMain.handle('update:check', () => checkForUpdate())
 ipcMain.handle('background:get', () => getBackground())
 ipcMain.handle('background:choose', (event) => chooseBackground(BrowserWindow.fromWebContents(event.sender)))

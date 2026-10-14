@@ -16,7 +16,7 @@ import type { GameCornerGameProps } from './GameCornerTabs'
 import CoinIcon from './CoinIcon'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
 import { playCornerClunk, playCornerTick } from './ticks'
-import { IS_MOBILE } from './platform'
+import { IS_MOBILE_LAYOUT } from './platform'
 
 const SPIN_MS = 4200
 const SEGMENT = 360 / WHEEL_ORDER.length
@@ -58,7 +58,7 @@ function boardPlace(key: RouletteBetKey): [number, number, number] {
  */
 function boardStyle(key: RouletteBetKey): React.CSSProperties {
   const [column, row, span] = boardPlace(key)
-  if (!IS_MOBILE) return { gridColumn: `${column} / span ${span}`, gridRow: key === 'n:0' ? '1 / span 3' : row }
+  if (!IS_MOBILE_LAYOUT) return { gridColumn: `${column} / span ${span}`, gridRow: key === 'n:0' ? '1 / span 3' : row }
   return { gridRow: `${column} / span ${span}`, gridColumn: key === 'n:0' ? '1 / span 3' : row <= 3 ? 4 - row : row }
 }
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { loadSpriteStyle } from './spriteStyle'
 import { createPortal } from 'react-dom'
 import type { RunMonEditInfo, RunMonView, RunView } from '../../shared/battle-types'
+import type { RunApi } from '../../shared/api'
 import { toSpriteId } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
 import ItemSprite from './ItemSprite'
@@ -17,16 +18,18 @@ interface Props {
   mon?: RunMonView
   onClose: () => void
   onSaved: (run: RunView) => void
+  // The run's calls - the solo run's, or the co-op one's.
+  api?: RunApi
 }
 
 /**
- * Roguelite's own moves editor - apart from the classic Pokemon editor: a run Pokemon's
+ * Battle Tower's own moves editor - apart from the classic Pokemon editor: a run Pokemon's
  * four moves (anything its species can ever learn) and which of them are locked in
  * (kept when its moves change on evolving), with Smogon's sets to fill them in. Laid out
  * like the classic editor: the Pokemon on the left, its moves as cards with their type,
  * category, power, accuracy and PP.
  */
-function RunMonEditor({ runMonId, mon, onClose, onSaved }: Props): React.JSX.Element {
+function RunMonEditor({ runMonId, mon, onClose, onSaved, api = window.api }: Props): React.JSX.Element {
   const [info, setInfo] = useState<RunMonEditInfo | null>(null)
   const [moves, setMoves] = useState<string[]>(['', '', '', ''])
   const [locked, setLocked] = useState<string[]>([])
@@ -47,7 +50,7 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved }: Props): React.JSX.Ele
   }
 
   useEffect(() => {
-    window.api
+    api
       .getRunMonEditInfo(runMonId)
       .then((loaded) => {
         setInfo(loaded)
@@ -57,7 +60,7 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved }: Props): React.JSX.Ele
         setSetId(loaded.autoSets[0]?.id ?? '')
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
-  }, [runMonId])
+  }, [runMonId, api])
 
   const moveInfo = (id: string): RunMonEditInfo['learnable'][number] | undefined =>
     info?.learnable.find((m) => m.id === id)
@@ -72,7 +75,7 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved }: Props): React.JSX.Ele
     setBusy(true)
     setError(null)
     try {
-      const setMovesFound = await window.api.runSmogonSet(runMonId, setId)
+      const setMovesFound = await api.runSmogonSet(runMonId, setId)
       // Locked moves stay; the set fills the other slots.
       const keep = moves.filter((m) => m && locked.includes(m))
       const fill = setMovesFound.filter((m) => !keep.includes(m))
@@ -90,8 +93,8 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved }: Props): React.JSX.Ele
     setBusy(true)
     setError(null)
     try {
-      onSaved(await window.api.resetRunAbility(runMonId))
-      const fresh = await window.api.getRunMonEditInfo(runMonId)
+      onSaved(await api.resetRunAbility(runMonId))
+      const fresh = await api.getRunMonEditInfo(runMonId)
       setInfo((current) => (current ? { ...current, abilityDescription: fresh.abilityDescription } : fresh))
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -106,7 +109,7 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved }: Props): React.JSX.Ele
     try {
       const chosen = moves.filter(Boolean)
       onSaved(
-        await window.api.updateRunMon(runMonId, {
+        await api.updateRunMon(runMonId, {
           moves: chosen,
           lockedMoves: locked.filter((m) => chosen.includes(m)),
           teraType

@@ -47,9 +47,8 @@ async function boot(): Promise<void> {
   window.api = createApi(directTransport)
   const { restoreRememberedSession } = await import('../main/showdown/player-session')
   restoreRememberedSession()
+  // The screens, with the phone layout (mobile.css) after styles.css.
   await import('../renderer/src/main')
-  // After styles.css, so the phone layout's rules win.
-  await import('./mobile.css')
   if (Capacitor.isNativePlatform()) installBackButton()
 }
 

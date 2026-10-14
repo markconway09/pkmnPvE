@@ -7,7 +7,7 @@ interface Props {
   // Mid-spin / mid-hand in the Game Corner: nothing can be left until it's over.
   locked: boolean
   onGo: (page: MenuPage, from: HTMLElement) => void
-  // The floor of a run in progress, shown on the Roguelite button.
+  // The floor of a run in progress, shown on the Battle Tower button.
   runFloor: number | null
   // Raid Crystals held, shown on the Max Raid button (null while raids are locked).
   raidCrystals: number | null
@@ -72,7 +72,7 @@ function MenuRail({
     { id: 'classic', label: 'Battles', icon: <img className="menu-rail-icon menu-rail-icon-pixel" src="./icons/nav/challenge.png" alt="" /> },
     {
       id: 'roguelite',
-      label: 'Roguelite',
+      label: 'Battle Tower',
       icon: <img className="menu-rail-icon menu-rail-icon-pixel" src="./icons/nav/roguelite.png" alt="" />,
       badge: runFloor !== null ? `F${runFloor}` : undefined
     },

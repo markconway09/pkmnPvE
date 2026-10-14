@@ -22,9 +22,9 @@ const DIFFICULTIES: [AiDifficulty, string][] = [
   ['hard', 'Hard']
 ]
 
-// The Roguelite bosses' own trainer editor (Debug → Edit Roguelite Bosses) - kept apart
+// The Battle Tower bosses' own trainer editor (Debug → Edit Battle Tower Bosses) - kept apart
 // from the classic TrainerEditor so run-only settings can go here without cluttering
-// that one. Everything it saves is a Roguelite boss: none of the classic game's boss,
+// that one. Everything it saves is a Battle Tower boss: none of the classic game's boss,
 // always-available or Team Rocket options apply.
 function RogueliteBossEditor({ trainer, trainers, onClose, onSaved }: Props): React.JSX.Element {
   const [trainerId, setTrainerId] = useState<string | null>(trainer?.id ?? null)
@@ -121,7 +121,7 @@ function RogueliteBossEditor({ trainer, trainers, onClose, onSaved }: Props): Re
   return createPortal(
     <div className="modal-overlay" onMouseDown={onClose}>
       <div className="modal-panel trainer-editor-modal" onMouseDown={(e) => e.stopPropagation()}>
-        <h2>{trainerId ? 'Edit Roguelite Boss' : 'New Roguelite Boss'}</h2>
+        <h2>{trainerId ? 'Edit Battle Tower Boss' : 'New Battle Tower Boss'}</h2>
         <div className="trainer-editor-scroll">
           <div className="trainer-editor-grid">
             <div className="trainer-editor-column">

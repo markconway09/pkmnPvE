@@ -217,7 +217,7 @@ function PlayerTrainerModal({
                     ? ` (${runDifficultyInfo(profile.stats.bestFloorDifficulty).label})`
                     : ''}
                 </span>
-                <span className="profile-stat-label">Roguelite best floor</span>
+                <span className="profile-stat-label">Battle Tower best floor</span>
               </div>
             </div>
           </div>

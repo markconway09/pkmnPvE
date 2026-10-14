@@ -4,14 +4,13 @@ import { reloadPlayerSave } from './player-session'
 
 /**
  * A save as one file (.pkmnsave), to move it between the PC and the phone by hand -
- * through the Google Drive app, a cable, a chat... It's the same file the cloud saves
- * upload (a gzipped bundle of every file in the player's save folder), so a cloud save
- * downloaded from Drive imports too. Importing replaces the current save, which is
- * backed up first; the player's own name and admin status stay as they are.
+ * through a file-sharing app, a cable, a chat... (a gzipped bundle of every file in the
+ * player's save folder). Importing replaces the current save, which is backed up first;
+ * the player's own name and admin status stay as they are.
  */
 
 const SAVE_FORMAT = 'pkmnpve-save'
-// Never part of a save file: the Google Drive connection, and the local backups.
+// Never part of a save file: the Google Drive sign-in older versions left behind, and the local backups.
 const CLOUD_FILE = 'cloud.json'
 const BACKUPS_DIR = 'backups'
 const LOCAL_BACKUPS_KEPT = 5

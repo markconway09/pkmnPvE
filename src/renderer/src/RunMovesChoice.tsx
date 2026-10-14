@@ -26,7 +26,7 @@ function MoveColumn({ heading, moves }: { heading: string; moves: MoveInfo[] }):
   )
 }
 
-// Roguelite: a Pokemon starting the run or evolving can keep its moves or take the run
+// Battle Tower: a Pokemon starting the run or evolving can keep its moves or take the run
 // moveset for what it now is - its moves change only at these moments (and on a catch).
 function RunMovesChoice({ title, preview, busy, onKeep, onNew, onCancel }: Props): React.JSX.Element {
   return createPortal(

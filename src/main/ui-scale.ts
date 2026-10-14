@@ -13,6 +13,10 @@ import { UI_SCALE_CHOICES, type UiScaleChoice, type UiScaleState } from '../shar
 export const BASE_WIDTH = 1280
 export const BASE_HEIGHT = 960
 
+// Mobile: the phone layout in a window a phone's size (in the layout's own pixels).
+const PHONE_WIDTH = 412
+const PHONE_HEIGHT = 880
+
 // Auto never shrinks below this (text gets hard to read) or grows past this.
 const AUTO_MIN = 0.6
 const AUTO_MAX = 1.5
@@ -48,26 +52,36 @@ function workAreaFor(win?: BrowserWindow): Electron.Rectangle {
   return display.workArea
 }
 
-/** The zoom for a choice on a screen: a fixed size, or for Auto whatever fits, in 5% steps. */
+/** The layout's own size for a choice: the desktop's 1280x960, or a phone's. */
+function baseFor(pick: UiScaleChoice): { width: number; height: number } {
+  return pick === 'mobile' ? { width: PHONE_WIDTH, height: PHONE_HEIGHT } : { width: BASE_WIDTH, height: BASE_HEIGHT }
+}
+
+// Auto and Mobile fit the screen; the others are a fixed zoom.
+const fitsScreen = (pick: UiScaleChoice): boolean => pick === 'auto' || pick === 'mobile'
+
+/** The zoom for a choice on a screen: a fixed size, or for Auto / Mobile whatever fits, in 5% steps. */
 function zoomFor(pick: UiScaleChoice, area: Electron.Rectangle): number {
-  if (pick !== 'auto') return Number(pick) / 100
-  const fit = Math.min(area.width / BASE_WIDTH, area.height / BASE_HEIGHT)
+  if (!fitsScreen(pick)) return Number(pick) / 100
+  const base = baseFor(pick)
+  const fit = Math.min(area.width / base.width, area.height / base.height)
   const stepped = Math.floor(fit * 20) / 20
   return Math.min(AUTO_MAX, Math.max(AUTO_MIN, stepped))
 }
 
 /** The window's size at a zoom - never bigger than the screen, even at a fixed 150%. */
-function sizeFor(zoom: number, area: Electron.Rectangle): { width: number; height: number } {
+function sizeFor(pick: UiScaleChoice, zoom: number, area: Electron.Rectangle): { width: number; height: number } {
+  const base = baseFor(pick)
   return {
-    width: Math.min(area.width, Math.round(BASE_WIDTH * zoom)),
-    height: Math.min(area.height, Math.round(BASE_HEIGHT * zoom))
+    width: Math.min(area.width, Math.round(base.width * zoom)),
+    height: Math.min(area.height, Math.round(base.height * zoom))
   }
 }
 
 /** The size the main window opens at, for the screen it's about to open on. */
 export function initialWindowSize(): { width: number; height: number } {
   const area = workAreaFor()
-  return sizeFor(zoomFor(currentChoice(), area), area)
+  return sizeFor(currentChoice(), zoomFor(currentChoice(), area), area)
 }
 
 // The zoom each window is drawn at, and the screen it was worked out for (so moving
@@ -83,11 +97,16 @@ function apply(win: BrowserWindow, resize: boolean): void {
   if (win.isDestroyed()) return
   const area = workAreaFor(win)
   const zoom = zoomFor(currentChoice(), area)
-  const size = sizeFor(zoom, area)
+  const size = sizeFor(currentChoice(), zoom, area)
   applied.set(win, { zoom, displayId: screen.getDisplayMatching(win.getBounds()).id })
   win.webContents.setZoomFactor(zoom)
   win.setMinimumSize(size.width, size.height)
-  if (win.isMaximized() || win.isFullScreen()) return
+  if (win.isMaximized() || win.isFullScreen()) {
+    // Switching to Mobile leaves the full screen, to show the phone-shaped window.
+    if (!resize || currentChoice() !== 'mobile') return
+    if (win.isFullScreen()) win.setFullScreen(false)
+    win.unmaximize()
+  }
   const [width, height] = win.getSize()
   if (resize || width < size.width || height < size.height) {
     win.setSize(size.width, size.height)
@@ -99,7 +118,7 @@ function apply(win: BrowserWindow, resize: boolean): void {
 export function installUiScale(win: BrowserWindow): void {
   win.webContents.on('did-finish-load', () => apply(win, false))
   win.on('moved', () => {
-    if (currentChoice() !== 'auto') return
+    if (!fitsScreen(currentChoice())) return
     const now = screen.getDisplayMatching(win.getBounds()).id
     if (applied.get(win)?.displayId !== now) apply(win, true)
   })
@@ -112,19 +131,24 @@ function watchScreens(): void {
   if (watchingScreens) return
   watchingScreens = true
   screen.on('display-metrics-changed', () => {
-    if (currentChoice() !== 'auto') return
+    if (!fitsScreen(currentChoice())) return
     for (const win of BrowserWindow.getAllWindows()) apply(win, true)
   })
 }
 
 export function installUiScaleIpc(): void {
   watchScreens()
+  // Asked by the preload before the screens load: the phone layout (Mobile) or the desktop one.
+  ipcMain.on('uiScale:layout', (event) => {
+    event.returnValue = currentChoice() === 'mobile' ? 'mobile' : 'desktop'
+  })
   ipcMain.handle('uiScale:get', (event): UiScaleState => {
     const win = BrowserWindow.fromWebContents(event.sender)
     return { choice: currentChoice(), zoom: win ? (applied.get(win)?.zoom ?? 1) : 1 }
   })
   ipcMain.handle('uiScale:set', (event, next: UiScaleChoice): UiScaleState => {
     if ((UI_SCALE_CHOICES as string[]).includes(next)) {
+      const layoutChanged = (currentChoice() === 'mobile') !== (next === 'mobile')
       choice = next
       loaded = true
       try {
@@ -132,7 +156,11 @@ export function installUiScaleIpc(): void {
       } catch (e) {
         console.error('[ui-scale] failed to save:', e)
       }
-      for (const win of BrowserWindow.getAllWindows()) apply(win, true)
+      for (const win of BrowserWindow.getAllWindows()) {
+        apply(win, true)
+        // Switching between the phone and desktop layouts reloads the screens.
+        if (layoutChanged) win.webContents.reload()
+      }
     }
     const win = BrowserWindow.fromWebContents(event.sender)
     return { choice: currentChoice(), zoom: win ? (applied.get(win)?.zoom ?? 1) : 1 }

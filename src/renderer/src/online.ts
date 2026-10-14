@@ -1,11 +1,14 @@
 import { useSyncExternalStore } from 'react'
 import { Peer, type DataConnection } from 'peerjs'
-import type { BattleView } from '../../shared/battle-types'
+import type { BattleView, CoopBattleResult, RunDifficulty, RunView } from '../../shared/battle-types'
 import type { DraftView } from '../../shared/draft'
 import {
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
   ROOM_ID_PREFIX,
+  type CoopProgress,
+  type CoopSetup,
+  type OnlineCoopTeam,
   type OnlineMessage,
   type OnlinePlayer,
   type OnlineViews
@@ -27,6 +30,17 @@ export interface OnlineDraftState {
   friendLeadPicked: boolean
 }
 
+// A co-op Battle Tower run (see shared/online.ts): its settings, where the friend's run
+// stands, and whether this player is waiting at a boss or villain for them. `version` goes
+// up whenever this copy changed the player's co-op run itself (the friend's run ending
+// theirs, a fight's result) - the run screen reads it again then.
+export interface OnlineCoopState {
+  setup: CoopSetup
+  partner: CoopProgress | null
+  ready: { floor: number; kind: 'boss' | 'villain' } | null
+  version: number
+}
+
 export interface OnlineState {
   phase: OnlinePhase
   role: 'host' | 'guest' | null
@@ -37,9 +51,20 @@ export interface OnlineState {
   error: string | null
   // An online chaos draft is going (the room stays in the lobby between its battles).
   draft: OnlineDraftState | null
+  // A co-op Battle Tower run is going (the room stays in the lobby between its fights together).
+  coop: OnlineCoopState | null
 }
 
-const IDLE: OnlineState = { phase: 'idle', role: null, code: null, friend: null, starting: false, error: null, draft: null }
+const IDLE: OnlineState = {
+  phase: 'idle',
+  role: null,
+  code: null,
+  friend: null,
+  starting: false,
+  error: null,
+  draft: null,
+  coop: null
+}
 
 let state: OnlineState = IDLE
 let peer: Peer | null = null
@@ -63,9 +88,15 @@ let sentTeamStage = -1
 let myLead: { stage: number; order: number[] } | null = null
 let friendLead: { stage: number; order: number[] } | null = null
 let draftResultPending = false
+// Co-op: the friend's run team for the fight they're waiting at (host), and the fights
+// together whose result this copy has already applied (friend).
+let friendCoopTeam: { floor: number; team: OnlineCoopTeam } | null = null
+const appliedCoopBattles = new Set<string>()
 
 const stateListeners = new Set<(state: OnlineState) => void>()
 const viewListeners = new Set<(view: BattleView, fresh: boolean) => void>()
+// A co-op fight cut off by a dropped connection: the battle screen just closes.
+const battleClosedListeners = new Set<() => void>()
 
 function setState(patch: Partial<OnlineState>): void {
   state = { ...state, ...patch }
@@ -90,6 +121,17 @@ export function useOnlineState(): OnlineState {
 export function onOnlineBattleView(listener: (view: BattleView, fresh: boolean) => void): () => void {
   viewListeners.add(listener)
   return () => viewListeners.delete(listener)
+}
+
+// A co-op fight that stopped part-way (the connection dropped) - the battle page closes.
+export function onOnlineBattleClosed(listener: () => void): () => void {
+  battleClosedListeners.add(listener)
+  return () => battleClosedListeners.delete(listener)
+}
+
+function closeBattle(): void {
+  lastView = null
+  for (const listener of battleClosedListeners) listener()
 }
 
 const LOG_ARRAYS = ['log', 'logStates', 'feedback', 'moveEvents', 'gimmickEvents', 'abilityEvents'] as const
@@ -126,6 +168,28 @@ function showView(next: BattleView, from: number): void {
     const result = view.winner === 'You' ? true : view.winner === null ? null : false
     window.api.finishOnlineDraftBattle(result).then(showDraftView, () => {})
   }
+  // A co-op fight: nobody is waiting at the boss any more - and once it's over, the
+  // friend's copy applies how it went to its own run (the host's already has).
+  if (fresh && state.coop?.ready) setState({ coop: { ...state.coop, ready: null } })
+  const result = view.coop?.result
+  if (view.ended && result && state.role === 'guest' && !appliedCoopBattles.has(result.battleId)) {
+    appliedCoopBattles.add(result.battleId)
+    applyCoopResult(result, view)
+  }
+}
+
+// The friend's copy: a fight together's result into its run, and its screen's results.
+function applyCoopResult(result: CoopBattleResult, view: BattleView | null): void {
+  window.api.applyCoopBattle(result).then(
+    (applied) => {
+      if (state.coop) setState({ coop: { ...state.coop, version: state.coop.version + 1 } })
+      if (!applied || !view || lastView !== view) return
+      const patched = { ...view, expGains: applied.expGains, runFainted: applied.fainted, runItemReward: applied.itemReward }
+      lastView = patched
+      for (const listener of viewListeners) listener(patched, false)
+    },
+    (e) => setState({ error: e instanceof Error ? e.message : String(e) })
+  )
 }
 
 function send(message: OnlineMessage): void {
@@ -158,6 +222,7 @@ function reset(error: string | null = null): void {
   pendingChoices.clear()
   if (state.draft) void window.api.endOnlineDraft()
   resetDraftProgress()
+  friendCoopTeam = null
   state = { ...IDLE, error }
   for (const listener of stateListeners) listener(state)
 }
@@ -253,22 +318,35 @@ function attach(connection: DataConnection): void {
 // The friend went away (closed the game, lost their connection or left the room).
 function friendLeft(): void {
   const name = state.friend?.name ?? 'Your friend'
+  // A co-op fight cut off part-way counts for neither run: both runs are still at the
+  // boss, saved, and the fight starts over when the two meet up again.
+  const coopCutOff = !!state.coop && state.phase === 'battle' && !!lastView && !lastView.ended
   if (state.role === 'host') {
     // Mid-battle, leaving counts as giving up.
-    if (state.phase === 'battle' && lastView && !lastView.ended) void window.api.forfeitOnline(1)
+    if (coopCutOff) {
+      void window.api.abandonCoopBattle()
+      closeBattle()
+    } else if (state.phase === 'battle' && lastView && !lastView.ended) void window.api.forfeitOnline(1)
     conn = null
     guestSent = 0
     // A chaos draft can't go on without them.
     if (state.draft) void window.api.endOnlineDraft()
     resetDraftProgress()
+    friendCoopTeam = null
     // The room stays open for them to come back.
     setState({
-      phase: state.phase === 'battle' ? 'battle' : 'waiting',
+      phase: state.phase === 'battle' && !coopCutOff ? 'battle' : 'waiting',
       friend: null,
       starting: false,
       draft: null,
-      error: `${name} left the room`
+      coop: null,
+      error: state.coop ? `${name} left the room - your co-op run is saved, carry it on when they're back` : `${name} left the room`
     })
+    return
+  }
+  if (coopCutOff) {
+    closeBattle()
+    reset(`Lost the connection to ${name} - your co-op run is saved, carry it on when you're back`)
     return
   }
   // The friend's copy can't go on without the host's: an unfinished battle just stops.
@@ -333,7 +411,29 @@ async function receive(message: OnlineMessage): Promise<void> {
         friendLead = null
         showDraftView(state.draft.view)
       }
+      // A co-op fight that couldn't start: nobody's waiting at the boss any more.
+      if (state.coop) setState({ coop: { ...state.coop, ready: null } })
       setState({ starting: false, error: message.reason })
+      return
+    case 'coopStart':
+      if (state.role === 'guest' && message.setup) void joinCoop(message.setup, !!message.resume, message.lastBattle ?? null)
+      return
+    case 'coopRefuse':
+      if (state.role === 'host') setState({ coop: null, starting: false, error: message.reason })
+      return
+    case 'coopProgress':
+      if (state.coop && message.progress && typeof message.progress === 'object') void partnerProgressed(message.progress)
+      return
+    case 'coopTeam':
+      if (state.role !== 'host' || !state.coop || !message.team) return
+      friendCoopTeam = { floor: Number(message.floor), team: message.team }
+      startCoopBattleIfReady()
+      return
+    case 'coopLeave':
+      if (state.coop) {
+        friendCoopTeam = null
+        setState({ coop: null, error: `${state.friend?.name ?? 'Your friend'} left the co-op run - it's saved, carry it on later` })
+      }
       return
     case 'draftStart': {
       if (state.role !== 'guest') return
@@ -515,6 +615,161 @@ export function leaveOnlineBattle(): void {
   if (state.role === 'host') void window.api.endOnlineBattle()
   if (state.phase !== 'battle') return
   setState({ phase: state.friend ? 'lobby' : state.role === 'host' ? 'waiting' : 'idle' })
+}
+
+// ---- Co-op Battle Tower (see shared/online.ts) ----
+
+function randomSeed(): string {
+  return Array.from({ length: 16 }, () => Math.floor(Math.random() * 36).toString(36)).join('')
+}
+
+/** Host: a new co-op run for both, on these settings - each player then picks a starter. */
+export function startCoopRun(difficulty: RunDifficulty, generation: number | null): void {
+  if (state.role !== 'host' || state.phase !== 'lobby' || state.starting || state.draft || state.coop) return
+  const setup: CoopSetup = { seed: randomSeed(), difficulty, generation }
+  friendCoopTeam = null
+  setState({ coop: { setup, partner: null, ready: null, version: 0 }, error: null })
+  send({ type: 'coopStart', setup, resume: false, lastBattle: null })
+}
+
+/** Host: carries on the co-op run saved with this friend (the friend's copy must have it too). */
+export async function resumeCoopRun(run: RunView): Promise<void> {
+  if (state.role !== 'host' || state.phase !== 'lobby' || state.starting || state.draft || state.coop || !run.coop) return
+  const setup: CoopSetup = { seed: run.coop.seed, difficulty: run.difficulty, generation: run.generation }
+  friendCoopTeam = null
+  setState({ coop: { setup, partner: null, ready: null, version: 0 }, error: null })
+  let lastBattle: CoopBattleResult | null = null
+  try {
+    lastBattle = await window.api.getLastCoopBattle()
+  } catch {
+    // Nothing to send again.
+  }
+  send({ type: 'coopStart', setup, resume: true, lastBattle })
+}
+
+// The friend's copy: the host started (or carried on) a co-op run - joined if this copy can.
+async function joinCoop(setup: CoopSetup, resume: boolean, lastBattle: CoopBattleResult | null): Promise<void> {
+  const friendName = state.friend?.name ?? 'Your friend'
+  const myName = self?.name ?? 'Your friend'
+  let run: RunView | null = null
+  try {
+    run = await window.api.coopRun.getRun()
+  } catch {
+    run = null
+  }
+  const sameRun = run?.coop?.seed === setup.seed
+  if (resume && !sameRun) {
+    send({ type: 'coopRefuse', reason: `${myName} has no save of this co-op run` })
+    setState({ error: `${friendName} wanted to carry on a co-op run you have no save of` })
+    return
+  }
+  if (!resume && run?.status === 'active' && !sameRun) {
+    send({ type: 'coopRefuse', reason: `${myName} has another co-op run going - they need to forfeit it first` })
+    setState({ error: `${friendName} started a co-op run - forfeit your other co-op run (with ${run.coop?.partnerName ?? 'someone else'}) to join` })
+    return
+  }
+  friendCoopTeam = null
+  setState({ coop: { setup, partner: null, ready: null, version: 0 }, draft: null, error: null })
+  // A fight together the host's copy finished but this one never heard the end of.
+  if (sameRun && lastBattle && !appliedCoopBattles.has(lastBattle.battleId)) {
+    appliedCoopBattles.add(lastBattle.battleId)
+    applyCoopResult(lastBattle, null)
+  }
+}
+
+// Where the friend's run stands now. Their run over means this one is too.
+async function partnerProgressed(progress: CoopProgress): Promise<void> {
+  const coop = state.coop
+  if (!coop) return
+  setState({ coop: { ...coop, partner: progress } })
+  // No longer waiting at the boss: the team they sent for it is out of date.
+  if (!progress.ready) friendCoopTeam = null
+  if (progress.seed === coop.setup.seed && progress.status === 'lost') {
+    try {
+      const run = await window.api.coopRun.getRun()
+      if (run?.status === 'active' && run.coop?.seed === coop.setup.seed) {
+        await window.api.coopRun.forfeitRun()
+        if (state.coop) setState({ coop: { ...state.coop, ready: null, version: state.coop.version + 1 } })
+      }
+    } catch {
+      // The run screen shows how things stand.
+    }
+  }
+  startCoopBattleIfReady()
+}
+
+/** This player's co-op run as it now stands, for the friend's screen. */
+export function reportCoopProgress(run: RunView | null): void {
+  const coop = state.coop
+  if (!coop) return
+  const mine = run?.coop?.seed === coop.setup.seed ? run : null
+  send({
+    type: 'coopProgress',
+    progress: {
+      seed: mine ? coop.setup.seed : null,
+      status: mine ? mine.status : 'none',
+      floor: mine?.floor ?? 0,
+      bossesBeaten: mine?.bossesBeaten ?? 0,
+      team: mine?.team ?? [],
+      ready: coop.ready
+    }
+  })
+}
+
+/**
+ * Waiting at this floor's boss or villain for the friend (or not any more: null). The
+ * friend's copy sends its run team along; the host's starts the fight once both are there.
+ */
+export async function setCoopReady(ready: { floor: number; kind: 'boss' | 'villain' } | null, run: RunView | null): Promise<void> {
+  if (!state.coop) return
+  // The friend's copy sends its team first, so the host's never starts with an old one.
+  let team: OnlineCoopTeam | null = null
+  if (ready && state.role === 'guest') {
+    try {
+      team = await window.api.getCoopTeam()
+    } catch (e) {
+      setState({ error: e instanceof Error ? e.message : String(e) })
+      return
+    }
+  }
+  const coop = state.coop
+  if (!coop) return
+  setState({ coop: { ...coop, ready }, error: null })
+  if (ready && team) send({ type: 'coopTeam', floor: ready.floor, team })
+  reportCoopProgress(run)
+  startCoopBattleIfReady()
+}
+
+// Host: both at the same boss (or villain), the friend's team in hand - the fight starts.
+function startCoopBattleIfReady(): void {
+  const coop = state.coop
+  if (state.role !== 'host' || !coop?.ready || !state.friend || state.starting || state.phase !== 'lobby') return
+  const floor = coop.ready.floor
+  if (coop.partner?.ready?.floor !== floor || friendCoopTeam?.floor !== floor) return
+  const team = friendCoopTeam.team
+  friendCoopTeam = null
+  setState({ starting: true, error: null })
+  guestSent = 0
+  lastView = null
+  window.api.startCoopBattle(state.friend, team).then(
+    (views) => {
+      setState({ starting: false })
+      hostViews(views)
+    },
+    (e) => {
+      const reason = e instanceof Error ? e.message : String(e)
+      send({ type: 'startError', reason })
+      setState({ starting: false, error: reason, coop: state.coop ? { ...state.coop, ready: null } : null })
+    }
+  )
+}
+
+/** Leaves the co-op run (back to the room) - both copies keep it saved. */
+export function leaveCoopRun(): void {
+  if (!state.coop) return
+  send({ type: 'coopLeave' })
+  friendCoopTeam = null
+  setState({ coop: null })
 }
 
 /** Closes the room (or leaves the friend's). */

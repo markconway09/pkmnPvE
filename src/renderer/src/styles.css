@@ -132,7 +132,7 @@ textarea,
   gap: 14px;
 }
 
-/* Classic | Roguelite, the lit half is the mode you're in. */
+/* Classic | Battle Tower, the lit half is the mode you're in. */
 .mode-switch {
   display: flex;
   border: 2px solid #3a4150;
@@ -180,7 +180,7 @@ textarea,
   vertical-align: middle;
 }
 
-/* Icons on the Classic | Roguelite switch and in the player card's menu. */
+/* Icons on the Classic | Battle Tower switch and in the player card's menu. */
 .mode-switch-option {
   display: flex;
   align-items: center;
@@ -4089,7 +4089,7 @@ button:disabled {
   text-align: center;
 }
 
-/* ---- Roguelite mode ---- */
+/* ---- Battle Tower mode ---- */
 
 .run-panel {
   display: flex;
@@ -4324,7 +4324,7 @@ button:disabled {
   flex: 1;
 }
 
-/* Roguelite: the next run's difficulty and generation, beside the starter slot. */
+/* Battle Tower: the next run's difficulty and generation, beside the starter slot. */
 .run-starter-row {
   gap: 18px;
   align-items: flex-start;
@@ -4658,7 +4658,7 @@ button:disabled {
   color: #ffd76b;
 }
 
-/* Roguelite: keep-or-change moves, and the run's own moves editor. */
+/* Battle Tower: keep-or-change moves, and the run's own moves editor. */
 .run-moves-modal {
   width: 520px;
 }
@@ -5028,7 +5028,7 @@ button:disabled {
   color: #ff9a8f;
 }
 
-/* Roguelite: the run's progress - a notch per floor, bigger ones for the bosses. */
+/* Battle Tower: the run's progress - a notch per floor, bigger ones for the bosses. */
 .run-progress {
   position: relative;
   width: min(760px, calc(100% - 32px));
@@ -5098,7 +5098,7 @@ button:disabled {
   border-color: #ffffff;
 }
 
-/* Roguelite floor options: the New Ability patch and the New Move TR. */
+/* Battle Tower floor options: the New Ability patch and the New Move TR. */
 .run-node-item-icon {
   object-fit: contain;
   padding: 6px;
@@ -5505,7 +5505,7 @@ input.editor-ev-input:focus {
   margin-top: 8px;
 }
 
-/* Switching Classic / Roguelite: a ring of the new mode's colour spreading from the
+/* Switching Classic / Battle Tower: a ring of the new mode's colour spreading from the
    toggle across the window, with a soft wash of that colour inside it. */
 .mode-pulse {
   position: fixed;
@@ -5643,7 +5643,7 @@ input.editor-ev-input:focus {
   box-shadow: 0 0 0 1px #ffd76b, 0 0 10px rgba(255, 215, 107, 0.45);
 }
 
-/* A Roguelite wild floor: the location's backdrop behind the grass (same pictures as
+/* A Battle Tower wild floor: the location's backdrop behind the grass (same pictures as
    the main menu's location buttons), darkened toward the bottom for the label. */
 .run-node-button.run-node-located {
   position: relative;
@@ -5685,7 +5685,7 @@ img.wild-location-icon {
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
 }
 
-/* Roguelite wild floors: the location's small pixel icon, scaled up crisply. */
+/* Battle Tower wild floors: the location's small pixel icon, scaled up crisply. */
 .run-node-location-icon {
   object-fit: contain;
   image-rendering: pixelated;
@@ -6273,7 +6273,7 @@ img.wild-location-icon {
   }
 }
 
-/* Options → Cloud saves: the Google Drive buttons and the list of exported saves. */
+/* Options → Saves: the button rows, the save preview card and the status line. */
 .cloud-actions {
   display: flex;
   gap: 8px;
@@ -6885,7 +6885,7 @@ button.editor-evolution:disabled.editor-evolution-locked {
   animation: achievement-flash 1.2s ease-out 2;
 }
 
-/* Roguelite gems and consumables. */
+/* Battle Tower gems and consumables. */
 .run-gem-icon {
   width: 18px;
   height: 18px;
@@ -8452,7 +8452,7 @@ button.editor-evolution:disabled.editor-evolution-locked {
   font-weight: bold;
 }
 
-/* ---- The trainer screens (classic and Roguelite) ---- */
+/* ---- The trainer screens (classic and Battle Tower) ---- */
 .trainer-screen {
   gap: 10px;
 }
@@ -8524,7 +8524,7 @@ button.editor-evolution:disabled.editor-evolution-locked {
   color: #9ccbff;
 }
 
-/* The Roguelite bosses by generation: each one's Gym Leaders, Elite Four and Champion. */
+/* The Battle Tower bosses by generation: each one's Gym Leaders, Elite Four and Champion. */
 .trainer-coverage {
   display: flex;
   align-items: center;
@@ -9921,7 +9921,7 @@ button.trainer-danger {
   text-decoration: underline dotted;
 }
 
-/* ---- Roguelite run screen rework ---- */
+/* ---- Battle Tower run screen rework ---- */
 
 /* The HUD across the top: the floor in big numbers, the run's stats, difficulty, gems
    and Forfeit, on one framed strip tinted by the difficulty. */
@@ -10511,7 +10511,7 @@ button.trainer-danger {
   }
 }
 
-/* ---- Roguelite setup screen rework ---- */
+/* ---- Battle Tower setup screen rework ---- */
 
 /* The last run's result: a banner that drops in, rewards dealt in after it. */
 .run-setup .run-result {
@@ -10856,7 +10856,7 @@ button.trainer-danger {
   --run-accent: #e0453b;
 }
 
-/* ---- Roguelite setup: compact layout and generation chips ---- */
+/* ---- Battle Tower setup: compact layout and generation chips ---- */
 
 /* Tighter all round, so the box below keeps its room. */
 .run-panel.run-setup {
@@ -11007,7 +11007,7 @@ button.trainer-danger {
   }
 }
 
-/* ---- Roguelite setup: one-line last-run banner, roomier rules box ---- */
+/* ---- Battle Tower setup: one-line last-run banner, roomier rules box ---- */
 
 .run-setup .run-result {
   display: flex;
@@ -11099,7 +11099,7 @@ button.trainer-danger {
   color: #ff8a80;
 }
 
-/* ---- Classic mode: the battle buttons in a framed card, like the Roguelite and Draft setups ---- */
+/* ---- Classic mode: the battle buttons in a framed card, like the Battle Tower and Draft setups ---- */
 
 /* A gap under the nav bar, so the card doesn't touch it. */
 .run-panel.classic-panel {
@@ -11366,7 +11366,7 @@ button.trainer-danger {
 }
 
 
-/* ---- Roguelite: the Revive modal ---- */
+/* ---- Battle Tower: the Revive modal ---- */
 
 .run-revive-overlay {
   backdrop-filter: blur(3px);
@@ -15068,7 +15068,7 @@ img.sprite-smooth {
   text-shadow: none;
 }
 
-/* ---- Roguelite page, in the floating-card look: the setup card and the run's HUD as
+/* ---- Battle Tower page, in the floating-card look: the setup card and the run's HUD as
    soft dark cards (the difficulty's colour a faint border and glow, not a thick stripe),
    choices on sunken tiles, the controls soft pills ---- */
 .menu-page-roguelite .run-setup-card,
@@ -15890,7 +15890,7 @@ img.sprite-smooth {
   }
 }
 
-/* The Roguelite revive window keeps its green, in the new card look. */
+/* The Battle Tower revive window keeps its green, in the new card look. */
 .modal-panel.run-revive-modal {
   border: 1px solid rgba(139, 224, 143, 0.35);
   background:
@@ -16319,8 +16319,8 @@ img.sprite-smooth {
   background: linear-gradient(#ffd560, #d8a92e);
 }
 
-/* ---- Options window, in the floating-card look: each part (Updates, Account, Cloud
-   saves, Sprite style, Background) on its own sunken tile, small headings, soft pill
+/* ---- Options window, in the floating-card look: each part (Updates, Account, Saves,
+   Sprite style, Background) on its own sunken tile, small headings, soft pill
    buttons, a round close X ---- */
 .options-modal-body {
   display: flex;
@@ -17379,7 +17379,7 @@ img.sprite-smooth {
   color: #ffd9d6;
 }
 
-/* ---- Keep or new moves (Roguelite), in the floating-card look: a purple-tinted card,
+/* ---- Keep or new moves (Battle Tower), in the floating-card look: a purple-tinted card,
    the two movesets side by side as cards (the new one tinted purple), each move a
    rounded row, and pill buttons - Use new moves purple ---- */
 .modal-panel.run-moves-modal {
@@ -17461,7 +17461,7 @@ img.sprite-smooth {
   background: rgba(180, 140, 255, 0.32);
 }
 
-/* ---- Revive (Roguelite), in the floating-card look: the green-tinted card (set above),
+/* ---- Revive (Battle Tower), in the floating-card look: the green-tinted card (set above),
    the heading on a sunken bar, the fainted on a sunken tile of rounded cards, and pill
    Back / Cancel ---- */
 .run-revive-modal .run-revive-header {
@@ -18241,11 +18241,11 @@ img.sprite-smooth {
 }
 
 .classic-trainer-tile {
-  height: 92px;
+  height: 128px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 14px 0 8px;
+  gap: 14px;
+  padding: 0 18px 0 10px;
   text-align: left;
   background:
     radial-gradient(ellipse at 10% 60%, rgba(107, 176, 255, 0.2), transparent 55%),
@@ -18276,8 +18276,8 @@ img.sprite-smooth {
 }
 
 .classic-trainer-sprite {
-  width: 76px;
-  height: 76px;
+  width: 112px;
+  height: 112px;
   flex-shrink: 0;
   object-fit: contain;
   image-rendering: pixelated;
@@ -18291,17 +18291,17 @@ img.sprite-smooth {
 .classic-trainer-text {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 5px;
   min-width: 0;
 }
 
 .classic-trainer-title {
-  font-size: 16px;
+  font-size: 20px;
   font-weight: bold;
 }
 
 .classic-trainer-sub {
-  font-size: 12px;
+  font-size: 14px;
   color: #c9d1dd;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -20161,7 +20161,7 @@ img.sprite-smooth {
   font-weight: 600;
 }
 
-/* ---- Roguelite: Villain Takeover ---- */
+/* ---- Battle Tower: Villain Takeover ---- */
 
 /* The banner over a taken-over floor. */
 .run-takeover-title {
@@ -21171,9 +21171,9 @@ img.sprite-smooth {
   max-width: 320px;
 }
 
-/* Options: the screen size tabs (Auto and the fixed zooms). */
+/* Options: the screen size tabs (Auto, the fixed zooms and Mobile). */
 .options-scale-tabs {
-  max-width: 520px;
+  max-width: 600px;
 }
 
 /* A double resist (1/4x) - or, from the receiving end, a 4x weakness - in a darker red
@@ -22110,7 +22110,7 @@ img.sprite-smooth {
   margin: 0;
 }
 
-/* Small pixel-art sidebar icons (Classic, Roguelite) kept crisp rather than
+/* Small pixel-art sidebar icons (Classic, Battle Tower) kept crisp rather than
    smoothed as they're scaled up. */
 .menu-rail-icon.menu-rail-icon-pixel {
   image-rendering: pixelated;
@@ -24405,4 +24405,212 @@ img.battle-result-icon {
   object-fit: cover;
   border-radius: 10px;
   background: #000;
+}
+
+/* Merge stars: a star each, or "3★" where a row doesn't fit (the phone's team dock). */
+.box-icon-stars-short {
+  display: none;
+}
+
+/* Options → Screen size in the PC's phone layout: all seven tabs across the narrow window. */
+html[data-layout='mobile'] .options-scale-tabs .tab-strip-tab {
+  padding: 8px 2px;
+  font-size: 12px;
+}
+
+/* ---- Sprite credits: the sprite picker's look, each sprite with its artist under it ---- */
+.sprite-credits-intro {
+  margin: 0 0 10px;
+}
+
+.trainer-picker .trainer-picker-option.sprite-credit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 122px;
+  padding: 4px;
+  box-sizing: border-box;
+}
+
+.sprite-credit-artist {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: #ffd76b;
+}
+
+/* The columns never widen to fit a long artist name (it's cut short with "..." instead),
+   so the grid never scrolls sideways. */
+.sprite-credits .trainer-picker-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  overflow-x: hidden;
+}
+
+.trainer-picker .trainer-picker-option.sprite-credit {
+  min-width: 0;
+}
+
+/* The picker's Sprite credits button sits on the left, apart from Cancel. */
+.trainer-picker > .editor-actions .trainer-picker-credits {
+  margin-right: auto;
+}
+
+/* Trainer and Boss: a bigger Battle pill to go with their bigger tiles. */
+.classic-trainer-tile .classic-wild-go {
+  top: 10px;
+  right: 10px;
+  padding: 3px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+}
+
+/* ---- Co-op Battle Tower (CoopRunPanel) ---- */
+
+/* The co-op start in the online room: a Battle Tower purple, apart from the battle's red. */
+.online-section .online-row .online-coop-start:not(:disabled) {
+  border-color: #c9a6ff;
+  background: linear-gradient(180deg, #8a5ad6, #5b3399);
+  color: #fff;
+}
+
+.online-section .coop-select {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid #2f3746;
+  border-radius: 15px;
+  background: #1a1f28;
+  color: inherit;
+}
+
+/* The friend's strip: who, where they are, and their team - under the run's progress bar. */
+.coop-partner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(820px, calc(100% - 32px));
+  box-sizing: border-box;
+  margin: 2px 0 8px;
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(16, 20, 26, 0.72);
+}
+
+.coop-setup .coop-partner {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.coop-partner-sprite {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  flex-shrink: 0;
+}
+
+.coop-partner-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.coop-partner-name {
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.coop-partner-status {
+  color: #9aa6b8;
+  font-size: 0.85em;
+}
+
+/* Waiting at the boss: their status lights up. */
+.coop-partner-ready {
+  color: #9ff0b8;
+}
+
+.coop-partner-team {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+  justify-content: center;
+}
+
+.coop-partner-mon {
+  position: relative;
+  width: 44px;
+  height: 44px;
+}
+
+.coop-partner-mon-level {
+  position: absolute;
+  right: -2px;
+  bottom: -4px;
+  padding: 0 3px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  font-size: 10px;
+}
+
+.coop-leave {
+  flex-shrink: 0;
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid #2f3746;
+  border-radius: 15px;
+  background: #1a1f28;
+}
+
+.coop-leave:hover:not(:disabled) {
+  border-color: #ff8a80;
+}
+
+/* The waiting room at a boss or villain. */
+.coop-waiting .coop-waiting-standby {
+  width: min(560px, 100%);
+  box-sizing: border-box;
+}
+
+.coop-waiting-sprite {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+/* A co-op fight: the partner's Pokemon in the switch list (only they send it in). */
+.team-member-partner {
+  border-style: dashed;
+}
+
+.team-member-owner {
+  flex-shrink: 0;
+  max-width: 70px;
+  padding: 0 5px;
+  border-radius: 6px;
+  background: rgba(180, 140, 255, 0.22);
+  color: #d9c4ff;
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.coop-turn-error {
+  color: #ff9f8a;
+}
+
+/* The co-op run on the Battle page: laid out like the Battle Tower page's run. */
+.coop-run-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 10px;
 }

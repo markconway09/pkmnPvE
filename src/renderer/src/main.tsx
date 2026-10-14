@@ -2,6 +2,9 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import './styles.css'
+// The phone layout, after styles.css so its rules win - it only applies on the phone, or
+// with Options → Screen size → Mobile (see platform.ts).
+import '../../mobile/mobile.css'
 import { installMenuSounds } from './sfx'
 import { startMusic } from './music'
 import { installDragScroll } from './dragScroll'

@@ -36,7 +36,7 @@ import {
 } from './effectiveness'
 import { loadLegacyTrainerSprite } from './trainerSprite'
 import Login from './Login'
-import { chooseOnline, forfeitOnline, leaveOnlineBattle, onOnlineBattleView, useOnlineState } from './online'
+import { chooseOnline, forfeitOnline, leaveOnlineBattle, onOnlineBattleClosed, onOnlineBattleView, useOnlineState } from './online'
 import { CLICK } from './platform'
 
 type Screen = 'menu' | 'battle' | 'trainers' | 'rogueliteBosses' | 'premadeTeams'
@@ -199,6 +199,16 @@ function isFaintedSlot(request: NonNullable<BattleView['request']>, slotIndex: n
   return request.side.pokemon.filter((p) => p.active)[slotIndex]?.condition.endsWith(' fnt') ?? false
 }
 
+// A co-op fight: a slot the partner picks for, not this player.
+function isPartnerSlot(view: BattleView | null, slotIndex: number): boolean {
+  return !!view?.coop && !view.coop.mySlots[slotIndex]
+}
+
+// A slot with nothing for this player to pick: fainted, or the partner's.
+function isClosedSlot(view: BattleView | null, request: NonNullable<BattleView['request']>, slotIndex: number): boolean {
+  return isFaintedSlot(request, slotIndex) || isPartnerSlot(view, slotIndex)
+}
+
 async function skipTeamPreview(view: BattleView): Promise<BattleView> {
   let current = view
   while (!current.ended && current.request && 'teamPreview' in current.request && current.request.teamPreview) {
@@ -253,6 +263,15 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
           setScreen('battle')
         }
         setView(next)
+      }),
+    []
+  )
+  // A co-op fight cut off by a dropped connection: straight back to the menu.
+  useEffect(
+    () =>
+      onOnlineBattleClosed(() => {
+        setOnlineMode(false)
+        setScreen('menu')
       }),
     []
   )
@@ -383,12 +402,20 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
   useEffect(() => {
     const request = view?.request
     if (request && 'active' in request && request.active) {
-      // A slot whose Pokemon fainted with nothing left to replace it has no choice to make.
-      setPendingChoices(request.active.map((_, i) => (isFaintedSlot(request, i) ? 'pass' : null)))
+      // A slot whose Pokemon fainted with nothing left to replace it has no choice to make;
+      // in a co-op fight, neither has the partner's (it's sent as "partner", theirs to pick).
+      setPendingChoices(
+        request.active.map((_, i) => (isPartnerSlot(view, i) ? 'partner' : isFaintedSlot(request, i) ? 'pass' : null))
+      )
       setPendingGimmick(request.active.map(() => false))
       // Start on the first slot that actually needs a choice.
-      const firstOpen = request.active.findIndex((_, i) => !isFaintedSlot(request, i))
+      const firstOpen = request.active.findIndex((_, i) => !isClosedSlot(view, request, i))
       setActiveSelectSlot(firstOpen < 0 ? 0 : firstOpen)
+    } else if (request && 'forceSwitch' in request && request.forceSwitch && view?.coop) {
+      // A co-op fight: the replacements this player sends in (the main process worked out
+      // whose bench each comes from) - the rest are the partner's.
+      setPendingChoices(request.forceSwitch.map((_, i) => (isPartnerSlot(view, i) ? 'partner' : null)))
+      setPendingGimmick([])
     } else if (request && 'forceSwitch' in request && request.forceSwitch) {
       // In doubles, when both Pokemon faint with only one left on the bench, the
       // sim still flags both slots - the ones there's nobody to send in for pass.
@@ -538,7 +565,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
     }
   }
 
-  // A Roguelite floor's fight, already started by the run menu. A failure goes back to
+  // A Battle Tower floor's fight, already started by the run menu. A failure goes back to
   // the run menu, which shows it.
   async function startRunBattle(started: BattleView, location?: WildLocationId): Promise<void> {
     setError(null)
@@ -564,7 +591,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
     }
   }
 
-  // Giving up a draft match or a Roguelite fight: the battle ends as a loss and its end
+  // Giving up a draft match or a Battle Tower fight: the battle ends as a loss and its end
   // screen shows, just like losing it outright.
   async function forfeitBattle(): Promise<void> {
     if (busy) return
@@ -730,7 +757,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
     const request = view?.request
     if (!(request && 'active' in request && request.active)) return null
     for (let i = after + 1; i < request.active.length; i++) {
-      if (!isFaintedSlot(request, i)) return i
+      if (!isClosedSlot(view, request, i)) return i
     }
     return null
   }
@@ -741,7 +768,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
     const request = view?.request
     if (!(request && 'active' in request && request.active)) return null
     for (let i = before - 1; i >= 0; i--) {
-      if (!isFaintedSlot(request, i)) return i
+      if (!isClosedSlot(view, request, i)) return i
     }
     return null
   }
@@ -894,6 +921,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
             matchups={teamMatchupChips()}
             reservedSlots={switchTarget ? reservedSwitchSlots(switchTarget.slotIndex) : undefined}
             reviveMode={!!switchTarget?.reviving}
+            partnerOf={view.coop ? view.coop.myMons.map((mine) => (mine ? undefined : view.coop!.partnerName)) : undefined}
             onSwitch={(slot) => {
               if (!switchTarget) return
               if (switchTarget.forced) setPendingChoice(switchTarget.slotIndex, `switch ${slot}`)
@@ -907,7 +935,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
         {view && (
           <div className="battle-huds-large">
             <TrainerHud
-              name={username}
+              name={view.coop ? `${username} & ${view.coop.partnerName}` : username}
               title={playerTitle}
               gold={playerDexComplete}
               spriteId={trainerSprite}
@@ -1022,8 +1050,9 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
         {!view?.ended && activeRequest && (
           <div className="battle-action-slots">
             {activeRequest.map((active, slotIndex) => {
-              // Doubles picks one Pokemon at a time - only its panel is on screen.
-              if (slotIndex !== activeSelectSlot) return null
+              // Doubles picks one Pokemon at a time - only its panel is on screen (and, in a
+              // co-op fight, only for this player's own Pokemon).
+              if (slotIndex !== activeSelectSlot || isPartnerSlot(view, slotIndex)) return null
               const gimmick = getGimmickOption(active)
               // Doubles locks in one Pokemon at a time, so the gimmick may already be spoken
               // for by a partner's locked-in move this turn - only one of each kind per turn
@@ -1051,7 +1080,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
               const canGoBack = prevActiveSlot(slotIndex) !== null
               // Free from a wild Pokemon, paid from an ordinary trainer, never from a boss.
               const runCost = view?.runCost ?? null
-              // A draft match or a Roguelite fight has Forfeit in Run's place instead.
+              // A draft match or a Battle Tower fight has Forfeit in Run's place instead.
               const canForfeit = !canGoBack && !!view?.canForfeit
               const canRun = (!canGoBack && !!view && runCost !== null) || canForfeit
               // A paid run, walking away from a wild shiny, or forfeiting asks for a second click.
@@ -1198,8 +1227,12 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
           !view?.ended &&
           view?.request &&
           (view.request.wait || (pendingChoices.length > 0 && pendingChoices.every((c) => c !== null))) && (
-            <p className="online-waiting">Waiting for {view.opponentTrainer?.name ?? 'your friend'}...</p>
+            <p className="online-waiting">
+              Waiting for {view.coop?.partnerName ?? view.opponentTrainer?.name ?? 'your friend'}...
+            </p>
           )}
+        {/* A co-op turn the sim turned down: both pick again. */}
+        {view?.coop?.error && !view.ended && <p className="online-waiting coop-turn-error">{view.coop.error} - pick again</p>}
         {error && <p style={{ color: '#ff6b6b' }}>{error}</p>}
       </div>
 

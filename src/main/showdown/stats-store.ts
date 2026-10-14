@@ -53,7 +53,7 @@ export function getStats(): StoredStats {
   return { ...getState() }
 }
 
-/** Roguelite: keeps the furthest floor a run has reached, and on which difficulty -
+/** Battle Tower: keeps the furthest floor a run has reached, and on which difficulty -
  *  reaching the same floor on a harder difficulty takes the record over. */
 export function recordBestFloor(floor: number, difficulty: RunDifficulty): void {
   const stats = getState()

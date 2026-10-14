@@ -79,7 +79,7 @@ import {
   type PokemonSet
 } from './sim-access'
 import { expProgressForLevel, getExpInfo, levelForExp, totalExpForSpeciesLevel } from './exp'
-import { getProgression } from './progression-store'
+import { getProgression, lateItemsUnlocked } from './progression-store'
 import { addItem, bagItemUse, getItemQuantity, hasItem, removeItem } from './bag-store'
 import { playerDirFor, playerPathFor } from './save-paths'
 import { onPlayerChange } from './player-session'
@@ -519,7 +519,7 @@ function toView(mon: StoredMon, arrival: number, groups?: Map<string, StoredMon[
     everstone: isFullyEvolved(mon.set.species) ? undefined : { locked: !!mon.everstone, canUnlock: (mon.copies ?? 1) <= 1 },
     gigantamax: !!mon.set.gigantamax,
     gmaxLook: gmaxLookOf(mon.set) || undefined,
-    mergeCandidates: groups ? mergeCandidatesFor(mon, groups) : undefined,
+    mergeCandidates: groups && lateItemsUnlocked() ? mergeCandidatesFor(mon, groups) : undefined,
     rarityTier: speciesRarityTier(mon.set.species),
     sellPrice: monSellPrice(speciesRarityTier(mon.set.species), !!mon.set.shiny, mon.copies),
     dexNum: speciesDexNum(mon.set.species),
@@ -774,7 +774,7 @@ export function setTeam(team: (string | null)[]): BoxState {
   return getBoxState()
 }
 
-/** A detached copy of a box Pokemon's set - for a Roguelite run, which must never change the original. */
+/** A detached copy of a box Pokemon's set - for a Battle Tower run, which must never change the original. */
 export function copyBoxMonSet(id: string): PokemonSet {
   const mon = getState().mons.find((m) => m.id === id)
   if (!mon) throw new Error(`Unknown Pokemon id: ${id}`)
@@ -841,7 +841,14 @@ export function updateMon(id: string, input: EditablePokemonSet, admin = false):
  * shiny one makes it shiny, it keeps the higher friendship and the higher level (exp and
  * all), and their held items go back to the bag. They leave the box (and the team). All or nothing - every one is checked first.
  */
+// Merging is late game: it opens with Max Raids, once the boss flagged to unlock late
+// items is beaten.
+function requireMergeUnlocked(): void {
+  if (!lateItemsUnlocked()) throw new Error("Merging isn't unlocked yet - it opens with Max Raids")
+}
+
 export function mergeMons(keeperId: string, fodderIds: string[]): BoxState {
+  requireMergeUnlocked()
   mergeInto(keeperId, fodderIds)
   return getBoxState()
 }
@@ -934,6 +941,7 @@ function mergeInto(keeperId: string, fodderIds: string[], boosts: MergeBoosts = 
  * on pre-evolutions that aren't ready yet (see mergeEvolutionFor).
  */
 export function mergeSelectedMons(ids: string[], boosts: MergeBoosts = {}): { box: BoxState; merged: number; results: { species: string; stars: number }[] } {
+  requireMergeUnlocked()
   const box = getState()
   const wanted = new Set(ids)
   const picked = box.mons.filter((m) => wanted.has(m.id) && !m.fusedWith && (m.copies ?? 1) < MERGE_MAX_COPIES)
@@ -1011,6 +1019,7 @@ function bestMergeKeeperFor(monId: string): StoredMon | null {
 
 /** Which box Pokemon a Pokemon would auto-merge into, and its stars now (null: none). */
 export function mergeKeeperPreview(monId: string): { species: string; stars: number; uses: string[] } | null {
+  if (!lateItemsUnlocked()) return null
   const keeper = bestMergeKeeperFor(monId)
   const mon = getState().mons.find((m) => m.id === monId)
   if (!keeper || !mon) return null
@@ -1020,6 +1029,7 @@ export function mergeKeeperPreview(monId: string): { species: string; stars: num
 
 /** Merges a Pokemon straight into its best keeper (a Random Pokemon's "Auto merge"). */
 export function autoMergeMon(monId: string): { box: BoxState; species: string; stars: number } {
+  requireMergeUnlocked()
   const keeper = bestMergeKeeperFor(monId)
   if (!keeper) throw new Error('There is nothing in the box for it to merge into')
   mergeInto(keeper.id, [monId])
