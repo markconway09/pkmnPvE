@@ -29,7 +29,7 @@ Runs on Windows (PC) and Android. pkmnPvE is a non-commercial fan project and is
 - **Install (Android):** download the `.apk` from the same release and open it on the phone. Installing a newer APK over an old one keeps the save.
 - **Log in:** type a player name. Each name is its own save on that device.
 - **Welcome guide:** a short tour shown before your first starter. It can be reopened from Options > About.
-- **Starter:** a new save opens the starter picker: the 27 regional starters plus the two mascots.
+- **Starter:** a new save opens the starter picker: the 27 regional starters, Pikachu, Eevee, or a random unevolved Pokemon.
 
 The game saves by itself as you play.
 

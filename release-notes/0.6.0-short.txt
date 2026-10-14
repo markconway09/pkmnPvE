@@ -1,0 +1,9 @@
+Co-op Battle Tower
+
+- Android: move your save off the phone before updating, since this version cannot install over the old app
+- The Roguelite is now the Battle Tower, and you can climb it with a friend online
+- In co-op, bosses and villains are fought together in doubles
+- Merging now opens with Max Raids, after beating Boss Giovanni
+- New welcome guide for new players, also in Options > About
+- Google Drive backups are gone: use Send to another device or Save file
+- Clearer online connection errors, and a new Mobile screen size on PC
