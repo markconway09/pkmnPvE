@@ -299,6 +299,8 @@ export function createApi(transport: ApiTransport) {
     // The phone's: a picture from the gallery, already shrunk, as a data: URL.
     setBackground: (dataUrl: string): Promise<string> => transport.invoke('background:set', dataUrl),
     installUpdate: (): Promise<void> => transport.invoke('update:install'),
+    // Desktop only: opens save/logs, where errors are written for bug reports.
+    openLogFolder: (): Promise<void> => transport.invoke('logs:open'),
     // Download/unpack progress while an update installs; returns a function to stop listening.
     onUpdateProgress: (listener: (progress: UpdateProgress) => void): (() => void) => {
       return transport.on('update:progress', listener)

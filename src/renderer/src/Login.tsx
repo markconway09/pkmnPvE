@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { SessionInfo } from '../../shared/battle-types'
 import { MAX_USERNAME_LENGTH, normalizeUsername, usernameProblem } from '../../shared/battle-types'
+import { FAN_GAME_NOTICE } from '../../shared/about'
 
 interface Props {
   session: SessionInfo
@@ -83,6 +84,8 @@ function Login({ session, onLoggedIn }: Props): React.JSX.Element {
           </div>
         </div>
       )}
+
+      <p className="login-notice">{FAN_GAME_NOTICE}</p>
     </div>
   )
 }

@@ -1212,6 +1212,15 @@ export function unretiredHeldItem(itemName: string): string {
   return retired.replacement ? Dex.items.get(retired.replacement).name : ''
 }
 
+// Hyper Training isn't in the game, so the Bottle Caps say what the Rare Bone says:
+// they're only good for Fling (or selling).
+const RARE_BONE_TEXT_ITEMS = new Set(['bottlecap', 'goldbottlecap'])
+
+function itemDescription(item: { id: string; shortDesc?: string; desc?: string }): string {
+  const source = RARE_BONE_TEXT_ITEMS.has(item.id) ? Dex.items.get('rarebone') : item
+  return source.shortDesc || source.desc || ''
+}
+
 let cachedEditorOptions: EditorOptions | null = null
 
 export function getEditorOptions(): EditorOptions {
@@ -1220,7 +1229,7 @@ export function getEditorOptions(): EditorOptions {
   const items = Dex.items
     .all()
     .filter((i) => i.exists && !(i.id in RETIRED_ITEMS))
-    .map((i) => ({ id: i.id, name: i.name, description: i.shortDesc || i.desc || '', spritenum: i.spritenum ?? 0 }))
+    .map((i) => ({ id: i.id, name: i.name, description: itemDescription(i), spritenum: i.spritenum ?? 0 }))
     .concat([
       LINK_CABLE_ITEM,
       RARE_CANDY_ITEM,

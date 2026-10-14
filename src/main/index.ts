@@ -1,6 +1,6 @@
 // First, so the desktop platform is in place before any store reads a save.
 import './platform/electron'
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { join } from 'node:path'
 import { installMusicFolder } from './music-folder'
 import { initialWindowSize, installUiScale, installUiScaleIpc } from './ui-scale'
@@ -8,6 +8,9 @@ import { checkForUpdate, installUpdate } from './updater'
 import { chooseBackground, clearBackground, getBackground } from './showdown/background-store'
 import { restoreRememberedSession } from './showdown/player-session'
 import { gameHandlers, scheduleAchievementCheck } from './game-api'
+import { installCrashLog, openLogFolder, watchWindowErrors } from './crash-log'
+
+installCrashLog()
 
 // Every call from the window is followed by a (batched) achievement check - see
 // scheduleAchievementCheck in game-api.ts.
@@ -42,8 +45,22 @@ function createWindow(): void {
     show: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
+      // The page never gets Node itself - only the window.api calls the preload
+      // hands it. (The preload is an ES module, which a sandboxed preload can't be.)
+      contextIsolation: true,
+      nodeIntegration: false,
       sandbox: false
     }
+  })
+
+  // The window only ever shows the game: a link to the web (Report a bug...) opens
+  // in the player's own browser, and the window itself never goes to another page.
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https:\/\//i.test(url)) void shell.openExternal(url)
+    return { action: 'deny' }
+  })
+  mainWindow.webContents.on('will-navigate', (event) => {
+    if (event.url !== mainWindow.webContents.getURL()) event.preventDefault()
   })
 
   installUiScale(mainWindow)
@@ -55,13 +72,10 @@ function createWindow(): void {
     mainWindow.show()
   })
 
-  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
-    console.log(`[renderer:${level}] ${message} (${sourceId}:${line})`)
+  mainWindow.webContents.on('console-message', (event) => {
+    console.log(`[renderer:${event.level}] ${event.message} (${event.sourceId}:${event.lineNumber})`)
   })
-
-  mainWindow.webContents.on('render-process-gone', (_event, details) => {
-    console.log('[renderer] process gone:', details)
-  })
+  watchWindowErrors(mainWindow.webContents)
 
   if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) {
     void mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
@@ -79,6 +93,7 @@ ipcMain.handle('background:get', () => getBackground())
 ipcMain.handle('background:choose', (event) => chooseBackground(BrowserWindow.fromWebContents(event.sender)))
 ipcMain.handle('background:clear', () => clearBackground())
 ipcMain.handle('update:install', (event) => installUpdate(event.sender))
+ipcMain.handle('logs:open', () => openLogFolder())
 
 void app.whenReady().then(() => {
   restoreRememberedSession()

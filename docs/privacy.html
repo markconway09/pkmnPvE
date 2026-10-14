@@ -10,23 +10,57 @@
     <main>
       <p><a href="index.html">← pkmnPvE</a></p>
       <h1>Privacy Policy</h1>
-      <p class="updated">Last updated: 13 October 2026</p>
+      <p class="updated">Last updated: 14 October 2026</p>
 
       <p>
-        pkmnPvE is a game that runs on your own computer. This policy explains what information it handles, which is
-        very little.
+        pkmnPvE is a game that runs on your own computer or phone. This policy explains what information it handles,
+        which is very little.
       </p>
 
       <h2>What the game stores</h2>
       <p>
-        Your saves (your Pokémon, items, money, progress and settings) are kept in files in the game's own folder on
-        your computer. The game has no online accounts, no servers of its own, no analytics, no advertising and no
-        tracking, and it does not send your saves or any other information anywhere - except straight to your own
-        other device when you send a save to it by room code.
+        Your saves (your Pokémon, items, money, progress and settings) are kept on your own device: in the game's
+        <code>save</code> folder on a PC, and in the app's own storage on a phone. The game has no accounts, no servers
+        of its own, no analytics, no advertising and no tracking.
+      </p>
+      <p>
+        On a PC, errors the game runs into are written to <code>save/logs/errors.log</code> so you can attach it to a bug
+        report. It never leaves your computer unless you send it yourself.
+      </p>
+
+      <h2>When the game goes online</h2>
+      <p>The game only connects to the internet for these things:</p>
+      <ul>
+        <li>
+          <strong>Playing with a friend and sending saves.</strong> When you open or join a room, or send a save by code,
+          your device signs in to the free PeerJS connection server (peerjs.com) with a random ID so the two devices can
+          find each other. After that, battles and saves go straight between the two devices, not through any server.
+          Your friend sees your player name, trainer sprite and game version, and a sent save goes to the device you
+          gave the code to. Like any internet service, the connection server and your friend's device can see your IP
+          address.
+        </li>
+        <li>
+          <strong>Checking for updates.</strong> Options → Check for updates asks GitHub for the latest version and
+          downloads it from there. GitHub's own privacy policy covers those requests.
+        </li>
+        <li>
+          <strong>Pictures and music.</strong> Some Pokémon sprites load from play.pokemonshowdown.com, and the lofi music
+          streams from freetouse.com (or from the links you add yourself). These sites see an ordinary request for
+          the picture or song, including your IP address.
+        </li>
+      </ul>
+
+      <h2>Phone permissions</h2>
+      <p>
+        On Android the game only asks for the camera when you press Scan QR to receive a save. The picture is only used
+        to read the code and is never stored or sent anywhere.
       </p>
 
       <h2>Removing your data</h2>
-      <p>Saves on your computer are ordinary files in the game's <code>save</code> folder; delete them to remove them.</p>
+      <p>
+        On a PC, saves are ordinary files in the game's <code>save</code> folder; delete them to remove them. On a phone,
+        uninstalling the app (or clearing its storage) removes them.
+      </p>
 
       <h2>Children</h2>
       <p>The game does not knowingly collect any personal information from anyone, including children.</p>

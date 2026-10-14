@@ -5,6 +5,8 @@ import UpdatesSection from './UpdatesSection'
 import BackgroundSection from './BackgroundSection'
 import SavesModal from './SavesModal'
 import SpriteCreditsModal from './SpriteCreditsModal'
+import WelcomeGuide from './WelcomeGuide'
+import { BUG_REPORT_URL, FAN_GAME_NOTICE } from '../../shared/about'
 import { playSfx, setSfxOn, setSfxVolume, sfxLevel, sfxOn } from './sfx'
 import { cryOn, cryVolume, playCry, setCryOn, setCryVolume } from './cries'
 import {
@@ -279,6 +281,7 @@ function Options({
   const [loggingOut, setLoggingOut] = useState(false)
   const [savesOpen, setSavesOpen] = useState(false)
   const [creditsOpen, setCreditsOpen] = useState(false)
+  const [guideOpen, setGuideOpen] = useState(false)
   const [volume, setVolume] = useState(() => Math.round(sfxLevel() * 100))
   const [menuSoundsOn, setMenuSoundsOn] = useState(sfxOn)
   const [cries, setCries] = useState(() => Math.round(cryVolume() * 100))
@@ -416,6 +419,10 @@ function Options({
           <section className="options-section">
             <h2 className="options-heading">Saves</h2>
             <p className="editor-hint">Move this save to another device, or back it up.</p>
+            <p className="editor-hint">
+              Your save lives only on this device. Export a save file now and then, and always before
+              reinstalling the game or switching devices - it&apos;s the only way to get it back.
+            </p>
             <div>
               <button onClick={() => setSavesOpen(true)}>Saves…</button>
             </div>
@@ -423,12 +430,28 @@ function Options({
           </section>
 
           <section className="options-section">
-            <h2 className="options-heading">Credits</h2>
-            <p className="editor-hint">The artists behind the trainer sprites.</p>
-            <div>
+            <h2 className="options-heading">About</h2>
+            <p className="editor-hint">{FAN_GAME_NOTICE}</p>
+            <p className="editor-hint">
+              Battles run on Pokémon Showdown (MIT License, © Guangcong Luo and contributors). The full
+              notices are in THIRD_PARTY_NOTICES.md on the game&apos;s GitHub page.
+            </p>
+            <div className="options-about-buttons">
+              <button onClick={() => setGuideOpen(true)}>Welcome guide…</button>
               <button onClick={() => setCreditsOpen(true)}>Sprite credits…</button>
             </div>
+            {guideOpen && <WelcomeGuide onClose={() => setGuideOpen(false)} />}
             {creditsOpen && <SpriteCreditsModal onClose={() => setCreditsOpen(false)} />}
+            <p className="editor-hint">
+              Found a bug? Report it on GitHub
+              {IS_MOBILE ? '.' : ' - and attach errors.log from the log folder, it shows what went wrong.'}
+            </p>
+            <div className="options-about-buttons">
+              <button onClick={() => window.open(BUG_REPORT_URL, '_blank')}>Report a bug</button>
+              {!IS_MOBILE && (
+                <button onClick={() => void window.api.openLogFolder().catch(() => undefined)}>Open log folder</button>
+              )}
+            </div>
           </section>
 
           <section className="options-section">

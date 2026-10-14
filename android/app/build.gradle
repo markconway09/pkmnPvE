@@ -7,8 +7,10 @@ android {
         applicationId "com.pkmnpve.game"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // scripts/build-apk.mjs passes the game's version; Android only installs
+        // an update over an older copy when its versionCode is not lower.
+        versionCode((project.findProperty('pkmnVersionCode') ?: '1') as Integer)
+        versionName(project.findProperty('pkmnVersionName') ?: '1.0')
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +18,24 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // The release key lives outside the repo (~/.pkmnpve, or PKMNPVE_KEYSTORE_PROPS):
+    // every APK players get must be signed with this same key to update over itself.
+    def keystoreProps = new Properties()
+    def keystorePropsFile = file(System.getenv('PKMNPVE_KEYSTORE_PROPS') ?: "${System.getProperty('user.home')}/.pkmnpve/keystore.properties")
+    if (keystorePropsFile.exists()) keystorePropsFile.withInputStream { keystoreProps.load(it) }
+    signingConfigs {
+        release {
+            if (keystoreProps['storeFile']) {
+                storeFile file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
+            signingConfig keystoreProps['storeFile'] ? signingConfigs.release : null
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

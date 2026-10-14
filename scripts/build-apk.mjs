@@ -36,16 +36,27 @@ writeFileSync(join(android, 'local.properties'), `sdk.dir=${sdk.replace(/\\/g, '
 // ships would keep taking room - so it starts from nothing each time.
 rmSync(join(android, 'app/build/outputs/apk'), { recursive: true, force: true })
 
+// The release key (made once, kept outside the repo - back up the whole folder):
+// a phone only installs an update signed with the same key as the copy it has.
+const keystoreProps =
+  process.env.PKMNPVE_KEYSTORE_PROPS || join(process.env.USERPROFILE || process.env.HOME || '', '.pkmnpve', 'keystore.properties')
+if (!existsSync(keystoreProps)) throw new Error(`No release key found at ${keystoreProps}`)
+
+// "0.5.1" -> 501: Android's versionCode, which must grow with every release.
+const [major, minor, patch] = version.split('.').map((n) => parseInt(n, 10) || 0)
+const versionCode = major * 10000 + minor * 100 + patch
+
 const gradlew = join(android, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew')
-const result = spawnSync(gradlew, ['assembleDebug', '--console=plain'], {
+const gradleArgs = ['assembleRelease', `-PpkmnVersionCode=${versionCode}`, `-PpkmnVersionName=${version}`, '--console=plain']
+const result = spawnSync(gradlew, gradleArgs, {
   cwd: android,
   stdio: 'inherit',
   shell: process.platform === 'win32',
-  env: { ...process.env, JAVA_HOME: javaHome, ANDROID_HOME: sdk }
+  env: { ...process.env, JAVA_HOME: javaHome, ANDROID_HOME: sdk, PKMNPVE_KEYSTORE_PROPS: keystoreProps }
 })
 if (result.status !== 0) process.exit(result.status ?? 1)
 
-const apk = join(android, 'app/build/outputs/apk/debug/app-debug.apk')
+const apk = join(android, 'app/build/outputs/apk/release/app-release.apk')
 const out = join(root, 'dist', `pkmnPvE-${version}.apk`)
 mkdirSync(dirname(out), { recursive: true })
 copyFileSync(apk, out)

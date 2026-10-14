@@ -131,6 +131,10 @@ export function startSending(handlers: SendHandlers): () => void {
     room.on('open', () => {
       if (!closed) handlers.onPhase('waiting', code)
     })
+    // Lost the connection server while waiting: sign back in so the code still works.
+    room.on('disconnected', () => {
+      if (!closed && peer === room && !room.destroyed) room.reconnect()
+    })
     room.on('error', (error) => {
       if (closed || peer !== room) return
       // Someone else already has this code: pick another.
@@ -222,7 +226,13 @@ export function startReceiving(code: string, handlers: ReceiveHandlers): Receive
     handlers.onError(message)
   }
 
-  const timer = setTimeout(() => fail("Couldn't connect to the other device - check the code, or try again"), CONNECT_TIMEOUT_MS)
+  const timer = setTimeout(
+    () =>
+      fail(
+        "Couldn't connect to the other device - check the code and try again. If it still fails, one of the networks may be blocking direct connections (common on school, work and some mobile networks): put both devices on the same home Wi-Fi, or use Save file instead."
+      ),
+    CONNECT_TIMEOUT_MS
+  )
   peer.on('open', () => {
     if (closed) return
     const connection = peer.connect(TRANSFER_ID_PREFIX + code, { reliable: true })

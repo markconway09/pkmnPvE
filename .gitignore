@@ -9,6 +9,7 @@ dist
 save/players/
 save/session.json
 save/display.json
+save/logs/
 
 # Local build secrets (the Google Drive OAuth client) - compiled into the build, never committed.
 .env.local

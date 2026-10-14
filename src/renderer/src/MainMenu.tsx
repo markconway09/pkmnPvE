@@ -44,6 +44,7 @@ import PlayerTrainerModal from './PlayerTrainerModal'
 import PokedexModal from './PokedexModal'
 import OnlineSection from './OnlineSection'
 import StarterPicker from './StarterPicker'
+import WelcomeGuide, { welcomeSeen, markWelcomeSeen } from './WelcomeGuide'
 import PokemonContextMenu from './PokemonContextMenu'
 import MergeModal from './MergeModal'
 import RewardsModal, { type RewardsTab } from './RewardsModal'
@@ -356,13 +357,17 @@ function MainMenu({
   // The entry to open the Pokedex at - from a clicked "registered" pop-up.
   const [pokedexFocus, setPokedexFocus] = useState<string | null>(null)
   const [starterOpen, setStarterOpen] = useState(false)
+  // The first-run tour, shown before the starter picker the first time this device sees a new save.
+  const [welcomeOpen, setWelcomeOpen] = useState(false)
   // A new save (nothing in the box yet) opens the starter picker straight away - once; after
   // a Cancel the Choose Starter button is still there.
   const starterOffered = useRef(false)
   useEffect(() => {
     if (!boxState || starterOffered.current) return
     starterOffered.current = true
-    if (boxState.mons.length === 0) setStarterOpen(true)
+    if (boxState.mons.length > 0) return
+    if (welcomeSeen()) setStarterOpen(true)
+    else setWelcomeOpen(true)
   }, [boxState])
   // The Items window (the bag and the shop together, the Key Items and the TMs).
   const [itemsOpen, setItemsOpen] = useState(false)
@@ -2104,6 +2109,16 @@ function MainMenu({
         />
       )}
 
+
+      {welcomeOpen && (
+        <WelcomeGuide
+          onClose={() => {
+            markWelcomeSeen()
+            setWelcomeOpen(false)
+            setStarterOpen(true)
+          }}
+        />
+      )}
 
       {starterOpen && (
         <StarterPicker

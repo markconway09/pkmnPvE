@@ -67,6 +67,9 @@ const IDLE: OnlineState = {
 }
 
 let state: OnlineState = IDLE
+// How long opening or joining a room may take before the player is told why it isn't working.
+const CONNECT_TIMEOUT_MS = 20_000
+let connectTimer: ReturnType<typeof setTimeout> | undefined
 let peer: Peer | null = null
 let conn: DataConnection | null = null
 let self: OnlinePlayer | null = null
@@ -205,14 +208,37 @@ function randomCode(): string {
 // Turns PeerJS's errors into something a player can act on.
 function errorText(type: string, fallback: string): string {
   if (type === 'peer-unavailable') return 'No room with that code - check it and try again'
-  if (type === 'network' || type === 'server-error' || type === 'socket-error' || type === 'socket-closed') {
-    return "Couldn't reach the matchmaking server - check your internet connection"
+  if (type === 'network' || type === 'server-error' || type === 'socket-error' || type === 'socket-closed' || type === 'disconnected') {
+    return "Couldn't reach the matchmaking server - check your internet connection, or try again in a minute"
   }
+  if (type === 'webrtc') return BLOCKED_TEXT
   if (type === 'browser-incompatible') return "Online play isn't supported here"
   return fallback
 }
 
+// The two devices talk to each other directly; some networks (school, work, some mobile
+// data and hotspots) block that, and the room then just never connects.
+const BLOCKED_TEXT =
+  "Couldn't connect to your friend - one of your networks may be blocking direct connections (common on school, work and some mobile networks). Try another network, e.g. home Wi-Fi."
+
+// Gives up on a room that hasn't opened (host) or reached the friend (guest) in time.
+function startConnectTimer(message: string): void {
+  clearTimeout(connectTimer)
+  connectTimer = setTimeout(() => {
+    if (state.phase === 'connecting') reset(message)
+  }, CONNECT_TIMEOUT_MS)
+}
+
+// A room that loses the matchmaking server keeps its open connection, but no one new
+// could join it - so it signs back in.
+function keepSignedIn(room: Peer): void {
+  room.on('disconnected', () => {
+    if (peer === room && !room.destroyed) room.reconnect()
+  })
+}
+
 function reset(error: string | null = null): void {
+  clearTimeout(connectTimer)
   conn?.close()
   peer?.destroy()
   conn = null
@@ -244,7 +270,12 @@ function openRoom(triesLeft: number): void {
   const code = randomCode()
   const room = new Peer(ROOM_ID_PREFIX + code)
   peer = room
-  room.on('open', () => setState({ phase: 'waiting', code }))
+  startConnectTimer("Couldn't reach the matchmaking server - check your internet connection, or try again in a minute")
+  keepSignedIn(room)
+  room.on('open', () => {
+    clearTimeout(connectTimer)
+    setState({ phase: 'waiting', code })
+  })
   room.on('error', (error) => {
     if (peer !== room) return
     // Someone else already has this code: pick another.
@@ -289,6 +320,8 @@ export async function joinRoom(rawCode: string): Promise<void> {
   }
   const me = new Peer()
   peer = me
+  // Reaching the server and then the friend; the hello that moves on to the lobby ends it.
+  startConnectTimer(BLOCKED_TEXT)
   me.on('open', () => {
     if (peer !== me) return
     attach(me.connect(ROOM_ID_PREFIX + code, { reliable: true }))
@@ -373,6 +406,7 @@ async function receive(message: OnlineMessage): Promise<void> {
         } else reset(reason)
         return
       }
+      clearTimeout(connectTimer)
       setState({ phase: 'lobby', friend, error: null })
       return
     }
