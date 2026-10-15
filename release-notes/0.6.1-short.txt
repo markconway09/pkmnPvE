@@ -1,0 +1,8 @@
+Spanish translation
+
+- The game is now available in Spanish (Español)
+- Pick a language on the login screen or in Options
+- First launch follows your system language
+- Moves, items, abilities and types use their official Spanish names and descriptions
+- Battles, missions, achievements and rewards are translated too
+- Case openings no longer spoil the result with an early Pokedex pop-up
