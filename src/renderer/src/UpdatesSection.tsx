@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { UpdateCheckResult, UpdateProgress } from '../../shared/battle-types'
+import { IS_MOBILE } from './platform'
 
 function megabytes(bytes: number): string {
   return `${Math.round(bytes / 1048576)} MB`
@@ -7,7 +8,9 @@ function megabytes(bytes: number): string {
 
 // Options → Updates: checks the GitHub repo's latest release and, in the packaged
 // game, downloads and installs it (see src/main/updater.ts). Player saves are kept;
-// the shared game data comes from the new version.
+// the shared game data comes from the new version. On the phone the APK can't replace
+// itself, so "Update now" opens the new APK in the browser instead; installing it over
+// this copy keeps the saves, since every APK is signed with the same key.
 function UpdatesSection(): React.JSX.Element {
   const [check, setCheck] = useState<UpdateCheckResult | null>(null)
   const [checking, setChecking] = useState(false)
@@ -80,12 +83,24 @@ function UpdatesSection(): React.JSX.Element {
             Version <strong>{check.latest}</strong> is available ({megabytes(check.sizeBytes)}).
           </div>
           {check.notes && <pre className="update-notes">{check.notes}</pre>}
-          {check.canInstall ? (
+          {check.canInstall && IS_MOBILE ? (
+            <>
+              <button onClick={() => check.downloadUrl && window.open(check.downloadUrl, '_blank')}>Download update</button>
+              <p className="editor-hint">
+                Your browser downloads the new version - open the file once it's done and tap Update to install it
+                over this one.
+              </p>
+            </>
+          ) : check.canInstall ? (
             <button disabled={installing} onClick={() => void install()}>
               {installing ? 'Updating…' : 'Update now'}
             </button>
           ) : (
-            <p className="editor-hint">This is the development copy - update it with git instead.</p>
+            <p className="editor-hint">
+              {IS_MOBILE
+                ? 'This copy runs in a browser, not the phone app - install the new APK on a phone instead.'
+                : 'This is the development copy - update it with git instead.'}
+            </p>
           )}
           {progress && (
             <div className="update-progress">

@@ -310,11 +310,9 @@ function Options({
           </button>
         </div>
         <div className="options-modal-body">
-          {!IS_MOBILE && (
-            <section className="options-section">
-              <UpdatesSection />
-            </section>
-          )}
+          <section className="options-section">
+            <UpdatesSection />
+          </section>
 
           <section className="options-section">
             <h2 className="options-heading">Sound</h2>

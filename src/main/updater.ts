@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
 import { app, type WebContents } from 'electron'
 import type { UpdateCheckResult } from '../shared/battle-types'
+import { checkLatestRelease, type ReleaseAsset } from '../shared/update-check'
 import packageJson from '../../package.json'
 
 /**
@@ -22,24 +23,6 @@ const ZIP_ASSET = /-win\.zip$/i
 // A dropped download resumes up to this many times; a connection silent this long counts as dropped.
 const DOWNLOAD_TRIES = 5
 const STALL_MS = 30_000
-
-// "0.2.10" > "0.2.9": compares dotted version numbers part by part.
-function isNewer(latest: string, current: string): boolean {
-  const a = latest.split('.').map((n) => parseInt(n, 10) || 0)
-  const b = current.split('.').map((n) => parseInt(n, 10) || 0)
-  for (let i = 0; i < Math.max(a.length, b.length); i++) {
-    if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) > (b[i] ?? 0)
-  }
-  return false
-}
-
-interface ReleaseAsset {
-  name: string
-  size: number
-  browser_download_url: string
-  // "sha256:<hex>" - GitHub publishes one for every release file.
-  digest?: string | null
-}
 
 let pendingAsset: ReleaseAsset | null = null
 let latestVersion: string | null = null
@@ -81,33 +64,14 @@ export function applyScript(pid: number, newDir: string, appDir: string, version
   ].join('\r\n')
 }
 
-// A release's notes hold a short version for the update box, then this marker, then the
-// full notes (see scripts/release.mjs). Older releases without it show whole.
-const FULL_NOTES_MARKER = '<!-- full notes -->'
-
 export async function checkForUpdate(): Promise<UpdateCheckResult> {
-  const current = app.getVersion()
-  if (!REPO) throw new Error('No update repo is set (updateRepo in package.json)')
-  const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
-    headers: { 'User-Agent': 'pkmnPvE-updater', Accept: 'application/vnd.github+json' }
+  // Only the packaged game replaces itself - a dev copy updates with git.
+  const { result, asset } = await checkLatestRelease(REPO, app.getVersion(), ZIP_ASSET, app.isPackaged, {
+    'User-Agent': 'pkmnPvE-updater'
   })
-  if (res.status === 404) return { current, latest: null, available: false, notes: '', sizeBytes: 0, canInstall: app.isPackaged }
-  if (!res.ok) throw new Error(`GitHub answered ${res.status} - try again later`)
-  const release = (await res.json()) as { tag_name: string; body?: string; assets: ReleaseAsset[] }
-  const latest = release.tag_name.replace(/^v/i, '')
-  const asset = release.assets.find((a) => ZIP_ASSET.test(a.name)) ?? null
-  const available = !!asset && isNewer(latest, current)
-  pendingAsset = available ? asset : null
-  latestVersion = available ? latest : null
-  return {
-    current,
-    latest,
-    available,
-    notes: (release.body ?? '').split(FULL_NOTES_MARKER)[0].trim(),
-    sizeBytes: asset?.size ?? 0,
-    // Only the packaged game replaces itself - a dev copy updates with git.
-    canInstall: app.isPackaged
-  }
+  pendingAsset = asset
+  latestVersion = asset ? result.latest : null
+  return result
 }
 
 /**

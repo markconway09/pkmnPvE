@@ -975,6 +975,8 @@ export interface UpdateCheckResult {
   sizeBytes: number
   // False in the dev copy, which updates with git rather than replacing itself.
   canInstall: boolean
+  // The new version's file - the phone opens it in the browser to download the APK.
+  downloadUrl?: string
 }
 
 export interface UpdateProgress {

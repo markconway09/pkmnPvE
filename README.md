@@ -4,8 +4,11 @@ A free, single-player Pokemon game built on the Pokemon Showdown battle engine. 
 
 Runs on Windows (PC) and Android. pkmnPvE is a non-commercial fan project and is not affiliated with Nintendo, Game Freak, Creatures or The Pokemon Company.
 
+![A battle: Nidorino against Gengar](promo/battle-nidorino-vs-gengar.gif)
+
 ## Contents
 
+- [Screenshots](#screenshots)
 - [Getting started](#getting-started)
 - [Getting around](#getting-around)
 - [Money and currencies](#money-and-currencies)
@@ -23,10 +26,23 @@ Runs on Windows (PC) and Android. pkmnPvE is a non-commercial fan project and is
 - [Options and saves](#options-and-saves)
 - [Credits and license](#credits-and-license)
 
+## Screenshots
+
+| | |
+| --- | --- |
+| ![Home](promo/01-home.png) | ![Catch](promo/02-catch.png) |
+| Home | Catch |
+| ![Box](promo/03-box.png) | ![Battles](promo/04-battles.png) |
+| Box | Battles |
+| ![Battle Tower](promo/05-battle-tower.png) | ![Draft](promo/06-draft.png) |
+| Battle Tower | Draft |
+| ![Max Raid](promo/07-max-raid.png) | ![Game Corner](promo/08-game-corner.png) |
+| Max Raid | Game Corner |
+
 ## Getting started
 
 - **Install (PC):** download the `-win.zip` from the latest GitHub release, unzip it and run `pkmnPvE.exe`. The game checks for updates itself (Options).
-- **Install (Android):** download the `.apk` from the same release and open it on the phone. Installing a newer APK over an old one keeps the save.
+- **Install (Android):** download the `.apk` from the same release and open it on the phone. Installing a newer APK over an old one keeps the save. The app checks for updates too (Options) and opens the new APK in the browser to install.
 - **Log in:** type a player name. Each name is its own save on that device.
 - **Welcome guide:** a short tour shown before your first starter. It can be reopened from Options > About.
 - **Starter:** a new save opens the starter picker: the 27 regional starters, Pikachu, Eevee, or a random unevolved Pokemon.
@@ -96,6 +112,8 @@ TMs are kept forever and let Pokemon learn those moves in the editor.
 ## Box
 
 Everything you catch goes to the Box.
+
+![Editing a Pokemon in the Box](promo/box-edit.gif)
 
 - **Team:** drag up to six Pokemon onto the team. Only team Pokemon fight and gain exp.
 - **Level cap:** Pokemon cannot level past it. Beating certain bosses raises it.
@@ -243,6 +261,8 @@ A singles draft just for fun, with the same 7-win / 3-loss gauntlet.
 
 Played with coins. Bets go up to 1,000 coins (10,000 with the High Roller title). Each game shows badges for the titles that affect it.
 
+![Spinning the slots](promo/slots-spin.gif)
+
 - **Slots:** three reels, five lines (three rows and two diagonals). Gholdengo is the jackpot (x50). Cherries on the first reel pay on their own. Pays back about 101.5% over time.
 - **Blackjack:** six-deck shoe, dealer stands on 17. Hit, stand or double down. Blackjack pays 3:2, a win 1:1, a tie returns the bet.
 - **Roulette:** a European wheel (0-36). Bet on single numbers, dozens, columns, red/black, odd/even and low/high.
@@ -348,7 +368,7 @@ Each title comes from an achievement and gives a permanent perk. Perks stack and
 
 ## Options and saves
 
-- **Updates (PC):** check for and install new versions.
+- **Updates:** checks for new versions each time Options opens. On PC, Update now downloads and installs it, then restarts the game. On Android, Download update opens the new APK in the browser: open it when it finishes and tap Update to install it over the old copy. Saves are kept either way.
 - **Sound:** separate volumes for menus, cries, music and the Game Corner. The music player in the top bar can pause or skip tracks.
 - **Screen size (PC):** Auto, a fixed 75% to 150%, or Mobile (the phone layout in a phone-shaped window).
 - **Move animations:** Normal, Fast or Off.

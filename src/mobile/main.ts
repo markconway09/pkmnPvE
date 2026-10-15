@@ -44,6 +44,7 @@ async function boot(): Promise<void> {
   deviceHooks.flushSaves = platform.flushed
   const { directTransport } = await import('./direct-transport')
   ;(await import('./background')).installBackgroundHandlers()
+  ;(await import('./updates')).installUpdateHandlers(Capacitor.isNativePlatform() && !import.meta.env.DEV)
   window.api = createApi(directTransport)
   const { restoreRememberedSession } = await import('../main/showdown/player-session')
   restoreRememberedSession()
