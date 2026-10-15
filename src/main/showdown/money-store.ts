@@ -1,6 +1,7 @@
 import { readText, writeText } from '../platform'
 import { playerPathFor } from './save-paths'
 import { onPlayerChange } from './player-session'
+import { t } from '../i18n'
 
 const DEFAULT_MONEY = 1000
 
@@ -66,7 +67,7 @@ export function spendMoney(amount: number): boolean {
 
 /** The Debug menu: sets the balance outright (a whole number, never below zero). */
 export function setMoney(amount: number): number {
-  if (!Number.isFinite(amount)) throw new Error('Enter an amount of money')
+  if (!Number.isFinite(amount)) throw new Error(t('err.enterAnAmountOfMoney'))
   getState().amount = Math.max(0, Math.floor(amount))
   persist()
   return getState().amount

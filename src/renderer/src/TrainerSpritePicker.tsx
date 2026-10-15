@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { TRAINER_SPRITE_IDS, trainerSpriteUrl } from './trainerSprite'
 import SearchBar from './SearchBar'
+import { t } from './i18n'
 import SpriteCreditsModal from './SpriteCreditsModal'
 
 interface Props {
@@ -21,9 +22,9 @@ function TrainerSpritePicker({ value, onChange, onClose }: Props): React.JSX.Ele
       <div className="modal-panel trainer-picker" onMouseDown={(e) => e.stopPropagation()}>
         {/* The title, how many sprites are shown, and the search - on one bar. */}
         <div className="trainer-picker-header">
-          <h2>Choose trainer sprite</h2>
+          <h2>{t('card.spriteTitle')}</h2>
           <span className="trainer-picker-count">{filtered.length} sprites</span>
-          <SearchBar className="trainer-picker-search" placeholder="Search sprites..." value={query} onChange={setQuery} autoFocus />
+          <SearchBar className="trainer-picker-search" placeholder={t('card.spriteSearch')} value={query} onChange={setQuery} autoFocus />
         </div>
         <div className="trainer-picker-grid">
           {filtered.map((id) => (
@@ -50,7 +51,7 @@ function TrainerSpritePicker({ value, onChange, onClose }: Props): React.JSX.Ele
           <button className="trainer-picker-credits" onClick={() => setCreditsOpen(true)}>
             Sprite credits
           </button>
-          <button onClick={onClose}>Cancel</button>
+          <button onClick={onClose}>{t('common.cancel')}</button>
         </div>
         {creditsOpen && <SpriteCreditsModal onClose={() => setCreditsOpen(false)} />}
       </div>

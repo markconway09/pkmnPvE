@@ -11,6 +11,8 @@ import { TYPE_COLORS } from './moveAnimations'
 import ModalSpinner from './ModalSpinner'
 import { teraTypeStyle } from './PokemonEditor'
 import Tooltip from './Tooltip'
+import { abilityName, abilityText, itemName, itemText, moveName as dexMoveName, moveText, nameMatches, t, typeName } from './i18n'
+import { categoryName } from './movePower'
 
 interface Props {
   runMonId: string
@@ -64,10 +66,10 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved, api = window.api }: Pro
 
   const moveInfo = (id: string): RunMonEditInfo['learnable'][number] | undefined =>
     info?.learnable.find((m) => m.id === id)
-  const moveName = (id: string): string => moveInfo(id)?.name ?? id
+  const moveName = (id: string): string => dexMoveName(moveInfo(id)?.name ?? id)
   const results =
     info && activeSlot !== null
-      ? info.learnable.filter((m) => m.name.toLowerCase().includes(moveQuery.trim().toLowerCase()))
+      ? info.learnable.filter((m) => nameMatches(moveQuery.trim(), m.name, dexMoveName(m.name)))
       : []
 
   async function applySet(): Promise<void> {
@@ -127,7 +129,7 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved, api = window.api }: Pro
     <div className="modal-overlay" onMouseDown={onClose}>
       <div className="modal-row" onMouseDown={(e) => e.stopPropagation()}>
         <div className={`modal-panel pokemon-editor pokemon-editor-main run-mon-editor${info ? '' : ' modal-panel-loading'}`}>
-          <h2>{info ? `${info.species} - moves` : 'Moves'}</h2>
+          <h2>{info ? t('runEditor.title', { name: info.species }) : t('editor.moves')}</h2>
           {!info && <ModalSpinner />}
           {info && (
             <div
@@ -139,7 +141,7 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved, api = window.api }: Pro
             >
               <div className="pokemon-editor-top">
                 <div className="pokemon-editor-side">
-                  <div className="pokemon-editor-portrait" title={mon?.shiny ? `Shiny ${info.species}` : info.species}>
+                  <div className="pokemon-editor-portrait" title={mon?.shiny ? t('editor.shinyTitle', { name: info.species }) : info.species}>
                     {/* In the sprite style picked in Options. */}
                     <SpriteImage
                       style={loadSpriteStyle()}
@@ -150,19 +152,19 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved, api = window.api }: Pro
                     <span className="pokemon-editor-portrait-name">
                       {mon?.shiny && <ShinyIcon />}
                       {info.species}
-                      {mon ? ` · Lv ${mon.level}` : ''}
+                      {mon ? ` · ${t('tower.lv', { level: mon.level })}` : ''}
                     </span>
                   </div>
                   {mon && (
                     <div className="run-editor-facts">
                       <div>
-                        <span className="editor-hint">Gender</span>{' '}
+                        <span className="editor-hint">{t('editor.gender')}</span>{' '}
                         {mon.gender === 'M' ? (
-                          <span className="gender-male">♂ Male</span>
+                          <span className="gender-male">{t('runEditor.male')}</span>
                         ) : mon.gender === 'F' ? (
-                          <span className="gender-female">♀ Female</span>
+                          <span className="gender-female">{t('runEditor.female')}</span>
                         ) : (
-                          'Genderless'
+                          t('gender.N')
                         )}
                       </div>
                       {/* Hovering the ability or the item says what it does. */}
@@ -172,16 +174,20 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved, api = window.api }: Pro
                         content={
                           <div className="tooltip-panel">
                             <div className="tooltip-title">
-                              {mon.ability}
+                              {abilityName(mon.ability ?? '')}
                               {mon.abilityLocked && ' 🔒'}
                             </div>
-                            <div className="tooltip-desc">{info?.abilityDescription || 'No description.'}</div>
-                            {mon.abilityLocked && <div className="tooltip-desc">From a New Ability pick - kept through evolution.</div>}
+                            <div className="tooltip-desc">
+                              {info?.abilityDescription
+                                ? abilityText(mon.ability ?? '', info.abilityDescription)
+                                : t('runEditor.noDesc')}
+                            </div>
+                            {mon.abilityLocked && <div className="tooltip-desc">{t('runEditor.abilityPick')}</div>}
                           </div>
                         }
                       >
                         <div>
-                          <span className="editor-hint">Ability</span> {mon.ability}
+                          <span className="editor-hint">{t('editor.ability')}</span> {abilityName(mon.ability ?? '')}
                           {mon.abilityLocked && ' 🔒'}
                         </div>
                       </Tooltip>
@@ -190,10 +196,10 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved, api = window.api }: Pro
                           type="button"
                           className="run-editor-reset-ability"
                           disabled={busy}
-                          title={`Undo the New Ability pick - back to ${mon.abilityResetTo}`}
+                          title={t('runEditor.resetTip', { name: abilityName(mon.abilityResetTo) })}
                           onClick={() => void resetAbility()}
                         >
-                          ↺ Reset to {mon.abilityResetTo}
+                          {t('runEditor.reset', { name: abilityName(mon.abilityResetTo) })}
                         </button>
                       )}
                       {mon.item ? (
@@ -202,20 +208,22 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved, api = window.api }: Pro
                           placement="below"
                           content={
                             <div className="tooltip-panel">
-                              <div className="tooltip-title">{mon.item}</div>
-                              <div className="tooltip-desc">{info?.itemDescription || 'No description.'}</div>
+                              <div className="tooltip-title">{itemName(mon.item)}</div>
+                              <div className="tooltip-desc">
+                                {info?.itemDescription ? itemText(mon.item, info.itemDescription) : t('runEditor.noDesc')}
+                              </div>
                             </div>
                           }
                         >
                           <div className="run-editor-item">
-                            <span className="editor-hint">Item</span>
+                            <span className="editor-hint">{t('editor.item')}</span>
                             {mon.itemSpritenum != null && <ItemSprite spritenum={mon.itemSpritenum} />}
-                            {mon.item}
+                            {itemName(mon.item)}
                           </div>
                         </Tooltip>
                       ) : (
                         <div className="run-editor-item">
-                          <span className="editor-hint">Item</span> None
+                          <span className="editor-hint">{t('editor.item')}</span> {t('mon.none')}
                         </div>
                       )}
                     </div>
@@ -224,22 +232,22 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved, api = window.api }: Pro
 
                 <div className="pokemon-editor-details">
                   <label className="editor-field run-editor-tera">
-                    <span>Tera Type</span>
+                    <span>{t('editor.teraType')}</span>
                     <select
                       className="editor-tera-select"
                       style={teraTypeStyle(teraType)}
                       value={teraType}
                       onChange={(e) => setTeraType(e.target.value)}
                     >
-                      {info.teraTypes.map((t) => (
-                        <option key={t} value={t} style={teraTypeStyle(t)}>
-                          {t}
+                      {info.teraTypes.map((type) => (
+                        <option key={type} value={type} style={teraTypeStyle(type)}>
+                          {typeName(type)}
                         </option>
                       ))}
                     </select>
                   </label>
                   <div className="editor-section">
-                    <h3>Smogon set</h3>
+                    <h3>{t('runEditor.smogonSet')}</h3>
                     <div className="auto-set-row">
                       <select value={setId} onChange={(e) => setSetId(e.target.value)}>
                         {info.autoSets.map((o) => (
@@ -249,25 +257,28 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved, api = window.api }: Pro
                         ))}
                       </select>
                       <button disabled={busy || !setId} onClick={() => void applySet()}>
-                        Apply
+                        {t('editor.apply')}
                       </button>
                     </div>
-                    <p className="editor-hint">Fills in its moves. Locked moves stay.</p>
+                    <p className="editor-hint">{t('runEditor.fills')}</p>
                   </div>
                   <p className="editor-hint">
-                    🔒 Locked moves are kept when its moves change on evolving.
+                    {t('runEditor.lockedHint')}
                     {locked.filter((m) => moves.includes(m)).length > 0 &&
-                      ` Locked now: ${locked
-                        .filter((m) => moves.includes(m))
-                        .map(moveName)
-                        .join(', ')}.`}
+                      t('runEditor.lockedNow', {
+                        list: locked
+                          .filter((m) => moves.includes(m))
+                          .map(moveName)
+                          .join(', ')
+                      })}
                   </p>
                 </div>
               </div>
 
               <div className="editor-section">
                 <h3>
-                  Moves <span className="editor-hint">(up to 4, {info.learnable.length} available)</span>
+                  {t('editor.moves')}{' '}
+                  <span className="editor-hint">{t('editor.movesHint', { n: info.learnable.length })}</span>
                 </h3>
                 <div className="editor-moves-grid">
                   {moves.map((move, i) => {
@@ -282,7 +293,7 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved, api = window.api }: Pro
                           <input
                             type="text"
                             value={activeSlot === i ? moveQuery : moveName(move)}
-                            placeholder={moveName(move) || `Move ${i + 1}`}
+                            placeholder={moveName(move) || t('editor.moveN', { n: i + 1 })}
                             data-move-slot={i}
                             onFocus={() => {
                               setActiveSlot(i)
@@ -298,7 +309,7 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved, api = window.api }: Pro
                           />
                           <label
                             className="run-editor-lock"
-                            title="Locked moves are kept when its moves change on evolving"
+                            title={t('runEditor.lockTip')}
                           >
                             <input
                               type="checkbox"
@@ -314,19 +325,19 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved, api = window.api }: Pro
                         <div className="editor-move-info">
                           {chosen ? (
                             <>
-                              <span className={`type-badge type-${chosen.type.toLowerCase()}`}>{chosen.type}</span>
+                              <span className={`type-badge type-${chosen.type.toLowerCase()}`}>{typeName(chosen.type)}</span>
                               <img
                                 className="editor-move-category"
                                 src={`./sprites/misc/category-${chosen.category.toLowerCase()}.png`}
-                                alt={chosen.category}
-                                title={chosen.category}
+                                alt={categoryName(chosen.category)}
+                                title={categoryName(chosen.category)}
                               />
-                              <span>Pow {chosen.basePower || '—'}</span>
-                              <span>Acc {chosen.accuracy === true ? '—' : chosen.accuracy}</span>
-                              <span>PP {chosen.pp}</span>
+                              <span>{t('editor.pow', { n: chosen.basePower || '—' })}</span>
+                              <span>{t('editor.acc', { n: chosen.accuracy === true ? '—' : chosen.accuracy })}</span>
+                              <span>{t('editor.ppN', { n: chosen.pp })}</span>
                             </>
                           ) : (
-                            <span className="editor-hint">No move</span>
+                            <span className="editor-hint">{t('editor.noMove')}</span>
                           )}
                         </div>
                       </div>
@@ -339,10 +350,10 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved, api = window.api }: Pro
           {error && <p className="editor-error">{error}</p>}
           <div className="editor-actions">
             <button onClick={onClose} disabled={busy}>
-              Cancel
+              {t('common.cancel')}
             </button>
             <button onClick={() => void save()} disabled={busy || !info || !moves.some(Boolean)}>
-              Save
+              {t('editor.save')}
             </button>
           </div>
         </div>
@@ -350,11 +361,11 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved, api = window.api }: Pro
         {info && activeSlot !== null && (
           <div className="selector-panel">
             <div className="selector-panel-header">
-              Move {activeSlot + 1} ({results.length})
+              {t('editor.moveCount', { n: activeSlot + 1, count: results.length })}
             </div>
             <div className="selector-list">
               <button className="selector-row selector-row-clear" onClick={() => chooseMove(activeSlot, '')}>
-                (None)
+                {t('editor.none')}
               </button>
               {results.map((m) => {
                 const learnedElsewhere = moves.some((id, i) => id === m.id && i !== activeSlot)
@@ -367,15 +378,19 @@ function RunMonEditor({ runMonId, mon, onClose, onSaved, api = window.api }: Pro
                   >
                     <div className="selector-row-main">
                       <div className="selector-row-title">
-                        {m.name}
-                        <span className={`type-badge type-${m.type.toLowerCase()}`}>{m.type}</span>
-                        {learnedElsewhere && <span className="learned-badge">Learned</span>}
+                        {dexMoveName(m.name)}
+                        <span className={`type-badge type-${m.type.toLowerCase()}`}>{typeName(m.type)}</span>
+                        {learnedElsewhere && <span className="learned-badge">{t('editor.learned')}</span>}
                       </div>
                       <div className="selector-row-sub">
-                        {m.category} · Pow {m.basePower || '—'} · Acc {m.accuracy === true ? '—' : m.accuracy} · PP{' '}
-                        {m.pp}
+                        {t('editor.moveLine', {
+                          category: categoryName(m.category),
+                          pow: m.basePower || '—',
+                          acc: m.accuracy === true ? '—' : m.accuracy,
+                          pp: m.pp
+                        })}
                       </div>
-                      <div className="selector-row-desc">{m.description}</div>
+                      <div className="selector-row-desc">{moveText(m.id, m.description)}</div>
                     </div>
                   </button>
                 )

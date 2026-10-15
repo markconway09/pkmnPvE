@@ -3,6 +3,7 @@ import { useDroppable } from '@dnd-kit/core'
 import type { BoxPokemonView, BoxState, LoadoutView } from '../../shared/battle-types'
 import PokemonIcon from './PokemonIcon'
 import { errorMessage, pointOf, useFloatingNotes } from './FloatingNotes'
+import { t } from './i18n'
 
 interface Props {
   team: (string | null)[]
@@ -43,7 +44,7 @@ function DockSlot({ slot, mon, lead, onEdit, onContextMenu }: {
       ref={setNodeRef}
       className={`team-dock-slot${mon ? ' team-dock-slot-filled' : ''}${isOver ? ' team-dock-slot-over' : ''}${lead ? ' team-dock-slot-lead' : ''}`}
     >
-      {lead && <span className="team-dock-lead-tag">Lead</span>}
+      {lead && <span className="team-dock-lead-tag">{t('dock.lead')}</span>}
       {mon ? (
         <PokemonIcon mon={mon} fill draggable onEdit={onEdit} onContextMenu={onContextMenu} />
       ) : (
@@ -100,7 +101,7 @@ function TeamDock({
     setBusy(true)
     try {
       onApplied(await window.api.applyLoadout(loadout.id))
-      notes.show(`Loaded "${loadout.name}"`, at)
+      notes.show(t('dock.loaded', { name: loadout.name }), at)
     } catch (err) {
       notes.show(errorMessage(err), at, 'bad')
     } finally {
@@ -111,11 +112,11 @@ function TeamDock({
   // Hidden: a small tab in its place - the dock itself stays loaded behind it.
   if (collapsed) {
     return (
-      <button className="team-dock team-dock-tab" title="Show your team" onClick={() => onCollapsedChange(false)}>
+      <button className="team-dock team-dock-tab" title={t('dock.show')} onClick={() => onCollapsedChange(false)}>
         <svg className="team-dock-tab-icon" viewBox="0 0 16 16" aria-hidden="true">
           <path d="M4 10l4-4 4 4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        Team <span className="team-dock-tab-count">{count}/{team.length}</span>
+        {t('dock.team')} <span className="team-dock-tab-count">{count}/{team.length}</span>
       </button>
     )
   }
@@ -125,7 +126,7 @@ function TeamDock({
       {companion}
       <div className="team-dock-side">
         {/* Hides the dock down to a small tab. */}
-        <button className="team-dock-side-button team-dock-hide" title="Hide the team" aria-label="Hide the team" onClick={() => onCollapsedChange(true)}>
+        <button className="team-dock-side-button team-dock-hide" title={t('dock.hide')} aria-label={t('dock.hide')} onClick={() => onCollapsedChange(true)}>
           <svg className="team-dock-loadout-icon" viewBox="0 0 16 16" aria-hidden="true">
             <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -135,8 +136,14 @@ function TeamDock({
           <button
             className={`team-dock-side-button team-dock-loadout${menuOpen ? ' team-dock-loadout-open' : ''}${current ? ' team-dock-loadout-saved' : ''}`}
             disabled={busy}
-            title={`Loadouts - ${current ? `using "${current.name}"` : count > 0 ? "this team isn't saved" : 'no team yet'}`}
-            aria-label="Loadouts"
+            title={
+              current
+                ? t('dock.loadoutsUsing', { name: current.name })
+                : count > 0
+                  ? t('dock.loadoutsUnsaved')
+                  : t('dock.loadoutsNoTeam')
+            }
+            aria-label={t('dock.loadouts')}
             onClick={() => {
               if (!menuOpen) refreshLoadouts()
               setMenuOpen((v) => !v)
@@ -153,9 +160,9 @@ function TeamDock({
               <div className="context-menu team-dock-menu">
                 {/* Which one is in use, over the list. */}
                 <div className="team-dock-menu-head">
-                  {current ? `Using "${current.name}"` : count > 0 ? "This team isn't saved" : 'No team yet'}
+                  {current ? t('dock.using', { name: current.name }) : count > 0 ? t('dock.unsaved') : t('dock.noTeam')}
                 </div>
-                {loadouts && loadouts.length === 0 && <div className="team-dock-menu-empty">No saved loadouts yet</div>}
+                {loadouts && loadouts.length === 0 && <div className="team-dock-menu-empty">{t('dock.noLoadouts')}</div>}
                 {loadouts?.map((l) => {
                   const inUse = current?.id === l.id
                   return (
@@ -178,7 +185,7 @@ function TeamDock({
                     onManage()
                   }}
                 >
-                  Manage loadouts…
+                  {t('dock.manage')}
                 </button>
               </div>
             </>
@@ -187,8 +194,8 @@ function TeamDock({
         {onToggleBox && (
           <button
             className={`team-dock-side-button team-dock-box-button${boxOpen ? ' team-dock-box-button-open' : ''}`}
-            title={boxOpen ? 'Put the box away' : 'Pull up the box'}
-            aria-label="Box"
+            title={boxOpen ? t('dock.boxAway') : t('dock.boxUp')}
+            aria-label={t('nav.box')}
             onClick={onToggleBox}
           >
             <img className="team-dock-box-button-icon" src="./icons/nav/box.png" alt="" />

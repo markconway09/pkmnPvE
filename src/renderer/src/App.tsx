@@ -37,7 +37,8 @@ import {
 import { loadLegacyTrainerSprite } from './trainerSprite'
 import Login from './Login'
 import { chooseOnline, forfeitOnline, leaveOnlineBattle, onOnlineBattleClosed, onOnlineBattleView, useOnlineState } from './online'
-import { CLICK } from './platform'
+import { formatMoney } from './money'
+import { clickWord, t, tellGame, typeName, useLocale } from './i18n'
 
 type Screen = 'menu' | 'battle' | 'trainers' | 'rogueliteBosses' | 'premadeTeams'
 
@@ -92,16 +93,16 @@ function getGimmickOption(active: GimmickFlags): GimmickOption | null {
   // than offering both - Dynamax is intentionally left out.
   if (active.canMegaEvo || active.canMegaEvoX || active.canMegaEvoY) {
     const suffix = !active.canMegaEvo && active.canMegaEvoY ? 'megay' : !active.canMegaEvo ? 'megax' : 'mega'
-    return { label: 'Mega Evolve', suffix }
+    return { label: t('battle.megaEvolve'), suffix }
   }
   if (active.canUltraBurst) {
-    return { label: 'Ultra Burst', suffix: 'ultra' }
+    return { label: t('battle.ultraBurst'), suffix: 'ultra' }
   }
   if (active.canZMove) {
-    return { label: 'Z-Move', suffix: 'zmove' }
+    return { label: t('battle.zMove'), suffix: 'zmove' }
   }
   if (active.canTerastallize) {
-    return { label: 'Terastallize', suffix: 'terastallize', typeForBadge: active.canTerastallize }
+    return { label: t('battle.terastallize'), suffix: 'terastallize', typeForBadge: active.canTerastallize }
   }
   return null
 }
@@ -286,7 +287,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
       const target = e.target as HTMLElement | null
       if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return
       const button = [...document.querySelectorAll<HTMLButtonElement>('.run-cancel-button')].find(
-        (b) => !b.disabled && b.textContent?.trim() !== 'Cancel'
+        (b) => !b.disabled && !b.classList.contains('run-cancel-back')
       )
       if (!button) return
       e.preventDefault()
@@ -708,7 +709,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
         if (i === allySlotIndex && !mon.fainted) {
           options.push({ loc: -(i + 1), label: mon.species, species: mon.species, facing: 'back' })
         } else if (i === slotIndex && moveTarget === 'adjacentAllyOrSelf') {
-          options.push({ loc: -(i + 1), label: `${mon.species} (self)`, species: mon.species, facing: 'back' })
+          options.push({ loc: -(i + 1), label: t('battle.self', { name: mon.species }), species: mon.species, facing: 'back' })
         }
       }
       return options
@@ -917,7 +918,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
             selectable={!!switchTarget}
             disabled={!switchTarget || switchTarget.disabled}
             locked={!switchTarget}
-            lockedNote={switchTrapped && !view.ended ? "Trapped - can't switch out" : undefined}
+            lockedNote={switchTrapped && !view.ended ? t('battle.trapped') : undefined}
             matchups={teamMatchupChips()}
             reservedSlots={switchTarget ? reservedSwitchSlots(switchTarget.slotIndex) : undefined}
             reviveMode={!!switchTarget?.reviving}
@@ -1097,14 +1098,14 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
                         <button
                           className={`gimmick-toggle ${gimmickOn ? 'gimmick-toggle-on' : ''}`}
                           disabled={!caughtUp || busy || chosen || gimmickTaken}
-                          title={gimmickTaken ? 'Your other Pokemon is already using this this turn' : undefined}
+                          title={gimmickTaken ? t('battle.gimmickTaken') : undefined}
                           onClick={() => togglePendingGimmick(slotIndex)}
                         >
                           <span className="gimmick-toggle-check" aria-hidden="true" />
                           {gimmick.label}
                           {gimmick.typeForBadge && (
                             <span className={`type-badge type-${gimmick.typeForBadge.toLowerCase()}`}>
-                              {gimmick.typeForBadge}
+                              {typeName(gimmick.typeForBadge)}
                             </span>
                           )}
                         </button>
@@ -1116,7 +1117,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
                           disabled={busy || (!canGoBack && view?.canAffordRun === false)}
                           title={
                             !canGoBack && view?.canAffordRun === false
-                              ? `Not enough money to run (₽${(runCost ?? 0).toLocaleString('en-US')})`
+                              ? t('battle.cantAffordRun', { money: formatMoney(runCost ?? 0) })
                               : undefined
                           }
                           onClick={() => {
@@ -1132,20 +1133,20 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
                           }}
                         >
                           {canGoBack
-                            ? 'Cancel'
+                            ? t('common.cancel')
                             : canForfeit
                               ? confirmingRun
                                 ? view?.runBattle
-                                  ? `End the run? ${CLICK} again`
-                                  : `Lose this match? ${CLICK} again`
-                                : 'Forfeit'
+                                  ? t('battle.endRunConfirm', { click: clickWord() })
+                                  : t('battle.loseMatchConfirm', { click: clickWord() })
+                                : t('battle.forfeit')
                             : confirmingRun
                               ? (runCost ?? 0) > 0
-                                ? `Pay ₽${(runCost ?? 0).toLocaleString('en-US')} to run? ${CLICK} again`
-                                : `Run from the shiny? ${CLICK} again`
+                                ? t('battle.payToRunConfirm', { money: formatMoney(runCost ?? 0), click: clickWord() })
+                                : t('battle.runFromShinyConfirm', { click: clickWord() })
                               : (runCost ?? 0) > 0
-                                ? `Run (₽${(runCost ?? 0).toLocaleString('en-US')})`
-                                : 'Run'}
+                                ? t('battle.runPaid', { money: formatMoney(runCost ?? 0) })
+                                : t('battle.run')}
                         </button>
                       )}
                     </div>
@@ -1185,9 +1186,9 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
           <div className="battle-action-slots">
             <div className="battle-action-slot">
               <div className="battle-action-slot-label">
-                {switchTarget?.reviving ? 'Choose a fainted Pokémon to revive' : 'Choose a replacement'}
+                {switchTarget?.reviving ? t('battle.chooseRevive') : t('battle.chooseReplacement')}
               </div>
-              <p className="box-empty-hint">Pick one from the list on the left.</p>
+              <p className="box-empty-hint">{t('battle.pickFromList')}</p>
             </div>
           </div>
         )}
@@ -1195,7 +1196,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
         {targeting && (
           <div className="modal-overlay target-picker-overlay" onMouseDown={() => setTargeting(null)}>
             <div className="modal-panel target-picker" onMouseDown={(e) => e.stopPropagation()}>
-              <h2>Choose a target</h2>
+              <h2>{t('battle.chooseTarget')}</h2>
               <div className="target-picker-options">
                 {targeting.options.map((opt) => (
                   <button key={opt.loc} className="target-option" onClick={() => confirmTarget(opt.loc)}>
@@ -1214,13 +1215,13 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
                 ))}
               </div>
               <div className="editor-actions">
-                <button onClick={() => setTargeting(null)}>Cancel</button>
+                <button onClick={() => setTargeting(null)}>{t('common.cancel')}</button>
               </div>
             </div>
           </div>
         )}
 
-        {caughtUp && !view?.ended && !view?.request && <p>Waiting...</p>}
+        {caughtUp && !view?.ended && !view?.request && <p>{t('battle.waiting')}</p>}
         {/* Online: the friend still has to choose (or this side has nothing to choose). */}
         {onlineMode &&
           caughtUp &&
@@ -1228,11 +1229,13 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
           view?.request &&
           (view.request.wait || (pendingChoices.length > 0 && pendingChoices.every((c) => c !== null))) && (
             <p className="online-waiting">
-              Waiting for {view.coop?.partnerName ?? view.opponentTrainer?.name ?? 'your friend'}...
+              {t('battle.waitingFor', { name: view.coop?.partnerName ?? view.opponentTrainer?.name ?? t('battle.yourFriend') })}
             </p>
           )}
         {/* A co-op turn the sim turned down: both pick again. */}
-        {view?.coop?.error && !view.ended && <p className="online-waiting coop-turn-error">{view.coop.error} - pick again</p>}
+        {view?.coop?.error && !view.ended && (
+          <p className="online-waiting coop-turn-error">{t('battle.pickAgain', { error: view.coop.error })}</p>
+        )}
         {error && <p style={{ color: '#ff6b6b' }}>{error}</p>}
       </div>
 
@@ -1253,6 +1256,12 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
 function App(): React.JSX.Element {
   const [session, setSession] = useState<SessionInfo | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
+  // Every screen is drawn again in the new language when the player switches.
+  useLocale()
+
+  useEffect(() => {
+    tellGame()
+  }, [])
 
   useEffect(() => {
     window.api

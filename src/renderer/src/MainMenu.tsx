@@ -76,7 +76,9 @@ import { formatMoney } from './money'
 import ShinyIcon from './ShinyIcon'
 import ItemSprite from './ItemSprite'
 import MusicPlayer from './MusicPlayer'
-import { CLICK, CLICK_LC, IS_MOBILE } from './platform'
+import { IS_MOBILE } from './platform'
+import { abilityName, clickWord, clickWordLc, itemName, moveName, natureName, numberLocale, t, titleName, typeName } from './i18n'
+import type { MessageKey } from '../../shared/i18n'
 import { leaveCoopRun, reportCoopProgress, setCoopReady, useOnlineState } from './online'
 import CoopRunPanel from './CoopRunPanel'
 import type { RunApi } from '../../shared/api'
@@ -115,20 +117,24 @@ const WILD_LEVEL_CAP_MIN = 15
 
 // The orders the expanded box can be sorted in.
 type BoxSortKey = 'arrival' | 'name' | 'bst' | 'dex' | 'stars'
-const BOX_SORTS: { key: BoxSortKey; label: string }[] = [
-  { key: 'arrival', label: 'Catch date' },
-  { key: 'name', label: 'Name' },
-  { key: 'bst', label: 'Base stat total' },
-  { key: 'dex', label: 'Pokédex number' },
-  { key: 'stars', label: 'Stars' }
-]
+const BOX_SORTS: { key: BoxSortKey; readonly label: string }[] = (['arrival', 'name', 'bst', 'dex', 'stars'] as const).map(
+  (key) => ({
+    key,
+    get label() {
+      return t(`box.sort.${key}`)
+    }
+  })
+)
 
 // What the Alchemist title turned up selling, for the sale's note: " · found a Thunder Stone".
 function alchemistText(found: string[]): string {
   if (found.length === 0) return ''
   const counts = new Map<string, number>()
   for (const name of found) counts.set(name, (counts.get(name) ?? 0) + 1)
-  return ` · found ${[...counts].map(([name, n]) => (n > 1 ? `${n}× ${name}` : `a ${name}`)).join(', ')}`
+  const list = [...counts]
+    .map(([name, n]) => (n > 1 ? t('box.alchemistMany', { n, name: itemName(name) }) : t('box.alchemistOne', { name: itemName(name) })))
+    .join(', ')
+  return t('box.alchemistFound', { list })
 }
 
 // The expanded box's filter chips: each one on narrows the box to Pokemon that pass it.
@@ -137,13 +143,12 @@ type BoxFilterKey = 'favorite' | 'shiny' | 'stars' | 'duplicates'
 const BOX_FILTERS: {
   key: BoxFilterKey
   icon: React.ReactNode
-  title: string
   test: (m: BoxPokemonView, candidateIds: Set<string>) => boolean
 }[] = [
-  { key: 'favorite', icon: '❤️', title: 'Favorites only', test: (m) => !!m.favorite },
-  { key: 'shiny', icon: <ShinyIcon />, title: 'Shinies only', test: (m) => !!m.shiny },
-  { key: 'stars', icon: '★', title: 'Merged (starred) only', test: (m) => (m.mergeStars ?? 0) > 0 },
-  { key: 'duplicates', icon: '⧉', title: 'Duplicates only - Pokémon with another of their species (or a pre-evolution of theirs) to merge in, and the ones that would go in', test: (m, candidateIds) => (m.mergeCandidates?.length ?? 0) > 0 || candidateIds.has(m.id) }
+  { key: 'favorite', icon: '❤️', test: (m) => !!m.favorite },
+  { key: 'shiny', icon: <ShinyIcon />, test: (m) => !!m.shiny },
+  { key: 'stars', icon: '★', test: (m) => (m.mergeStars ?? 0) > 0 },
+  { key: 'duplicates', icon: '⧉', test: (m, candidateIds) => (m.mergeCandidates?.length ?? 0) > 0 || candidateIds.has(m.id) }
 ]
 
 // Ascending order for a sort key (the caller flips it for descending).
@@ -160,8 +165,23 @@ function compareBoxMons(a: BoxPokemonView, b: BoxPokemonView, key: BoxSortKey): 
 function matchesBoxSearch(mon: BoxPokemonView, search: string): boolean {
   const words = search.toLowerCase().split(/\s+/).filter(Boolean)
   if (words.length === 0) return true
-  const squash = (text: string): string => text.toLowerCase().replace(/[^a-z0-9]/g, '')
-  const haystack = [mon.species, ...mon.types, mon.ability, mon.item, mon.nature, ...mon.moveIds].map(squash)
+  // Accents dropped, so "electrico" finds Eléctrico.
+  const squash = (text: string): string =>
+    text
+      .normalize('NFD')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+  // The English names, and the ones shown in the player's language.
+  const shown = [
+    ...mon.types.map(typeName),
+    abilityName(mon.ability ?? ''),
+    itemName(mon.item ?? ''),
+    natureName(mon.nature ?? ''),
+    ...mon.moveIds.map(moveName)
+  ]
+  const haystack = [mon.species, ...mon.types, mon.ability, mon.item, mon.nature, ...mon.moveIds, ...shown].map((v) =>
+    squash(v ?? '')
+  )
   return words.every((word) => {
     const w = squash(word)
     return !w || haystack.some((field) => field.includes(w))
@@ -181,15 +201,15 @@ const MODE_COLORS: Record<MenuPage, string> = {
 }
 
 // Each page's name over it, beside its sidebar icon.
-const PAGE_TITLES: Record<MenuPage, string> = {
-  home: 'Home',
-  classic: 'Battles',
-  catch: 'Catch',
-  box: 'Box',
-  roguelite: 'Battle Tower',
-  draft: 'Draft',
-  raid: 'Max Raid',
-  corner: 'Game Corner'
+const PAGE_TITLES: Record<MenuPage, MessageKey> = {
+  home: 'nav.home',
+  classic: 'nav.battles',
+  catch: 'nav.catch',
+  box: 'nav.box',
+  roguelite: 'nav.tower',
+  draft: 'nav.draft',
+  raid: 'nav.raid',
+  corner: 'nav.corner'
 }
 
 // The number keys open the pages, in the sidebar's order (Home is 0).
@@ -510,9 +530,9 @@ function MainMenu({
         }),
       onEvolve: (runMonId: string, target: string) =>
         void runAction(async () => {
-          const from = current?.team.find((m) => m.id === runMonId)?.species ?? 'It'
+          const from = current?.team.find((m) => m.id === runMonId)?.species ?? t('menu.it')
           setMovesChoice({
-            title: `${from} evolves into ${target}`,
+            title: t('menu.evolvesInto', { from, to: target }),
             preview: await api.previewEvolutionMoves(runMonId, target),
             decide: async (keep) => set(await api.evolveRunMon(runMonId, target, !keep))
           })
@@ -824,7 +844,7 @@ function MainMenu({
       const result = await window.api.mergeSelectedMons([...boxSelection], { petals: mergeWithPetals, candies: mergeWithCandies })
       setBoxState(result.box)
       const stars = result.results.map((r) => `${r.species} ★${r.stars}`).join(', ')
-      notes.show(`Merged ${result.merged} Pokemon - ${stars}`, at)
+      notes.show(t('box.mergedMany', { count: result.merged, stars }), at)
       stopBoxSelection()
     } catch (err) {
       notes.show(errorMessage(err), at, 'bad')
@@ -847,7 +867,10 @@ function MainMenu({
       const result = await window.api.sellMons([...boxSelection])
       setBoxState(result.box)
       setMoney(result.money)
-      notes.show(`Sold ${result.count} Pokemon for ${formatMoney(result.sold)}${alchemistText(result.found)}`, at)
+      notes.show(
+        t('box.soldMany', { count: result.count, money: formatMoney(result.sold), found: alchemistText(result.found) }),
+        at
+      )
       stopBoxSelection()
     } catch (err) {
       notes.show(errorMessage(err), at, 'bad')
@@ -864,7 +887,10 @@ function MainMenu({
       const result = await window.api.sellMon(monId)
       setBoxState(result.box)
       setMoney(result.money)
-      notes.show(`Sold ${result.species} for ${formatMoney(result.sold)}${alchemistText(result.found)}`, at)
+      notes.show(
+        t('box.soldOne', { name: result.species, money: formatMoney(result.sold), found: alchemistText(result.found) }),
+        at
+      )
     } catch (e) {
       notes.show(errorMessage(e), at, 'bad')
     } finally {
@@ -890,7 +916,7 @@ function MainMenu({
       setEditorVersion((v) => v + 1)
       // A cream change is only the look; any other form comes with a new set.
       notes.show(
-        form.startsWith('Alcremie') ? `Changed into ${form}` : `Changed into ${form} - it has a new set to match`,
+        form.startsWith('Alcremie') ? t('box.changedLook', { form }) : t('box.changedForm', { form }),
         { x: window.innerWidth / 2, y: window.innerHeight / 3 }
       )
     } catch (e) {
@@ -982,7 +1008,7 @@ function MainMenu({
       .setCompanion(draggedId)
       .then((box) => {
         setBoxState(box)
-        notes.show(`${mon.species} is your companion now`, at)
+        notes.show(t('box.companionNow', { name: mon.species }), at)
       })
       .catch((e) => notes.show(errorMessage(e), at, 'bad'))
   }
@@ -1084,16 +1110,16 @@ function MainMenu({
 
   const nextBoss = eligibility?.nextBoss ?? null
   let bossHint = ''
-  if (!nextBoss) bossHint = 'No boss queued up yet'
+  if (!nextBoss) bossHint = t('menu.noBoss')
   else if (!nextBoss.ready) {
     const remaining = nextBoss.requiredTrainerWins - nextBoss.trainerWinsSinceLastBoss
-    bossHint = `Beat ${remaining} more trainer${remaining === 1 ? '' : 's'} to challenge ${nextBoss.trainerName}`
-  } else bossHint = `Ready: ${nextBoss.trainerName}`
+    bossHint = t('menu.bossNeedWins', { count: remaining, name: nextBoss.trainerName })
+  } else bossHint = t('menu.bossReady', { name: nextBoss.trainerName })
   // Every boss beaten: Boss Battle becomes the rematch menu.
   const allBossesDefeated = !!eligibility?.allBossesDefeated
   // TM searches: a strip along the bottom of each wild area's tile.
   const tmSearch = useTmSearch((id) => onFight(id))
-  if (allBossesDefeated) bossHint = 'Fight any boss again'
+  if (allBossesDefeated) bossHint = t('menu.bossAgain')
 
   // The wild level tile fills what's left of the wild grid's last row (four to a row,
   // "Anywhere" taking two) - or a whole row of its own when the tiles fill theirs.
@@ -1223,7 +1249,7 @@ function MainMenu({
       {/* The open page's name on the left, the music player (while music is on) in the
           middle, the player card on the right. */}
       <div className="menu-header">
-        <h1 className={`menu-page-title menu-page-title-${mode}`}>{PAGE_TITLES[mode]}</h1>
+        <h1 className={`menu-page-title menu-page-title-${mode}`}>{t(PAGE_TITLES[mode])}</h1>
         <MusicPlayer />
         <div className="menu-nav">
           {/* The player: their trainer, name, title and money. A click anywhere on it opens
@@ -1231,7 +1257,7 @@ function MainMenu({
               screen, a tap opens that menu). */}
           <button
             className={`nav-player-card${playerMenu ? ' nav-player-card-open' : ''}`}
-            title="Trainer Card"
+            title={t('menu.trainerCard')}
             onPointerDown={(e) => {
               playerCardPointer.current = e.pointerType
             }}
@@ -1262,13 +1288,13 @@ function MainMenu({
             <span className="nav-player-text">
               {/* A full Pokedex puts the name in a gold card. */}
               {achievements?.dexComplete ? (
-                <RarityCard tier="legendary" framed className="nav-player-name nav-player-name-gold" title="Pokédex complete">
+                <RarityCard tier="legendary" framed className="nav-player-name nav-player-name-gold" title={t('menu.dexComplete')}>
                   {username}
                 </RarityCard>
               ) : (
                 <span className="nav-player-name">{username}</span>
               )}
-              {achievements?.title && <span className="nav-player-title">{achievements.title}</span>}
+              {achievements?.title && <span className="nav-player-title">{titleName(achievements.title)}</span>}
             </span>
             {money !== null && <span className="nav-player-money">{formatMoney(money)}</span>}
             <span className="nav-player-caret">▾</span>
@@ -1288,17 +1314,17 @@ function MainMenu({
             >
               {[
                 {
-                  label: 'Trainer Card',
+                  label: t('menu.trainerCard'),
                   icon: <img className="nav-menu-icon" src="./icons/nav/trainercard.png" alt="" />,
                   action: () => setPlayerTrainerOpen(true)
                 },
                 {
-                  label: 'Options',
+                  label: t('nav.options'),
                   icon: <img className="nav-menu-icon" src="./icons/nav/options.png" alt="" />,
                   action: onOptions
                 },
                 ...(isAdmin
-                  ? [{ label: 'Debug', icon: <span className="nav-menu-icon">🛠</span>, action: () => setDebugOpen(true) }]
+                  ? [{ label: t('menu.debug'), icon: <span className="nav-menu-icon">🛠</span>, action: () => setDebugOpen(true) }]
                   : [])
               ].map(({ label, icon, action }, i) => (
                 <button
@@ -1320,7 +1346,7 @@ function MainMenu({
         )}
 
       {fightError && <p style={{ color: '#ff6b6b' }}>{fightError}</p>}
-      {loadError && <p style={{ color: '#ff6b6b' }}>Failed to load your box: {loadError}</p>}
+      {loadError && <p style={{ color: '#ff6b6b' }}>{t('menu.loadBoxFailed', { error: loadError })}</p>}
       {(mode === 'roguelite' || (mode === 'classic' && online.coop)) && runError && <p style={{ color: '#ff6b6b' }}>{runError}</p>}
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -1396,7 +1422,7 @@ function MainMenu({
                   if (!runPickId) return
                   const starter = runPickId
                   setMovesChoice({
-                    title: `${monsById.get(starter)?.species ?? 'Your starter'} starts the run`,
+                    title: t('menu.starterStarts', { name: monsById.get(starter)?.species ?? t('menu.yourStarter') }),
                     preview: await window.api.previewStarterMoves(starter),
                     decide: async (keep) => {
                       setRun(await window.api.startRun(starter, difficulty, generation, keep))
@@ -1436,7 +1462,7 @@ function MainMenu({
                   const friend = online.friend
                   const role = online.role === 'host' ? 'host' : 'guest'
                   setMovesChoice({
-                    title: `${monsById.get(starter)?.species ?? 'Your starter'} starts the climb`,
+                    title: t('menu.starterClimb', { name: monsById.get(starter)?.species ?? t('menu.yourStarter') }),
                     preview: await window.api.coopRun.previewStarterMoves(starter),
                     decide: async (keep) => {
                       setCoopRun(await window.api.startCoopRun(starter, keep, setup, friend, role))
@@ -1468,8 +1494,8 @@ function MainMenu({
           <div className="run-panel classic-panel">
           <div className="classic-card">
           <div className="run-setup-header">
-            <span className="run-hud-label">Battle</span>
-            {levelCap !== null && <span className="classic-level-cap">Level Cap {levelCap}</span>}
+            <span className="run-hud-label">{t('classic.battle')}</span>
+            {levelCap !== null && <span className="classic-level-cap">{t('classic.levelCap', { cap: levelCap })}</span>}
           </div>
 
           {mode !== 'classic' ? (
@@ -1479,8 +1505,8 @@ function MainMenu({
               Pokemon there straight away (it's remembered as the last area fought in). */}
           <div className="classic-section-head">
             <img className="classic-section-icon" src="./icons/tall-grass.png" alt="" />
-            <span className="run-hud-label">Wild battle</span>
-            <span className="classic-section-sub">Pick an area to search</span>
+            <span className="run-hud-label">{t('classic.wildBattle')}</span>
+            <span className="classic-section-sub">{t('classic.pickArea')}</span>
           </div>
           <div className="classic-wild-grid">
             {WILD_LOCATIONS.filter((loc) => !loc.requiresAllBosses || allBossesDefeated).map((loc) => (
@@ -1488,14 +1514,16 @@ function MainMenu({
                 <button
                   className={`classic-wild-tile${wildLocation === loc.id ? ' classic-wild-tile-last' : ''}`}
                   disabled={battleBusy || teamEmpty}
-                  title={wildLocation === loc.id ? `${loc.label} - where you last searched` : `Find a wild Pokémon: ${loc.label}`}
+                  title={
+                    wildLocation === loc.id ? t('classic.lastSearched', { area: loc.label }) : t('classic.findWild', { area: loc.label })
+                  }
                   style={{ backgroundImage: `url(${backdropUrl(LOCATION_BUTTON_BACKDROP[loc.id])})` }}
                   onClick={() => onFight(loc.id)}
                 >
-                  <span className="classic-wild-go">Battle ▸</span>
+                  <span className="classic-wild-go">{t('classic.battleGo')}</span>
                   <span className="classic-wild-label">
                     <img className="classic-wild-icon" src={locationIconUrl(loc.id)} alt="" />
-                    {loc.id === 'all' ? 'Anywhere' : loc.label}
+                    {loc.id === 'all' ? t('location.anywhere') : loc.label}
                   </span>
                 </button>
                 <TmSearchStrip
@@ -1512,7 +1540,7 @@ function MainMenu({
             <div
               className="classic-level-tile"
               style={{ gridColumn: `span ${wildLevelSpan}` }}
-              title="Wild Pokémon come at up to this level - scroll over it to change it"
+              title={t('classic.levelTip')}
               onWheel={(e) =>
                 onChangeWildLevelCap(
                   Math.min(levelCapMax, Math.max(WILD_LEVEL_CAP_MIN, effectiveWildLevelCap + (e.deltaY < 0 ? 1 : -1)))
@@ -1522,19 +1550,19 @@ function MainMenu({
               <div className="classic-level-main">
                 <button
                   className="classic-level-step"
-                  aria-label="One level lower"
+                  aria-label={t('classic.levelDown')}
                   disabled={effectiveWildLevelCap <= WILD_LEVEL_CAP_MIN}
                   onClick={() => onChangeWildLevelCap(effectiveWildLevelCap - 1)}
                 >
                   −
                 </button>
                 <span className="classic-level-value">
-                  <span className="classic-level-label">Wild level</span>
-                  <strong>Lv {effectiveWildLevelCap}</strong>
+                  <span className="classic-level-label">{t('classic.wildLevel')}</span>
+                  <strong>{t('classic.lv', { level: effectiveWildLevelCap })}</strong>
                 </span>
                 <button
                   className="classic-level-step"
-                  aria-label="One level higher"
+                  aria-label={t('classic.levelUp')}
                   disabled={effectiveWildLevelCap >= levelCapMax}
                   onClick={() => onChangeWildLevelCap(effectiveWildLevelCap + 1)}
                 >
@@ -1542,14 +1570,14 @@ function MainMenu({
                 </button>
                 <span className="classic-level-picks">
                   {[
-                    { label: 'Min', level: WILD_LEVEL_CAP_MIN },
-                    { label: 'Half', level: Math.round((WILD_LEVEL_CAP_MIN + levelCapMax) / 2) },
-                    { label: 'Max', level: levelCapMax }
+                    { label: t('classic.min'), level: WILD_LEVEL_CAP_MIN },
+                    { label: t('classic.half'), level: Math.round((WILD_LEVEL_CAP_MIN + levelCapMax) / 2) },
+                    { label: t('classic.max'), level: levelCapMax }
                   ].map((p) => (
                     <button
                       key={p.label}
                       className={`classic-level-pick${effectiveWildLevelCap === p.level ? ' classic-level-pick-on' : ''}`}
-                      title={`Lv ${p.level}`}
+                      title={t('classic.lv', { level: p.level })}
                       onClick={() => onChangeWildLevelCap(p.level)}
                     >
                       {p.label}
@@ -1560,7 +1588,7 @@ function MainMenu({
               <input
                 type="range"
                 className="classic-level-bar"
-                aria-label="Wild level"
+                aria-label={t('classic.wildLevel')}
                 min={WILD_LEVEL_CAP_MIN}
                 max={levelCapMax}
                 value={effectiveWildLevelCap}
@@ -1587,7 +1615,7 @@ function MainMenu({
           <>
           <div className="classic-section-head">
             <img className="classic-section-icon" src="./icons/nav/trainercard.png" alt="" />
-            <span className="run-hud-label">Trainer battles</span>
+            <span className="run-hud-label">{t('classic.trainerBattles')}</span>
           </div>
           <div className="classic-trainer-row">
             <button
@@ -1601,12 +1629,14 @@ function MainMenu({
                 alt=""
               />
               <span className="classic-trainer-text">
-                <span className="classic-trainer-title">{eligibility?.rocketEvent ? 'Team Rocket!' : 'Trainer Battle'}</span>
+                <span className="classic-trainer-title">
+                  {eligibility?.rocketEvent ? t('classic.teamRocket') : t('classic.trainerBattle')}
+                </span>
                 <span className="classic-trainer-sub">
-                  {eligibility?.rocketEvent ? 'A grunt blocks the way' : 'Take on the next trainer'}
+                  {eligibility?.rocketEvent ? t('classic.gruntBlocks') : t('classic.nextTrainer')}
                 </span>
               </span>
-              <span className="classic-wild-go">Battle ▸</span>
+              <span className="classic-wild-go">{t('classic.battleGo')}</span>
             </button>
             <button
               className="classic-trainer-tile classic-boss-tile"
@@ -1616,10 +1646,12 @@ function MainMenu({
             >
               <img className="classic-trainer-sprite" src={trainerSpriteUrl(nextBoss?.spriteId || 'giovanni')} alt="" />
               <span className="classic-trainer-text">
-                <span className="classic-trainer-title">{allBossesDefeated ? 'Boss Rematch' : 'Boss Battle'}</span>
+                <span className="classic-trainer-title">
+                  {allBossesDefeated ? t('classic.bossRematch') : t('classic.bossBattle')}
+                </span>
                 <span className="classic-trainer-sub">{bossHint}</span>
               </span>
-              <span className="classic-wild-go">{allBossesDefeated ? 'Pick ▸' : 'Battle ▸'}</span>
+              <span className="classic-wild-go">{allBossesDefeated ? t('classic.pick') : t('classic.battleGo')}</span>
             </button>
           </div>
           </>
@@ -1637,7 +1669,7 @@ function MainMenu({
 
       {boxEmpty && !fullPanel && (
         <button className="choose-starter-button" onClick={() => setStarterOpen(true)}>
-          Choose Starter
+          {t('box.chooseStarter')}
         </button>
       )}
 
@@ -1651,14 +1683,14 @@ function MainMenu({
         {boxState && (
           <div className="box-summary">
             {[
-              { label: 'Pokémon', value: boxState.mons.length },
-              { label: 'Shiny', value: boxState.mons.filter((m) => m.shiny).length },
-              { label: 'Merged ★', value: boxState.mons.filter((m) => (m.mergeStars ?? 0) > 0).length },
-              { label: 'Favorites', value: boxState.mons.filter((m) => m.favorite).length },
-              { label: 'Can merge', value: boxState.mons.filter((m) => (m.mergeCandidates?.length ?? 0) > 0).length }
+              { label: t('box.stat.pokemon'), value: boxState.mons.length },
+              { label: t('box.stat.shiny'), value: boxState.mons.filter((m) => m.shiny).length },
+              { label: t('box.stat.merged'), value: boxState.mons.filter((m) => (m.mergeStars ?? 0) > 0).length },
+              { label: t('box.stat.favorites'), value: boxState.mons.filter((m) => m.favorite).length },
+              { label: t('box.stat.canMerge'), value: boxState.mons.filter((m) => (m.mergeCandidates?.length ?? 0) > 0).length }
             ].map((s) => (
               <span key={s.label} className="box-summary-stat">
-                <strong>{s.value.toLocaleString('en-US')}</strong>
+                <strong>{s.value.toLocaleString(numberLocale())}</strong>
                 {s.label}
               </span>
             ))}
@@ -1666,18 +1698,18 @@ function MainMenu({
         )}
         {boxSelection ? (
           <div className="box-toolbar box-toolbar-attached box-selection-bar">
-            <button className="box-selection-cancel" disabled={busy} title="Stop selecting" onClick={stopBoxSelection}>
+            <button className="box-selection-cancel" disabled={busy} title={t('box.stopSelecting')} onClick={stopBoxSelection}>
               ✕
             </button>
-            <span className="box-selection-mode">{boxSelectMode === 'merge' ? 'Merging' : 'Selling'}</span>
+            <span className="box-selection-mode">{boxSelectMode === 'merge' ? t('box.merging') : t('box.selling')}</span>
             <span className="box-selection-summary">
-              {boxSelection.size} selected ·{' '}
+              {t('box.selected', { count: boxSelection.size })} ·{' '}
               {boxSelectMode === 'merge'
                 ? (() => {
                     const plan = mergePlan()
                     return plan.mergedAway > 0
-                      ? `${plan.mergedAway} merged into ${plan.groups} Pokémon`
-                      : 'pick two or more of the same Pokémon'
+                      ? t('box.mergePlan', { away: plan.mergedAway, groups: plan.groups })
+                      : t('box.mergePick')
                   })()
                 : formatMoney(
                     (boxState?.mons ?? [])
@@ -1690,27 +1722,27 @@ function MainMenu({
                 <Tooltip
                   className="game-corner-info"
                   placement="below"
-                  content={<div className="tooltip-panel">Each species goes into its best copy (most stars, then most evolved, then highest level)</div>}
+                  content={<div className="tooltip-panel">{t('box.mergeInfo')}</div>}
                 >
-                  <span className="game-corner-info-icon" aria-label="How merging works">
+                  <span className="game-corner-info-icon" aria-label={t('box.howMerging')}>
                     i
                   </span>
                 </Tooltip>
                 <span className="box-selection-hint" />
               </>
             ) : (
-              <span className="box-selection-hint">Favorites can't be picked</span>
+              <span className="box-selection-hint">{t('box.noFavorites')}</span>
             )}
             {boxSelectMode === 'sell' && (
               <>
                 <span className="box-merge-ticks">
-                  <label className="box-merge-items-toggle" title="Also pick Pokémon with merge stars when selecting all">
+                  <label className="box-merge-items-toggle" title={t('box.starredTip')}>
                     <input type="checkbox" checked={sellWithStars} onChange={(e) => setSellWithStars(e.target.checked)} />
-                    <span>★ Starred</span>
+                    <span>{t('box.starred')}</span>
                   </label>
                 </span>
-                <button disabled={busy} onClick={selectAllToSell} title="Pick every Pokémon shown, except favorites and shinies">
-                  Select all
+                <button disabled={busy} onClick={selectAllToSell} title={t('box.selectAllSellTip')}>
+                  {t('box.selectAll')}
                 </button>
               </>
             )}
@@ -1718,24 +1750,24 @@ function MainMenu({
               <>
                 {/* What "Select all duplicates" may spend on pre-evolutions that need it to go in. */}
                 <span className="box-merge-ticks">
-                  <span className="box-merge-ticks-label">Use</span>
-                  <label className="box-merge-items-toggle" title="Also pick pre-evolutions that use up an evolution item to go in (as many as your bag has items for)">
+                  <span className="box-merge-ticks-label">{t('box.use')}</span>
+                  <label className="box-merge-items-toggle" title={t('box.evoItemsTip')}>
                     <input type="checkbox" checked={mergeWithItems} onChange={(e) => setMergeWithItems(e.target.checked)} />
-                    <span>Evo items</span>
+                    <span>{t('box.evoItems')}</span>
                   </label>
-                  <label className="box-merge-items-toggle" title="Also pick pre-evolutions with a friendship evolution, using up a Friendship Petal each to max their friendship">
+                  <label className="box-merge-items-toggle" title={t('box.petalsTip')}>
                     <input type="checkbox" checked={mergeWithPetals} onChange={(e) => setMergeWithPetals(e.target.checked)} />
                     <ItemSprite spritenum={FRIENDSHIP_PETAL_SPRITENUM} className="box-merge-tick-icon" />
-                    <span>Petals</span>
+                    <span>{t('box.petals')}</span>
                   </label>
-                  <label className="box-merge-items-toggle" title="Also pick pre-evolutions short of their evolution's level, using up Rare Candies to reach it (up to the level cap)">
+                  <label className="box-merge-items-toggle" title={t('box.candiesTip')}>
                     <input type="checkbox" checked={mergeWithCandies} onChange={(e) => setMergeWithCandies(e.target.checked)} />
                     <ItemSprite spritenum={RARE_CANDY_SPRITENUM} className="box-merge-tick-icon" />
-                    <span>Candies</span>
+                    <span>{t('box.candies')}</span>
                   </label>
                 </span>
-                <button disabled={busy} onClick={selectAllDuplicates} title="Pick every Pokémon shown that has another of its species">
-                  Select all duplicates
+                <button disabled={busy} onClick={selectAllDuplicates} title={t('box.selectDupesTip')}>
+                  {t('box.selectDupes')}
                 </button>
               </>
             )}
@@ -1745,7 +1777,7 @@ function MainMenu({
                 disabled={busy || mergePlan().mergedAway === 0}
                 onClick={(e) => void mergeSelectedMons(e)}
               >
-                {confirmingBoxSell ? `Merge them? ${CLICK} again` : 'Merge selected'}
+                {confirmingBoxSell ? t('box.mergeConfirm', { click: clickWord() }) : t('box.mergeSelected')}
               </button>
             ) : (
               <button
@@ -1753,7 +1785,7 @@ function MainMenu({
                 disabled={busy || boxSelection.size === 0}
                 onClick={(e) => void sellSelectedMons(e)}
               >
-                {confirmingBoxSell ? `Includes rare or shiny Pokemon - ${CLICK_LC} again` : 'Sell selected'}
+                {confirmingBoxSell ? t('box.sellConfirm', { click: clickWordLc() }) : t('box.sellSelected')}
               </button>
             )}
           </div>
@@ -1764,7 +1796,7 @@ function MainMenu({
               <div className="box-toolbar box-toolbar-attached">
                 {/* How many Pokemon are on show - the search and filters narrow it. */}
                 <span className="box-toolbar-section box-toolbar-title box-toolbar-count-label">
-                  Box <span className="box-count">· {boxMons.length}</span>
+                  {t('nav.box')} <span className="box-count">· {boxMons.length}</span>
                 </span>
                 <div className="box-toolbar-section box-toolbar-search">
                   <SearchBar
@@ -1772,7 +1804,7 @@ function MainMenu({
                     className="box-search"
                     value={boxSearch}
                     onChange={setBoxSearch}
-                    placeholder="Search name, type, move, ability, item…"
+                    placeholder={t('box.searchPlaceholder')}
                     autoFocus={false}
                   />
                 </div>
@@ -1781,7 +1813,7 @@ function MainMenu({
                     <button
                       key={f.key}
                       className={`box-filter-chip${boxFilters.has(f.key) ? ' box-filter-chip-on' : ''}`}
-                      title={f.title}
+                      title={t(`box.filter.${f.key}`)}
                       onClick={() =>
                         setBoxFilters((current) => {
                           const next = new Set(current)
@@ -1798,9 +1830,9 @@ function MainMenu({
                 {/* Rarity: a menu like Sort's - every rarity, or just one colour. */}
                 <div className="box-toolbar-section box-rarity-filter">
                   <span className="box-select-menu-wrap">
-                    <button className="box-select-button box-rarity-button" title="Show one rarity" onClick={() => setRarityMenuOpen((v) => !v)}>
+                    <button className="box-select-button box-rarity-button" title={t('box.oneRarity')} onClick={() => setRarityMenuOpen((v) => !v)}>
                       {boxRarity && <span className={`box-rarity-dot rarity-tier-${boxRarity}`} />}
-                      {boxRarity ? TIER_LABELS[boxRarity] : 'Any rarity'} ▾
+                      {boxRarity ? TIER_LABELS[boxRarity] : t('box.anyRarity')} ▾
                     </button>
                     {rarityMenuOpen && (
                       <>
@@ -1816,7 +1848,7 @@ function MainMenu({
                               }}
                             >
                               {tier && <span className={`box-rarity-dot rarity-tier-${tier}`} />}
-                              {tier ? TIER_LABELS[tier] : 'Any rarity'}
+                              {tier ? TIER_LABELS[tier] : t('box.anyRarity')}
                             </button>
                           ))}
                         </div>
@@ -1825,9 +1857,9 @@ function MainMenu({
                   </span>
                 </div>
                 <div className="box-toolbar-section box-sort">
-                  <span className="box-sort-label">Sort</span>
+                  <span className="box-sort-label">{t('box.sort')}</span>
                   <span className="box-select-menu-wrap">
-                    <button className="box-select-button box-sort-button" title="Order the box" onClick={() => setSortMenuOpen((v) => !v)}>
+                    <button className="box-select-button box-sort-button" title={t('box.orderTip')} onClick={() => setSortMenuOpen((v) => !v)}>
                       {BOX_SORTS.find((sort) => sort.key === boxSort)?.label} ▾
                     </button>
                     {sortMenuOpen && (
@@ -1852,7 +1884,7 @@ function MainMenu({
                   </span>
                   <button
                     className="box-sort-direction"
-                    title={boxSortDescending ? 'Descending - click for ascending' : 'Ascending - click for descending'}
+                    title={boxSortDescending ? t('box.descending') : t('box.ascending')}
                     onClick={() => setBoxSortDescending((d) => !d)}
                   >
                     {/* One arrow, turned to point up for ascending. */}
@@ -1863,7 +1895,7 @@ function MainMenu({
                 </div>
                 <div className="box-toolbar-section box-select-menu-wrap">
                   <button className="box-select-button" onClick={() => setSelectMenuOpen((v) => !v)}>
-                    Select ▾
+                    {t('box.select')}
                   </button>
                   {selectMenuOpen && (
                     <>
@@ -1876,7 +1908,7 @@ function MainMenu({
                             startBoxSelection('sell')
                           }}
                         >
-                          Select to sell
+                          {t('box.selectToSell')}
                         </button>
                         {/* Merging is late game - it opens with Max Raids. */}
                         <button
@@ -1885,14 +1917,14 @@ function MainMenu({
                           title={
                             eligibility?.raidsUnlocked
                               ? undefined
-                              : `Merging opens with Max Raids - beat ${eligibility?.raidUnlockBoss ?? 'more bosses'}`
+                              : t('box.mergeLocked', { boss: eligibility?.raidUnlockBoss ?? t('home.moreBosses') })
                           }
                           onClick={() => {
                             setSelectMenuOpen(false)
                             startBoxSelection('merge')
                           }}
                         >
-                          {eligibility?.raidsUnlocked ? 'Select to merge' : '🔒 Select to merge'}
+                          {eligibility?.raidsUnlocked ? t('box.selectToMerge') : `🔒 ${t('box.selectToMerge')}`}
                         </button>
                       </div>
                     </>
@@ -1907,7 +1939,7 @@ function MainMenu({
             mons={boxMons}
             onEdit={(id) => openEditor(id, false)}
             onContextMenu={handleContextMenu}
-            emptyHint={boxSearch.trim() ? 'No Pokemon in the box match that search.' : undefined}
+            emptyHint={boxSearch.trim() ? t('box.noMatch') : undefined}
             selection={boxSelection}
             onToggleSelect={toggleBoxSelected}
             canSelect={canSelect}
@@ -1939,13 +1971,13 @@ function MainMenu({
             <div className="team-dock-box-head">
               <img className="team-dock-box-icon" src="./icons/nav/box.png" alt="" />
               <span className="team-dock-box-title">
-                Box <span className="box-count">· {sortedBoxMons.length}</span>
+                {t('nav.box')} <span className="box-count">· {sortedBoxMons.length}</span>
               </span>
               <SearchBar
                 className="team-dock-box-search"
                 value={dockBoxSearch}
                 onChange={setDockBoxSearch}
-                placeholder="Search name, type, move…"
+                placeholder={t('box.dockSearch')}
                 autoFocus={false}
               />
             </div>
@@ -1953,7 +1985,7 @@ function MainMenu({
               mons={sortedBoxMons.filter((m) => matchesBoxSearch(m, dockBoxSearch)).slice(0, dockBoxBuilt)}
               onEdit={(id) => openEditor(id, false)}
               onContextMenu={handleContextMenu}
-              emptyHint={dockBoxSearch.trim() ? 'No Pokemon in the box match that search.' : undefined}
+              emptyHint={dockBoxSearch.trim() ? t('box.noMatch') : undefined}
             />
           </div>
         )}
@@ -2005,7 +2037,10 @@ function MainMenu({
           onMerged={(box, stars) => {
             setBoxState(box)
             setMergingId(null)
-            notes.show(stars > 0 ? `Merged - now ★${stars}` : 'Merged', { x: window.innerWidth / 2, y: window.innerHeight / 2 })
+            notes.show(stars > 0 ? t('box.mergedStars', { stars }) : t('box.merged'), {
+              x: window.innerWidth / 2,
+              y: window.innerHeight / 2
+            })
           }}
           onClose={() => setMergingId(null)}
         />
@@ -2150,7 +2185,7 @@ function MainMenu({
           onFuse={(partnerId) =>
             void fusionAction(
               () => window.api.fuseMon(contextMenu.mon.id, partnerId),
-              `Fused into ${contextMenu.mon.fusions?.find((f) => f.partnerId === partnerId)?.result}`,
+              t('box.fusedInto', { name: contextMenu.mon.fusions?.find((f) => f.partnerId === partnerId)?.result ?? '' }),
               { x: contextMenu.x, y: contextMenu.y }
             )
           }
@@ -2170,7 +2205,7 @@ function MainMenu({
           onUnfuse={() =>
             void fusionAction(
               () => window.api.unfuseMon(contextMenu.mon.id),
-              `Unfused - ${contextMenu.mon.unfuse?.partnerSpecies} is back in your box`,
+              t('box.unfused', { name: contextMenu.mon.unfuse?.partnerSpecies ?? '' }),
               { x: contextMenu.x, y: contextMenu.y }
             )
           }

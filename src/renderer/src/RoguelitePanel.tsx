@@ -46,7 +46,9 @@ import RunMonEditor from './RunMonEditor'
 import { useTapGuard } from './useTapGuard'
 import { trainerSpriteUrl } from './trainerSprite'
 import { LOCATION_BUTTON_BACKDROP, backdropUrl, locationIconUrl } from './battleScenery'
-import { CLICK, CLICK_LC } from './platform'
+import { abilityName, abilityText, clickWord, clickWordLc, itemName, itemText, moveName, moveText, statusLabel, t, typeName } from './i18n'
+import { categoryName } from './movePower'
+import type { MessageKey } from '../../shared/i18n'
 
 // The whole run as a bar: a notch per floor, a bigger one for each boss (coloured by
 // Gym Leader / Elite Four / Champion), filled up to the floor the run is on.
@@ -54,7 +56,7 @@ function RunProgressBar({ floor, difficulty }: { floor: number; difficulty: RunD
   const finalFloor = runFinalFloor(difficulty)
   const done = Math.min(1, (floor - 1) / (finalFloor - 1))
   return (
-    <div className="run-progress" title={`Floor ${floor} of ${finalFloor}`}>
+    <div className="run-progress" title={t('tower.floorOf', { n: floor, of: finalFloor })}>
       <div className="run-progress-fill" style={{ width: `${done * 100}%` }} />
       {/* A little flag over the floor the run is on. */}
       <span className="run-progress-marker" style={{ left: `${done * 100}%` }}>
@@ -70,7 +72,7 @@ function RunProgressBar({ floor, difficulty }: { floor: number; difficulty: RunD
             key={n}
             className={`run-notch run-notch-${state}${boss ? ` run-notch-boss run-notch-${rogueliteBossClassAt(bossIndex, difficulty)}` : ''}`}
             style={{ left: `${(i / (finalFloor - 1)) * 100}%` }}
-            title={boss ? `Floor ${n}: ${rogueliteBossLabelAt(bossIndex, difficulty)}` : `Floor ${n}`}
+            title={boss ? t('tower.floorBoss', { n, boss: rogueliteBossLabelAt(bossIndex, difficulty) }) : t('tower.floor', { n })}
           />
         )
       })}
@@ -120,36 +122,18 @@ interface Props {
   forfeitConfirm?: string
 }
 
-// Badly poisoned reads as PSN, the same as the battle screen shows it.
-const statusLabel = (status: string): string => (status === 'tox' ? 'PSN' : status.toUpperCase())
-
 // Each floor kind's name, its tooltip, and the one-liner under it on its tile.
 // The floors that start a battle.
 const BATTLE_NODES: RunNodeKind[] = ['wild', 'trainer', 'boss', 'villain']
 
-const NODE_INFO: Record<RunNodeKind, { label: string; hint: string; short: string }> = {
-  wild: { label: 'Wild Pokémon', hint: 'Beat it and you can add it to your team', short: 'Catch a new member' },
-  trainer: {
-    label: 'Trainer',
-    hint: 'A trainer battle, sized for this floor - win it for a held item and extra exp',
-    short: 'Item, exp & gems'
-  },
-  item: { label: 'Item', hint: 'Pick a held item for one of your Pokémon', short: 'Pick a held item' },
-  heal: { label: 'Pokémon Center', hint: 'Your whole team back to full HP, no status', short: 'Full team heal' },
-  boss: { label: 'Boss', hint: 'A boss battle - win it to heal up and move on', short: 'Boss battle' },
-  ability: { label: 'New Ability', hint: 'Pick one of four strong abilities for one of your Pokémon', short: 'Pick an ability' },
-  move: { label: 'New Move', hint: 'Pick one of four signature moves to teach one of your Pokémon', short: 'Teach a move' },
-  swap: {
-    label: 'Random Swap',
-    hint: 'Swap one Pokémon - or your whole team - for completely random ones at the next boss’s level',
-    short: 'Roll the dice'
-  },
-  villain: {
-    label: 'Villain',
-    hint: 'The villain who took this floor over - free to fight. Beat them to pick one of 3 Pokémon at the next level cap, each holding an item',
-    short: 'Takeover'
-  }
-}
+// Read in the player's language whenever a tile is drawn.
+const NODE_INFO = new Proxy({} as Record<RunNodeKind, { label: string; hint: string; short: string }>, {
+  get: (_, kind: string) => ({
+    label: t(`node.${kind}` as MessageKey),
+    hint: t(`node.${kind}.hint` as MessageKey),
+    short: t(`node.${kind}.short` as MessageKey)
+  })
+})
 
 // Where a wild option is - its location's entry, or none for an older run's "anywhere".
 const locationOf = (choice: RunChoice): (typeof WILD_LOCATIONS)[number] | undefined =>
@@ -194,20 +178,13 @@ function NodeIcon({ choice, villainSprite }: { choice: RunChoice; villainSprite?
 
 // A boss floor's shop picks, in order: each plays out like the floor of the same name.
 const SHOP_TILES: RunShopTile[] = ['ability', 'move', 'item', 'swap']
-const SHOP_TILE_LABELS: Record<RunShopTile, string> = {
-  ability: 'New Ability',
-  move: 'New Move',
-  item: 'New Item',
-  swap: 'Random Swap'
-}
-
 function GemIcon(): React.JSX.Element {
-  return <img className="run-gem-icon" src={RUN_GEM_ICON} alt="Gems" />
+  return <img className="run-gem-icon" src={RUN_GEM_ICON} alt={t('tower.gems')} />
 }
 
 const gemPrice = (price: number): React.JSX.Element =>
   price === 0 ? (
-    <span className="run-shop-price">Free</span>
+    <span className="run-shop-price">{t('tower.free')}</span>
   ) : (
     <span className="run-shop-price">
       <GemIcon />
@@ -227,13 +204,7 @@ const RANDOM_POKEMON_SPRITENUM = -10
 const RANDOM_LEGENDARY_SPRITENUM = 276
 // The Raid Crystal's icon (see ItemSprite).
 const RAID_CRYSTAL_SPRITENUM = -26
-const BOSS_CLASS_NAMES: Record<RogueliteBossClass, string> = {
-  gymLeader: 'Gym Leaders',
-  eliteFour: 'Elite Four',
-  champion: 'Champion',
-  villainGrunt: 'Villain Grunts',
-  villainElite: 'Villain Elites'
-}
+const bossClassNames = (bossClass: RogueliteBossClass): string => t(`bossClasses.${bossClass}`)
 
 function RewardChip({ spritenum, label }: { spritenum?: number; label: string }): React.JSX.Element {
   return (
@@ -246,13 +217,13 @@ function RewardChip({ spritenum, label }: { spritenum?: number; label: string })
 
 function RunRewardChips({ reward }: { reward: RunBossReward }): React.JSX.Element {
   const candy = EXP_CANDY_REWARDS[reward.expCandy]
-  const randomPokemon = <RewardChip spritenum={RANDOM_POKEMON_SPRITENUM} label="Random Pokémon" />
-  const randomLegendary = <RewardChip spritenum={RANDOM_LEGENDARY_SPRITENUM} label="Random Legendary" />
+  const randomPokemon = <RewardChip spritenum={RANDOM_POKEMON_SPRITENUM} label={t('tower.randomPokemon')} />
+  const randomLegendary = <RewardChip spritenum={RANDOM_LEGENDARY_SPRITENUM} label={t('tower.randomLegendary')} />
   // The extras for particular classes, grouped by which classes get them.
   const extras = new Map<string, React.JSX.Element[]>()
   const addExtra = (classes: RunBossReward['randomPokemon'], chip: React.JSX.Element): void => {
     if (!Array.isArray(classes)) return
-    const key = classes.map((c) => BOSS_CLASS_NAMES[c]).join(' & ')
+    const key = classes.map(bossClassNames).join(' & ')
     extras.set(key, [...(extras.get(key) ?? []), chip])
   }
   addExtra(reward.randomPokemon, randomPokemon)
@@ -260,19 +231,19 @@ function RunRewardChips({ reward }: { reward: RunBossReward }): React.JSX.Elemen
   const crystals = reward.raidCrystals ? (
     <RewardChip
       spritenum={RAID_CRYSTAL_SPRITENUM}
-      label={reward.raidCrystals.count > 1 ? `${reward.raidCrystals.count}× Raid Crystal` : 'Raid Crystal'}
+      label={t('tower.raidCrystals', { count: reward.raidCrystals.count })}
     />
   ) : null
   if (reward.raidCrystals && crystals) addExtra(reward.raidCrystals.from, crystals)
   return (
     <div className="run-reward-groups">
       <div className="run-reward-group">
-        <span className="run-reward-group-label">Every boss</span>
+        <span className="run-reward-group-label">{t('tower.everyBoss')}</span>
         <div className="run-reward-group-chips">
           {reward.randomLegendary === 'all' && randomLegendary}
           {reward.randomPokemon === 'all' && randomPokemon}
         {reward.raidCrystals?.from === 'all' && crystals}
-          {candy && <RewardChip spritenum={candy.spritenum} label={candy.name} />}
+          {candy && <RewardChip spritenum={candy.spritenum} label={itemName(candy.name)} />}
           <RewardChip label={formatMoney(reward.money)} />
         </div>
       </div>
@@ -312,7 +283,7 @@ export function StarterSlot({ picked }: { picked: BoxPokemonView | undefined }):
           </div>
         </Tooltip>
       ) : (
-        <span className="team-slot-empty">Drop here</span>
+        <span className="team-slot-empty">{t('tower.dropHere')}</span>
       )}
     </div>
   )
@@ -377,12 +348,12 @@ function RunMonCard({ mon, index, onClick, onContextMenu, onEdit, selectable, mo
           </div>
         </div>
         {/* The first one leads every battle. */}
-        {index === 0 && <span className="run-mon-lead">Lead</span>}
+        {index === 0 && <span className="run-mon-lead">{t('tower.lead')}</span>}
         <div className="run-mon-hp">
           <div className={`hp-bar-fill ${hpClass}`} style={{ width: `${mon.hpPercent}%` }} />
         </div>
         <div className="run-mon-meta">
-          <span>Lv {mon.level}</span>
+          <span>{t('tower.lv', { level: mon.level })}</span>
           <span className={`run-mon-hp-text ${hpClass}`}>{Math.round(mon.hpPercent)}%</span>
           {mon.status && (
             <span className={`status-badge status-${mon.status}`}>{statusLabel(mon.status)}</span>
@@ -582,19 +553,21 @@ function RoguelitePanel({
         {/* The last run in one line: how it ended, then its rewards as icons (names on hover). */}
         {run && (
           <div className={`run-result ${run.status === 'won' ? 'run-result-won' : 'run-result-lost'}`}>
-            <span className="run-result-title">{run.status === 'won' ? '🏆 Won' : 'Run over'}</span>
+            <span className="run-result-title">{run.status === 'won' ? t('tower.won') : t('tower.runOver')}</span>
             <span className="run-result-summary">
               {run.starterSpecies} · {runDifficultyInfo(run.difficulty).label} ·{' '}
-              {run.status === 'won' ? `all ${runBossCount(run.difficulty)} bosses` : `floor ${run.floor}, ${run.bossesBeaten}/${runBossCount(run.difficulty)} bosses`}
+              {run.status === 'won'
+                ? t('tower.allBosses', { n: runBossCount(run.difficulty) })
+                : t('tower.floorBosses', { floor: run.floor, beaten: run.bossesBeaten, of: runBossCount(run.difficulty) })}
             </span>
             {run.rewards.length > 0 ? (
-              <span className="run-reward-list" title="Sent to your bag">
+              <span className="run-reward-list" title={t('tower.sentToBag')}>
                 {run.rewards.map((line, i) => (
                   <span
                     key={line.label}
                     className="run-reward-line"
                     style={{ '--i': i } as React.CSSProperties}
-                    title={line.itemId ? `${line.quantity}× ${line.label}` : line.label}
+                    title={line.itemId ? `${line.quantity}× ${itemName(line.label)}` : line.label}
                   >
                     {line.spritenum !== null ? (
                       <>
@@ -608,7 +581,7 @@ function RoguelitePanel({
                 ))}
               </span>
             ) : (
-              <span className="run-result-none">No rewards</span>
+              <span className="run-result-none">{t('tower.noRewards')}</span>
             )}
           </div>
         )}
@@ -616,29 +589,31 @@ function RoguelitePanel({
           <div className="run-starter-row">
             {/* The starter on its pedestal, its name, and the start button under it. */}
             <div className="run-starter-column">
-              <span className="run-hud-label">Starter</span>
+              <span className="run-hud-label">{t('tower.starter')}</span>
               <div
                 className={`run-starter-pedestal${picked ? ' run-starter-pedestal-filled' : ''}`}
-                title={`The run uses a Lv ${ROGUELITE_START_LEVEL} copy (no held item, fresh moveset) - the original stays as it is.`}
+                title={t('tower.starterTip', { level: ROGUELITE_START_LEVEL })}
               >
                 <StarterSlot picked={picked} />
               </div>
-              <span className="run-starter-name">{picked ? `${picked.species} · Lv ${ROGUELITE_START_LEVEL}` : 'Drag a Pokémon here'}</span>
+              <span className="run-starter-name">
+                {picked ? t('tower.starterName', { name: picked.species, level: ROGUELITE_START_LEVEL }) : t('tower.dragHere')}
+              </span>
               <button
                 className={`run-start-button${picked ? ' run-start-ready' : ''}`}
                 disabled={busy || !picked}
-                title="Enter starts the run, ← → change the difficulty"
+                title={t('tower.startTip')}
                 onClick={() => onStart(difficulty, generation)}
               >
-                {picked ? `Start ${info.label}` : 'Pick a starter'}
+                {picked ? t('tower.start', { difficulty: info.label }) : t('tower.pickStarter')}
               </button>
             </div>
             <div className="run-settings">
               <div className="run-setup-header">
-                <span className="run-hud-label">Difficulty</span>
+                <span className="run-hud-label">{t('tower.difficulty')}</span>
                 {bestFloor ? (
                   <span className={`run-setup-best${bestFloor.difficulty ? ` run-difficulty-${bestFloor.difficulty}` : ''}`}>
-                    Best floor: {bestFloor.floor}
+                    {t('tower.bestFloor', { n: bestFloor.floor })}
                     {bestFloor.difficulty ? ` · ${runDifficultyInfo(bestFloor.difficulty).label}` : ''}
                   </span>
                 ) : null}
@@ -649,7 +624,7 @@ function RoguelitePanel({
                     key={d.id}
                     className={`run-difficulty-button run-difficulty-${d.id}${difficulty === d.id ? ' run-difficulty-selected' : ''}`}
                     style={{ '--i': i } as React.CSSProperties}
-                    title={`${d.gymLeaders} Gym Leaders and ${d.eliteFour} Elite Four before the Champion`}
+                    title={t('tower.difficultyTip', { gyms: d.gymLeaders, e4: d.eliteFour })}
                     onClick={() => setDifficulty(d.id)}
                   >
                     <span className="run-difficulty-name">{d.label}</span>
@@ -659,7 +634,7 @@ function RoguelitePanel({
                         <span key={p} className={p <= i ? 'run-pip-on' : ''} />
                       ))}
                     </span>
-                    <span className="run-difficulty-sub">{runFinalFloor(d.id)} floors</span>
+                    <span className="run-difficulty-sub">{t('tower.floors', { n: runFinalFloor(d.id) })}</span>
                   </button>
                 ))}
               </div>
@@ -667,18 +642,18 @@ function RoguelitePanel({
                   never moves the box below. Keyed on the difficulty to fade in again. */}
               <div className="run-difficulty-details" key={difficulty}>
                 <p className="run-difficulty-text">{info.rules}</p>
-                <span className="run-hud-label">Rewards for each boss beaten</span>
+                <span className="run-hud-label">{t('tower.rewardsEachBoss')}</span>
                 <RunRewardChips reward={info.reward} />
               </div>
               {/* Where the bosses come from: any generation, or one with a full set of bosses. */}
               <div className="run-generation-row">
-                <span className="run-hud-label">Generation:</span>
+                <span className="run-hud-label">{t('tower.generation')}</span>
                 <div className="run-generation-chips">
                   <button
                     className={`run-generation-chip run-generation-any${generation === null ? ' run-generation-chosen' : ''}`}
                     onClick={() => setGeneration(null)}
                   >
-                    Any
+                    {t('tower.any')}
                   </button>
                   {POKEMON_GENERATIONS.map((g) => {
                     const complete = completeGenerations.includes(g)
@@ -687,7 +662,7 @@ function RoguelitePanel({
                         key={g}
                         className={`run-generation-chip${generation === g ? ' run-generation-chosen' : ''}`}
                         disabled={!complete}
-                        title={complete ? `Generation ${g} bosses only` : `Generation ${g} - coming soon`}
+                        title={complete ? t('tower.genOnly', { n: g }) : t('tower.genSoon', { n: g })}
                         onClick={() => setGeneration(g)}
                       >
                         {g}
@@ -776,9 +751,9 @@ function RoguelitePanel({
         disabled={busy || (battleLocked && BATTLE_NODES.includes(choice.kind))}
         title={
           battleLocked && BATTLE_NODES.includes(choice.kind)
-            ? 'Leave the online room first'
+            ? t('tower.leaveRoom')
             : corrupted
-            ? `${NODE_INFO[choice.kind].hint} - corrupted: costs ${cost} gem${cost === 1 ? '' : 's'}`
+            ? t('tower.corrupted', { hint: NODE_INFO[choice.kind].hint, count: cost })
             : villain
               ? `${villain.classLabel} ${villain.villainName}: ${NODE_INFO.villain.hint}`
               : NODE_INFO[choice.kind].hint
@@ -807,7 +782,7 @@ function RoguelitePanel({
                 : NODE_INFO[choice.kind].label}
         </span>
         <span className="run-node-sub">
-          {location ? 'Wild Pokémon' : villain ? villain.classLabel : NODE_INFO[choice.kind].short}
+          {location ? t('node.wild') : villain ? villain.classLabel : NODE_INFO[choice.kind].short}
         </span>
       </button>
     )
@@ -817,7 +792,7 @@ function RoguelitePanel({
       {/* The run's HUD: where it is, what's next and what it has to spend. */}
       <div className={`run-hud run-hud-${run.difficulty}`}>
         <div className="run-hud-floor">
-          <span className="run-hud-label">Floor</span>
+          <span className="run-hud-label">{t('tower.floorLabel')}</span>
           <span className="run-hud-big" key={run.floor}>
             {run.floor}
             <small>/{runFinalFloor(run.difficulty)}</small>
@@ -825,31 +800,31 @@ function RoguelitePanel({
         </div>
         <div className="run-hud-stats">
           <span className="run-hud-stat">
-            <span className="run-hud-label">Bosses</span>
+            <span className="run-hud-label">{t('tower.bosses')}</span>
             <strong>
               {run.bossesBeaten}/{runBossCount(run.difficulty)}
             </strong>
           </span>
           <span className="run-hud-stat">
-            <span className="run-hud-label">Next boss</span>
+            <span className="run-hud-label">{t('tower.nextBoss')}</span>
             <strong>{run.nextBossLabel}</strong>
           </span>
           <span className="run-hud-stat">
-            <span className="run-hud-label">Opponents</span>
-            <strong>Lv {run.opponentLevel}</strong>
+            <span className="run-hud-label">{t('tower.opponents')}</span>
+            <strong>{t('tower.lv', { level: run.opponentLevel })}</strong>
           </span>
           <span className="run-hud-stat">
-            <span className="run-hud-label">Level cap</span>
-            <strong>Lv {run.levelCap}</strong>
+            <span className="run-hud-label">{t('tower.levelCap')}</span>
+            <strong>{t('tower.lv', { level: run.levelCap })}</strong>
           </span>
         </div>
         <span className={`run-difficulty-tag run-difficulty-${run.difficulty}`}>
           {runDifficultyInfo(run.difficulty).label}
-          {run.generation ? ` · Gen ${run.generation}` : ''}
+          {run.generation ? t('tower.gen', { n: run.generation }) : ''}
         </span>
         <span
           className="run-gems run-hud-gems"
-          title={`Gems: 1 per trainer, 2 per boss${run.difficulty === 'easy' ? ' (+1 each on Easy)' : ''} - spend them in the shop on boss floors`}
+          title={run.difficulty === 'easy' ? t('tower.gemsTipEasy') : t('tower.gemsTip')}
         >
           <GemIcon />
           <strong key={run.consumables.gems}>{run.consumables.gems}</strong>
@@ -871,7 +846,7 @@ function RoguelitePanel({
           }}
           onBlur={() => setConfirmingForfeit(false)}
         >
-          {confirmingForfeit ? (forfeitConfirm ?? `Give up the run? ${CLICK} again`) : 'Forfeit'}
+          {confirmingForfeit ? (forfeitConfirm ?? t('tower.forfeitConfirm', { click: clickWord() })) : t('tower.forfeit')}
         </button>
       </div>
       <RunProgressBar floor={run.floor} difficulty={run.difficulty} />
@@ -882,11 +857,11 @@ function RoguelitePanel({
       ) : run.monOffer ? (
         // A beaten villain's reward: one of three Pokemon, each holding an item.
         <div className="run-item-offer">
-          <p className="run-reward-heading">Villain defeated!</p>
+          <p className="run-reward-heading">{t('tower.villainDefeated')}</p>
           <p className="box-empty-hint">
             {rewardPick !== null
-              ? `Your team is full - ${CLICK_LC} the Pokémon ${run.monOffer[rewardPick]?.species ?? 'it'} replaces (its held item then needs a new holder).`
-              : 'Pick one Pokémon to join your team, held item and all.'}
+              ? t('tower.rewardFull', { click: clickWordLc(), name: run.monOffer[rewardPick]?.species ?? t('tower.it') })
+              : t('tower.rewardPick')}
           </p>
           <div className="run-item-row run-reward-mons">
             {run.monOffer.map((mon, i) => (
@@ -900,7 +875,7 @@ function RoguelitePanel({
                     else setRewardPick(rewardPick === i ? null : i)
                   }}
                 >
-                  <div className="run-revive-sprite rarity-glow" title={mon.item || undefined}>
+                  <div className="run-revive-sprite rarity-glow" title={mon.item ? itemName(mon.item) : undefined}>
                     <SpriteImage
                       style="3d-static"
                       className="run-revive-img"
@@ -913,8 +888,8 @@ function RoguelitePanel({
                     {mon.itemSpritenum != null && <ItemSprite spritenum={mon.itemSpritenum} className="run-revive-item" />}
                   </div>
                   <FitName className="run-revive-name" text={mon.species} />
-                  <span className="run-revive-ability">{mon.item || mon.ability}</span>
-                  <span className="run-revive-level">Lv {mon.level}</span>
+                  <span className="run-revive-ability">{mon.item ? itemName(mon.item) : abilityName(mon.ability ?? '')}</span>
+                  <span className="run-revive-level">{t('tower.lv', { level: mon.level })}</span>
                 </button>
               </Tooltip>
             ))}
@@ -922,7 +897,7 @@ function RoguelitePanel({
           <div className="run-item-row">
             {rewardPick !== null && (
               <button className="run-item-button run-item-skip" disabled={busy || itemBusy} onClick={() => setRewardPick(null)}>
-                Back
+                {t('tower.back')}
               </button>
             )}
             <button
@@ -930,17 +905,17 @@ function RoguelitePanel({
               disabled={busy || itemBusy}
               onClick={() => void runItemAction(() => api.skipRunRewardMon())}
             >
-              Skip
+              {t('tower.skip')}
             </button>
           </div>
         </div>
       ) : run.swapOffer ? (
         <div className="run-item-offer">
-          <p className="run-reward-heading">Random Swap</p>
+          <p className="run-reward-heading">{t('node.swap')}</p>
           <p className="box-empty-hint">
             {swapMode === 'one'
-              ? `Now ${CLICK_LC} the Pokémon to swap away - its replacement takes over its held item and its New Ability / New Move picks.`
-              : `Swapped-in Pokémon are completely random, at Lv ${run.swapLevel}, and take over the held items and New Ability / New Move picks of the ones they replace. Each has a 10% chance to be a legendary - and swapping the whole team has a 5% chance to be all restricted legendaries.`}
+              ? t('tower.swapOneHint', { click: clickWordLc() })
+              : t('tower.swapHint', { level: run.swapLevel })}
           </p>
           <div className="run-item-row">
             <button
@@ -951,7 +926,7 @@ function RoguelitePanel({
                 setSwapMode(swapMode === 'one' ? null : 'one')
               }}
             >
-              Swap one Pokémon
+              {t('tower.swapOne')}
             </button>
             <button
               className={`run-item-button${confirmingTeamSwap ? ' confirm-button' : ''}`}
@@ -963,14 +938,14 @@ function RoguelitePanel({
               }}
               onBlur={() => setConfirmingTeamSwap(false)}
             >
-              {confirmingTeamSwap ? `Swap all of them? ${CLICK} again` : 'Swap the whole team'}
+              {confirmingTeamSwap ? t('tower.swapAllConfirm', { click: clickWord() }) : t('tower.swapAll')}
             </button>
             <button
               className="run-item-button run-item-skip"
               disabled={busy || swapBusy}
               onClick={() => void doSwap(() => api.skipRunSwap())}
             >
-              Skip
+              {t('tower.skip')}
             </button>
           </div>
           {swapError && <p className="editor-error">{swapError}</p>}
@@ -979,17 +954,19 @@ function RoguelitePanel({
         <div className="run-item-offer">
           <p className="run-reward-heading">
             {run.pickReason === 'reward'
-              ? 'Victory reward!'
+              ? t('tower.victoryReward')
               : run.pickReason === 'bonus'
-                ? `Title bonus: a free ${pick.kind === 'ability' ? 'ability' : 'move'}!`
+                ? pick.kind === 'ability'
+                  ? t('tower.bonusAbility')
+                  : t('tower.bonusMove')
                 : pick.kind === 'ability'
-                  ? 'New Ability'
-                  : 'New Move'}
+                  ? t('node.ability')
+                  : t('node.move')}
           </p>
           {learner && chosenPick ? (
             <>
               <p className="box-empty-hint">
-                Which of {learner.species}&apos;s moves should {pickName} replace? (It stays locked in when moves update.)
+                {t('tower.whichMove', { name: learner.species, move: moveName(pickName ?? '') })}
               </p>
               <div className="run-item-row">
                 {learner.moveList.map((move) => (
@@ -1004,7 +981,7 @@ function RoguelitePanel({
                     }}
                   >
                     {move.locked && '🔒 '}
-                    {move.name}
+                    {moveName(move.name)}
                   </button>
                 ))}
                 {learner.moveList.length < 4 && (
@@ -1017,11 +994,11 @@ function RoguelitePanel({
                       setLearner(null)
                     }}
                   >
-                    Add as a new move
+                    {t('tower.addMove')}
                   </button>
                 )}
                 <button className="run-item-button run-item-skip" onClick={() => setLearner(null)}>
-                  Back
+                  {t('tower.back')}
                 </button>
               </div>
             </>
@@ -1029,38 +1006,48 @@ function RoguelitePanel({
             <>
               <p className="box-empty-hint">
                 {chosenPick
-                  ? `Now ${CLICK_LC} the Pokémon to ${pick.kind === 'ability' ? 'give' : 'teach'} ${pickName} to.`
-                  : `Pick one ${pick.kind === 'ability' ? 'ability' : 'move'}.`}
+                  ? pick.kind === 'ability'
+                    ? t('tower.giveAbility', { click: clickWordLc(), name: abilityName(pickName ?? '') })
+                    : t('tower.teachMove', { click: clickWordLc(), name: moveName(pickName ?? '') })
+                  : pick.kind === 'ability'
+                    ? t('tower.pickAbility')
+                    : t('tower.pickMove')}
               </p>
               <div className="run-item-row">
-                {pick.options.map((option) => (
-                  <Tooltip
-                    key={option.id}
-                    placement="below"
-                    content={
-                      <div className="tooltip-panel">
-                        <div className="tooltip-title">{option.name}</div>
-                        {option.type && (
-                          <div className="tooltip-row">
-                            <span className={`type-badge type-${option.type.toLowerCase()}`}>{option.type}</span>
-                            <span className="tooltip-category">{option.category}</span>
-                            {!!option.basePower && <span>Power: {option.basePower}</span>}
-                          </div>
-                        )}
-                        {option.description && <div className="tooltip-desc">{option.description}</div>}
-                      </div>
-                    }
-                  >
-                    <button
-                      className={`run-item-button${chosenPick === option.id ? ' run-item-button-chosen' : ''}`}
-                      disabled={busy}
-                      onClick={() => setChosenPick(option.id)}
+                {pick.options.map((option) => {
+                  const shownName = pick.kind === 'ability' ? abilityName(option.name) : moveName(option.name)
+                  const shownText =
+                    option.description &&
+                    (pick.kind === 'ability' ? abilityText(option.id, option.description) : moveText(option.id, option.description))
+                  return (
+                    <Tooltip
+                      key={option.id}
+                      placement="below"
+                      content={
+                        <div className="tooltip-panel">
+                          <div className="tooltip-title">{shownName}</div>
+                          {option.type && (
+                            <div className="tooltip-row">
+                              <span className={`type-badge type-${option.type.toLowerCase()}`}>{typeName(option.type)}</span>
+                              <span className="tooltip-category">{categoryName(option.category ?? '')}</span>
+                              {!!option.basePower && <span>{t('tower.power', { n: option.basePower })}</span>}
+                            </div>
+                          )}
+                          {shownText && <div className="tooltip-desc">{shownText}</div>}
+                        </div>
+                      }
                     >
-                      {option.type && <span className={`type-badge type-${option.type.toLowerCase()}`}>{option.type}</span>}
-                      <span>{option.name}</span>
-                    </button>
-                  </Tooltip>
-                ))}
+                      <button
+                        className={`run-item-button${chosenPick === option.id ? ' run-item-button-chosen' : ''}`}
+                        disabled={busy}
+                        onClick={() => setChosenPick(option.id)}
+                      >
+                        {option.type && <span className={`type-badge type-${option.type.toLowerCase()}`}>{typeName(option.type)}</span>}
+                        <span>{shownName}</span>
+                      </button>
+                    </Tooltip>
+                  )
+                })}
                 <button
                   className="run-item-button run-item-skip"
                   disabled={busy}
@@ -1069,7 +1056,7 @@ function RoguelitePanel({
                     onSkipPick()
                   }}
                 >
-                  Skip
+                  {t('tower.skip')}
                 </button>
               </div>
             </>
@@ -1077,11 +1064,11 @@ function RoguelitePanel({
         </div>
       ) : offer ? (
         <div className="run-item-offer">
-          {run.itemOfferReason === 'reward' && <p className="run-reward-heading">Victory reward!</p>}
-          {run.itemOfferReason === 'bonus' && <p className="run-reward-heading">Title bonus: a free item!</p>}
-          {run.itemOfferReason === 'shop' && <p className="run-reward-heading">New Item</p>}
+          {run.itemOfferReason === 'reward' && <p className="run-reward-heading">{t('tower.victoryReward')}</p>}
+          {run.itemOfferReason === 'bonus' && <p className="run-reward-heading">{t('tower.bonusItem')}</p>}
+          {run.itemOfferReason === 'shop' && <p className="run-reward-heading">{t('tower.newItem')}</p>}
           <p className="box-empty-hint">
-            {chosenItem ? `Now ${CLICK_LC} the Pokémon to give it to (it replaces what it holds).` : 'Pick one item.'}
+            {chosenItem ? t('tower.giveItem', { click: clickWordLc() }) : t('tower.pickItem')}
           </p>
           <div className="run-item-row">
             {offer.map((item) => (
@@ -1090,8 +1077,8 @@ function RoguelitePanel({
                 placement="below"
                 content={
                   <div className="tooltip-panel">
-                    <div className="tooltip-title">{item.itemName}</div>
-                    {item.description && <div className="tooltip-desc">{item.description}</div>}
+                    <div className="tooltip-title">{itemName(item.itemName)}</div>
+                    {item.description && <div className="tooltip-desc">{itemText(item.itemId, item.description)}</div>}
                   </div>
                 }
               >
@@ -1101,7 +1088,7 @@ function RoguelitePanel({
                   onClick={() => setChosenItem(item.itemId)}
                 >
                   <ItemSprite spritenum={item.spritenum} />
-                  <span>{item.itemName}</span>
+                  <span>{itemName(item.itemName)}</span>
                 </button>
               </Tooltip>
             ))}
@@ -1109,13 +1096,13 @@ function RoguelitePanel({
               <button
                 className="run-item-button run-item-skip"
                 disabled={busy}
-                title="Roll three new items - once per floor"
+                title={t('tower.rerollTip')}
                 onClick={() => {
                   setChosenItem(null)
                   onRerollItems()
                 }}
               >
-                🎲 Reroll
+                {t('tower.reroll')}
               </button>
             )}
             <button
@@ -1126,22 +1113,20 @@ function RoguelitePanel({
                 onSkipItem()
               }}
             >
-              Skip
+              {t('tower.skip')}
             </button>
           </div>
         </div>
       ) : displaced ? (
         <div className="run-item-offer">
           <p className="run-reward-heading">
-            <ItemSprite spritenum={displaced.spritenum} /> {displacedFrom?.species ?? 'Your Pokémon'}&apos;s old{' '}
-            {displaced.itemName}
+            <ItemSprite spritenum={displaced.spritenum} />{' '}
+            {t('tower.oldItem', { name: displacedFrom?.species ?? t('tower.yourMon'), item: itemName(displaced.itemName) })}
           </p>
-          <p className="box-empty-hint">
-            Click the Pokémon to give it to (if it holds something, that one needs a new holder next).
-          </p>
+          <p className="box-empty-hint">{t('tower.placeItem')}</p>
           <div className="run-item-row">
             <button className="run-item-button run-item-skip" disabled={busy} onClick={() => onPlaceDisplacedItem(null)}>
-              Skip (let it go)
+              {t('tower.letGo')}
             </button>
           </div>
         </div>
@@ -1151,7 +1136,11 @@ function RoguelitePanel({
         <div className="run-boss-floor">
           <div className="run-boss-shop-items">
             <p className="run-reward-heading">
-              Shop <span className="run-shop-balance">You have <GemIcon />{run.consumables.gems}</span>
+              {t('tower.shop')}{' '}
+              <span className="run-shop-balance">
+                {t('tower.youHave')} <GemIcon />
+                {run.consumables.gems}
+              </span>
             </p>
             {RUN_CONSUMABLES.map((c) => {
               const locked = run.consumables.locked.includes(c.id)
@@ -1162,7 +1151,9 @@ function RoguelitePanel({
                   content={
                     <div className="tooltip-panel">
                       <div className="tooltip-title">{c.name}</div>
-                      <div className="tooltip-desc">{locked ? `Not on ${runDifficultyInfo(run.difficulty).label}.` : c.description}</div>
+                      <div className="tooltip-desc">
+                        {locked ? t('tower.notOn', { difficulty: runDifficultyInfo(run.difficulty).label }) : c.description}
+                      </div>
                     </div>
                   }
                 >
@@ -1182,10 +1173,8 @@ function RoguelitePanel({
               placement="below"
               content={
                 <div className="tooltip-panel">
-                  <div className="tooltip-title">Rare Candy</div>
-                  <div className="tooltip-desc">
-                    Used right away: pick a Pokémon to raise by one level - it can go past the level cap.
-                  </div>
+                  <div className="tooltip-title">{t('tower.rareCandy')}</div>
+                  <div className="tooltip-desc">{t('tower.rareCandyDesc')}</div>
                 </div>
               }
             >
@@ -1199,7 +1188,7 @@ function RoguelitePanel({
                 }}
               >
                 <img className="run-consumable-icon" src={RUN_RARE_CANDY_ICON} alt="" />
-                <span>Rare Candy</span>
+                <span>{t('tower.rareCandy')}</span>
                 {gemPrice(RUN_RARE_CANDY_PRICE)}
               </button>
             </Tooltip>
@@ -1217,12 +1206,12 @@ function RoguelitePanel({
                   className={`big-battle-button run-node-button run-node-${tile}${used ? ' run-node-bought' : ''}`}
                   style={{ '--i': i + run.choices.length } as React.CSSProperties}
                   disabled={busy || itemBusy || used || run.consumables.gems < price}
-                  title={used ? 'Already bought on this floor' : NODE_INFO[tile].hint}
+                  title={used ? t('tower.alreadyBought') : NODE_INFO[tile].hint}
                   onClick={() => void runItemAction(() => api.buyRunShopTile(tile))}
                 >
                   <NodeIcon choice={{ kind: tile }} />
-                  <span className="run-node-label">{SHOP_TILE_LABELS[tile]}</span>
-                  {used ? <span className="run-node-sub">Bought</span> : gemPrice(price)}
+                  <span className="run-node-label">{t(`shopTile.${tile}`)}</span>
+                  {used ? <span className="run-node-sub">{t('tower.bought')}</span> : gemPrice(price)}
                 </button>
               )
             })}
@@ -1233,19 +1222,21 @@ function RoguelitePanel({
           {takeover ? (
             // A Villain Takeover: who took the floor over, and what the corrupted tiles cost.
             <p className="run-floor-title run-takeover-title">
-              <span className="run-takeover-name">Villain Takeover!</span>
+              <span className="run-takeover-name">{t('tower.takeover')}</span>
               <span className="run-takeover-sub">
-                {takeover.classLabel} {takeover.villainName} corrupted this floor -{' '}
+                {t('tower.corruptedFloor', { who: `${takeover.classLabel} ${takeover.villainName}` })}
                 {takeover.tileCost > 0 ? (
-                  <>every other path costs {gemPrice(takeover.tileCost)}</>
+                  <>
+                    {t('tower.otherPathsCost')} {gemPrice(takeover.tileCost)}
+                  </>
                 ) : (
-                  'with no gems, every path is free'
+                  t('tower.freePaths')
                 )}
               </span>
             </p>
           ) : (
             <p className="run-floor-title">
-              {run.choices.length === 1 && run.choices[0].kind === 'boss' ? 'A boss blocks the way' : 'Choose your path'}
+              {run.choices.length === 1 && run.choices[0].kind === 'boss' ? t('tower.bossBlocks') : t('tower.choosePath')}
             </p>
           )}
           {/* Keyed on the floor, so the tiles deal themselves in again each new floor. */}
@@ -1256,7 +1247,7 @@ function RoguelitePanel({
       )}
 
       <h2 className="options-heading run-team-heading">
-        Run Team <span className="run-team-count">{run.team.length}/{run.maxTeam}</span>
+        {t('tower.runTeam')} <span className="run-team-count">{run.team.length}/{run.maxTeam}</span>
       </h2>
       <div className="team-row run-team-row">
         {run.team.map((mon, index) => {
@@ -1281,7 +1272,7 @@ function RoguelitePanel({
         })}
       </div>
       <div className="run-consumables">
-        <span className="run-hud-label run-consumables-label">Bag</span>
+        <span className="run-hud-label run-consumables-label">{t('tower.bag')}</span>
         {RUN_CONSUMABLES.map((c) => {
           const count = run.consumables.counts[c.id]
           const locked = run.consumables.locked.includes(c.id)
@@ -1293,7 +1284,7 @@ function RoguelitePanel({
                 <div className="tooltip-panel">
                   <div className="tooltip-title">{c.name}</div>
                   <div className="tooltip-desc">
-                    {locked ? `Not on ${runDifficultyInfo(run.difficulty).label} - there's no healing.` : c.description}
+                    {locked ? t('tower.noHealing', { difficulty: runDifficultyInfo(run.difficulty).label }) : c.description}
                   </div>
                 </div>
               }
@@ -1332,14 +1323,14 @@ function RoguelitePanel({
               <div className="run-revive-header">
                 <img className="run-revive-icon" src={RUN_CONSUMABLES.find((c) => c.id === 'revive')?.icon} alt="" />
                 <div>
-                  <h2>{reviving ? `Make room for ${reviving.species}` : 'Revive'}</h2>
+                  <h2>{reviving ? t('tower.makeRoom', { name: reviving.species }) : t('tower.revive')}</h2>
                   <p className="run-revive-sub">
                     {run.consumables.fainted.length === 0
-                      ? 'Nobody has fainted this run.'
+                      ? t('tower.nobodyFainted')
                       : reviving
-                        ? 'Your team is full - pick who leaves. They join the fainted, and can be revived later.'
-                        : `Comes back at half HP, at Lv ${run.consumables.reviveLevel}.${
-                            run.team.length >= run.maxTeam ? ' Your team is full, so someone will leave to make room.' : ''
+                        ? t('tower.pickLeaver')
+                        : `${t('tower.reviveAt', { level: run.consumables.reviveLevel })}${
+                            run.team.length >= run.maxTeam ? t('tower.reviveFull') : ''
                           }`}
                   </p>
                 </div>
@@ -1359,7 +1350,7 @@ function RoguelitePanel({
                     }}
                   >
                     {/* The sprite with its held item tucked in the corner, then name and ability. */}
-                    <div className="run-revive-sprite rarity-glow" title={mon.item || undefined}>
+                    <div className="run-revive-sprite rarity-glow" title={mon.item ? itemName(mon.item) : undefined}>
                       <SpriteImage
                         style="3d-static"
                         className="run-revive-img"
@@ -1372,13 +1363,13 @@ function RoguelitePanel({
                       {mon.itemSpritenum != null && <ItemSprite spritenum={mon.itemSpritenum} className="run-revive-item" />}
                     </div>
                     <FitName className="run-revive-name" text={mon.species} />
-                    <span className="run-revive-ability">{mon.ability}</span>
+                    <span className="run-revive-ability">{abilityName(mon.ability ?? '')}</span>
                     <span className="run-revive-level">
                       {reviving ? (
-                        `Lv ${mon.level}`
+                        t('tower.lv', { level: mon.level })
                       ) : (
                         <>
-                          Lv {mon.level} → <strong>{run.consumables.reviveLevel}</strong>
+                          {t('tower.lv', { level: mon.level })} → <strong>{run.consumables.reviveLevel}</strong>
                         </>
                       )}
                     </span>
@@ -1389,7 +1380,7 @@ function RoguelitePanel({
               <div className="editor-actions run-revive-actions">
                 {reviving && (
                   <button className="run-item-button run-item-skip" onClick={() => setReviving(null)}>
-                    Back
+                    {t('tower.back')}
                   </button>
                 )}
                 <button
@@ -1399,7 +1390,7 @@ function RoguelitePanel({
                     setReviving(null)
                   }}
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
               </div>
             </div>
@@ -1410,8 +1401,8 @@ function RoguelitePanel({
       {using === 'abilitycapsule' && capsuleMon && (
         <div className="run-item-offer">
           <p className="box-empty-hint">
-            Which ability should {capsuleMon.species} have?
-            {capsuleMon.abilityLocked ? ' (It replaces the ability from its New Ability pick.)' : ''}
+            {t('tower.whichAbility', { name: capsuleMon.species })}
+            {capsuleMon.abilityLocked ? t('tower.replacesPick') : ''}
           </p>
           <div className="run-item-row">
             {capsuleMon.abilityChoices.map((a) => {
@@ -1422,8 +1413,8 @@ function RoguelitePanel({
                   placement="below"
                   content={
                     <div className="tooltip-panel">
-                      <div className="tooltip-title">{a.name}</div>
-                      <div className="tooltip-desc">{a.description}</div>
+                      <div className="tooltip-title">{abilityName(a.name)}</div>
+                      <div className="tooltip-desc">{abilityText(a.id, a.description)}</div>
                     </div>
                   }
                 >
@@ -1432,14 +1423,14 @@ function RoguelitePanel({
                     disabled={busy || itemBusy || current}
                     onClick={() => void runItemAction(() => api.useRunAbilityCapsule(capsuleMon.id, a.id))}
                   >
-                    {a.name}
-                    {current && <span className="run-shop-price">Current</span>}
+                    {abilityName(a.name)}
+                    {current && <span className="run-shop-price">{t('tower.current')}</span>}
                   </button>
                 </Tooltip>
               )
             })}
             <button className="run-item-button run-item-skip" onClick={() => setCapsuleMon(null)}>
-              Back
+              {t('tower.back')}
             </button>
           </div>
         </div>

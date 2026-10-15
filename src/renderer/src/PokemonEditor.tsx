@@ -22,6 +22,8 @@ import { TYPE_COLORS } from './moveAnimations'
 import ModalSpinner from './ModalSpinner'
 import { TmIcon } from './TmBits'
 import { hiddenPowerType } from '../../shared/hidden-power'
+import { abilityName, abilityText, itemName, itemText, moveName, moveText, nameMatches, natureName, t, typeName } from './i18n'
+import { categoryName } from './movePower'
 
 export type PokemonEditorSource = { kind: 'box'; monId: string } | { kind: 'premadeTeam'; teamId: string; monId: string }
 
@@ -104,14 +106,17 @@ function MergeProgress({ copies, tier }: { copies: number; tier: RarityTier | un
   const to = 2 ** (stars + 1)
   const percent = maxed ? 100 : ((copies - from) / (to - from)) * 100
   return (
-    <div className="editor-merge" title={stars > 0 ? `${mergeBonusText(stars, tier)} to all stats but HP in classic battles` : 'Merge duplicates in to earn stars'}>
+    <div
+      className="editor-merge"
+      title={stars > 0 ? t('editor.mergeBonus', { bonus: mergeBonusText(stars, tier) }) : t('editor.mergeToEarn')}
+    >
       <span className="merge-stars">{starRow(stars)}</span>
       <div className="editor-merge-bar">
         <div className="editor-merge-fill" style={{ width: `${percent}%` }} />
       </div>
       <span className="editor-merge-text">
-        {copies} cop{copies === 1 ? 'y' : 'ies'}
-        {maxed ? ' · fully merged' : ` · ${to - copies} more for ★${stars + 1}`}
+        {t('editor.copies', { count: copies })}
+        {maxed ? t('editor.fullyMerged') : t('editor.moreForStar', { n: to - copies, star: stars + 1 })}
       </span>
     </div>
   )
@@ -122,23 +127,29 @@ const RARE_CANDY_SPRITENUM = -2
 // The Poke Ball item icon - an evolution already in the Pokedex.
 const POKE_BALL_SPRITENUM = 345
 
-const STAT_LABELS: { key: keyof StatBlock; label: string }[] = [
-  { key: 'hp', label: 'HP' },
-  { key: 'atk', label: 'Atk' },
-  { key: 'def', label: 'Def' },
-  { key: 'spa', label: 'SpA' },
-  { key: 'spd', label: 'SpD' },
-  { key: 'spe', label: 'Spe' }
-]
+// Each stat's short name, read in the player's language when shown.
+const STAT_LABELS: { key: keyof StatBlock; readonly label: string }[] = (['hp', 'atk', 'def', 'spa', 'spd', 'spe'] as const).map(
+  (key) => ({
+    key,
+    get label() {
+      return t(`stat.${key}`)
+    }
+  })
+)
 
-const STAT_LABEL_BY_KEY: Record<string, string> = Object.fromEntries(STAT_LABELS.map((s) => [s.key, s.label]))
-
-function natureLabel(n: NatureOptionEntry): string {
-  if (!n.plus || !n.minus || n.plus === n.minus) return `${n.name} (Neutral)`
-  return `${n.name} (+${STAT_LABEL_BY_KEY[n.plus]}, -${STAT_LABEL_BY_KEY[n.minus]})`
+function statLabel(key: string): string {
+  return STAT_LABELS.find((s) => s.key === key)?.label ?? key
 }
 
-const GENDER_LABELS: Record<string, string> = { M: 'Male', F: 'Female', N: 'Genderless' }
+function natureLabel(n: NatureOptionEntry): string {
+  const name = natureName(n.name)
+  if (!n.plus || !n.minus || n.plus === n.minus) return t('editor.natureNeutral', { name })
+  return t('editor.natureStats', { name, plus: statLabel(n.plus), minus: statLabel(n.minus) })
+}
+
+function genderLabel(gender: string): string {
+  return gender === 'M' || gender === 'F' || gender === 'N' ? t(`gender.${gender}`) : gender
+}
 const EV_TOTAL_CAP = 510
 
 function evMax(evs: StatBlock, stat: keyof StatBlock): number {
@@ -532,7 +543,7 @@ function PokemonEditor({
 
   function moveDisplayName(id: string): string {
     if (!id) return ''
-    return speciesInfo?.moves.find((m) => m.id === id)?.name ?? id
+    return moveName(speciesInfo?.moves.find((m) => m.id === id)?.name ?? id)
   }
 
   const evTotal = set ? STAT_LABELS.reduce((sum, { key }) => sum + set.evs[key], 0) : 0
@@ -540,13 +551,14 @@ function PokemonEditor({
   const baseStats = options?.species.find((s) => s.name === set?.species)?.baseStats
   const nature = options?.natures.find((n) => n.name === set?.nature)
 
+  // The pickers' searches find the English names and the ones shown alike.
   const speciesResults =
     options && activeSelector === 'species'
       ? options.species.filter((s) => s.name.toLowerCase().includes(speciesQuery.toLowerCase()))
       : []
   const abilityResults =
     speciesInfo && activeSelector === 'ability'
-      ? speciesInfo.abilities.filter((a) => a.name.toLowerCase().includes(abilityQuery.toLowerCase()))
+      ? speciesInfo.abilities.filter((a) => nameMatches(abilityQuery, a.name, abilityName(a.name)))
       : []
   const itemResults =
     options && (isAdmin || bagItemIds) && activeSelector === 'item'
@@ -554,13 +566,13 @@ function PokemonEditor({
           (i) =>
             !NON_HELD_ITEM_IDS.has(i.id) &&
             (isAdmin || bagItemIds!.has(i.id) || (heldItem !== '' && i.name === heldItem)) &&
-            i.name.toLowerCase().includes(itemQuery.toLowerCase())
+            nameMatches(itemQuery, i.name, itemName(i.name))
         )
       : []
   const currentItemSpritenum = options?.items.find((i) => i.name === set?.item)?.spritenum
   const moveResults =
     speciesInfo && typeof activeSelector === 'number'
-      ? speciesInfo.moves.filter((m) => m.name.toLowerCase().includes(moveQuery.toLowerCase()))
+      ? speciesInfo.moves.filter((m) => nameMatches(moveQuery, m.name, moveName(m.name)))
       : []
 
   return createPortal(
@@ -573,12 +585,12 @@ function PokemonEditor({
               <div className="pokemon-editor-top">
                 {/* The Pokemon itself, with its merge stars under it. */}
                 <div className="pokemon-editor-side">
-                  <div className="pokemon-editor-portrait" title={set.shiny ? `Shiny ${set.species}` : set.species}>
+                  <div className="pokemon-editor-portrait" title={set.shiny ? t('editor.shinyTitle', { name: set.species }) : set.species}>
                     {onToggleFavorite && (
                       <button
                         type="button"
                         className={`pokemon-editor-favorite${favorite ? ' pokemon-editor-favorite-on' : ''}`}
-                        title={favorite ? 'Favorite - click to unfavorite' : 'Click to favorite'}
+                        title={favorite ? t('editor.favoriteOn') : t('editor.favoriteOff')}
                         onClick={onToggleFavorite}
                       >
                         {favorite ? '❤️' : '🤍'}
@@ -589,7 +601,7 @@ function PokemonEditor({
                       <button
                         type="button"
                         className={`pokemon-editor-gmax${set.gmaxLook ? ' pokemon-editor-gmax-on' : ''}`}
-                        title={set.gmaxLook ? 'Gigantamax look - click to show its usual sprite' : 'Click to show its Gigantamax sprite (cosmetic only)'}
+                        title={set.gmaxLook ? t('editor.gmaxOn') : t('editor.gmaxOff')}
                         onClick={() => update('gmaxLook', !set.gmaxLook)}
                       >
                         <img src={set.gmaxLook ? './sprites/misc/gmax-on.png' : './sprites/misc/gmax-off.png'} alt="" />
@@ -605,13 +617,13 @@ function PokemonEditor({
                     />
                     <span className="pokemon-editor-portrait-name">
                       {set.shiny && <ShinyIcon />}
-                      {set.species} · Lv {set.level}
+                      {t('editor.nameLevel', { name: set.species, level: set.level })}
                       {onUseRareCandy && (
                         <button
                           type="button"
                           className="pokemon-editor-candy"
                           disabled={!canUseRareCandy || usingCandy}
-                          title={canUseRareCandy ? 'Use a Rare Candy (+1 level)' : 'No Rare Candy in your bag, or already at the level cap'}
+                          title={canUseRareCandy ? t('editor.useCandy') : t('editor.noCandy')}
                           onClick={() => void useRareCandy()}
                         >
                           <ItemSprite spritenum={RARE_CANDY_SPRITENUM} />
@@ -625,7 +637,7 @@ function PokemonEditor({
                 <div className="pokemon-editor-details">
                   <div className="pokemon-editor-inline">
                     <label className="editor-field">
-                      <span>Nickname</span>
+                      <span>{t('editor.nickname')}</span>
                       <input
                         type="text"
                         value={nicknameValue}
@@ -634,26 +646,26 @@ function PokemonEditor({
                       />
                     </label>
                     <label className="editor-field">
-                      <span>Gender</span>
+                      <span>{t('editor.gender')}</span>
                       <select value={set.gender} onChange={(e) => update('gender', e.target.value)}>
                         {speciesInfo.genders.map((g) => (
                           <option key={g} value={g}>
-                            {GENDER_LABELS[g] ?? g}
+                            {genderLabel(g)}
                           </option>
                         ))}
                       </select>
                     </label>
                     <label className="editor-field">
-                      <span>Tera Type</span>
+                      <span>{t('editor.teraType')}</span>
                       <select
                         className="editor-tera-select"
                         style={teraTypeStyle(set.teraType)}
                         value={set.teraType}
                         onChange={(e) => update('teraType', e.target.value)}
                       >
-                        {options.types.map((t) => (
-                          <option key={t} value={t} style={teraTypeStyle(t)}>
-                            {t}
+                        {options.types.map((type) => (
+                          <option key={type} value={type} style={teraTypeStyle(type)}>
+                            {typeName(type)}
                           </option>
                         ))}
                       </select>
@@ -661,18 +673,18 @@ function PokemonEditor({
                   </div>
                   <div className="pokemon-editor-inline pokemon-editor-inline-pair">
                     <label className="editor-field">
-                      <span>Ability</span>
+                      <span>{t('editor.ability')}</span>
                       <input
                         type="text"
                         data-selector-field="ability"
-                        value={activeSelector === 'ability' ? abilityQuery : set.ability}
-                        placeholder={set.ability || 'Ability'}
+                        value={activeSelector === 'ability' ? abilityQuery : abilityName(set.ability)}
+                        placeholder={abilityName(set.ability) || t('editor.ability')}
                         onChange={(e) => setAbilityQuery(e.target.value)}
                         onKeyDown={handleSelectorKeyDown}
                       />
                     </label>
                     <label className="editor-field">
-                      <span>Item</span>
+                      <span>{t('editor.item')}</span>
                       <div className="editor-field-with-icon">
                         {set.item && currentItemSpritenum !== undefined && (
                           <span style={itemIconStyle(currentItemSpritenum)} />
@@ -680,8 +692,8 @@ function PokemonEditor({
                         <input
                           type="text"
                           data-selector-field="item"
-                          value={activeSelector === 'item' ? itemQuery : set.item}
-                          placeholder={set.item || '(None)'}
+                          value={activeSelector === 'item' ? itemQuery : itemName(set.item)}
+                          placeholder={itemName(set.item) || t('editor.none')}
                           onChange={(e) => setItemQuery(e.target.value)}
                           onKeyDown={handleSelectorKeyDown}
                         />
@@ -692,12 +704,12 @@ function PokemonEditor({
                     <div className="pokemon-editor-inline">
                       {isAdmin && (
                         <label className="editor-field">
-                          <span>Species</span>
+                          <span>{t('editor.species')}</span>
                           <input
                             type="text"
                             data-selector-field="species"
                             value={activeSelector === 'species' ? speciesQuery : set.species}
-                            placeholder={set.species || 'Species'}
+                            placeholder={set.species || t('editor.species')}
                             onChange={(e) => setSpeciesQuery(e.target.value)}
                             onKeyDown={handleSelectorKeyDown}
                           />
@@ -705,27 +717,27 @@ function PokemonEditor({
                       )}
                       {isAdmin && (
                         <label className="editor-field">
-                          <span>Level</span>
+                          <span>{t('editor.level')}</span>
                           <input
                             type="number"
                             min={1}
                             max={100}
                             value={set.level}
                             disabled={typeof set.capOffset === 'number'}
-                            title={typeof set.capOffset === 'number' ? 'Set by the level cap - untick "Level follows the cap" to fix it' : undefined}
+                            title={typeof set.capOffset === 'number' ? t('editor.levelByCap') : undefined}
                             onChange={(e) => void updateLevel(Number(e.target.value))}
                           />
                         </label>
                       )}
                       {isAdmin && (
                         <label className="editor-field editor-field-checkbox">
-                          <span>Shiny</span>
+                          <span>{t('editor.shiny')}</span>
                           <input type="checkbox" checked={set.shiny} onChange={(e) => update('shiny', e.target.checked)} />
                         </label>
                       )}
                       {isAdmin && (
                         <label className="editor-field">
-                          <span>Happiness</span>
+                          <span>{t('editor.happiness')}</span>
                           <input
                             type="number"
                             min={0}
@@ -736,8 +748,8 @@ function PokemonEditor({
                         </label>
                       )}
                       {isAdmin && (
-                        <label className="editor-field" title={`Merge stars: +10% to all stats but HP each in classic battles (less for red and gold)`}>
-                          <span>Stars</span>
+                        <label className="editor-field" title={t('editor.starsTip')}>
+                          <span>{t('editor.stars')}</span>
                           <input
                             type="number"
                             min={0}
@@ -757,7 +769,7 @@ function PokemonEditor({
                           checked={typeof set.capOffset === 'number'}
                           onChange={(e) => updateCapOffset(e.target.checked ? Math.max(0, (levelCap ?? set.level) - set.level) : null)}
                         />
-                        <span>Level follows the cap</span>
+                        <span>{t('editor.followsCap')}</span>
                       </label>
                       {typeof set.capOffset === 'number' && (
                         <span className="editor-cap-offset-detail">
@@ -768,11 +780,11 @@ function PokemonEditor({
                             value={set.capOffset}
                             onChange={(e) => updateCapOffset(Number(e.target.value))}
                           />{' '}
-                          below the cap
+                          {t('editor.belowCap')}
                           {levelCap !== null && (
                             <span className="editor-hint">
                               {' '}
-                              (Lv {set.level} at the current cap of {levelCap})
+                              {t('editor.atCap', { level: set.level, cap: levelCap })}
                             </span>
                           )}
                         </span>
@@ -780,7 +792,7 @@ function PokemonEditor({
                     </div>
                   )}
                   <div className="editor-section">
-                    <h3>Auto-fill</h3>
+                    <h3>{t('editor.autoFill')}</h3>
                     <div className="auto-set-row">
                       <select value={autoSetId} onChange={(e) => setAutoSetId(e.target.value)}>
                         {autoSets.map((o) => (
@@ -790,7 +802,7 @@ function PokemonEditor({
                         ))}
                       </select>
                       <button disabled={autoBusy || !autoSetId} onClick={() => void applyAutoSet()}>
-                        Apply
+                        {t('editor.apply')}
                       </button>
                     </div>
                     {autoNotes && autoNotes.length > 0 && (
@@ -811,7 +823,7 @@ function PokemonEditor({
                     {/* Not fully evolved: an Everstone lock under the title - it stops evolving but takes
                         merges, for good once it has. */}
                     <div className="editor-evolutions-heading">
-                      <h3>Evolutions</h3>
+                      <h3>{t('editor.evolutions')}</h3>
                       {everstone && onSetEverstone && (
                         <Tooltip
                           placement="below"
@@ -819,11 +831,11 @@ function PokemonEditor({
                             <span className="tooltip-panel editor-everstone-tip">
                               {everstone.locked
                                 ? everstone.canUnlock
-                                  ? 'Locked: it never evolves and counts as fully evolved (an Eviolite does nothing), but takes merges. Click to take the Everstone off.'
-                                  : 'Locked for good: it has taken merges, so it never evolves (and an Eviolite does nothing).'
-                                : 'Lock it with an Everstone: it never evolves and counts as fully evolved (an Eviolite does nothing), but it can take merges.'}
+                                  ? t('editor.everLockedCan')
+                                  : t('editor.everLockedForGood')
+                                : t('editor.everLockHint')}
                               <br />
-                              Each merge star: <b>{mergeBonusText(1, rarityTier)}</b> to all stats but HP
+                              {t('editor.everEachStar')} <b>{mergeBonusText(1, rarityTier)}</b> {t('editor.everAllStats')}
                             </span>
                           }
                         >
@@ -833,7 +845,7 @@ function PokemonEditor({
                             disabled={everstone.locked && !everstone.canUnlock}
                             onClick={() => onSetEverstone(!everstone.locked)}
                           >
-                            {everstone.locked ? 'Everstone locked' : 'Lock with Everstone'}
+                            {everstone.locked ? t('editor.everLocked') : t('editor.lockEver')}
                           </button>
                         </Tooltip>
                       )}
@@ -847,10 +859,10 @@ function PokemonEditor({
                           disabled={!evo.ready}
                           title={
                             everstone?.locked
-                              ? 'Locked with an Everstone - it never evolves'
+                              ? t('editor.lockedNever')
                               : evo.ready
-                                ? `Evolve into ${evo.species}`
-                                : `Not yet: ${evo.method}`
+                                ? t('pm.evolveInto', { name: evo.species })
+                                : t('editor.notYet', { method: evo.method })
                           }
                           onClick={() => onEvolve(evo.species)}
                         >
@@ -865,7 +877,7 @@ function PokemonEditor({
                             <span className="editor-evolution-name">
                               {evo.species}
                               {evo.registered && (
-                                <span className="context-menu-caught" title="Already in your Pokédex">
+                                <span className="context-menu-caught" title={t('pm.inDex')}>
                                   <ItemSprite spritenum={POKE_BALL_SPRITENUM} />
                                 </span>
                               )}
@@ -881,11 +893,13 @@ function PokemonEditor({
                   <div className="editor-section" ref={focusFormsSection}>
                     {/* Many forms (Rotom, Alcremie): small tiles, the item named once in the heading. */}
                     <h3>
-                      Form changes
+                      {t('editor.formChanges')}
                       {formChanges.forms.length > 4 && (
                         <span className="editor-form-item-heading">
                           <ItemSprite spritenum={formChanges.spritenum} className="editor-form-item" />
-                          {formChanges.ready ? formChanges.itemName : `Needs the ${formChanges.itemName}`}
+                          {formChanges.ready
+                            ? itemName(formChanges.itemName)
+                            : t('editor.needsItem', { item: itemName(formChanges.itemName) })}
                         </span>
                       )}
                     </h3>
@@ -901,8 +915,8 @@ function PokemonEditor({
                           disabled={!formChanges.ready}
                           title={
                             formChanges.ready
-                              ? `Change into ${form} (use the ${formChanges.itemName})`
-                              : `Needs the ${formChanges.itemName} - a key item unlocked by an achievement`
+                              ? t('editor.changeInto', { form, item: itemName(formChanges.itemName) })
+                              : t('editor.needsKeyItem', { item: itemName(formChanges.itemName) })
                           }
                           onClick={() => onChangeForm(form)}
                         >
@@ -915,13 +929,15 @@ function PokemonEditor({
                           />
                           {formChanges.forms.length > 4 ? (
                             // Just the form's own part of the name: "Ruby Cream", "Wash" (plain Alcremie is Vanilla Cream).
-                            <span className="editor-evolution-name">{form.split('-').slice(1).join(' ') || (form === 'Alcremie' ? 'Vanilla Cream' : 'Normal')}</span>
+                            <span className="editor-evolution-name">{form.split('-').slice(1).join(' ') || (form === 'Alcremie' ? t('editor.vanilla') : t('editor.normalForm'))}</span>
                           ) : (
                             <span className="editor-evolution-text">
                               <span className="editor-evolution-name">{form}</span>
                               <span className="editor-evolution-method">
                                 <ItemSprite spritenum={formChanges.spritenum} className="editor-form-item" />
-                                {formChanges.ready ? formChanges.itemName : `Needs the ${formChanges.itemName}`}
+                                {formChanges.ready
+                                  ? itemName(formChanges.itemName)
+                                  : t('editor.needsItem', { item: itemName(formChanges.itemName) })}
                               </span>
                             </span>
                           )}
@@ -934,7 +950,7 @@ function PokemonEditor({
 
               <div className="editor-section">
                 <h3>
-                  Moves <span className="editor-hint">(up to 4, {speciesInfo.moves.length} available)</span>
+                  {t('editor.moves')} <span className="editor-hint">{t('editor.movesHint', { n: speciesInfo.moves.length })}</span>
                 </h3>
                 <div className="editor-moves-grid">
                   {[0, 1, 2, 3].map((i) => {
@@ -951,26 +967,26 @@ function PokemonEditor({
                           type="text"
                           data-selector-field={`move-${i}`}
                           value={activeSelector === i ? moveQuery : moveDisplayName(set.moves[i] ?? '')}
-                          placeholder={moveDisplayName(set.moves[i] ?? '') || `Move ${i + 1}`}
+                          placeholder={moveDisplayName(set.moves[i] ?? '') || t('editor.moveN', { n: i + 1 })}
                           onChange={(e) => setMoveQuery(e.target.value)}
                           onKeyDown={handleSelectorKeyDown}
                         />
                         <div className="editor-move-info">
                           {move ? (
                             <>
-                              <span className={`type-badge type-${move.type.toLowerCase()}`}>{move.type}</span>
+                              <span className={`type-badge type-${move.type.toLowerCase()}`}>{typeName(move.type)}</span>
                               <img
                                 className="editor-move-category"
                                 src={`./sprites/misc/category-${move.category.toLowerCase()}.png`}
-                                alt={move.category}
-                                title={move.category}
+                                alt={categoryName(move.category)}
+                                title={categoryName(move.category)}
                               />
-                              <span>Pow {move.basePower || '—'}</span>
-                              <span>Acc {move.accuracy === true ? '—' : move.accuracy}</span>
-                              <span>PP {move.pp}</span>
+                              <span>{t('editor.pow', { n: move.basePower || '—' })}</span>
+                              <span>{t('editor.acc', { n: move.accuracy === true ? '—' : move.accuracy })}</span>
+                              <span>{t('editor.ppN', { n: move.pp })}</span>
                             </>
                           ) : (
-                            <span className="editor-hint">No move</span>
+                            <span className="editor-hint">{t('editor.noMove')}</span>
                           )}
                         </div>
                       </div>
@@ -983,22 +999,20 @@ function PokemonEditor({
                 {/* The heading, with the nature picker on the same line. */}
                 <div className="editor-stats-header">
                   <h3>
-                    Stats{' '}
-                    <span className="editor-hint">
-                      (EVs {evTotal}/{EV_TOTAL_CAP})
-                    </span>
+                    {t('editor.stats')}{' '}
+                    <span className="editor-hint">{t('editor.evs', { n: evTotal, max: EV_TOTAL_CAP })}</span>
                     {/* Its merge bonus, as a badge - the gold numbers beside each stat include it. */}
                     {!!mergeStars && (
                       <span
                         className="merge-stat-badge"
-                        title={`Merged ★${mergeStars}: ${mergeBonusText(mergeStars, rarityTier)} to all stats but HP in classic battles - shown in gold beside each stat`}
+                        title={t('editor.mergedStatTip', { stars: mergeStars, bonus: mergeBonusText(mergeStars, rarityTier) })}
                       >
                         ★{mergeStars} {mergeBonusText(mergeStars, rarityTier)}
                       </span>
                     )}
                   </h3>
                   <label className="editor-field editor-nature-field">
-                    <span>Nature</span>
+                    <span>{t('editor.nature')}</span>
                     <select value={set.nature} onChange={(e) => update('nature', e.target.value)}>
                       {options.natures.map((n) => (
                         <option key={n.name} value={n.name}>
@@ -1010,11 +1024,11 @@ function PokemonEditor({
                 </div>
                 <div className="editor-ev-row editor-ev-header">
                   <span className="editor-ev-label" />
-                  <span className="editor-ev-base">Base</span>
-                  <span className="editor-ev-iv">IVs</span>
+                  <span className="editor-ev-base">{t('editor.base')}</span>
+                  <span className="editor-ev-iv">{t('editor.ivs')}</span>
                   <span className="editor-ev-spacer" />
-                  <span className="editor-ev-input-head">EVs</span>
-                  <span className={`editor-ev-stat${mergeStars ? ' editor-ev-stat-wide' : ''}`}>Stat</span>
+                  <span className="editor-ev-input-head">{t('editor.evsHead')}</span>
+                  <span className={`editor-ev-stat${mergeStars ? ' editor-ev-stat-wide' : ''}`}>{t('editor.stat')}</span>
                 </div>
                 {STAT_LABELS.map(({ key, label }) => {
                   const natureMark =
@@ -1035,7 +1049,7 @@ function PokemonEditor({
                         min={0}
                         max={31}
                         value={set.ivs[key]}
-                        title={`${label} IV (0-31)`}
+                        title={t('editor.ivTip', { stat: label })}
                         onChange={(e) => updateIv(key, Number(e.target.value))}
                       />
                       <input
@@ -1052,9 +1066,7 @@ function PokemonEditor({
                         inputMode="numeric"
                         value={set.evs[key]}
                         title={
-                          key === 'hp'
-                            ? 'HP EVs (0-252)'
-                            : `${label} EVs (0-252) - type + or - after the number to raise or lower ${label} with the nature`
+                          key === 'hp' ? t('editor.hpEvTip') : t('editor.evTip', { stat: label })
                         }
                         onChange={(e) => handleEvInput(key, e.target.value)}
                       />
@@ -1065,7 +1077,13 @@ function PokemonEditor({
                         {!!mergeStars && baseStats && (
                           <span
                             className="editor-ev-stat-merged"
-                            title={key === 'hp' ? 'Merge stars leave HP alone' : set.ivs[key] === 0 ? 'At 0 IVs this stat takes no merge bonus' : `With the ★${mergeStars} merge bonus`}
+                            title={
+                              key === 'hp'
+                                ? t('editor.hpNoMerge')
+                                : set.ivs[key] === 0
+                                  ? t('editor.zeroIv')
+                                  : t('editor.withBonus', { stars: mergeStars })
+                            }
                           >
                             {/* Stars leave HP alone, and a stat at 0 IVs (kept low on purpose). */}
                             {Math.floor(
@@ -1086,18 +1104,23 @@ function PokemonEditor({
           <div className="editor-actions editor-actions-pinned">
             <button
               className="editor-save-full"
-              title={changed ? undefined : 'Nothing has changed yet'}
+              title={changed ? undefined : t('editor.nothingChanged')}
               onClick={() => void save()}
               disabled={saving || !changed}
             >
-              Save
+              {t('editor.save')}
+            </button>
+            <button className="tab-strip-close editor-close" data-sfx="close" title={t('common.close')} aria-label={t('common.close')} onClick={onClose}>
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+              </svg>
             </button>
           </div>
         </div>
 
         {isAdmin && activeSelector === 'species' && (
           <div className="selector-panel">
-            <div className="selector-panel-header">Species ({speciesResults.length})</div>
+            <div className="selector-panel-header">{t('editor.speciesCount', { n: speciesResults.length })}</div>
             <div className="selector-list">
               {speciesResults.map((s) => (
                 <button
@@ -1117,16 +1140,15 @@ function PokemonEditor({
                   <div className="selector-row-main">
                     <div className="selector-row-title">
                       {s.name}
-                      {s.types.map((t) => (
-                        <span key={t} className={`type-badge type-${t.toLowerCase()}`}>
-                          {t}
+                      {s.types.map((type) => (
+                        <span key={type} className={`type-badge type-${type.toLowerCase()}`}>
+                          {typeName(type)}
                         </span>
                       ))}
                     </div>
-                    <div className="selector-row-sub">{s.abilities.join(' / ')}</div>
+                    <div className="selector-row-sub">{s.abilities.map(abilityName).join(' / ')}</div>
                     <div className="selector-row-stats">
-                      HP {s.baseStats.hp} Atk {s.baseStats.atk} Def {s.baseStats.def} SpA {s.baseStats.spa} SpD{' '}
-                      {s.baseStats.spd} Spe {s.baseStats.spe}
+                      {STAT_LABELS.map(({ key, label }) => `${label} ${s.baseStats[key]}`).join(' ')}
                     </div>
                   </div>
                 </button>
@@ -1137,7 +1159,7 @@ function PokemonEditor({
 
         {activeSelector === 'ability' && (
           <div className="selector-panel">
-            <div className="selector-panel-header">Abilities ({abilityResults.length})</div>
+            <div className="selector-panel-header">{t('editor.abilitiesCount', { n: abilityResults.length })}</div>
             <div className="selector-list">
               {abilityResults.map((a) => (
                 <button
@@ -1149,8 +1171,8 @@ function PokemonEditor({
                   }}
                 >
                   <div className="selector-row-main">
-                    <div className="selector-row-title">{a.name}</div>
-                    <div className="selector-row-desc">{a.description}</div>
+                    <div className="selector-row-title">{abilityName(a.name)}</div>
+                    <div className="selector-row-desc">{abilityText(a.id, a.description)}</div>
                   </div>
                 </button>
               ))}
@@ -1160,7 +1182,7 @@ function PokemonEditor({
 
         {activeSelector === 'item' && (
           <div className="selector-panel">
-            <div className="selector-panel-header">Items ({itemResults.length})</div>
+            <div className="selector-panel-header">{t('editor.itemsCount', { n: itemResults.length })}</div>
             <div className="selector-list">
               <button
                 className="selector-row selector-row-clear"
@@ -1169,10 +1191,10 @@ function PokemonEditor({
                   setActiveSelector(null)
                 }}
               >
-                (None)
+                {t('editor.none')}
               </button>
               {!isAdmin && itemResults.length === 0 && (bagItemIds?.size ?? 0) === 0 && (
-                <p className="box-empty-hint">Your bag is empty - held items come from your bag.</p>
+                <p className="box-empty-hint">{t('editor.bagEmpty')}</p>
               )}
               {itemResults.map((i) => (
                 <button
@@ -1185,8 +1207,8 @@ function PokemonEditor({
                 >
                   <span style={itemIconStyle(i.spritenum)} />
                   <div className="selector-row-main">
-                    <div className="selector-row-title">{i.name}</div>
-                    <div className="selector-row-desc">{i.description}</div>
+                    <div className="selector-row-title">{itemName(i.name)}</div>
+                    <div className="selector-row-desc">{itemText(i.id, i.description)}</div>
                   </div>
                 </button>
               ))}
@@ -1197,7 +1219,7 @@ function PokemonEditor({
         {typeof activeSelector === 'number' && (
           <div className="selector-panel">
             <div className="selector-panel-header">
-              Move {activeSelector + 1} ({moveResults.length})
+              {t('editor.moveCount', { n: activeSelector + 1, count: moveResults.length })}
             </div>
             <div className="selector-list">
               <button
@@ -1207,7 +1229,7 @@ function PokemonEditor({
                   setActiveSelector(null)
                 }}
               >
-                (None)
+                {t('editor.none')}
               </button>
               {(() => {
                 const currentMoves = set?.moves ?? []
@@ -1228,7 +1250,7 @@ function PokemonEditor({
                       key={m.id}
                       className={`selector-row ${learnedElsewhere || tmLocked ? 'selector-row-disabled' : ''} ${swapping ? 'selector-row-swapping' : ''}`}
                       disabled={learnedElsewhere || tmLocked}
-                      title={tmLocked ? `Find or buy the ${m.name} TM to teach it` : undefined}
+                      title={tmLocked ? t('editor.findTm', { move: moveName(m.name) }) : undefined}
                       onClick={() => {
                         updateMove(activeSelector, m.id)
                         setActiveSelector(null)
@@ -1236,21 +1258,25 @@ function PokemonEditor({
                     >
                       <div className="selector-row-main">
                         <div className="selector-row-title">
-                          {m.name}
-                          <span className={`type-badge type-${moveType(m).toLowerCase()}`}>{moveType(m)}</span>
-                          {learnedElsewhere && <span className="learned-badge">Learned</span>}
-                          {swapping && <span className="swapping-badge">Swapping</span>}
+                          {moveName(m.name)}
+                          <span className={`type-badge type-${moveType(m).toLowerCase()}`}>{typeName(moveType(m))}</span>
+                          {learnedElsewhere && <span className="learned-badge">{t('editor.learned')}</span>}
+                          {swapping && <span className="swapping-badge">{t('editor.swapping')}</span>}
                           {tmLocked && (
                             <span className="tm-locked-badge">
-                              <TmIcon type={m.type} /> Needs TM
+                              <TmIcon type={m.type} /> {t('editor.needsTm')}
                             </span>
                           )}
                         </div>
                         <div className="selector-row-sub">
-                          {m.category} · Pow {m.basePower || '—'} · Acc {m.accuracy === true ? '—' : m.accuracy} · PP{' '}
-                          {m.pp}
+                          {t('editor.moveLine', {
+                            category: categoryName(m.category),
+                            pow: m.basePower || '—',
+                            acc: m.accuracy === true ? '—' : m.accuracy,
+                            pp: m.pp
+                          })}
                         </div>
-                        <div className="selector-row-desc">{m.description}</div>
+                        <div className="selector-row-desc">{moveText(m.id, m.description)}</div>
                       </div>
                     </button>
                   )

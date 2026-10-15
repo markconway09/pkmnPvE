@@ -4,6 +4,7 @@ import { readdir, stat } from 'node:fs/promises'
 import { basename, dirname, extname, join, relative, resolve, isAbsolute } from 'node:path'
 import { Readable } from 'node:stream'
 import type { LocalMusicFile } from '../shared/music'
+import { t } from './i18n'
 
 // The "local folder" music source: the player picks a folder of their own music and the
 // game plays the audio files in it (and its subfolders). The window can't open files off
@@ -111,7 +112,7 @@ export function installMusicFolder(): void {
 
   ipcMain.handle('music:pickFolder', async (event) => {
     const window = BrowserWindow.fromWebContents(event.sender)
-    const options = { title: 'Choose a music folder', properties: ['openDirectory' as const] }
+    const options = { title: t('dialog.musicFolder'), properties: ['openDirectory' as const] }
     const result = window ? await dialog.showOpenDialog(window, options) : await dialog.showOpenDialog(options)
     return result.canceled ? null : (result.filePaths[0] ?? null)
   })

@@ -8,6 +8,7 @@ import {
   savePathFor,
   setCurrentPlayerSlug
 } from './save-paths'
+import { t } from '../i18n'
 
 /**
  * Who is playing, and where their save lives. Every player has a folder under
@@ -148,7 +149,7 @@ export function isAdmin(): boolean {
 
 /** For handlers only admins may use: throws for anyone else. */
 export function requireAdmin(): void {
-  if (!isAdmin()) throw new Error('This needs an admin account')
+  if (!isAdmin()) throw new Error(t('err.thisNeedsAnAdminAccount'))
 }
 
 /** Logs in as a player, creating their save if the name is new. */
@@ -192,7 +193,7 @@ export function restoreRememberedSession(): void {
 
 export function setTrainerSprite(spriteId: string): SessionInfo {
   const slug = getCurrentPlayerSlug()
-  if (!slug) throw new Error('Not logged in')
+  if (!slug) throw new Error(t('err.notLoggedIn'))
   const profile = readProfile(slug) ?? { displayName: slug, trainerSprite: null, admin: false }
   writeProfile(slug, { ...profile, trainerSprite: spriteId })
   return getSessionInfo()

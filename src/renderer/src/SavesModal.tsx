@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import SaveFileSection from './SaveFileSection'
+import { t } from './i18n'
 import SaveTransferSection from './SaveTransferSection'
 
 /**
@@ -23,21 +24,21 @@ function SavesModal({ onClose }: { onClose: () => void }): React.JSX.Element {
     <div className="modal-overlay" onMouseDown={onClose}>
       <div className="modal-panel options-modal saves-modal" onMouseDown={(e) => e.stopPropagation()}>
         <div className="options-modal-header">
-          <h2>Saves</h2>
-          <button className="options-modal-close" data-sfx="close" title="Close (Esc)" onClick={onClose}>
+          <h2>{t('saves.title')}</h2>
+          <button className="options-modal-close" data-sfx="close" title={t('common.closeEsc')} onClick={onClose}>
             ×
           </button>
         </div>
         <div className="options-modal-body">
           <section className="options-section">
-            <h2 className="options-heading">PC &amp; phone</h2>
+            <h2 className="options-heading">{t('saves.pcPhone')}</h2>
             <SaveTransferSection />
             <SaveFileSection />
           </section>
         </div>
 
         <div className="editor-actions">
-          <button onClick={onClose}>Close</button>
+          <button onClick={onClose}>{t('common.close')}</button>
         </div>
       </div>
     </div>,

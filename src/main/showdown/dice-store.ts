@@ -5,17 +5,18 @@ import { LONG_SHOT_DOUBLE_CHANCE, LONG_SHOT_REFUND_CHANCE } from '../../shared/t
 import { betCap, hasTitle } from './title-perks'
 import { countAchievement } from './achievement-progress'
 import { changeCoins, getCoins } from './game-corner-store'
+import { t } from '../i18n'
 
 /**
  * Game Corner Dice, rolled here (the renderer only slides the marker to where it landed -
  * see shared/dice for the payouts). The bet is taken and the win paid in one go.
  */
 export function rollDice(bet: number, target: number, over: boolean): DiceRoll {
-  if (!Number.isInteger(bet) || bet < 1) throw new Error('Bet at least 1 coin')
-  if (bet > betCap()) throw new Error(`Bet at most ${betCap()} coins`)
-  if (getCoins() < bet) throw new Error('Not enough coins - buy some at the Coin Shop')
+  if (!Number.isInteger(bet) || bet < 1) throw new Error(t('err.betAtLeast1Coin'))
+  if (bet > betCap()) throw new Error(t('err.betAtMostCoins', { a: betCap() }))
+  if (getCoins() < bet) throw new Error(t('err.notEnoughCoinsBuySomeAt'))
   if (typeof target !== 'number' || target < DICE_MIN_TARGET || target > DICE_MAX_TARGET || (target * 2) % 1 !== 0) {
-    throw new Error(`Put the divider between ${DICE_MIN_TARGET} and ${DICE_MAX_TARGET}`)
+    throw new Error(t('err.putTheDividerBetweenAnd', { a: DICE_MIN_TARGET, b: DICE_MAX_TARGET }))
   }
   over = !!over
 

@@ -6,15 +6,27 @@
 // main process (see draft-store.ts, which decides everything) and the renderer.
 
 import type { PokemonSummary, RarityTier, StatBlock } from './battle-types'
+import { activeLocale, tr } from './i18n/current'
+import { dexName } from './i18n/dex'
 
 export const DRAFT_ROUNDS = 6
 export const DRAFT_PACK_SIZE = 4
 // Chaos: a just-for-fun singles draft (see CHAOS_* below) - started from its own button,
 // so it isn't in DRAFT_FORMATS.
 export type DraftFormat = 'singles' | 'doubles' | 'chaos'
-export const DRAFT_FORMATS: { id: DraftFormat; label: string }[] = [
-  { id: 'singles', label: 'Singles' },
-  { id: 'doubles', label: 'Doubles' }
+export const DRAFT_FORMATS: { id: DraftFormat; readonly label: string }[] = [
+  {
+    id: 'singles',
+    get label() {
+      return tr('draftFormat.singles')
+    }
+  },
+  {
+    id: 'doubles',
+    get label() {
+      return tr('draftFormat.doubles')
+    }
+  }
 ]
 
 // How many of the six go into each battle: three in singles (the first leads), four in
@@ -198,13 +210,36 @@ export interface ChaosTutorMove {
   description: string
 }
 
-export const CHAOS_STAT_LABELS: Record<keyof StatBlock, string> = {
+// Each stat's full name, in the language in use (English: HP, Attack, Defense, Sp. Atk...).
+const CHAOS_STAT_ENGLISH: Record<keyof StatBlock, string> = {
   hp: 'HP',
   atk: 'Attack',
   def: 'Defense',
   spa: 'Sp. Atk',
   spd: 'Sp. Def',
   spe: 'Speed'
+}
+const chaosStatLabel = (stat: keyof StatBlock): string =>
+  activeLocale() === 'en' ? CHAOS_STAT_ENGLISH[stat] : dexName(activeLocale(), 'stats', stat)
+export const CHAOS_STAT_LABELS: Record<keyof StatBlock, string> = {
+  get hp() {
+    return chaosStatLabel('hp')
+  },
+  get atk() {
+    return chaosStatLabel('atk')
+  },
+  get def() {
+    return chaosStatLabel('def')
+  },
+  get spa() {
+    return chaosStatLabel('spa')
+  },
+  get spd() {
+    return chaosStatLabel('spd')
+  },
+  get spe() {
+    return chaosStatLabel('spe')
+  }
 }
 
 // Abilities an Ability modifier can't give: the ones that break a fight on their own, and

@@ -5,6 +5,7 @@ import { changeCoins, getCoins } from './game-corner-store'
 import { betCap, getGameCornerPerks } from './title-perks'
 import { onPlayerChange } from './player-session'
 import { countAchievement } from './achievement-progress'
+import { t } from '../i18n'
 
 /**
  * Game Corner blackjack, dealt and settled here (the renderer only shows the table - see
@@ -116,7 +117,7 @@ function finish(current: Round, outcome: BlackjackOutcome): void {
 }
 
 function activeRound(): Round {
-  if (!round || round.done) throw new Error('No hand is being played - place a bet to deal')
+  if (!round || round.done) throw new Error(t('err.noHandIsBeingPlayedPlace'))
   return round
 }
 
@@ -126,9 +127,9 @@ export function getBlackjackView(): BlackjackView {
 
 /** Takes the bet and deals two cards each. A blackjack on either side ends the hand at once. */
 export function dealBlackjack(bet: number): BlackjackView {
-  if (round && !round.done) throw new Error('Finish this hand first')
-  if (!Number.isInteger(bet) || bet < 1) throw new Error('Bet at least 1 coin')
-  if (bet > betCap()) throw new Error(`Bet at most ${betCap()} coins`)
+  if (round && !round.done) throw new Error(t('err.finishThisHandFirst'))
+  if (!Number.isInteger(bet) || bet < 1) throw new Error(t('err.betAtLeast1Coin'))
+  if (bet > betCap()) throw new Error(t('err.betAtMostCoins', { a: betCap() }))
   changeCoins(-bet)
   if (shoe.length < RESHUFFLE_BELOW) shoe = freshShoe()
   const current: Round = { bet, player: [], dealer: [], doubled: false, done: false, outcome: null, returned: 0 }
@@ -159,7 +160,7 @@ export function standBlackjack(): BlackjackView {
 /** Doubles the bet on the first two cards, takes exactly one more card, and stands. */
 export function doubleBlackjack(): BlackjackView {
   const current = activeRound()
-  if (current.player.length !== 2 || current.doubled) throw new Error('You can only double down on your first two cards')
+  if (current.player.length !== 2 || current.doubled) throw new Error(t('err.youCanOnlyDoubleDownOn'))
   changeCoins(-current.bet)
   current.bet *= 2
   current.doubled = true

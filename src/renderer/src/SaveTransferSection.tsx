@@ -4,6 +4,7 @@ import { ROOM_CODE_LENGTH } from '../../shared/online'
 import { deviceHooks } from './deviceHooks'
 import { formatMoney } from './money'
 import { IS_MOBILE } from './platform'
+import { t } from './i18n'
 import {
   QR_PREFIX,
   cleanCode,
@@ -91,7 +92,7 @@ function QrScanner({ onCode, onClose }: { onCode: (code: string) => void; onClos
         void video.play()
         void look()
       })
-      .catch(() => onClose("Couldn't open the camera - allow it for pkmnPvE, or type the code instead"))
+      .catch(() => onClose(t('transfer.noCamera')))
     return () => {
       stopped = true
       clearTimeout(timer)
@@ -103,8 +104,8 @@ function QrScanner({ onCode, onClose }: { onCode: (code: string) => void; onClos
   return (
     <div className="save-transfer-scanner">
       <video ref={videoRef} muted playsInline />
-      <p className="editor-hint">Point the camera at the QR code on your PC.</p>
-      <button onClick={() => onClose()}>Cancel</button>
+      <p className="editor-hint">{t('transfer.pointCamera')}</p>
+      <button onClick={() => onClose()}>{t('common.cancel')}</button>
     </div>
   )
 }
@@ -160,7 +161,7 @@ function SaveTransferSection(): React.JSX.Element {
   function receive(rawCode: string): void {
     const code = cleanCode(rawCode)
     if (!code) {
-      setMessage({ text: `The code is ${ROOM_CODE_LENGTH} letters and numbers`, bad: true })
+      setMessage({ text: t('transfer.badCode', { n: ROOM_CODE_LENGTH }), bad: true })
       return
     }
     setMessage(null)
@@ -192,17 +193,14 @@ function SaveTransferSection(): React.JSX.Element {
 
   return (
     <>
-      <h3 className="saves-subheading">Send to another device</h3>
+      <h3 className="saves-subheading">{t('transfer.title')}</h3>
       {mode.kind === 'idle' && (
         <>
-          <p className="editor-hint">
-            Move this save straight to your {IS_MOBILE ? 'PC' : 'phone'} (or another {IS_MOBILE ? 'phone' : 'PC'}).
-            Both need the game open and the internet - no account needed.
-          </p>
+          <p className="editor-hint">{IS_MOBILE ? t('transfer.hintPhone') : t('transfer.hintPc')}</p>
           <div className="cloud-actions">
-            <button onClick={send}>Send this save</button>
+            <button onClick={send}>{t('transfer.send')}</button>
             <button onClick={() => (setMessage(null), setMode({ kind: 'receive-entry', scanning: false }))}>
-              Receive a save
+              {t('transfer.receive')}
             </button>
           </div>
         </>
@@ -210,22 +208,22 @@ function SaveTransferSection(): React.JSX.Element {
 
       {mode.kind === 'send' && (
         <div className="save-transfer-box">
-          {mode.phase === 'opening' && <p className="editor-hint">Opening a room…</p>}
+          {mode.phase === 'opening' && <p className="editor-hint">{t('transfer.opening')}</p>}
           {(mode.phase === 'waiting' || mode.phase === 'connected') && (
             <>
               <div className="save-transfer-code">{mode.code}</div>
               {!IS_MOBILE && <QrCode text={QR_PREFIX + mode.code} />}
               <p className="editor-hint">
                 {mode.phase === 'connected'
-                  ? 'Connected - waiting for the other device to accept the save…'
+                  ? t('transfer.connected')
                   : IS_MOBILE
-                    ? 'On the other device, open Options → Saves → Receive a save and type this code.'
-                    : 'On your phone, open Options → Saves → Receive a save, then scan this QR code or type the code.'}
+                    ? t('transfer.typeCode')
+                    : t('transfer.scanCode')}
               </p>
             </>
           )}
-          {mode.phase === 'sent' && <p className="cloud-message">Save sent - the other device has it now.</p>}
-          <button onClick={() => back()}>{mode.phase === 'sent' ? 'Done' : 'Cancel'}</button>
+          {mode.phase === 'sent' && <p className="cloud-message">{t('transfer.sent')}</p>}
+          <button onClick={() => back()}>{mode.phase === 'sent' ? t('common.done') : t('common.cancel')}</button>
         </div>
       )}
 
@@ -240,15 +238,13 @@ function SaveTransferSection(): React.JSX.Element {
           />
         ) : (
           <>
-            <p className="editor-hint">
-              On the device with the save, open Options → Saves → Send this save, then enter its code here.
-            </p>
+            <p className="editor-hint">{t('transfer.enterHint')}</p>
             <div className="cloud-actions save-transfer-entry">
               <input
                 className="save-transfer-input"
                 value={typed}
                 maxLength={ROOM_CODE_LENGTH + 2}
-                placeholder="CODE"
+                placeholder={t('transfer.code')}
                 autoCapitalize="characters"
                 autoComplete="off"
                 spellCheck={false}
@@ -257,28 +253,28 @@ function SaveTransferSection(): React.JSX.Element {
                   if (e.key === 'Enter') receive(typed)
                 }}
               />
-              <button onClick={() => receive(typed)}>Connect</button>
+              <button onClick={() => receive(typed)}>{t('transfer.connect')}</button>
               {CAN_SCAN && (
                 <button onClick={() => (setMessage(null), setMode({ kind: 'receive-entry', scanning: true }))}>
-                  Scan QR
+                  {t('transfer.scan')}
                 </button>
               )}
-              <button onClick={() => back()}>Cancel</button>
+              <button onClick={() => back()}>{t('common.cancel')}</button>
             </div>
           </>
         ))}
 
       {mode.kind === 'receive' && (
         <div className="save-transfer-box">
-          {mode.phase === 'connecting' && <p className="editor-hint">Connecting to {mode.code}…</p>}
+          {mode.phase === 'connecting' && <p className="editor-hint">{t('transfer.connecting', { code: mode.code })}</p>}
           {mode.phase !== 'connecting' && preview && (
             <>
               <div className="cloud-save">
                 <div className="cloud-save-info">
-                  <span className="cloud-save-date">{preview.name ?? 'A save'}</span>
+                  <span className="cloud-save-date">{preview.name ?? t('transfer.aSave')}</span>
                   <span className="cloud-save-detail">
                     {[
-                      preview.pokemon !== null && `${preview.pokemon} Pokémon`,
+                      preview.pokemon !== null && t('transfer.pokemon', { n: preview.pokemon }),
                       preview.money !== null && formatMoney(preview.money),
                       preview.appVersion && `v${preview.appVersion}`
                     ]
@@ -289,10 +285,10 @@ function SaveTransferSection(): React.JSX.Element {
               </div>
               {tooNew ? (
                 <p className="editor-error">
-                  That save is from v{preview.appVersion} - update this copy of the game (v{myVersion}) first.
+                  {t('transfer.tooNew', { theirs: preview.appVersion ?? '', mine: myVersion ?? '' })}
                 </p>
               ) : (
-                <p className="editor-hint">This replaces the save on this device - it&apos;s backed up first.</p>
+                <p className="editor-hint">{t('transfer.replaceHint')}</p>
               )}
             </>
           )}
@@ -303,7 +299,7 @@ function SaveTransferSection(): React.JSX.Element {
                 disabled={mode.phase === 'importing'}
                 onClick={() => mode.data && void replaceSave(mode.data)}
               >
-                {mode.phase === 'importing' ? 'Loading…' : 'Replace my save'}
+                {mode.phase === 'importing' ? t('transfer.loading') : t('transfer.replace')}
               </button>
             )}
             <button
@@ -314,7 +310,7 @@ function SaveTransferSection(): React.JSX.Element {
                 back()
               }}
             >
-              Cancel
+              {t('common.cancel')}
             </button>
           </div>
         </div>

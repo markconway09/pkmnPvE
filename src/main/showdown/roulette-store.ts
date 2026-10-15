@@ -6,6 +6,7 @@ import { CROUPIER_DOUBLE_CHANCE, CROUPIER_REFUND_CHANCE } from '../../shared/tit
 import { changeCoins, getCoins } from './game-corner-store'
 import { onPlayerChange } from './player-session'
 import { countAchievement } from './achievement-progress'
+import { t } from '../i18n'
 
 /**
  * Game Corner roulette, spun here (the renderer only turns the wheel to where the ball
@@ -29,16 +30,16 @@ export function getRouletteHistory(): number[] {
 /** Spins the wheel with these bets on the board (bet key -> coins on it). */
 export function spinRoulette(bets: Record<string, number>): RouletteSpin {
   const entries = Object.entries(bets).filter(([, amount]) => amount > 0)
-  if (entries.length === 0) throw new Error('Place a bet on the board first')
+  if (entries.length === 0) throw new Error(t('err.placeABetOnTheBoard'))
   for (const [key, amount] of entries) {
-    if (!isRouletteBet(key)) throw new Error("That isn't a bet on this table")
-    if (!Number.isInteger(amount)) throw new Error('Bets are whole coins')
-    if (amount > betCap()) throw new Error(`Each spot takes at most ${betCap()} coins`)
+    if (!isRouletteBet(key)) throw new Error(t('err.thatIsnTABetOn'))
+    if (!Number.isInteger(amount)) throw new Error(t('err.betsAreWholeCoins'))
+    if (amount > betCap()) throw new Error(t('err.eachSpotTakesAtMostCoins', { a: betCap() }))
   }
   const totalBet = entries.reduce((sum, [, amount]) => sum + amount, 0)
   const tableCap = betCap() * ROULETTE_MAX_FULL_BETS
-  if (totalBet > tableCap) throw new Error(`The table takes at most ${tableCap} coins a spin`)
-  if (getCoins() < totalBet) throw new Error('Not enough coins - buy some at the Coin Shop')
+  if (totalBet > tableCap) throw new Error(t('err.theTableTakesAtMostCoins', { a: tableCap }))
+  if (getCoins() < totalBet) throw new Error(t('err.notEnoughCoinsBuySomeAt'))
 
   changeCoins(-totalBet)
   const pocket = randomInt(ROULETTE_NUMBERS)

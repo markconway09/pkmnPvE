@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { t } from './i18n'
 import {
   musicState,
   nextTrack,
@@ -74,22 +75,22 @@ function MusicPlayer(): React.JSX.Element | null {
         {music.live ? 'LIVE' : `${formatTime(music.position)} / ${formatTime(music.duration)}`}
       </span>
       <div className="music-player-controls">
-        <button className="music-player-button" title="Previous track" onClick={previousTrack}>
+        <button className="music-player-button" title={t('music.previous')} onClick={previousTrack}>
           <Icon path={ICONS.previous} />
         </button>
         <button
           className="music-player-button music-player-play"
-          title={music.playing ? 'Pause' : 'Play'}
+          title={music.playing ? t('music.pause') : t('music.play')}
           onClick={toggleMusicPlaying}
         >
           <Icon path={music.playing ? ICONS.pause : ICONS.play} />
         </button>
-        <button className="music-player-button" title="Next track" onClick={nextTrack}>
+        <button className="music-player-button" title={t('music.next')} onClick={nextTrack}>
           <Icon path={ICONS.next} />
         </button>
         <button
           className={`music-player-button${music.muted ? ' music-player-muted' : ''}`}
-          title={music.muted ? 'Unmute' : 'Mute'}
+          title={music.muted ? t('music.unmute') : t('music.mute')}
           onClick={toggleMusicMuted}
         >
           <Icon path={music.muted ? ICONS.muted : ICONS.sound} />

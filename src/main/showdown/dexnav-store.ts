@@ -15,6 +15,7 @@ import { onPlayerChange } from './player-session'
 import { hasItem } from './bag-store'
 import { getPokedex, hasRegisteredSpecies } from './box-store'
 import { dexNavHuntInfo, generateHuntedMon, speciesRarityTier } from './sim-access'
+import { t } from '../i18n'
 
 // The DexNav's hunt: the species being hunted, and how long the chain of them has run.
 interface StoredDexNav {
@@ -105,15 +106,15 @@ export function listDexNavCandidates(): DexNavCandidate[] {
 
 /** Picks the species to hunt (or none) - a new target starts a new chain. */
 export function setDexNavTarget(species: string | null): DexNavState {
-  if (!hasItem(DEXNAV_ITEM_ID)) throw new Error('You need the DexNav for that')
+  if (!hasItem(DEXNAV_ITEM_ID)) throw new Error(t('err.youNeedTheDexnavForThat'))
   const s = getState()
   if (species === null) {
     s.target = null
     s.chain = 0
   } else {
     const diploma = hasDiploma()
-    if (!diploma && !hasRegisteredSpecies(species)) throw new Error(`${species} isn't registered in your Pokédex yet`)
-    if (!dexNavHuntInfo(species, diploma)) throw new Error(`${species} can't be found in the wild`)
+    if (!diploma && !hasRegisteredSpecies(species)) throw new Error(t('err.isnTRegisteredInYourPokedex', { a: species }))
+    if (!dexNavHuntInfo(species, diploma)) throw new Error(t('err.canTBeFoundInThe', { a: species }))
     if (s.target !== species) s.chain = 0
     s.target = species
   }

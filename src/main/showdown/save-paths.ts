@@ -1,4 +1,5 @@
 import { ensureDir as makeDir, joinPath, saveRoot } from '../platform'
+import { t } from '../i18n'
 
 // Where the save folder sits is up to the platform (see platform/electron.ts).
 function saveDir(): string {
@@ -40,6 +41,6 @@ export function playerDirFor(slug: string): string {
 
 /** A file in the logged-in player's own save. Throws if nobody is logged in. */
 export function playerPathFor(filename: string): string {
-  if (!currentPlayerSlug) throw new Error('Not logged in')
+  if (!currentPlayerSlug) throw new Error(t('err.notLoggedIn'))
   return joinPath(playerDirFor(currentPlayerSlug), filename)
 }

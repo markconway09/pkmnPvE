@@ -1,5 +1,6 @@
 import { toSpriteId } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
+import { t } from './i18n'
 
 // The pieces of a Pokemon's right-click menu (box, trainer roster and run team):
 // a header with its sprite and name, then rows grouped into sections, each row a
@@ -27,7 +28,7 @@ export function PokemonMenuHeader({ species, shiny = false, favorite = false, on
         <button
           type="button"
           className={`pkmn-menu-heart${favorite ? ' pkmn-menu-heart-on' : ''}`}
-          title={favorite ? 'Unfavorite' : 'Favorite'}
+          title={favorite ? t('pm.unfavorite') : t('pm.favorite')}
           onClick={onToggleFavorite}
         >
           {favorite ? '❤️' : '🤍'}

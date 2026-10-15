@@ -8,13 +8,6 @@ const DEFAULT_STYLE: SpriteStyle = '3d-animated'
 
 export const SPRITE_STYLES: SpriteStyle[] = ['2d-static', '2d-animated', '3d-static', '3d-animated']
 
-export const SPRITE_STYLE_LABELS: Record<SpriteStyle, string> = {
-  '2d-static': '2D',
-  '2d-animated': '2D Animated',
-  '3d-static': '3D',
-  '3d-animated': '3D Animated'
-}
-
 export function loadSpriteStyle(): SpriteStyle {
   // The phone app only ships the 3D stills (and the 2D ones they fall back on).
   if (IS_MOBILE) return '3d-static'

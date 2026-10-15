@@ -13,6 +13,7 @@ import {
 import SpriteImage from './SpriteImage'
 import { RarityGlow } from './RarityCard'
 import RarityOddsTooltip from './RarityOddsTooltip'
+import { t } from './i18n'
 
 interface Props {
   eligibility: BattleEligibility | null
@@ -39,10 +40,8 @@ function RaidBossCarousel({ bosses }: { bosses: RaidBossPreview[] }): React.JSX.
   return (
     <div className="raid-panel raid-bosses">
       <div className="raid-panel-title raid-bosses-title">
-        <span>Possible raid bosses</span>
-        <span className="raid-bosses-seen">
-          {seen}/{bosses.length} registered
-        </span>
+        <span>{t('raid.possible')}</span>
+        <span className="raid-bosses-seen">{t('raid.registered', { n: seen, of: bosses.length })}</span>
       </div>
       <div className="raid-bosses-viewport">
         <div className="raid-bosses-track" style={{ '--raid-scroll': `${bosses.length * 2.2}s` } as React.CSSProperties}>
@@ -50,14 +49,14 @@ function RaidBossCarousel({ bosses }: { bosses: RaidBossPreview[] }): React.JSX.
             <div
               key={i}
               className={`raid-boss${b.registered ? '' : ' raid-boss-unknown'}`}
-              title={b.registered ? `${b.species}${b.gigantamax ? ' (Gigantamax)' : ''}` : '??? - not in your Pokédex yet'}
+              title={b.registered ? (b.gigantamax ? t('raid.gmaxTitle', { name: b.species }) : b.species) : t('raid.unknown')}
               aria-hidden={i >= bosses.length}
             >
               <RarityGlow tier={b.registered ? b.rarityTier : 'common'} size={72} stand={b.registered}>
                 <SpriteImage style="3d-static" spriteId={toSpriteId(b.species)} gmax={b.gigantamax} alt="" draggable={false} />
               </RarityGlow>
               <span className="raid-boss-name">{b.registered ? b.species : '???'}</span>
-              {b.gigantamax && <span className="raid-boss-gmax">G-Max</span>}
+              {b.gigantamax && <span className="raid-boss-gmax">{t('raid.gmax')}</span>}
             </div>
           ))}
         </div>
@@ -100,10 +99,10 @@ function RaidPage({
   const canStart = unlocked && crystals > 0 && !teamEmpty && !fightBusy
   let hint = ''
   if (!eligibility) hint = ''
-  else if (!unlocked) hint = `Max Raids open up once you beat ${eligibility.raidUnlockBoss ?? 'the right boss'}`
-  else if (teamEmpty) hint = 'Put some Pokémon on your team first'
-  else if (crystals === 0) hint = 'You need a Raid Crystal - the Shop and the Coin Shop sell them'
-  else hint = `Uses 1 of your ${crystals} Raid Crystal${crystals === 1 ? '' : 's'}`
+  else if (!unlocked) hint = t('raid.locked', { boss: eligibility.raidUnlockBoss ?? t('bag.theRightBoss') })
+  else if (teamEmpty) hint = t('raid.teamEmpty')
+  else if (crystals === 0) hint = t('raid.needCrystal')
+  else hint = t('raid.uses', { count: crystals })
 
   const pct = (chance: number): string => `${Math.round(chance * 100)}%`
 
@@ -113,47 +112,43 @@ function RaidPage({
         <div className="raid-hero-crystal">
           <img src="./sprites/misc/raidcrystal.png" alt="" />
         </div>
-        <div className="raid-hero-title">{unlocked ? 'Max Raid' : '🔒 Max Raid'}</div>
+        <div className="raid-hero-title">{unlocked ? t('nav.raid') : `🔒 ${t('nav.raid')}`}</div>
         <div className="raid-hero-sub">
-          A Dynamaxed ★{RAID_STARS} boss{levelCap !== null ? ` at Lv ${levelCap}` : ''} - win and it's yours.
+          {levelCap !== null ? t('raid.subLevel', { stars: RAID_STARS, level: levelCap }) : t('raid.sub', { stars: RAID_STARS })}
         </div>
         <div className="raid-hero-crystals">
           <img src="./sprites/misc/raidcrystal.png" alt="" />×{crystals}
-          <span>Raid Crystal{crystals === 1 ? '' : 's'}</span>
+          <span>{t('raid.crystals', { count: crystals })}</span>
         </div>
         <RarityOddsTooltip source={{ kind: 'raid' }}>
           <button className="raid-start" disabled={!canStart} onClick={onStart}>
-            Start Max Raid
+            {t('raid.start')}
           </button>
         </RarityOddsTooltip>
         {hint && <div className="raid-hero-hint">{hint}</div>}
         <div className="raid-get">
-          <span>Get crystals:</span>
-          <button onClick={onOpenShop}>Shop</button>
-          <button onClick={onOpenCoinShop}>Coin Shop</button>
+          <span>{t('raid.getCrystals')}</span>
+          <button onClick={onOpenShop}>{t('raid.shop')}</button>
+          <button onClick={onOpenCoinShop}>{t('raid.coinShop')}</button>
         </div>
       </div>
 
       <div className="raid-side">
         <div className="raid-panel">
-          <div className="raid-panel-title">How a raid works</div>
+          <div className="raid-panel-title">{t('raid.how')}</div>
           <ul className="raid-rules">
-            <li>A doubles battle: your first two lead, the rest switch in.</li>
-            <li>The boss stays Dynamaxed the whole fight and attacks {RAID_ATTACKS_PER_TURN} times a turn.</li>
-            <li>It has {RAID_HP_MULTIPLIER}× its HP before Dynamaxing doubles it.</li>
-            <li>
-              Big hits are softened: past {pct(RAID_SOFT_CAP_SHARE)} of its HP in one hit, only {pct(RAID_OVERFLOW_FACTOR)} of the rest lands.
-            </li>
-            <li>
-              {pct(RAID_GIGANTAMAX_CHANCE)} of bosses are Gigantamax; otherwise a red Pokémon, or a gold legendary {pct(RAID_RESTRICTED_CHANCE)} of the time.
-            </li>
-            <li>Win to catch it, with its ★{RAID_STARS} merge stars.</li>
+            <li>{t('raid.rule1')}</li>
+            <li>{t('raid.rule2', { n: RAID_ATTACKS_PER_TURN })}</li>
+            <li>{t('raid.rule3', { n: RAID_HP_MULTIPLIER })}</li>
+            <li>{t('raid.rule4', { share: pct(RAID_SOFT_CAP_SHARE), rest: pct(RAID_OVERFLOW_FACTOR) })}</li>
+            <li>{t('raid.rule5', { gmax: pct(RAID_GIGANTAMAX_CHANCE), gold: pct(RAID_RESTRICTED_CHANCE) })}</li>
+            <li>{t('raid.rule6', { stars: RAID_STARS })}</li>
           </ul>
         </div>
 
         {raidsWon !== null && (
           <div className="raid-panel raid-stat">
-            <span>Raids won</span>
+            <span>{t('raid.won')}</span>
             <strong>{raidsWon}</strong>
           </div>
         )}

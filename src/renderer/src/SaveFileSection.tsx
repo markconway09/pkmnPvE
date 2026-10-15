@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { deviceHooks, saveFileOut } from './deviceHooks'
-import { CLICK } from './platform'
+import { clickWord, t } from './i18n'
 
 function errorText(e: unknown): string {
   const message = e instanceof Error ? e.message : String(e)
@@ -52,28 +52,24 @@ function SaveFileSection(): React.JSX.Element {
 
   return (
     <>
-      <h3 className="saves-subheading">Save file</h3>
-      <p className="editor-hint">
-        Move this player&apos;s save between your PC and your phone: export it as a file, put it on the other device
-        (the Google Drive app works), and import it there. Importing replaces the current save - it&apos;s backed up
-        first.
-      </p>
+      <h3 className="saves-subheading">{t('saveFile.title')}</h3>
+      <p className="editor-hint">{t('saveFile.hint')}</p>
       <div className="cloud-actions">
         <button disabled={!!busy} onClick={() => void exportFile()}>
-          {busy === 'export' ? 'Exporting…' : 'Export to file'}
+          {busy === 'export' ? t('saveFile.exporting') : t('saveFile.export')}
         </button>
         {picked ? (
           <>
             <button className="cloud-confirm" disabled={!!busy} onClick={() => void importFile(picked)}>
-              {busy === 'import' ? 'Importing…' : `Replace current save? ${CLICK} again`}
+              {busy === 'import' ? t('saveFile.importing') : t('saveFile.confirm', { click: clickWord() })}
             </button>
             <button disabled={!!busy} onClick={() => setPicked(null)}>
-              Cancel
+              {t('common.cancel')}
             </button>
           </>
         ) : (
           <button disabled={!!busy} onClick={() => inputRef.current?.click()}>
-            Import from file…
+            {t('saveFile.import')}
           </button>
         )}
         <input

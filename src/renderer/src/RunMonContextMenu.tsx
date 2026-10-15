@@ -2,6 +2,7 @@ import { createPortal } from 'react-dom'
 import ContextMenuPanel from './ContextMenuPanel'
 import ItemSprite from './ItemSprite'
 import { MenuIcon, PokemonMenuAction, PokemonMenuHeader, PokemonMenuSection } from './PokemonMenuParts'
+import { itemName, t } from './i18n'
 
 // The Poke Ball item icon - an evolution already in the Pokedex.
 const POKE_BALL_SPRITENUM = 345
@@ -37,19 +38,25 @@ function RunMonContextMenu({ x, y, species, evolutions, registeredEvolutions: re
     >
       <ContextMenuPanel x={x} y={y}>
         <PokemonMenuHeader species={species} />
-        <PokemonMenuSection label="Manage">
-          <PokemonMenuAction tone="edit" icon={<MenuIcon name="edit" />} label="Edit moves" detail="Moves and Tera Type" onClick={onEdit} />
+        <PokemonMenuSection label={t('pm.manage')}>
+          <PokemonMenuAction
+            tone="edit"
+            icon={<MenuIcon name="edit" />}
+            label={t('runMenu.editMoves')}
+            detail={t('runMenu.editDetail')}
+            onClick={onEdit}
+          />
           {heldItem && (
             <PokemonMenuAction
               tone="item"
               icon={heldItemSpritenum != null ? <ItemSprite spritenum={heldItemSpritenum} /> : <MenuIcon name="item" />}
-              label="Move item"
-              detail={`Give its ${heldItem} to another Pokemon`}
+              label={t('runMenu.moveItem')}
+              detail={t('runMenu.moveItemDetail', { item: itemName(heldItem) })}
               onClick={onMoveItem}
             />
           )}
         </PokemonMenuSection>
-        <PokemonMenuSection label="Transform">
+        <PokemonMenuSection label={t('pm.transform')}>
           {evolutions.map((target) => (
             <PokemonMenuAction
               key={target}
@@ -57,9 +64,9 @@ function RunMonContextMenu({ x, y, species, evolutions, registeredEvolutions: re
               icon={<MenuIcon name="evolve" />}
               label={
                 <>
-                  Evolve into {target}
+                  {t('pm.evolveInto', { name: target })}
                   {registered.includes(target) && (
-                    <span className="context-menu-caught" title="Already in your Pokédex">
+                    <span className="context-menu-caught" title={t('pm.inDex')}>
                       <ItemSprite spritenum={POKE_BALL_SPRITENUM} />
                     </span>
                   )}

@@ -13,29 +13,20 @@ import { coinPrizeRarityTier } from '../../shared/rarity'
 import { recommendedRank } from './ItemsPanel'
 import type { TmShopView } from '../../shared/tms'
 import { TmCard } from './TmBits'
+import { itemName, itemText, moveName, numberLocale, t, translateKey } from './i18n'
 
 // The Friendship Petal's icon (see ItemSprite).
 const FRIENDSHIP_PETAL_SPRITENUM = -31
 
 // Each coin pack's name, smallest to biggest.
-const PACK_NAMES = ['Handful', 'Pouch', 'Sack', 'Chest']
-
+const packName = (i: number): string => translateKey(`coinShop.pack${i}`, t('coinShop.pack'))
 
 // The bulk buttons beside each prize's own: trade this many at once.
 const BULK_AMOUNTS = [5, 10]
 
-// What each prize does, in a few words for its card - the item's full description shows
-// on hovering the card.
-const PRIZE_SUMMARIES: Record<string, string> = {
-  lockcapsule: 'A random Shop item',
-  rarecandy: 'One level up for one Pokemon',
-  expcandym: '50,000 exp for your whole team',
-  randompokemon: 'A random unevolved Pokemon',
-  expcandyl: '100,000 exp for your whole team',
-  wishingpiece: 'Starts one Max Raid',
-  shinypatch: 'Makes one Pokemon shiny',
-  randomlegendary: 'A random legendary, mythical, ultra beast or paradox Pokemon'
-}
+// What each prize does, in a few words for its card (prize.<item id>) - the item's full
+// description shows on hovering the card.
+const prizeSummary = (itemId: string, fallback: string): string => translateKey(`prize.${itemId}`, fallback)
 
 // In the Items window's Recommended order, so the two read the same.
 const PRIZES_IN_ORDER = [...COIN_PRIZES].sort((a, b) => recommendedRank(a.itemId) - recommendedRank(b.itemId))
@@ -159,7 +150,7 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusItem, o
       onCoinsChange(result.coins)
       setMoney(result.money)
       onMoneyChange(result.money)
-      return `Bought ${amount.toLocaleString('en-US')} coins`
+      return t('coinShop.boughtCoins', { n: amount })
     })
   }
 
@@ -171,7 +162,7 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusItem, o
       setMoney(result.money)
       onMoneyChange(result.money)
       setOffer((o) => (o ? { ...o, bought: true } : o))
-      return `Bought ${offer?.coins.toLocaleString('en-US') ?? ''} coins at a discount`
+      return t('coinShop.boughtOffer', { n: offer?.coins ?? 0 })
     })
   }
 
@@ -182,7 +173,7 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusItem, o
       onCoinsChange(result.coins)
       setDailyMon((m) => (m ? { ...m, bought: true } : m))
       onBoxChange?.()
-      return `${result.shiny ? 'A shiny ' : ''}${result.species} joined your box`
+      return t(result.shiny ? 'coinShop.joinedShiny' : 'coinShop.joined', { name: result.species })
     })
   }
 
@@ -195,8 +186,8 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusItem, o
       // New items in the bag can let more pre-evolutions merge in.
       onBoxChange?.()
       return result.quantity > 1
-        ? `Got ${result.quantity} ${result.itemName} - they're in your bag`
-        : `Got a ${result.itemName} - it's in your bag`
+        ? t('coinShop.gotMany', { n: result.quantity, item: itemName(result.itemName) })
+        : t('coinShop.gotOne', { item: itemName(result.itemName) })
     })
   }
 
@@ -204,7 +195,7 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusItem, o
     void act(e, async () => {
       setPetals(await window.api.claimFreePetals())
       onBoxChange?.()
-      return `Got ${petals?.free.petals ?? ''} Friendship Petals - they're in your bag`
+      return t('coinShop.gotPetals', { n: petals?.free.petals ?? 0 })
     })
   }
 
@@ -215,7 +206,7 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusItem, o
       onCoinsChange(result.coins)
       setPetals(result.deals)
       onBoxChange?.()
-      return `Got ${result.deals.pack.petals} Friendship Petals - they're in your bag`
+      return t('coinShop.gotPetals', { n: result.deals.pack.petals })
     })
   }
 
@@ -225,7 +216,7 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusItem, o
       setCoins(result.coins)
       onCoinsChange(result.coins)
       setTmShop(result.shop)
-      return `Got the ${name} TM`
+      return t('coinShop.gotTm', { name: moveName(name) })
     })
   }
 
@@ -235,7 +226,7 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusItem, o
       setCoins(result.coins)
       onCoinsChange(result.coins)
       setTmShop(result.shop)
-      return "Got the Scanner - it's in your Key Items"
+      return t('coinShop.gotScanner')
     })
   }
 
@@ -249,24 +240,24 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusItem, o
         {lateUnlocked && dailyMon && !dailyMon.bought && (
           <button
             className={`coin-daily-mon-bubble coin-daily-mon-bubble-${dailyMon.tier}`}
-            title={`Today's Pokemon: ${dailyMon.species}`}
+            title={t('coinShop.todaysMonTip', { name: dailyMon.species })}
             onClick={() => dailyMonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
           >
             <SpriteImage style="2d-static" className="coin-daily-mon-bubble-sprite" spriteId={toSpriteId(dailyMon.species)} alt={dailyMon.species} />
-            <span>Today&apos;s Pokemon</span>
+            <span>{t('coinShop.todaysMon')}</span>
           </button>
         )}
-        <span className="coin-shop-banner-title">Prize Exchange</span>
-        <span className="coin-shop-banner-sub">Buy coins with Poke Dollars, trade them for prizes</span>
+        <span className="coin-shop-banner-title">{t('coinShop.title')}</span>
+        <span className="coin-shop-banner-sub">{t('coinShop.sub')}</span>
       </div>
 
       <div className="coin-shop-section-head">
-        <h3>Buy coins</h3>
-        <span>{formatMoney(COIN_PRICE)} a coin · never sold back</span>
+        <h3>{t('coinShop.buyCoins')}</h3>
+        <span>{t('coinShop.perCoin', { money: formatMoney(COIN_PRICE) })}</span>
       </div>
       {offer && (
         <div className={`coin-daily-offer${offer.bought ? ' coin-daily-offer-bought' : ''}`}>
-          <span className="coin-daily-offer-tag">Daily offer</span>
+          <span className="coin-daily-offer-tag">{t('coinShop.dailyOffer')}</span>
           <span className="coin-pack-stack coin-daily-offer-stack" aria-hidden>
             {Array.from({ length: 5 }, (_, c) => (
               <img key={c} className="coin-pack-coin" src="./icons/nav/coin.png" alt="" style={{ zIndex: c }} />
@@ -274,12 +265,12 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusItem, o
           </span>
           <span className="coin-daily-offer-text">
             <span className="coin-daily-offer-amount">
-              {offer.coins.toLocaleString('en-US')} coins
+              {t('coinShop.coins', { n: offer.coins })}
             </span>
             <span className="coin-daily-offer-note">
               {offer.bought
-                ? 'Bought today - a new offer arrives tomorrow'
-                : `${Math.round((1 - offer.price / offer.fullPrice) * 100)}% off · once a day`}
+                ? t('coinShop.offerBought')
+                : t('coinShop.offerOff', { n: Math.round((1 - offer.price / offer.fullPrice) * 100) })}
             </span>
           </span>
           <span className="coin-daily-offer-buy">
@@ -293,14 +284,14 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusItem, o
           const price = amount * COIN_PRICE
           return (
             <div key={amount} className="coin-pack">
-              <span className="coin-pack-name">{PACK_NAMES[i] ?? 'Pack'}</span>
+              <span className="coin-pack-name">{packName(i)}</span>
               {/* A stack of coins that grows with the pack. */}
               <span className="coin-pack-stack" aria-hidden>
                 {Array.from({ length: Math.min(i + 1, 4) }, (_, c) => (
                   <img key={c} className="coin-pack-coin" src="./icons/nav/coin.png" alt="" style={{ zIndex: c }} />
                 ))}
               </span>
-              <span className="coin-pack-amount">{amount.toLocaleString('en-US')}</span>
+              <span className="coin-pack-amount">{amount.toLocaleString(numberLocale())}</span>
               <BuyButton price={price} currency="money" held={money} busy={busy} onBuy={(e) => buyPack(e, amount)} />
             </div>
           )
@@ -308,8 +299,8 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusItem, o
       </div>
 
       <div className="coin-shop-section-head">
-        <h3>Prizes</h3>
-        <span>Prizes go straight into your bag</span>
+        <h3>{t('coinShop.prizes')}</h3>
+        <span>{t('coinShop.prizesSub')}</span>
       </div>
       <div className="coin-prize-grid">
         {PRIZES_IN_ORDER.map((prize) => {
@@ -325,18 +316,18 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusItem, o
               className={`coin-prize${locked ? ' coin-prize-locked' : ''}${
                 prize.itemId === SHINY_PATCH_ITEM_ID && shinyPatchFlash ? ' coin-prize-flash' : ''
               }`}
-              title={item?.description}
+              title={item ? itemText(item.id, item.description) : undefined}
             >
               <RarityGlow size={80} className="coin-prize-art">
                 {item && <ItemSprite spritenum={item.spritenum} className="coin-prize-icon" />}
               </RarityGlow>
-              <span className="coin-prize-name">{item?.name ?? prize.itemId}</span>
+              <span className="coin-prize-name">{item ? itemName(item.name) : prize.itemId}</span>
               <span className="coin-prize-desc">
-                {PRIZE_SUMMARIES[prize.itemId] ?? item?.description ?? ''}
-                {prize.daily && (boughtToday ? ' · back tomorrow' : ' · one a day')}
+                {prizeSummary(prize.itemId, item ? itemText(item.id, item.description) : '')}
+                {prize.daily && (boughtToday ? t('coinShop.backTomorrow') : t('coinShop.oneADay'))}
               </span>
               {locked ? (
-                <span className="coin-prize-lock">🔒 Beat {raidLock?.boss ?? 'the right boss'} to unlock</span>
+                <span className="coin-prize-lock">{t('coinShop.locked', { boss: raidLock?.boss ?? t('bag.theRightBoss') })}</span>
               ) : prize.daily ? (
                 // Just the one a day - no bulk buttons.
                 <BuyButton
@@ -366,7 +357,7 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusItem, o
                       held={coins}
                       busy={busy}
                       label={`×${n}`}
-                      title={`Trade ${n} for ${(prize.coins * n).toLocaleString('en-US')} coins`}
+                      title={t('coinShop.tradeTip', { n, coins: prize.coins * n })}
                       onBuy={(e) => buyPrize(e, prize.itemId, n)}
                     />
                   ))}
@@ -380,19 +371,19 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusItem, o
       {/* Today's Friendship Petals: a free pack and a coin pack side by side, each once a day. */}
       {lateUnlocked && petals && (
         <div ref={petalsRef} className={`coin-petals${petalsFlash ? ' coin-petals-flash' : ''}`}>
-          <span className="coin-petals-tag">Daily petals</span>
+          <span className="coin-petals-tag">{t('coinShop.dailyPetals')}</span>
           <div className={`coin-petals-deal${petals.free.claimed ? ' coin-petals-deal-gone' : ''}`}>
             <ItemSprite spritenum={FRIENDSHIP_PETAL_SPRITENUM} className="coin-petals-icon" />
             <span className="coin-petals-text">
-              <span className="coin-petals-amount">{petals.free.petals} Friendship Petals</span>
-              <span className="coin-petals-note">{petals.free.claimed ? 'Claimed today - more tomorrow' : 'Free · once a day'}</span>
+              <span className="coin-petals-amount">{t('coinShop.petals', { n: petals.free.petals })}</span>
+              <span className="coin-petals-note">{petals.free.claimed ? t('coinShop.claimedToday') : t('coinShop.freeDaily')}</span>
             </span>
             <span className="coin-petals-buy">
               {petals.free.claimed ? (
-                <span className="coin-tm-owned">✓ Claimed</span>
+                <span className="coin-tm-owned">{t('coinShop.claimed')}</span>
               ) : (
                 <button className="buy-button" disabled={busy} onClick={claimFreePetals}>
-                  Claim
+                  {t('coinShop.claim')}
                 </button>
               )}
             </span>
@@ -400,8 +391,8 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusItem, o
           <div className={`coin-petals-deal${petals.pack.bought ? ' coin-petals-deal-gone' : ''}`}>
             <ItemSprite spritenum={FRIENDSHIP_PETAL_SPRITENUM} className="coin-petals-icon" />
             <span className="coin-petals-text">
-              <span className="coin-petals-amount">{petals.pack.petals} Friendship Petals</span>
-              <span className="coin-petals-note">{petals.pack.bought ? 'Bought today - back tomorrow' : 'Once a day'}</span>
+              <span className="coin-petals-amount">{t('coinShop.petals', { n: petals.pack.petals })}</span>
+              <span className="coin-petals-note">{petals.pack.bought ? t('coinShop.boughtBack') : t('coinShop.onceADay')}</span>
             </span>
             <span className="coin-petals-buy">
               <BuyButton price={petals.pack.coins} currency="coins" held={coins} busy={busy} soldOut={petals.pack.bought} onBuy={buyPetalPack} />
@@ -413,8 +404,8 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusItem, o
       {tmShop && (
         <>
           <div className="coin-shop-section-head">
-            <h3>TMs of the day</h3>
-            <span>Only ever sold here · a new set every day</span>
+            <h3>{t('coinShop.tms')}</h3>
+            <span>{t('coinShop.tmsSub')}</span>
           </div>
           {/* The Scanner: a key item, bought once - in a banner above the day's TMs. */}
           <RarityCard tier="legendary" framed dimmed={tmShop.hasScanner} className="coin-scanner">
@@ -423,17 +414,15 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusItem, o
             </RarityGlow>
             <span className="coin-scanner-text">
               <span className="coin-scanner-name">
-                Scanner <span className="coin-scanner-tag">Key item</span>
+                {t('coinShop.scanner')} <span className="coin-scanner-tag">{t('coinShop.keyItem')}</span>
               </span>
               <span className="coin-scanner-note">
-                {tmShop.hasScanner
-                  ? 'Owned - a quick TM search waits after every wild win'
-                  : 'Unlocks a quick TM search after every wild win: a Good finds one 5% of the time, a Great 15%'}
+                {tmShop.hasScanner ? t('coinShop.scannerOwned') : t('coinShop.scannerPitch')}
               </span>
             </span>
             <span className="coin-scanner-buy">
               {tmShop.hasScanner ? (
-                <span className="coin-tm-owned">✓ Owned</span>
+                <span className="coin-tm-owned">{t('coinShop.ownedCheck')}</span>
               ) : (
                 <BuyButton price={tmShop.scannerCoins} currency="coins" held={coins} busy={busy} onBuy={buyScanner} />
               )}
@@ -443,7 +432,7 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusItem, o
             {tmShop.offers.map((offer) => (
               <TmCard key={offer.tm.moveId} tm={offer.tm} dimmed={offer.owned} className="coin-tm-card">
                 {offer.owned ? (
-                  <span className="coin-tm-owned">Owned</span>
+                  <span className="coin-tm-owned">{t('coinShop.owned')}</span>
                 ) : (
                   <BuyButton price={offer.coins} currency="coins" held={coins} busy={busy} onBuy={(e) => buyTm(e, offer.tm.moveId, offer.tm.name)} />
                 )}
@@ -456,8 +445,8 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusItem, o
       {lateUnlocked && dailyMon && (
         <>
           <div className="coin-shop-section-head">
-            <h3>Pokemon of the day</h3>
-            <span>One a day · a new one every day</span>
+            <h3>{t('coinShop.monOfDay')}</h3>
+            <span>{t('coinShop.monSub')}</span>
           </div>
           <RarityCard cardRef={dailyMonRef} tier={dailyMon.tier} framed dimmed={dailyMon.bought} className="coin-daily-mon">
             <RarityGlow stand size={{ width: 150, height: 130 }}>
@@ -465,13 +454,11 @@ function CoinShopPanel({ onCoinsChange, onMoneyChange, onBoxChange, focusItem, o
             </RarityGlow>
             <span className="coin-daily-mon-text">
               <span className="coin-daily-mon-name">{dailyMon.species}</span>
-              <span className="coin-daily-mon-stars" title={`Arrives already merged to ${dailyMon.stars} stars`}>
+              <span className="coin-daily-mon-stars" title={t('coinShop.starsTip', { n: dailyMon.stars })}>
                 {'★'.repeat(dailyMon.stars)}
               </span>
               <span className="coin-daily-mon-note">
-                {dailyMon.bought
-                  ? 'Bought today - a new Pokemon arrives tomorrow'
-                  : `Joins your box at ${dailyMon.stars} stars - a little under the level cap`}
+                {dailyMon.bought ? t('coinShop.monBought') : t('coinShop.monJoins', { n: dailyMon.stars })}
               </span>
             </span>
             <span className="coin-daily-mon-buy">

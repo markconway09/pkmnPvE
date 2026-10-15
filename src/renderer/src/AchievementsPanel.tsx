@@ -9,7 +9,17 @@ import { toSpriteId } from '../../shared/battle-types'
 import { formatMoney } from './money'
 import { errorMessage, pointOf, useFloatingNotes } from './FloatingNotes'
 import CoinIcon from './CoinIcon'
-import { titlePerk } from '../../shared/titles'
+import { TITLE_PERKS, type Title } from '../../shared/titles'
+import {
+  achievementCategoryName,
+  achievementDescription,
+  achievementName,
+  itemName,
+  numberLocale,
+  t,
+  titleName,
+  titlePerkText
+} from './i18n'
 
 type Show = 'unlocked' | 'locked' | 'all'
 
@@ -44,7 +54,7 @@ function AchievementsPanel({ state, onChange, onClaimed, focus, onFocused }: Pro
       const result = await window.api.claimAchievement(achievement.id)
       onChange(result.state)
       onClaimed(result.money)
-      notes.show(`Got ${result.rewardText}`, at)
+      notes.show(t('rewards.got', { reward: result.rewardText }), at)
     } catch (err) {
       notes.show(errorMessage(err), at, 'bad')
     } finally {
@@ -63,7 +73,7 @@ function AchievementsPanel({ state, onChange, onClaimed, focus, onFocused }: Pro
         onChange(result.state)
         onClaimed(result.money)
       }
-      notes.show(`Claimed ${waiting.length} reward${waiting.length === 1 ? '' : 's'}`, at)
+      notes.show(t('rewards.claimedMany', { count: waiting.length }), at)
     } catch (err) {
       notes.show(errorMessage(err), at, 'bad')
     } finally {
@@ -161,15 +171,15 @@ function AchievementsPanel({ state, onChange, onClaimed, focus, onFocused }: Pro
         <div className="achievement-head">
           <span className="achievement-icon">{a.unlocked ? '🏆' : secret ? '❔' : '🔒'}</span>
           <div className="achievement-titles">
-            <span className="achievement-name">{secret ? '???' : a.name}</span>
-            <span className="achievement-desc">{secret ? 'A secret achievement' : a.description}</span>
+            <span className="achievement-name">{secret ? '???' : achievementName(a.id, a.name)}</span>
+            <span className="achievement-desc">{secret ? t('rewards.secret') : achievementDescription(a.id, a.description)}</span>
           </div>
         </div>
 
         {!secret && !a.unlocked && a.goal > 1 && (
           <div className="mission-progress achievement-progress">
             <div className="mission-progress-count">
-              <strong>{Math.min(a.progress, a.goal).toLocaleString('en-US')}</strong> / {a.goal.toLocaleString('en-US')}
+              <strong>{Math.min(a.progress, a.goal).toLocaleString(numberLocale())}</strong> / {a.goal.toLocaleString(numberLocale())}
               <span className="mission-progress-state">{Math.floor((Math.min(a.progress, a.goal) / a.goal) * 100)}%</span>
             </div>
             <div className="mission-progress-bar">
@@ -185,15 +195,15 @@ function AchievementsPanel({ state, onChange, onClaimed, focus, onFocused }: Pro
 
         {!secret && (
           <div className="achievement-rewards">
-            <span className="mission-col-label">Reward</span>
+            <span className="mission-col-label">{t('rewards.reward')}</span>
             <ul className="mission-reward-list">
               {(a.reward.keyItems ?? []).map((keyItem) => {
                 const item = items.get(keyItem)
                 return (
-                  <li key={keyItem} className="achievement-reward-key" title="A key item - kept for good">
+                  <li key={keyItem} className="achievement-reward-key" title={t('rewards.keyItemTip')}>
                     <span className="mission-reward-icon">{item && <ItemSprite spritenum={item.spritenum} />}</span>
-                    <span className="mission-reward-name">{item?.name ?? keyItem}</span>
-                    <span className="achievement-reward-tag">Key item</span>
+                    <span className="mission-reward-name">{itemName(item?.name ?? keyItem)}</span>
+                    <span className="achievement-reward-tag">{t('rewards.keyItem')}</span>
                   </li>
                 )
               })}
@@ -202,20 +212,20 @@ function AchievementsPanel({ state, onChange, onClaimed, focus, onFocused }: Pro
                 return (
                   <li key={itemId}>
                     <span className="mission-reward-icon">{item && <ItemSprite spritenum={item.spritenum} />}</span>
-                    <span className="mission-reward-name">{item?.name ?? itemId}</span>
+                    <span className="mission-reward-name">{itemName(item?.name ?? itemId)}</span>
                     {count > 1 && <span className="mission-reward-count">×{count}</span>}
                   </li>
                 )
               })}
               {(a.reward.pokemon ?? []).map(({ species, level, shiny }) => (
-                <li key={`mon-${species}`} className="achievement-reward-mon" title="A gift Pokemon - sent to the box">
+                <li key={`mon-${species}`} className="achievement-reward-mon" title={t('rewards.giftTip')}>
                   <span className="mission-reward-icon">
                     <SpriteImage style="2d-static" spriteId={toSpriteId(species)} shiny={shiny} alt={species} draggable={false} />
                   </span>
                   <span className="mission-reward-name">
-                    {species} {level && <span className="achievement-reward-mon-level">Lv. {level}</span>}
+                    {species} {level && <span className="achievement-reward-mon-level">{t('rewards.lv', { level })}</span>}
                   </span>
-                  {shiny ? <ShinyIcon /> : <span className="achievement-reward-tag">Pokémon</span>}
+                  {shiny ? <ShinyIcon /> : <span className="achievement-reward-tag">{t('rewards.pokemon')}</span>}
                 </li>
               ))}
               {!!a.reward.money && (
@@ -229,17 +239,17 @@ function AchievementsPanel({ state, onChange, onClaimed, focus, onFocused }: Pro
                   <span className="mission-reward-icon">
                     <CoinIcon />
                   </span>
-                  <span className="mission-reward-name">{a.reward.coins.toLocaleString('en-US')} coins</span>
+                  <span className="mission-reward-name">{t('rewards.coins', { n: a.reward.coins })}</span>
                 </li>
               )}
               {a.reward.title && (
                 <li
                   className="achievement-reward-title-line"
-                  title={titlePerk(a.reward.title)}
+                  title={titlePerkText(a.reward.title as Title, TITLE_PERKS[a.reward.title as Title] ?? '')}
                 >
                   <span className="mission-reward-icon">“”</span>
-                  <span className="mission-reward-name">“{a.reward.title}”</span>
-                  <span className="achievement-reward-tag">Title</span>
+                  <span className="mission-reward-name">“{titleName(a.reward.title)}”</span>
+                  <span className="achievement-reward-tag">{t('rewards.title')}</span>
                 </li>
               )}
             </ul>
@@ -248,14 +258,14 @@ function AchievementsPanel({ state, onChange, onClaimed, focus, onFocused }: Pro
 
         <div className="achievement-action">
           {a.claimed ? (
-            <span className="mission-col-done">✓ Claimed</span>
+            <span className="mission-col-done">{t('rewards.claimed')}</span>
           ) : (
             <button
               className={claimable ? 'mission-claim' : undefined}
               disabled={!a.unlocked || busy}
               onClick={(e) => void claim(e, a)}
             >
-              {a.unlocked ? 'Claim reward' : 'Locked'}
+              {a.unlocked ? t('rewards.claimReward') : t('rewards.locked')}
             </button>
           )}
         </div>
@@ -269,7 +279,7 @@ function AchievementsPanel({ state, onChange, onClaimed, focus, onFocused }: Pro
       <div className="missions-summary achievements-summary">
         <div className="missions-summary-count">
           <strong>{done}</strong>
-          <span>/ {total} unlocked</span>
+          <span>{t('rewards.unlockedOf', { n: total })}</span>
         </div>
         <div className="achievements-summary-bar">
           <div style={{ width: `${total > 0 ? (done / total) * 100 : 0}%` }} />
@@ -278,13 +288,13 @@ function AchievementsPanel({ state, onChange, onClaimed, focus, onFocused }: Pro
         <span className="tms-filter">
           {(['unlocked', 'locked', 'all'] as Show[]).map((s) => (
             <button key={s} className={show === s ? 'tms-filter-on' : undefined} onClick={() => setShow(s)}>
-              {s === 'unlocked' ? 'Unlocked' : s === 'locked' ? 'Locked' : 'All'}
+              {s === 'unlocked' ? t('rewards.unlocked') : s === 'locked' ? t('rewards.locked') : t('rewards.all')}
             </button>
           ))}
         </span>
         {unclaimed > 0 && (
           <button className="achievements-claim-all" disabled={busy} onClick={(e) => void claimAll(e)}>
-            Claim all ({unclaimed})
+            {t('rewards.claimAll', { n: unclaimed })}
           </button>
         )}
       </div>
@@ -301,11 +311,11 @@ function AchievementsPanel({ state, onChange, onClaimed, focus, onFocused }: Pro
               <button
                 key={category}
                 className={`${current === category ? 'tms-filter-on' : ''}${waiting > 0 ? ' achievements-category-glow' : ''}${complete ? ' achievements-category-complete' : ''}`}
-                title={waiting > 0 ? `${waiting} reward${waiting === 1 ? '' : 's'} to claim` : undefined}
+                title={waiting > 0 ? t('rewards.toClaim', { count: waiting }) : undefined}
                 disabled={!shown.some((a) => a.category === category)}
                 onClick={() => goToCategory(category)}
               >
-                {category}
+                {achievementCategoryName(category)}
                 <span className="achievements-tab-count">{complete ? '★' : `${got}/${inCategory.length}`}</span>
                 {waiting > 0 && <span className="achievements-tab-badge">{waiting}</span>}
               </button>
@@ -315,21 +325,23 @@ function AchievementsPanel({ state, onChange, onClaimed, focus, onFocused }: Pro
         {/* Floats under the buttons while there's a reward waiting that isn't on screen. */}
         {unclaimed > 0 && !claimableInView && (
           <div className="achievements-goto-float">
-            <button className="achievements-goto" onClick={goToFirstClaimable} title="Go to the first reward to claim">
-              Claim ↓
+            <button className="achievements-goto" onClick={goToFirstClaimable} title={t('rewards.gotoTip')}>
+              {t('rewards.goto')}
             </button>
           </div>
         )}
       </div>
 
       {/* Every category on the one page, each under its heading, cards two to a row. */}
-      {shown.length === 0 && <p className="achievements-empty">{show === 'unlocked' ? 'None unlocked yet.' : 'All unlocked!'}</p>}
+      {shown.length === 0 && (
+        <p className="achievements-empty">{show === 'unlocked' ? t('rewards.noneUnlocked') : t('rewards.allUnlocked')}</p>
+      )}
       {ACHIEVEMENT_CATEGORIES.map((category) => {
         const inCategory = shown.filter((a) => a.category === category)
         if (inCategory.length === 0) return null
         return (
           <section key={category} data-category={category} className="achievements-section">
-            <h3 className="shop-category-heading achievements-section-heading">{category}</h3>
+            <h3 className="shop-category-heading achievements-section-heading">{achievementCategoryName(category)}</h3>
             <div className="achievement-grid">{inCategory.map(renderCard)}</div>
           </section>
         )

@@ -6,6 +6,7 @@ import { COMPANION_SIZES, MAX_HAPPINESS, toSpriteId } from '../../shared/battle-
 import SpriteImage from './SpriteImage'
 import { loadSpriteStyle } from './spriteStyle'
 import ContextMenuPanel from './ContextMenuPanel'
+import { t } from './i18n'
 
 // The drop target's id (see MainMenu's handleDragEnd).
 export const COMPANION_SLOT_ID = 'companion-slot'
@@ -61,7 +62,7 @@ function CompanionSlot({ companion, dragging, size, sizeChoice, onSetSize, onRet
     <div
       ref={setNodeRef}
       className={classes}
-      title={companion ? undefined : 'Companion: drag a Pokémon here'}
+      title={companion ? undefined : t('companion.dragHere')}
       onClick={() => companion && setPat((n) => n + 1)}
       onContextMenu={(e) => {
         e.preventDefault()
@@ -89,7 +90,10 @@ function CompanionSlot({ companion, dragging, size, sizeChoice, onSetSize, onRet
             </span>
           )}
           {/* Its friendship, as a tiny pink bar under it. */}
-          <span className="companion-happiness" title={`Friendship ${companion.happiness ?? MAX_HAPPINESS}/${MAX_HAPPINESS}`}>
+          <span
+            className="companion-happiness"
+            title={t('companion.friendship', { n: companion.happiness ?? MAX_HAPPINESS, max: MAX_HAPPINESS })}
+          >
             <span
               className="companion-happiness-fill"
               style={{ width: `${(Math.min(companion.happiness ?? MAX_HAPPINESS, MAX_HAPPINESS) / MAX_HAPPINESS) * 100}%` }}
@@ -98,7 +102,7 @@ function CompanionSlot({ companion, dragging, size, sizeChoice, onSetSize, onRet
         </>
       ) : (
         <span className="companion-slot-hint">
-          Companion
+          {t('companion.label')}
         </span>
       )}
       {menu &&
@@ -116,19 +120,19 @@ function CompanionSlot({ companion, dragging, size, sizeChoice, onSetSize, onRet
             }}
           >
             <ContextMenuPanel x={menu.x} y={menu.y}>
-              <div className="context-menu-title">{companion.species} · your companion</div>
+              <div className="context-menu-title">{t('companion.title', { name: companion.species })}</div>
               {/* Its size, side by side on one line. */}
               <div className="companion-size-row">
-                <span className="companion-size-label">Size</span>
+                <span className="companion-size-label">{t('companion.size')}</span>
                 {/* Auto goes by its height; the size it gives is outlined while it's on. */}
                 {(['auto', ...COMPANION_SIZES] as CompanionSizeChoice[]).map((s) => (
                   <button
                     key={s}
                     className={`companion-size-option${s === 'auto' ? ' companion-size-auto' : ''}${s === sizeChoice ? ' companion-size-option-on' : ''}${sizeChoice === 'auto' && s === size ? ' companion-size-option-auto' : ''}`}
-                    title={s === 'auto' ? `By its height - ${size} for ${companion.species}` : undefined}
+                    title={s === 'auto' ? t('companion.byHeight', { size, name: companion.species }) : undefined}
                     onClick={() => onSetSize(s)}
                   >
-                    {s === 'auto' ? 'Auto' : s}
+                    {s === 'auto' ? t('companion.auto') : s}
                   </button>
                 ))}
               </div>
@@ -139,7 +143,7 @@ function CompanionSlot({ companion, dragging, size, sizeChoice, onSetSize, onRet
                   setPat((n) => n + 1)
                 }}
               >
-                Pat
+                {t('companion.pat')}
               </button>
               <button
                 className="context-menu-item"
@@ -148,7 +152,7 @@ function CompanionSlot({ companion, dragging, size, sizeChoice, onSetSize, onRet
                   onReturn()
                 }}
               >
-                Remove as companion
+                {t('companion.remove')}
               </button>
             </ContextMenuPanel>
           </div>,

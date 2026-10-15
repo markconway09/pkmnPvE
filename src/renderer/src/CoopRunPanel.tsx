@@ -9,7 +9,7 @@ import PokemonTooltipContent from './PokemonTooltipContent'
 import Tooltip from './Tooltip'
 import ItemSprite from './ItemSprite'
 import { trainerSpriteUrl } from './trainerSprite'
-import { CLICK } from './platform'
+import { clickWord, itemName, t } from './i18n'
 
 // The run screen's handlers, as MainMenu wires them (the same as a solo run's).
 type RunHandlers = Omit<
@@ -43,20 +43,22 @@ function CoopRunPanel({ coop, friend, run, picked, busy, starting, onStart, onCh
   const mine = run?.coop?.seed === coop.setup.seed ? run : null
   const partner = coop.partner?.seed === coop.setup.seed ? coop.partner : null
   const info = runDifficultyInfo(coop.setup.difficulty)
-  const settings = `${info.label}${coop.setup.generation ? ` · Gen ${coop.setup.generation}` : ''}`
+  const settings = `${info.label}${coop.setup.generation ? t('tower.gen', { n: coop.setup.generation }) : ''}`
 
   // Where the friend is, in a few words.
   const partnerStatus = !coop.partner
-    ? 'Connecting...'
+    ? t('coop.connecting')
     : !partner || partner.status === 'none'
-      ? 'Picking a starter'
+      ? t('coop.picking')
       : partner.status === 'lost'
-        ? 'Run over'
+        ? t('coop.runOver')
         : partner.status === 'won'
-          ? 'Run won!'
+          ? t('coop.runWon')
           : partner.ready
-            ? `Waiting at the ${partner.ready.kind}`
-            : `Floor ${partner.floor}`
+            ? partner.ready.kind === 'boss'
+              ? t('coop.waitingAtBoss')
+              : t('coop.waitingAtVillain')
+            : t('coop.floor', { n: partner.floor })
 
   // The friend: who they are, where they are and their team (names and details on hover).
   const partnerStrip = (
@@ -70,12 +72,12 @@ function CoopRunPanel({ coop, friend, run, picked, busy, starting, onStart, onCh
         {(partner?.team ?? []).map((mon, i) => (
           <Tooltip key={`${mon.id}-${i}`} className="coop-partner-mon" placement="below" content={<PokemonTooltipContent pokemon={mon} />}>
             <PokemonIconVisual mon={{ ...mon, expPercent: undefined }} />
-            <span className="coop-partner-mon-level">Lv {mon.level}</span>
+            <span className="coop-partner-mon-level">{t('tower.lv', { level: mon.level })}</span>
           </Tooltip>
         ))}
       </span>
-      <button className="coop-leave" disabled={busy || starting} title="Back to the room - the run stays saved" onClick={onLeave}>
-        Leave co-op
+      <button className="coop-leave" disabled={busy || starting} title={t('coop.leaveTip')} onClick={onLeave}>
+        {t('coop.leave')}
       </button>
     </div>
   )
@@ -87,28 +89,26 @@ function CoopRunPanel({ coop, friend, run, picked, busy, starting, onStart, onCh
         <div className={`run-setup-card run-hud-${coop.setup.difficulty}`}>
           <div className="run-starter-row">
             <div className="run-starter-column">
-              <span className="run-hud-label">Starter</span>
+              <span className="run-hud-label">{t('tower.starter')}</span>
               <div
                 className={`run-starter-pedestal${picked ? ' run-starter-pedestal-filled' : ''}`}
-                title={`The run uses a Lv ${ROGUELITE_START_LEVEL} copy (no held item, fresh moveset) - the original stays as it is.`}
+                title={t('tower.starterTip', { level: ROGUELITE_START_LEVEL })}
               >
                 <StarterSlot picked={picked} />
               </div>
-              <span className="run-starter-name">{picked ? `${picked.species} · Lv ${ROGUELITE_START_LEVEL}` : 'Drag a Pokémon here'}</span>
+              <span className="run-starter-name">
+                {picked ? t('tower.starterName', { name: picked.species, level: ROGUELITE_START_LEVEL }) : t('tower.dragHere')}
+              </span>
               <button className={`run-start-button${picked ? ' run-start-ready' : ''}`} disabled={busy || !picked} onClick={onStart}>
-                {picked ? 'Start the climb' : 'Pick a starter'}
+                {picked ? t('coop.start') : t('tower.pickStarter')}
               </button>
             </div>
             <div className="run-settings">
               <div className="run-setup-header">
-                <span className="run-hud-label">Co-op Battle Tower</span>
+                <span className="run-hud-label">{t('coop.title')}</span>
                 <span className={`run-difficulty-tag run-difficulty-${coop.setup.difficulty}`}>{settings}</span>
               </div>
-              <p className="run-difficulty-text">
-                You and {friend.name} each climb the same floors with your own team of up to 3, your own gems and shop. Every
-                boss and villain takeover is fought together, side by side in a double battle. If either team is wiped out, the
-                run is over for both - and each of you gets the usual rewards for the bosses beaten.
-              </p>
+              <p className="run-difficulty-text">{t('coop.rules', { name: friend.name })}</p>
               {partnerStrip}
             </div>
           </div>
@@ -122,21 +122,21 @@ function CoopRunPanel({ coop, friend, run, picked, busy, starting, onStart, onCh
     return (
       <div className="run-panel run-setup coop-setup">
         <div className={`run-result ${mine.status === 'won' ? 'run-result-won' : 'run-result-lost'}`}>
-          <span className="run-result-title">{mine.status === 'won' ? '🏆 Won together' : 'Co-op run over'}</span>
+          <span className="run-result-title">{mine.status === 'won' ? t('coop.wonTogether') : t('coop.over')}</span>
           <span className="run-result-summary">
             {mine.starterSpecies} · {runDifficultyInfo(mine.difficulty).label} ·{' '}
             {mine.status === 'won'
-              ? `all ${runBossCount(mine.difficulty)} bosses`
-              : `floor ${mine.floor}, ${mine.bossesBeaten}/${runBossCount(mine.difficulty)} bosses`}
+              ? t('tower.allBosses', { n: runBossCount(mine.difficulty) })
+              : t('tower.floorBosses', { floor: mine.floor, beaten: mine.bossesBeaten, of: runBossCount(mine.difficulty) })}
           </span>
           {mine.rewards.length > 0 ? (
-            <span className="run-reward-list" title="Sent to your bag">
+            <span className="run-reward-list" title={t('tower.sentToBag')}>
               {mine.rewards.map((line, i) => (
                 <span
                   key={line.label}
                   className="run-reward-line"
                   style={{ '--i': i } as React.CSSProperties}
-                  title={line.itemId ? `${line.quantity}× ${line.label}` : line.label}
+                  title={line.itemId ? `${line.quantity}× ${itemName(line.label)}` : line.label}
                 >
                   {line.spritenum !== null ? (
                     <>
@@ -150,7 +150,7 @@ function CoopRunPanel({ coop, friend, run, picked, busy, starting, onStart, onCh
               ))}
             </span>
           ) : (
-            <span className="run-result-none">No rewards</span>
+            <span className="run-result-none">{t('tower.noRewards')}</span>
           )}
         </div>
         {partnerStrip}
@@ -163,26 +163,22 @@ function CoopRunPanel({ coop, friend, run, picked, busy, starting, onStart, onCh
   const both = !!ready && partner?.ready?.floor === ready.floor
   const waitingRoom = ready ? (
     <div className="run-floor-pick coop-waiting">
-      <p className="run-floor-title">{ready.kind === 'boss' ? mine.nextBossLabel : 'Villain Takeover'}</p>
+      <p className="run-floor-title">{ready.kind === 'boss' ? mine.nextBossLabel : t('coop.villainTakeover')}</p>
       <div className="online-draft-standby coop-waiting-standby">
         <span className="online-draft-spinner" />
         <img className="coop-waiting-sprite" src={trainerSpriteUrl(friend.spriteId)} alt="" />
         <span>
           {both || starting
-            ? `${friend.name} is here - the fight is starting...`
+            ? t('coop.starting', { name: friend.name })
             : partner?.status === 'active'
-              ? `Waiting for ${friend.name} - they're on floor ${partner.floor}`
-              : `Waiting for ${friend.name}...`}
+              ? t('coop.waitingFloor', { name: friend.name, floor: partner.floor })
+              : t('coop.waiting', { name: friend.name })}
         </span>
       </div>
-      <p className="box-empty-hint">
-        {ready.kind === 'boss'
-          ? 'Bosses are fought together: your team and theirs on one side of a double battle.'
-          : 'The villain blocks the way for both of you - you fight them together.'}
-      </p>
+      <p className="box-empty-hint">{ready.kind === 'boss' ? t('coop.bossTogether') : t('coop.villainTogether')}</p>
       <div className="run-item-row">
         <button className="run-item-button run-item-skip" disabled={both || starting} onClick={onCancelReady}>
-          Back
+          {t('tower.back')}
         </button>
       </div>
     </div>
@@ -200,7 +196,7 @@ function CoopRunPanel({ coop, friend, run, picked, busy, starting, onStart, onCh
       api={window.api.coopRun}
       hudExtra={partnerStrip}
       floorOverride={waitingRoom}
-      forfeitConfirm={`End the run for both of you? ${CLICK} again`}
+      forfeitConfirm={t('coop.forfeit', { click: clickWord() })}
     />
   )
 }

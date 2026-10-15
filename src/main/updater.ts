@@ -7,6 +7,7 @@ import { app, type WebContents } from 'electron'
 import type { UpdateCheckResult } from '../shared/battle-types'
 import { checkLatestRelease, type ReleaseAsset } from '../shared/update-check'
 import packageJson from '../../package.json'
+import { t } from './i18n'
 
 /**
  * Options → Check for updates. The portable build updates itself from the GitHub
@@ -100,9 +101,9 @@ function cleanWorkDir(): string {
  * the window, then hands over to the swap script and quits the game.
  */
 export async function installUpdate(sender: WebContents): Promise<void> {
-  if (!app.isPackaged) throw new Error('Only the packaged game updates itself - in the project, pull with git instead')
+  if (!app.isPackaged) throw new Error(t('err.onlyThePackagedGameUpdatesItself'))
   const asset = pendingAsset
-  if (!asset) throw new Error('Check for updates first')
+  if (!asset) throw new Error(t('err.checkForUpdatesFirst'))
 
   const appDir = dirname(app.getPath('exe'))
   const work = cleanWorkDir()
@@ -133,7 +134,7 @@ export async function installUpdate(sender: WebContents): Promise<void> {
         const headers: Record<string, string> = { 'User-Agent': 'pkmnPvE-updater' }
         if (received > 0) headers.Range = `bytes=${received}-`
         const res = await fetch(asset.browser_download_url, { headers, signal: controller.signal })
-        if (!res.ok || !res.body) throw new Error(`Download failed (${res.status})`)
+        if (!res.ok || !res.body) throw new Error(t('err.downloadFailed', { a: res.status }))
         // The server ignored the Range and sent the whole file - start over cleanly.
         if (received > 0 && res.status !== 206) {
           await file.truncate(0)
@@ -161,7 +162,7 @@ export async function installUpdate(sender: WebContents): Promise<void> {
       }
       if (received >= asset.size) break
       if (++failures >= DOWNLOAD_TRIES) {
-        throw new Error('The download kept dropping out - check your connection and try again')
+        throw new Error(t('err.theDownloadKeptDroppingOutCheck'))
       }
       await new Promise((resolve) => setTimeout(resolve, 2000 * failures))
     }
@@ -172,10 +173,10 @@ export async function installUpdate(sender: WebContents): Promise<void> {
 
   // Nothing gets installed unless it's exactly the file GitHub has: same size, and
   // the same SHA-256 as the one GitHub publishes for it.
-  if (received !== asset.size) throw new Error('The download was cut short - try again')
+  if (received !== asset.size) throw new Error(t('err.theDownloadWasCutShortTry'))
   const digest = hash.digest('hex')
   if (asset.digest && asset.digest.toLowerCase() !== `sha256:${digest}`) {
-    throw new Error('The download came through damaged (checksum mismatch) - try again')
+    throw new Error(t('err.theDownloadCameThroughDamagedChecksum'))
   }
 
   // Unpack with .NET's zip reader, which every Windows has (through PowerShell).
@@ -197,7 +198,7 @@ export async function installUpdate(sender: WebContents): Promise<void> {
     }
   )
   if (unzip.status !== 0 || !existsSync(join(work, 'new', 'pkmnPvE.exe'))) {
-    throw new Error('Could not unpack the update: ' + (unzip.stderr?.toString().trim() || 'the download looks incomplete'))
+    throw new Error(t('err.unpack', { reason: unzip.stderr?.toString().trim() || t('err.incomplete') }))
   }
 
   // The swap, run once this process has exited (a running exe can't be replaced):

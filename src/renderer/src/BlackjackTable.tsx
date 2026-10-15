@@ -7,19 +7,20 @@ import type { GameCornerGameProps } from './GameCornerTabs'
 import PlayingCard from './PlayingCard'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
 import CoinIcon from './CoinIcon'
+import { numberLocale, t } from './i18n'
 
 // A payout to 1 as odds: 1.5 is "3:2", 4 is "4:1".
 function oddsText(toOne: number): string {
   return Number.isInteger(toOne) ? `${toOne}:1` : `${toOne * 2}:2`
 }
 
-const OUTCOME_TEXT: Record<BlackjackOutcome, string> = {
-  blackjack: 'Blackjack!',
-  win: 'You win!',
-  push: 'Push - your bet is returned',
-  lose: 'The dealer wins',
-  bust: 'Bust!',
-  dealerBlackjack: 'The dealer has blackjack'
+const OUTCOME_TEXT: Record<BlackjackOutcome, 'bj.blackjack' | 'bj.win' | 'bj.push' | 'bj.lose' | 'bj.bust' | 'bj.dealerBlackjack'> = {
+  blackjack: 'bj.blackjack',
+  win: 'bj.win',
+  push: 'bj.push',
+  lose: 'bj.lose',
+  bust: 'bj.bust',
+  dealerBlackjack: 'bj.dealerBlackjack'
 }
 
 // "17", or "7 / 17" while an ace still counts as 11.
@@ -71,8 +72,8 @@ function BlackjackTable({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCor
         const rect = actionsRef.current.getBoundingClientRect()
         const at = { x: rect.left + rect.width / 2, y: rect.top }
         const won = next.returned - next.bet
-        if (won > 0) notes.show(`+${won.toLocaleString('en-US')} coins`, at)
-        else if (next.outcome !== 'push') notes.show(`-${next.bet.toLocaleString('en-US')} coins`, at, 'bad')
+        if (won > 0) notes.show(t('corner.plusCoins', { n: won }), at)
+        else if (next.outcome !== 'push') notes.show(t('corner.minusCoins', { n: next.bet }), at, 'bad')
       }
     } catch (e) {
       setError(errorMessage(e))
@@ -96,7 +97,7 @@ function BlackjackTable({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCor
       <div className="blackjack-felt">
         <div className="blackjack-hand">
           <div className="blackjack-hand-label">
-            Dealer {table && table.dealer.length > 0 && <span>{totalLabel(table.dealerTotal)}</span>}
+            {t('bj.dealer')} {table && table.dealer.length > 0 && <span>{totalLabel(table.dealerTotal)}</span>}
           </div>
           <div className="blackjack-cards">
             {table?.dealer.map((card, i) => (
@@ -108,18 +109,18 @@ function BlackjackTable({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCor
         <div className={`blackjack-result${outcomeTone ? ` blackjack-result-${outcomeTone}` : ''}`}>
           {table?.phase === 'done' && table.outcome
             ? table.outcome === 'blackjack'
-              ? `Blackjack! Paid ${oddsText(perks.blackjackPayout)}`
+              ? t('bj.paidBlackjack', { odds: oddsText(perks.blackjackPayout) })
               : table.outcome === 'win' && perks.blackjackWinPayout !== 1
-                ? `You win! Paid ${oddsText(perks.blackjackWinPayout)}`
-                : OUTCOME_TEXT[table.outcome]
+                ? t('bj.paidWin', { odds: oddsText(perks.blackjackWinPayout) })
+                : t(OUTCOME_TEXT[table.outcome])
             : playing
               ? (
                 <>
-                  Bet <CoinIcon /> {table!.bet.toLocaleString('en-US')}
-                  {table!.doubled ? ' (doubled)' : ''}
+                  {t('bj.bet')} <CoinIcon /> {table!.bet.toLocaleString(numberLocale())}
+                  {table!.doubled ? t('bj.doubled') : ''}
                 </>
               )
-              : 'Place a bet and deal'}
+              : t('bj.placeBet')}
         </div>
 
         <div className="blackjack-hand">
@@ -129,7 +130,7 @@ function BlackjackTable({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCor
             ))}
           </div>
           <div className="blackjack-hand-label">
-            You {table && table.player.length > 0 && <span>{totalLabel(table.playerTotal)}</span>}
+            {t('bj.you')} {table && table.player.length > 0 && <span>{totalLabel(table.playerTotal)}</span>}
           </div>
         </div>
       </div>
@@ -138,22 +139,22 @@ function BlackjackTable({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCor
         {playing ? (
           <>
             <button className="blackjack-action" disabled={busy} onClick={() => void act(() => window.api.hitBlackjack())}>
-              Hit
+              {t('bj.hit')}
             </button>
             <button
               className="blackjack-action"
               disabled={busy}
               onClick={() => void act(() => window.api.standBlackjack())}
             >
-              Stand
+              {t('bj.stand')}
             </button>
             <button
               className="blackjack-action"
               disabled={busy || !table?.canDouble}
-              title={table?.canDouble ? 'Double your bet, take one more card and stand' : 'Only on your first two cards, with enough coins'}
+              title={table?.canDouble ? t('bj.doubleTip') : t('bj.cantDouble')}
               onClick={() => void act(() => window.api.doubleBlackjack())}
             >
-              Double down
+              {t('bj.double')}
             </button>
           </>
         ) : (
@@ -162,9 +163,11 @@ function BlackjackTable({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCor
           step={betStep(perks.betCap)} disabled={busy || !coins} onChange={setBet}
           info={
             <>
-              The dealer draws to 16 and stands on 17. Blackjack pays{' '}
-              {perks.blackjackPayout !== 1.5 ? <strong>{oddsText(perks.blackjackPayout)} (9+10)</strong> : '3:2'}, a win{' '}
-              {perks.blackjackWinPayout !== 1 ? <strong>{oddsText(perks.blackjackWinPayout)} (9+10)</strong> : '1:1'}, a tie returns your bet.
+              {t('bj.info1')}{' '}
+              {perks.blackjackPayout !== 1.5 ? <strong>{oddsText(perks.blackjackPayout)} (9+10)</strong> : '3:2'}
+              {t('bj.info2')}{' '}
+              {perks.blackjackWinPayout !== 1 ? <strong>{oddsText(perks.blackjackWinPayout)} (9+10)</strong> : '1:1'}
+              {t('bj.info3')}
             </>
           }
         />
@@ -173,7 +176,7 @@ function BlackjackTable({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCor
               disabled={busy || coins === null || coins < bet}
               onClick={() => void act(() => window.api.dealBlackjack(bet))}
             >
-              Deal
+              {t('bj.deal')}
             </button>
           </>
         )}
@@ -181,9 +184,9 @@ function BlackjackTable({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCor
       {error && <p className="editor-error">{error}</p>}
       {coins !== null && coins < 1 && !playing && (
         <p className="editor-hint">
-          You&apos;re out of coins.{' '}
+          {t('corner.outOfCoins')}{' '}
           <button className="link-button" onClick={onOpenCoinShop}>
-            Buy some at the Coin Shop
+            {t('corner.buyCoins')}
           </button>
         </p>
       )}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { UpdateCheckResult, UpdateProgress } from '../../shared/battle-types'
 import { IS_MOBILE } from './platform'
+import { useT } from './i18n'
 
 function megabytes(bytes: number): string {
   return `${Math.round(bytes / 1048576)} MB`
@@ -12,6 +13,7 @@ function megabytes(bytes: number): string {
 // itself, so "Update now" opens the new APK in the browser instead; installing it over
 // this copy keeps the saves, since every APK is signed with the same key.
 function UpdatesSection(): React.JSX.Element {
+  const t = useT()
   const [check, setCheck] = useState<UpdateCheckResult | null>(null)
   const [checking, setChecking] = useState(false)
   const [progress, setProgress] = useState<UpdateProgress | null>(null)
@@ -59,48 +61,46 @@ function UpdatesSection(): React.JSX.Element {
   }
 
   const percent = progress && progress.total > 0 ? Math.round((progress.received / progress.total) * 100) : 0
+  // The "is available" line, split around the version so it can be shown in bold.
+  const [availableBefore, availableAfter] = check?.available
+    ? t('updates.available', { version: '\u0000', size: megabytes(check.sizeBytes) }).split('\u0000')
+    : ['', '']
 
   return (
     <div ref={panelRef}>
-      <h2 className="options-heading">Updates</h2>
-      <p className="editor-hint">
-        Version {check?.current ?? '…'} - your saves are kept when updating; trainers and other game data come from
-        the new version.
-      </p>
+      <h2 className="options-heading">{t('updates.title')}</h2>
+      <p className="editor-hint">{t('updates.version', { version: check?.current ?? '…' })}</p>
       <div className="update-row">
         <button disabled={checking || installing} onClick={() => void runCheck()}>
-          {checking ? 'Checking…' : 'Check for updates'}
+          {checking ? t('updates.checking') : t('updates.check')}
         </button>
         {check && !check.available && (
           <span className="editor-hint">
-            {check.latest ? `Up to date (latest is ${check.latest})` : 'No releases have been published yet'}
+            {check.latest ? t('updates.upToDate', { version: check.latest }) : t('updates.noReleases')}
           </span>
         )}
       </div>
       {check?.available && (
         <div className="update-available">
           <div>
-            Version <strong>{check.latest}</strong> is available ({megabytes(check.sizeBytes)}).
+            {availableBefore}
+            <strong>{check.latest}</strong>
+            {availableAfter}
           </div>
           {check.notes && <pre className="update-notes">{check.notes}</pre>}
           {check.canInstall && IS_MOBILE ? (
             <>
-              <button onClick={() => check.downloadUrl && window.open(check.downloadUrl, '_blank')}>Download update</button>
-              <p className="editor-hint">
-                Your browser downloads the new version - open the file once it's done and tap Update to install it
-                over this one.
-              </p>
+              <button onClick={() => check.downloadUrl && window.open(check.downloadUrl, '_blank')}>
+                {t('updates.download')}
+              </button>
+              <p className="editor-hint">{t('updates.downloadHint')}</p>
             </>
           ) : check.canInstall ? (
             <button disabled={installing} onClick={() => void install()}>
-              {installing ? 'Updating…' : 'Update now'}
+              {installing ? t('updates.updating') : t('updates.now')}
             </button>
           ) : (
-            <p className="editor-hint">
-              {IS_MOBILE
-                ? 'This copy runs in a browser, not the phone app - install the new APK on a phone instead.'
-                : 'This is the development copy - update it with git instead.'}
-            </p>
+            <p className="editor-hint">{IS_MOBILE ? t('updates.browserCopy') : t('updates.devCopy')}</p>
           )}
           {progress && (
             <div className="update-progress">
@@ -108,9 +108,10 @@ function UpdatesSection(): React.JSX.Element {
                 <div className="hp-bar-fill hp-high" style={{ width: `${progress.phase === 'downloading' ? percent : 100}%` }} />
               </div>
               <span className="editor-hint">
-                {progress.phase === 'downloading' && `Downloading… ${megabytes(progress.received)} of ${megabytes(progress.total)}`}
-                {progress.phase === 'unpacking' && 'Unpacking…'}
-                {progress.phase === 'restarting' && 'Installing - the game will close and reopen in a moment…'}
+                {progress.phase === 'downloading' &&
+                  t('updates.downloading', { received: megabytes(progress.received), total: megabytes(progress.total) })}
+                {progress.phase === 'unpacking' && t('updates.unpacking')}
+                {progress.phase === 'restarting' && t('updates.restarting')}
               </span>
             </div>
           )}

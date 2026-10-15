@@ -4,6 +4,7 @@ import PokemonTooltipContent from './PokemonTooltipContent'
 import PokemonIconVisual from './PokemonIconVisual'
 import Tooltip from './Tooltip'
 import RarityCard from './RarityCard'
+import { t } from './i18n'
 
 interface Props {
   mon: BoxPokemonView
@@ -56,7 +57,7 @@ function PokemonIcon({
           <button
             type="button"
             className="box-icon-remove"
-            title="Remove"
+            title={t('common.remove')}
             onClick={(e) => {
               e.stopPropagation()
               onRemove(mon.id)

@@ -5,6 +5,7 @@ import type { BoxState } from '../../shared/battle-types'
 import { toSpriteId } from '../../shared/battle-types'
 import { spriteUrl } from './spriteStyle'
 import { STARTER_SPECIES } from './starterSpecies'
+import { t } from './i18n'
 
 interface Props {
   onClose: () => void
@@ -21,7 +22,7 @@ function StarterPicker({ onClose, onChosen }: Props): React.JSX.Element {
   return createPortal(
     <div className="modal-overlay" onMouseDown={onClose}>
       <div className="modal-panel starter-picker" onMouseDown={(e) => e.stopPropagation()}>
-        <h2>Choose Your Starter</h2>
+        <h2>{t('starter.title')}</h2>
         <div className="starter-grid">
           {STARTER_SPECIES.map((species) => (
             <button
@@ -42,13 +43,13 @@ function StarterPicker({ onClose, onChosen }: Props): React.JSX.Element {
               <FitName className="starter-name" text={species} />
             </button>
           ))}
-          <button className="starter-option" title="Random Unevolved" onClick={() => void choose('random')}>
+          <button className="starter-option" title={t('starter.random')} onClick={() => void choose('random')}>
             <span className="starter-random-icon">?</span>
-            <span className="starter-name">Random Unevolved</span>
+            <span className="starter-name">{t('starter.random')}</span>
           </button>
         </div>
         <div className="editor-actions">
-          <button onClick={onClose}>Cancel</button>
+          <button onClick={onClose}>{t('common.cancel')}</button>
         </div>
       </div>
     </div>,

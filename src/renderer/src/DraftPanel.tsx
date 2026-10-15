@@ -30,7 +30,8 @@ import CoinIcon from './CoinIcon'
 import { DraftPackOpening, OpponentReveal } from './DraftPackOpening'
 import { trainerSpriteUrl } from './trainerSprite'
 import ItemSprite from './ItemSprite'
-import { CLICK, CLICK_LC } from './platform'
+import { abilityName, abilityText, clickWord, clickWordLc, itemName, itemText, moveName, moveText, nameMatches, numberLocale, t, typeName } from './i18n'
+import { categoryName } from './movePower'
 import { ONLINE_CHAOS_BATTLES, ONLINE_CHAOS_WINS } from '../../shared/online'
 import { leaveOnlineDraft, pickOnlineDraftLead, showDraftView, type OnlineDraftState } from './online'
 
@@ -77,58 +78,58 @@ function saveFormat(format: DraftFormat): void {
 }
 
 function formatLabel(format: DraftFormat): string {
-  return format === 'chaos' ? 'Chaos' : format === 'singles' ? 'Singles' : 'Doubles'
+  return t(`draftFormat.${format}`)
 }
 
 function fieldLabel(kind: 'weather' | 'terrain', id: string): string {
   const option = (kind === 'weather' ? FIELD_START_WEATHERS : FIELD_START_TERRAINS).find((o) => o.id === id)
-  return kind === 'weather' ? (option?.label ?? id) : `${option?.label ?? id} Terrain`
+  return kind === 'weather' ? (option?.label ?? id) : t('draft.terrain', { name: option?.label ?? id })
 }
 
 // A chaos modifier's chip: its name, and what it does (shown once it's picked).
 function modifierText(modifier: ChaosModifier): { icon: string; title: string; text: string } {
   switch (modifier.kind) {
     case 'weather':
-      return { icon: '☀', title: fieldLabel('weather', modifier.id), text: 'Every battle starts in it, until a move or ability replaces it' }
+      return { icon: '☀', title: fieldLabel('weather', modifier.id), text: t('mod.weather') }
     case 'terrain':
-      return { icon: '⛰', title: fieldLabel('terrain', modifier.id), text: 'Every battle starts with it, until a move or ability replaces it' }
+      return { icon: '⛰', title: fieldLabel('terrain', modifier.id), text: t('mod.terrain') }
     case 'trickroom':
-      return { icon: '⧗', title: 'Trick Room', text: 'Every battle starts in Trick Room (slower Pokémon move first) - until someone uses Trick Room' }
+      return { icon: '⧗', title: t('mod.trickroom'), text: t('mod.trickroom.text') }
     case 'tailwind':
-      return { icon: '༄', title: 'Tailwind Start', text: 'Tailwind on your side for the first 4 turns of every battle' }
+      return { icon: '༄', title: t('mod.tailwind'), text: t('mod.tailwind.text') }
     case 'screens':
-      return { icon: '▣', title: 'Screens Up', text: 'Reflect and Light Screen on your side for the first 5 turns of every battle' }
+      return { icon: '▣', title: t('mod.screens'), text: t('mod.screens.text') }
     case 'hazard':
       return modifier.id === 'stealthrock'
-        ? { icon: '◆', title: 'Stealth Rock', text: "Stealth Rock on the opponent's side from the start of every battle" }
+        ? { icon: '◆', title: moveName('Stealth Rock'), text: t('mod.stealthrock.text') }
         : modifier.id === 'stickyweb'
-          ? { icon: '✱', title: 'Sticky Web', text: "Sticky Web on the opponent's side from the start of every battle (-1 Speed on switch-in)" }
-          : { icon: '⋀', title: 'Spikes', text: "A layer of Spikes on the opponent's side from the start of every battle (up to 3)" }
+          ? { icon: '✱', title: moveName('Sticky Web'), text: t('mod.stickyweb.text') }
+          : { icon: '⋀', title: moveName('Spikes'), text: t('mod.spikes.text') }
     case 'intimidate':
-      return { icon: '☠', title: 'Intimidating Aura', text: "The opponent's lead starts every battle at -1 Attack, Sp. Atk and Speed" }
+      return { icon: '☠', title: t('mod.intimidate'), text: t('mod.intimidate.text') }
     case 'ability':
-      return { icon: '✦', title: 'Ability Change', text: 'Give one of your Pokémon any ability' }
+      return { icon: '✦', title: t('mod.ability'), text: t('mod.ability.text') }
     case 'stat':
-      return { icon: '▲', title: 'Stat Boost', text: '+50% to one stat of one of your Pokémon, for good' }
+      return { icon: '▲', title: t('mod.stat'), text: t('mod.stat.text') }
     case 'tutor':
-      return { icon: '✎', title: 'Move Tutor', text: 'Swap one of its moves for any move in the game' }
+      return { icon: '✎', title: t('mod.tutor'), text: t('mod.tutor.text') }
     case 'fortress':
-      return { icon: '⛨', title: 'Fortress', text: '+50% HP, Defense and Sp. Def, -30% Attack, Sp. Atk and Speed' }
+      return { icon: '⛨', title: t('mod.fortress'), text: t('mod.fortress.text') }
     case 'glasscannon':
-      return { icon: '✸', title: 'Glass Cannon', text: '+50% Attack, Sp. Atk and Speed, -30% Defense and Sp. Def' }
+      return { icon: '✸', title: t('mod.glasscannon'), text: t('mod.glasscannon.text') }
     case 'lockon':
-      return { icon: '◎', title: 'Lock-On', text: 'Its moves never miss (not one-hit KO moves) - take it twice for +1 crit stage too' }
+      return { icon: '◎', title: t('mod.lockon'), text: t('mod.lockon.text') }
     case 'wildcard':
-      return { icon: '⁇', title: 'Wild Card', text: 'Swap it for a random Pokémon from the tier above (its stat modifiers stay)' }
+      return { icon: '⁇', title: t('mod.wildcard'), text: t('mod.wildcard.text') }
   }
 }
 
 // The modifier offer's rows, in order.
-const MODIFIER_GROUPS: { label: string; kinds: ChaosModifier['kind'][] }[] = [
-  { label: 'Weather', kinds: ['weather'] },
-  { label: 'Terrain', kinds: ['terrain'] },
-  { label: 'Battle start', kinds: ['trickroom', 'tailwind', 'screens', 'hazard', 'intimidate'] },
-  { label: 'Pokémon', kinds: CHAOS_MON_MODIFIERS }
+const MODIFIER_GROUPS: { label: 'modGroup.weather' | 'modGroup.terrain' | 'modGroup.start' | 'modGroup.pokemon'; kinds: ChaosModifier['kind'][] }[] = [
+  { label: 'modGroup.weather', kinds: ['weather'] },
+  { label: 'modGroup.terrain', kinds: ['terrain'] },
+  { label: 'modGroup.start', kinds: ['trickroom', 'tailwind', 'screens', 'hazard', 'intimidate'] },
+  { label: 'modGroup.pokemon', kinds: CHAOS_MON_MODIFIERS }
 ]
 
 // The chaos field so far, as chips (nothing while it's empty).
@@ -137,17 +138,17 @@ function ChaosFieldChips({ field }: { field?: ChaosField }): React.JSX.Element |
   const chips = [
     field.weather ? fieldLabel('weather', field.weather) : null,
     field.terrain ? fieldLabel('terrain', field.terrain) : null,
-    field.trickRoom ? 'Trick Room' : null,
-    field.tailwind ? 'Tailwind' : null,
-    field.screens ? 'Screens' : null,
-    field.stealthRock ? 'Stealth Rock' : null,
-    field.stickyWeb ? 'Sticky Web' : null,
-    field.spikes ? `Spikes${field.spikes > 1 ? ` x${field.spikes}` : ''}` : null,
-    field.intimidate ? 'Intimidating Aura' : null
+    field.trickRoom ? t('mod.trickroom') : null,
+    field.tailwind ? t('chip.tailwind') : null,
+    field.screens ? t('chip.screens') : null,
+    field.stealthRock ? moveName('Stealth Rock') : null,
+    field.stickyWeb ? moveName('Sticky Web') : null,
+    field.spikes ? `${moveName('Spikes')}${field.spikes > 1 ? ` x${field.spikes}` : ''}` : null,
+    field.intimidate ? t('mod.intimidate') : null
   ].filter((c): c is string => !!c)
   if (chips.length === 0) return null
   return (
-    <span className="draft-tiers" title="Every chaos battle starts with these">
+    <span className="draft-tiers" title={t('chip.fieldTip')}>
       {chips.map((chip) => (
         <span key={chip} className="draft-tier-chip draft-chaos-chip">
           {chip}
@@ -159,7 +160,7 @@ function ChaosFieldChips({ field }: { field?: ChaosField }): React.JSX.Element |
 
 // "the first leads" / "the first two lead".
 function leadText(format: DraftFormat): string {
-  return draftLeads(format) === 1 ? 'the first leads' : 'the first two lead'
+  return draftLeads(format) === 1 ? t('draft.firstLeads') : t('draft.firstTwoLead')
 }
 
 // A Pokemon as a small box-style card, its whole set on hover.
@@ -181,7 +182,7 @@ function DraftMonIcon({ mon }: { mon: DraftMonView }): React.JSX.Element {
 function TierChips({ tiers }: { tiers: string[] | null }): React.JSX.Element | null {
   if (!tiers || tiers.length === 0) return null
   return (
-    <span className="draft-tiers" title="Every Pokémon in this draft - yours and your opponents' - comes from these tiers">
+    <span className="draft-tiers" title={t('draft.tiersTip')}>
       {tiers.map((tier) => (
         <span key={tier} className="draft-tier-chip">
           {tier}
@@ -358,9 +359,14 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
     return (
       <div className="run-panel draft-panel online-draft-over">
         <p className={`run-result ${outcome === 'won' ? 'run-result-won' : 'run-result-lost'}`}>
-          {outcome === 'won' ? 'You won the match' : outcome === 'lost' ? `${online.friendName} won the match` : 'The match is a draw'}:{' '}
+          {outcome === 'won'
+            ? t('draft.youWon')
+            : outcome === 'lost'
+              ? t('draft.friendWon', { name: online.friendName })
+              : t('draft.draw')}
+          :{' '}
           {draft.wins}-{draft.losses}
-          {ties > 0 ? ` (${ties} tie${ties > 1 ? 's' : ''})` : ''}
+          {ties > 0 ? t('draft.ties', { count: ties }) : ''}
         </p>
         <div className="draft-team-row">
           {draft.picks.map((mon, i) => (
@@ -370,7 +376,7 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
           ))}
         </div>
         <button className="run-start-button draft-start-button" onClick={leaveOnlineDraft}>
-          Back to the room
+          {t('draft.backToRoom')}
         </button>
       </div>
     )
@@ -392,8 +398,8 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
               ))}
             </div>
             <div className="draft-home-title">
-              <h2>Draft</h2>
-              <span>Build a team from packs, then battle the gauntlet</span>
+              <h2>{t('nav.draft')}</h2>
+              <span>{t('draft.homeSub')}</span>
             </div>
           </div>
           <div className="draft-format-picker">
@@ -406,10 +412,8 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
               saveFormat('chaos')
             }}
           >
-            <strong>Chaos</strong>
-            <span className="draft-format-sub">
-              Singles for fun · draft 2 at a time, permanent weather, Trick Room, ability swaps and stat boosts
-            </span>
+            <strong>{t('draftFormat.chaos')}</strong>
+            <span className="draft-format-sub">{t('draft.chaosSub')}</span>
           </button>
           <div className="draft-format-tiles">
             {DRAFT_FORMATS.map((f) => (
@@ -427,14 +431,15 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
                   {Array.from({ length: draftLeads(f.id) }, (_, i) => (
                     <span key={`a${i}`} className="draft-format-ball draft-format-ball-you" />
                   ))}
-                  <span className="draft-format-vs">vs</span>
+                  <span className="draft-format-vs">VS</span>
                   {Array.from({ length: draftLeads(f.id) }, (_, i) => (
                     <span key={`b${i}`} className="draft-format-ball" />
                   ))}
                 </span>
                 <strong>{f.label}</strong>
                 <span className="draft-format-sub">
-                  Bring {draftBring(f.id)} of {DRAFT_ROUNDS} · {f.id === 'singles' ? 'Gen 9 Ubers-ZU sets' : 'Doubles OU sets'}
+                  {t('draft.bringOf', { n: draftBring(f.id), of: DRAFT_ROUNDS })} ·{' '}
+                  {f.id === 'singles' ? t('draft.singlesSets') : t('draft.doublesSets')}
                 </span>
               </button>
             ))}
@@ -444,7 +449,7 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
             <button
               className="run-start-button draft-start-button"
               disabled={disabled || !canAfford}
-              title={canAfford ? undefined : 'Not enough coins - buy some at the Coin Shop'}
+              title={canAfford ? undefined : t('draft.noCoins')}
               onClick={() =>
                 void act(async () => {
                   setDraft(await window.api.startDraft(format))
@@ -454,18 +459,18 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
                 })
               }
             >
-              Start {format} draft · <CoinIcon /> {fee.toLocaleString('en-US')}
+              {t('draft.start', { format: formatLabel(format).toLowerCase() })} <CoinIcon /> {fee.toLocaleString(numberLocale())}
             </button>
             {coins !== null && (
               <span className={`draft-balance${canAfford ? '' : ' draft-balance-short'}`}>
-                <CoinIcon /> {coins.toLocaleString('en-US')}
+                <CoinIcon /> {coins.toLocaleString(numberLocale())}
               </span>
             )}
           </div>
           {draft && (
             <p className={`run-result ${draft.wins > 0 ? 'run-result-won' : 'run-result-lost'}`}>
-              Last draft ({formatLabel(draft.format).toLowerCase()}): {draft.wins}-{draft.losses}
-              {draft.reward > 0 ? ` · +${draft.reward.toLocaleString('en-US')} coins` : ''}
+              {t('draft.last', { format: formatLabel(draft.format).toLowerCase(), wins: draft.wins, losses: draft.losses })}
+              {draft.reward > 0 ? t('draft.lastCoins', { n: draft.reward }) : ''}
             </p>
           )}
           {error && <p className="editor-error">{error}</p>}
@@ -473,51 +478,51 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
 
         <div className="draft-home-side">
           <div className="draft-home-card">
-            <h3>How it works</h3>
+            <h3>{t('draft.how')}</h3>
             {format === 'chaos' ? (
               <ul className="draft-rules">
                 <li>
                   <span className="draft-rule-icon">1</span>
-                  Draft 2, take 1 of {CHAOS_OFFER_SIZE} random modifiers, then battle a hard trainer with as many Pokémon as you
+                  {t('draft.chaosRule1', { n: CHAOS_OFFER_SIZE })}
                 </li>
                 <li>
                   <span className="draft-rule-icon">2</span>
-                  A modifier after every battle, win or lose - with 2 more picks before it every other battle until the team is full
+                  {t('draft.chaosRule2')}
                 </li>
                 <li>
                   <span className="draft-rule-icon">3</span>
-                  Each Pokémon takes {CHAOS_MON_MODIFIER_CAP} modifiers at most - plus one free item swap every round
+                  {t('draft.chaosRule3', { n: CHAOS_MON_MODIFIER_CAP })}
                 </li>
                 <li>
                   <span className="draft-rule-icon">4</span>
-                  Ends at {DRAFT_MAX_WINS} wins or {DRAFT_MAX_LOSSES} losses
+                  {t('draft.endsAt', { wins: DRAFT_MAX_WINS, losses: DRAFT_MAX_LOSSES })}
                 </li>
               </ul>
             ) : (
             <ul className="draft-rules">
               <li>
                 <span className="draft-rule-icon">1</span>
-                Pick 1 of {DRAFT_PACK_SIZE}, {DRAFT_ROUNDS} times - Smogon sets with items, Lv {DRAFT_LEVEL}
+                {t('draft.rule1', { pack: DRAFT_PACK_SIZE, rounds: DRAFT_ROUNDS, level: DRAFT_LEVEL })}
               </li>
               <li>
                 <span className="draft-rule-icon">2</span>
-                See their whole team, bring {draftBring(format)} ({leadText(format)})
+                {t('draft.rule2', { n: draftBring(format), leads: leadText(format) })}
               </li>
               <li>
                 <span className="draft-rule-icon">3</span>
-                Fully healed before every battle
+                {t('draft.rule3')}
               </li>
               <li>
                 <span className="draft-rule-icon">4</span>
-                Ends at {DRAFT_MAX_WINS} wins or {DRAFT_MAX_LOSSES} losses
+                {t('draft.endsAt', { wins: DRAFT_MAX_WINS, losses: DRAFT_MAX_LOSSES })}
               </li>
             </ul>
             )}
           </div>
           <div className="draft-home-card">
-            <h3>Rewards</h3>
+            <h3>{t('draft.rewards')}</h3>
             {/* Coins by wins, as bars - the perfect run in gold. */}
-            <div className="draft-reward-ladder" title="Coins paid when the draft ends, by wins">
+            <div className="draft-reward-ladder" title={t('draft.ladderTip')}>
               {DRAFT_REWARDS.map((reward, wins) => (
                 <div
                   key={wins}
@@ -529,7 +534,7 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
                   <span className="draft-reward-track">
                     <span className="draft-reward-bar" style={{ height: `${Math.max(4, (reward / topReward) * 100)}%` }} />
                   </span>
-                  <span className="draft-reward-wins">{wins}W</span>
+                  <span className="draft-reward-wins">{t('draft.winsShort', { n: wins })}</span>
                 </div>
               ))}
             </div>
@@ -538,12 +543,12 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
               <div className={`draft-daily-win${dailyWinClaimed ? ' draft-daily-win-claimed' : ''}`}>
                 <ItemSprite spritenum={SHINY_PATCH_SPRITENUM} className="draft-daily-win-icon" />
                 <span className="draft-daily-win-text">
-                  <span className="draft-daily-win-name">Daily reward: Shiny Patch</span>
+                  <span className="draft-daily-win-name">{t('draft.dailyReward')}</span>
                   <span className="draft-daily-win-note">
-                    {dailyWinClaimed ? 'Claimed today - back tomorrow' : `For your first ${DRAFT_MAX_WINS}-win gauntlet today`}
+                    {dailyWinClaimed ? t('draft.claimedToday') : t('draft.firstGauntlet', { n: DRAFT_MAX_WINS })}
                   </span>
                 </span>
-                {dailyWinClaimed && <span className="draft-daily-win-check">✓ Claimed</span>}
+                {dailyWinClaimed && <span className="draft-daily-win-check">{t('draft.claimed')}</span>}
               </div>
             )}
           </div>
@@ -573,13 +578,18 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
       }}
       onMouseLeave={() => setConfirmingAbandon(false)}
     >
-      {confirmingAbandon ? `${online ? 'Leave' : 'Abandon'}? ${CLICK} again` : online ? 'Leave match' : 'Abandon draft'}
+      {confirmingAbandon
+        ? t(online ? 'draft.leaveConfirm' : 'draft.abandonConfirm', { click: clickWord() })
+        : online
+          ? t('draft.leave')
+          : t('draft.abandon')}
     </button>
   )
   // Online: whether the friend is done picking for the next battle.
   const friendReady = online && draft.opponent ? (
-    <span className="draft-tier-chip online-draft-ready">{online.friendName} is ready</span>
+    <span className="draft-tier-chip online-draft-ready">{t('draft.friendReady', { name: online.friendName })}</span>
   ) : null
+  const vsFriend = online ? t('draft.vs', { name: online.friendName }) : ''
 
   // ---- Drafting: one from the pack ----
   if (draft.status === 'drafting') {
@@ -587,8 +597,8 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
       <div className="run-panel draft-panel">
         <div className="run-status-row">
           <span>
-            {formatLabel(draft.format)} draft{online ? ` vs ${online.friendName}` : ''} · Pick <strong>{draft.round}</strong> of{' '}
-            {draft.pickTarget ?? DRAFT_ROUNDS}
+            {t('draft.picking', { format: formatLabel(draft.format), vs: vsFriend })} <strong>{draft.round}</strong>{' '}
+            {t('draft.of')} {draft.pickTarget ?? DRAFT_ROUNDS}
           </span>
           {friendReady}
           <TierChips tiers={draft.tiers} />
@@ -598,14 +608,14 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
             <button
               className="run-forfeit-button draft-reroll-button"
               disabled={disabled || !draft.canReroll}
-              title={draft.canReroll ? 'Swap this pack for a new one - once per draft phase' : 'Already rerolled this draft phase'}
+              title={draft.canReroll ? t('draft.rerollTip') : t('draft.rerolledTip')}
               onClick={() =>
                 void act(async () => {
                   setDraft(await draftApi.reroll())
                 })
               }
             >
-              {draft.canReroll ? 'Reroll pack' : 'Rerolled'}
+              {draft.canReroll ? t('draft.rerollPack') : t('draft.rerolled')}
             </button>
           )}
           {abandonButton}
@@ -647,21 +657,21 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
   const recordPips = online ? (
     <>
       {/* First to ONLINE_CHAOS_WINS, over ONLINE_CHAOS_BATTLES battles at most. */}
-      <span className="draft-record" title={`First to ${ONLINE_CHAOS_WINS} wins - ${ONLINE_CHAOS_BATTLES} battles at most`}>
-        You <Pips count={draft.wins} max={ONLINE_CHAOS_WINS} kind="win" />
+      <span className="draft-record" title={t('draft.firstTo', { wins: ONLINE_CHAOS_WINS, battles: ONLINE_CHAOS_BATTLES })}>
+        {t('draft.you')} <Pips count={draft.wins} max={ONLINE_CHAOS_WINS} kind="win" />
       </span>
       <span className="draft-record">
         {online.friendName} <Pips count={draft.losses} max={ONLINE_CHAOS_WINS} kind="loss" />
       </span>
-      {(draft.ties ?? 0) > 0 && <span className="draft-record">Ties {draft.ties}</span>}
+      {(draft.ties ?? 0) > 0 && <span className="draft-record">{t('draft.tiesCount', { n: draft.ties ?? 0 })}</span>}
     </>
   ) : (
     <>
       <span className="draft-record">
-        Wins <Pips count={draft.wins} max={DRAFT_MAX_WINS} kind="win" />
+        {t('draft.wins')} <Pips count={draft.wins} max={DRAFT_MAX_WINS} kind="win" />
       </span>
       <span className="draft-record">
-        Losses <Pips count={draft.losses} max={DRAFT_MAX_LOSSES} kind="loss" />
+        {t('draft.losses')} <Pips count={draft.losses} max={DRAFT_MAX_LOSSES} kind="loss" />
       </span>
     </>
   )
@@ -677,29 +687,30 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
     // What the chosen modifier (or the item swap) still needs, or null once it can be done.
     const missing = swapping
       ? !mon
-        ? 'Pick a Pokémon'
+        ? t('draft.pickMon')
         : !modifierItem
-          ? 'Pick an item'
+          ? t('draft.pickItem')
           : null
       : !chosen
-        ? 'Pick a modifier'
+        ? t('draft.pickModifier')
         : !needsMon
           ? null
           : !mon
-            ? 'Pick a Pokémon'
+            ? t('draft.pickMon')
             : chosen.kind === 'ability' && !modifierAbility
-              ? 'Pick an ability'
+              ? t('draft.pickAbility')
               : chosen.kind === 'stat' && !modifierStat
-                ? 'Pick a stat'
+                ? t('draft.pickStat')
                 : chosen.kind === 'tutor' && (tutorSlot === null || !tutorMove)
                   ? tutorSlot === null
-                    ? 'Pick a move to forget'
-                    : 'Pick a move to learn'
+                    ? t('draft.pickForget')
+                    : t('draft.pickLearn')
                   : null
-    const filter = listFilter.trim().toLowerCase()
-    // The searchable list for an Ability, item or move.
+    const filter = listFilter.trim()
+    // The searchable list for an Ability, item or move (names shown in the player's
+    // language, found by either).
     const searchList = (
-      entries: { id: string; name: string; description: string; spritenum?: number }[],
+      entries: { id: string; name: string; shown: string; description: string; spritenum?: number }[],
       value: string | null,
       onPick: (id: string) => void,
       placeholder: string
@@ -708,7 +719,7 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
         <input className="draft-ability-filter" placeholder={placeholder} value={listFilter} onChange={(e) => setListFilter(e.target.value)} />
         <div className="draft-ability-list">
           {entries
-            .filter((e) => !filter || e.name.toLowerCase().includes(filter))
+            .filter((e) => !filter || nameMatches(filter, e.name, e.shown))
             .map((e) => (
               <button
                 key={e.id}
@@ -719,7 +730,7 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
               >
                 <strong>
                   {e.spritenum !== undefined && <ItemSprite spritenum={e.spritenum} />}
-                  {e.name}
+                  {e.shown}
                 </strong>
                 <span>{e.description}</span>
               </button>
@@ -734,7 +745,7 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
     return (
       <div className="run-panel draft-panel">
         <div className="run-status-row">
-          <span>Chaos{online ? ` vs ${online.friendName}` : ''} · Pick a modifier</span>
+          <span>{t('draft.chaosPickModifier', { vs: vsFriend })}</span>
           {friendReady}
           <TierChips tiers={draft.tiers} />
           <ChaosFieldChips field={draft.chaosField} />
@@ -742,28 +753,26 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
           <button
             className="run-forfeit-button draft-reroll-button"
             disabled={disabled || !draft.canReroll}
-            title={draft.canReroll ? 'Swap these modifiers for new ones - once per modifier step' : 'Already rerolled these modifiers'}
+            title={draft.canReroll ? t('draft.rerollModsTip') : t('draft.rerolledModsTip')}
             onClick={() =>
               void act(async () => {
                 setDraft(await window.api.rerollDraftPack())
               })
             }
           >
-            {draft.canReroll ? 'Reroll modifiers' : 'Rerolled'}
+            {draft.canReroll ? t('draft.rerollMods') : t('draft.rerolled')}
           </button>
           {recordPips}
           {abandonButton}
         </div>
         <div className="draft-modifier-head">
-          <span className="draft-modifier-heading">
-            Take 1 of {offer.length}
-          </span>
+          <span className="draft-modifier-heading">{t('draft.takeOf', { n: offer.length })}</span>
           {/* The free item swap, once a round - not a modifier, so it doesn't count toward the cap. */}
           <button
             type="button"
             className={`draft-item-swap${swapping ? ' draft-item-swap-on' : ''}`}
             disabled={disabled || !draft.canSwapItem}
-            title={draft.canSwapItem ? 'Give one of your Pokémon any held item - free, once per round' : 'Already swapped an item this round'}
+            title={draft.canSwapItem ? t('draft.swapTip') : t('draft.swappedTip')}
             onClick={() => {
               setSwapping(!swapping)
               setModifierIndex(null)
@@ -775,8 +784,8 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
               ◈
             </span>
             <span className="draft-item-swap-text">
-              <strong>Item swap</strong>
-              <span>{draft.canSwapItem ? (swapping ? 'Cancel' : '1 free this round') : 'Used this round'}</span>
+              <strong>{t('draft.itemSwap')}</strong>
+              <span>{draft.canSwapItem ? (swapping ? t('common.cancel') : t('draft.freeRound')) : t('draft.usedRound')}</span>
             </span>
           </button>
         </div>
@@ -798,13 +807,15 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
                   resetModifierChoices()
                 }}
               >
-                <span className="draft-modifier-card-group">{group}</span>
+                <span className="draft-modifier-card-group">{t(group)}</span>
                 <span className="draft-modifier-icon" aria-hidden="true">
                   {text.icon}
                 </span>
                 <strong className="draft-modifier-card-title">{text.title}</strong>
                 <span className="draft-modifier-card-text">{text.text}</span>
-                {pinned !== undefined && draft.picks[pinned] && <span className="draft-modifier-pin">Only for {draft.picks[pinned].species}</span>}
+                {pinned !== undefined && draft.picks[pinned] && (
+                  <span className="draft-modifier-pin">{t('draft.onlyFor', { name: draft.picks[pinned].species })}</span>
+                )}
               </button>
             )
           })}
@@ -812,12 +823,12 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
         {/* The whole team is always on show - clickable when a Pokemon modifier or the item swap needs one. */}
         <p className="box-empty-hint">
           {swapping
-            ? 'Which Pokémon gets a new item?'
+            ? t('draft.whichItem')
             : !needsMon
-              ? 'Your team'
+              ? t('draft.yourTeam')
               : pin !== undefined
-                ? `Only for ${draft.picks[pin]?.species ?? 'one Pokémon'}`
-                : `Which Pokémon? Each takes ${CHAOS_MON_MODIFIER_CAP} Pokémon modifiers at most`}
+                ? t('draft.onlyFor', { name: draft.picks[pin]?.species ?? t('draft.onePokemon') })
+                : t('draft.whichMon', { n: CHAOS_MON_MODIFIER_CAP })}
         </p>
         <div className="draft-team-row">
           {draft.picks.map((pick, i) => {
@@ -828,7 +839,7 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
                 type="button"
                 className={`draft-bring-button${modifierMon === i ? ' draft-bring-chosen' : ''}`}
                 disabled={disabled || (pin !== undefined && pin !== i) || full}
-                title={full ? `Already has ${CHAOS_MON_MODIFIER_CAP} modifiers` : undefined}
+                title={full ? t('draft.alreadyHas', { n: CHAOS_MON_MODIFIER_CAP }) : undefined}
                 onClick={() => {
                   setModifierMon(i)
                   resetModifierChoices()
@@ -836,7 +847,9 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
               >
                 <DraftMonIcon mon={pick} />
                 {modifierMon === i && (
-                  <span className="draft-bring-order draft-bring-lead">{swapping ? pick.item || 'No item' : pick.ability}</span>
+                  <span className="draft-bring-order draft-bring-lead">
+                    {swapping ? (pick.item ? itemName(pick.item) : t('draft.noItem')) : abilityName(pick.ability ?? '')}
+                  </span>
                 )}
               </button>
             ) : (
@@ -861,12 +874,26 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
             ))}
           </div>
         )}
-        {chosen?.kind === 'ability' && mon && searchList(chaosAbilities, modifierAbility, setModifierAbility, 'Search abilities...')}
-        {swapping && mon && searchList(chaosItems, modifierItem, setModifierItem, 'Search items...')}
+        {chosen?.kind === 'ability' &&
+          mon &&
+          searchList(
+            chaosAbilities.map((a) => ({ ...a, shown: abilityName(a.name), description: abilityText(a.id, a.description) })),
+            modifierAbility,
+            setModifierAbility,
+            t('draft.searchAbilities')
+          )}
+        {swapping &&
+          mon &&
+          searchList(
+            chaosItems.map((i) => ({ ...i, shown: itemName(i.name), description: itemText(i.id, i.description) })),
+            modifierItem,
+            setModifierItem,
+            t('draft.searchItems')
+          )}
         {chosen?.kind === 'tutor' && mon && (
           <div className="draft-tutor">
             <div className="trainer-chips draft-modifier-choices">
-              <span className="draft-modifier-group-label">Forget</span>
+              <span className="draft-modifier-group-label">{t('draft.forget')}</span>
               {mon.moveList.map((move, slot) => (
                 <button
                   key={slot}
@@ -875,16 +902,21 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
                   disabled={disabled}
                   onClick={() => setTutorSlot(slot)}
                 >
-                  {move.name}
+                  {moveName(move.name)}
                 </button>
               ))}
             </div>
-            <span className="draft-modifier-group-label">Learn</span>
+            <span className="draft-modifier-group-label">{t('draft.learn')}</span>
             {searchList(
-              tutorMoves.map((move) => ({ id: move.id, name: move.name, description: `${move.type} · ${move.category} - ${move.description}` })),
+              tutorMoves.map((move) => ({
+                id: move.id,
+                name: move.name,
+                shown: moveName(move.name),
+                description: `${typeName(move.type)} · ${categoryName(move.category)} - ${moveText(move.id, move.description)}`
+              })),
               tutorMove,
               setTutorMove,
-              'Search moves...'
+              t('draft.searchMoves')
             )}
           </div>
         )}
@@ -917,7 +949,7 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
             })
           }
         >
-          {missing ?? (swapping ? 'Swap item' : 'Take it')}
+          {missing ?? (swapping ? t('draft.swapItem') : t('draft.takeIt'))}
         </button>
         {error && <p className="editor-error">{error}</p>}
       </div>
@@ -935,7 +967,7 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
     return (
       <div className="run-panel draft-panel">
         <div className="run-status-row">
-          <span>Chaos vs {online.friendName}</span>
+          <span>{t('draft.chaosVs', { name: online.friendName })}</span>
           <TierChips tiers={draft.tiers} />
           <ChaosFieldChips field={draft.chaosField} />
           {recordPips}
@@ -943,9 +975,9 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
         </div>
         <div className="online-draft-standby">
           <span className="online-draft-spinner" aria-hidden="true" />
-          <span>Waiting for {online.friendName} to pick their Pokémon and modifier...</span>
+          <span>{t('draft.waitingFriend', { name: online.friendName })}</span>
         </div>
-        <p className="box-empty-hint">Your team</p>
+        <p className="box-empty-hint">{t('draft.yourTeam')}</p>
         <div className="draft-team-row">
           {draft.picks.map((mon, i) => (
             <div key={i}>
@@ -974,13 +1006,13 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
           <img data-reveal="trainer" className="draft-opponent-sprite" src={trainerSpriteUrl(opponent.spriteId)} alt="" />
           <div className="draft-opponent-side">
             <span className="draft-opponent-name">
-              Battle {battleNumber}: <strong>{opponent.name}</strong>
+              {t('draft.battleN', { n: battleNumber })} <strong>{opponent.name}</strong>
               <span className="box-empty-hint">
                 {online
-                  ? ` - bringing all ${opponent.team.length}`
+                  ? t('draft.bringingAll', { n: opponent.team.length })
                   : draft.format === 'chaos'
-                    ? ` - a hard trainer, bringing all ${bringCount}`
-                    : ` - brings ${bringCount} of these`}
+                    ? t('draft.hardTrainer', { n: bringCount })
+                    : t('draft.bringsOf', { n: bringCount })}
               </span>
               <ChaosFieldChips field={opponent.chaosField} />
             </span>
@@ -998,10 +1030,12 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
         {online
           ? online.leadPicked
             ? ''
-            : `All ${bringCount} go in - ${CLICK_LC} one to lead.${online.friendLeadPicked ? ` ${online.friendName} has picked their lead.` : ''}`
+            : `${t('draft.allGoOnline', { n: bringCount, click: clickWordLc() })}${
+                online.friendLeadPicked ? t('draft.friendLeadPicked', { name: online.friendName }) : ''
+              }`
           : draft.format === 'chaos'
-          ? `All ${bringCount} go in - ${CLICK_LC} one to lead and start the battle.`
-          : `Pick ${bringCount} to bring, in order - ${leadText(draft.format)}.`}
+          ? t('draft.allGoChaos', { n: bringCount, click: clickWordLc() })
+          : t('draft.pickBring', { n: bringCount, leads: leadText(draft.format) })}
       </p>
       <div className="draft-team-row">
         {draft.picks.map((mon, i) => {
@@ -1014,7 +1048,7 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
                 type="button"
                 className="draft-bring-button draft-chaos-lead-button"
                 disabled={disabled || !!online?.leadPicked || (!online && battleLocked)}
-                title={!online && battleLocked ? 'Leave the online room first' : undefined}
+                title={!online && battleLocked ? t('draft.leaveRoom') : undefined}
                 onClick={() => {
                   const order = [i, ...draft.picks.map((_, j) => j).filter((j) => j !== i)]
                   // Online: the lead goes to the room; the battle starts once both have picked.
@@ -1044,7 +1078,7 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
               <DraftMonIcon mon={mon} />
               {order >= 0 && (
                 <span className={`draft-bring-order${order < leads ? ' draft-bring-lead' : ''}`}>
-                  {order < leads ? (leads === 1 ? 'Lead' : `Lead ${order + 1}`) : `#${order + 1}`}
+                  {order < leads ? (leads === 1 ? t('draft.lead') : t('draft.leadN', { n: order + 1 })) : `#${order + 1}`}
                 </span>
               )}
             </button>
@@ -1055,7 +1089,7 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
         <div className="online-draft-standby">
           <span className="online-draft-spinner" aria-hidden="true" />
           <span>
-            {online.friendLeadPicked ? 'Starting the battle...' : `Lead picked - waiting for ${online.friendName} to pick theirs...`}
+            {online.friendLeadPicked ? t('draft.starting') : t('draft.leadPicked', { name: online.friendName })}
           </span>
         </div>
       )}
@@ -1063,14 +1097,14 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
         <button
           className="run-start-button draft-start-button"
           disabled={disabled || validBring.length !== bringCount || battleLocked}
-          title={battleLocked ? 'Leave the online room first' : undefined}
+          title={battleLocked ? t('draft.leaveRoom') : undefined}
           onClick={() =>
             void act(async () => {
               await onBattle(await window.api.startDraftBattle(validBring))
             })
           }
         >
-          {validBring.length === bringCount ? 'Battle!' : `Pick ${bringCount - validBring.length} more`}
+          {validBring.length === bringCount ? t('draft.battle') : t('draft.pickMore', { n: bringCount - validBring.length })}
         </button>
       )}
       {error && <p className="editor-error">{error}</p>}

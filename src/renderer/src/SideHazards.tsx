@@ -1,4 +1,5 @@
 import type { FieldEffectView } from '../../shared/battle-types'
+import { moveName, t } from './i18n'
 
 interface Props {
   hazards: FieldEffectView[]
@@ -48,6 +49,12 @@ const LABELS: Record<string, string> = {
   stickyweb: 'Sticky Web'
 }
 
+// A hazard's name (they're named after their moves), with its layers.
+function hazardTitle(hazard: FieldEffectView): string {
+  const name = moveName(LABELS[hazard.id] ?? hazard.name)
+  return hazard.layers != null ? t('field.layers', { name, count: hazard.layers }) : name
+}
+
 // Entry hazards on one side of the field, drawn on the ground at that side's
 // Pokemon (semi-transparent, over its sprite).
 function SideHazards({ hazards }: Props): React.JSX.Element | null {
@@ -67,7 +74,7 @@ function SideHazards({ hazards }: Props): React.JSX.Element | null {
           src={`./battle/fx/${piece.image}.png`}
           alt=""
           draggable={false}
-          title={`${LABELS[hazard.id] ?? hazard.name}${hazard.layers != null ? ` (${hazard.layers} layer${hazard.layers === 1 ? '' : 's'})` : ''}`}
+          title={hazardTitle(hazard)}
           style={{
             left: `calc(50% + ${piece.dx}px)`,
             bottom: piece.bottom,

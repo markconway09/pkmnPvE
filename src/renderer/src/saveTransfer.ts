@@ -1,4 +1,5 @@
 import { Peer, type DataConnection } from 'peerjs'
+import { t } from './i18n'
 import { ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH } from '../../shared/online'
 
 // Sending a save straight to another device by a room code (Options → Saves). The sending
@@ -47,11 +48,11 @@ export function cleanCode(raw: string): string | null {
 
 // Turns PeerJS's errors into something a player can act on.
 function peerErrorText(type: string, fallback: string): string {
-  if (type === 'peer-unavailable') return 'No device is sending with that code - check it and try again'
+  if (type === 'peer-unavailable') return t('transfer.noSender')
   if (type === 'network' || type === 'server-error' || type === 'socket-error' || type === 'socket-closed') {
-    return "Couldn't reach the connection server - check your internet connection"
+    return t('transfer.noServer')
   }
-  if (type === 'browser-incompatible') return "Sending saves isn't supported here"
+  if (type === 'browser-incompatible') return t('transfer.unsupported')
   return fallback
 }
 
@@ -68,7 +69,7 @@ export async function previewSave(data: Uint8Array): Promise<SavePreview> {
     exportedAt?: string
     files?: Record<string, string>
   }
-  if (bundle.format !== 'pkmnpve-save' || !bundle.files?.['box.json']) throw new Error("That isn't a pkmnPvE save")
+  if (bundle.format !== 'pkmnpve-save' || !bundle.files?.['box.json']) throw new Error(t('transfer.notASave'))
   const json = (name: string): Record<string, unknown> | null => {
     try {
       const binary = atob(bundle.files![name])
@@ -229,7 +230,7 @@ export function startReceiving(code: string, handlers: ReceiveHandlers): Receive
   const timer = setTimeout(
     () =>
       fail(
-        "Couldn't connect to the other device - check the code and try again. If it still fails, one of the networks may be blocking direct connections (common on school, work and some mobile networks): put both devices on the same home Wi-Fi, or use Save file instead."
+        t('transfer.cantConnect')
       ),
     CONNECT_TIMEOUT_MS
   )
@@ -240,7 +241,7 @@ export function startReceiving(code: string, handlers: ReceiveHandlers): Receive
     connection.on('data', async (raw) => {
       const message = raw as TransferMessage
       if (message?.type === 'busy') {
-        fail('That device is already sending to someone else')
+        fail(t('transfer.busy'))
         return
       }
       if (message?.type !== 'save') return
@@ -252,8 +253,8 @@ export function startReceiving(code: string, handlers: ReceiveHandlers): Receive
         fail(e instanceof Error ? e.message : String(e))
       }
     })
-    connection.on('close', () => fail('The other device closed the connection'))
-    connection.on('error', () => fail('Lost the connection to the other device'))
+    connection.on('close', () => fail(t('transfer.closed')))
+    connection.on('error', () => fail(t('transfer.lost')))
   })
   peer.on('error', (error) => fail(peerErrorText(error.type, error.message)))
 

@@ -44,6 +44,7 @@ import {
   WALKING_DISC_NEW_TM_CHANCE,
   WALKING_DISC_PAYOUT_MULTIPLIER
 } from '../../shared/titles'
+import { moveName, t } from '../i18n'
 
 /**
  * The player's TMs (see shared/tms.ts), kept per player in tms.json: the ones owned, the
@@ -319,7 +320,7 @@ function pickTm(location: WildLocationId, tier: RarityTier): TmInfo {
       return picked
     }
   }
-  throw new Error('That area has no TMs')
+  throw new Error(t('err.thatAreaHasNoTms'))
 }
 
 // Into the player's TMs - or, if they already have it, its worth in Poke Dollars.
@@ -341,11 +342,11 @@ function grantTm(tm: TmInfo, upgraded: boolean): TmFind {
  */
 export function startTmSearch(location: WildLocationId, labOpen: boolean): TmSearchStart {
   const config = WILD_LOCATIONS.find((l) => l.id === location)
-  if (!config) throw new Error('There is no such area')
-  if (config.requiresAllBosses && !labOpen) throw new Error(`${config.label} opens once every boss is beaten`)
+  if (!config) throw new Error(t('err.thereIsNoSuchArea'))
+  if (config.requiresAllBosses && !labOpen) throw new Error(t('err.opensOnceEveryBossIsBeaten', { a: config.label }))
   const s = getState()
   const used = s.used[location] ?? 0
-  if (used >= TM_SEARCH_CHARGES_PER_DAY) throw new Error(`No searches left in ${config.label} today`)
+  if (used >= TM_SEARCH_CHARGES_PER_DAY) throw new Error(t('err.noSearchesLeftInToday', { a: config.label }))
   s.used[location] = used + 1
   persist()
   recordMission('tmSearches')
@@ -380,7 +381,7 @@ function settlePity(location: WildLocationId, tier: RarityTier | null): void {
  */
 export function reportTmSearchCheck(result: SkillCheckResult, timedOut = false): TmSearchProgress {
   const active = search
-  if (!active) throw new Error('There is no search going on')
+  if (!active) throw new Error(t('err.thereIsNoSearchGoingOn'))
   recordSkillCheck(result, timedOut)
   if (result === 'miss') {
     // AFK: a miss still makes noise, but loses no ground.
@@ -459,7 +460,7 @@ export function armTmQuickCheck(location: WildLocationId): boolean {
 /** The quick check after a wild win: a Good or a Great has its TM_QUICK_CHECK_CHANCE to turn up a TM from the area. */
 export function takeTmQuickCheck(result: SkillCheckResult, timedOut = false): TmQuickCheckResult {
   const location = quickCheckLocation
-  if (!location) throw new Error('There is nothing to search for here')
+  if (!location) throw new Error(t('err.thereIsNothingToSearchFor'))
   quickCheckLocation = null
   recordSkillCheck(result, timedOut)
   // Unstoppable doubles the chance.
@@ -518,10 +519,10 @@ export function getTmShop(): TmShopView {
 /** Buys one of today's Coin Shop TMs. */
 export function buyTmFromShop(moveId: string): { coins: number; shop: TmShopView } {
   const tm = todaysOffers().find((t) => t.moveId === moveId)
-  if (!tm) throw new Error("That TM isn't on sale today")
-  if (hasTm(moveId)) throw new Error(`You already have ${tm.name}`)
+  if (!tm) throw new Error(t('err.thatTmIsnTOnSale'))
+  if (hasTm(moveId)) throw new Error(t('err.youAlreadyHave', { a: moveName(tm.name) }))
   const price = TM_COIN_PRICES[tm.tier]
-  if (getCoins() < price) throw new Error(`That costs ${price.toLocaleString('en-US')} coins`)
+  if (getCoins() < price) throw new Error(t('err.thatCostsCoins', { a: price }))
   changeCoins(-price)
   grantTm(tm, false)
   return { coins: getCoins(), shop: getTmShop() }
@@ -529,8 +530,8 @@ export function buyTmFromShop(moveId: string): { coins: number; shop: TmShopView
 
 /** Buys the Scanner - a key item, kept for good: it opens the quick check after wild wins. */
 export function buyScanner(): { coins: number; shop: TmShopView } {
-  if (hasItem(SCANNER_ITEM_ID)) throw new Error('You already have the Scanner')
-  if (getCoins() < TM_SCANNER_COINS) throw new Error(`That costs ${TM_SCANNER_COINS.toLocaleString('en-US')} coins`)
+  if (hasItem(SCANNER_ITEM_ID)) throw new Error(t('err.youAlreadyHaveTheScanner'))
+  if (getCoins() < TM_SCANNER_COINS) throw new Error(t('err.thatCostsCoins', { a: TM_SCANNER_COINS }))
   changeCoins(-TM_SCANNER_COINS)
   addItem(SCANNER_ITEM_ID, 1)
   return { coins: getCoins(), shop: getTmShop() }

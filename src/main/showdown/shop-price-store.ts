@@ -1,5 +1,6 @@
 import { readText, writeText } from '../platform'
 import { savePathFor } from './save-paths'
+import { t } from '../i18n'
 
 // Shop prices an admin has changed, by item id. Shared by every player, like the trainers;
 // anything not listed keeps its default price (see getShopCatalog).
@@ -40,7 +41,7 @@ export function setShopPriceOverride(itemId: string, price: number | null): void
     delete getState()[itemId]
   } else {
     if (!Number.isInteger(price) || price < 0 || price > MAX_PRICE) {
-      throw new Error(`A price must be a whole number from 0 to ${MAX_PRICE}`)
+      throw new Error(t('err.aPriceMustBeAWhole', { a: MAX_PRICE }))
     }
     getState()[itemId] = price
   }

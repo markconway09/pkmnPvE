@@ -15,6 +15,7 @@ import SearchBar from './SearchBar'
 import ModalSpinner from './ModalSpinner'
 import { locationIconUrl } from './battleScenery'
 import { errorMessage } from './FloatingNotes'
+import { t } from './i18n'
 
 interface Props {
   // The wild level picked on the Battle page - the target only turns up once it's high enough.
@@ -80,12 +81,12 @@ function DexNavPanel({ wildLevel, disabled, labOpen, onHunt }: Props): React.JSX
       <div className="classic-section-head">
         <img className="classic-section-icon" src="./sprites/misc/dexnav.png" alt="" />
         <span className="run-hud-label">DexNav</span>
-        <span className="classic-section-sub">{state.diploma ? 'Hunt any Pokémon' : "Hunt a Pokémon you've registered"}</span>
+        <span className="classic-section-sub">{state.diploma ? t('dexnav.huntAny') : t('dexnav.huntRegistered')}</span>
       </div>
       <div className="dexnav-panel">
         {target ? (
           <>
-            <RarityCard tier={target.rarityTier} className="dexnav-target" title={`Hunting ${target.species}`}>
+            <RarityCard tier={target.rarityTier} className="dexnav-target" title={t('dexnav.hunting', { name: target.species })}>
               <RarityGlow size={56}>
                 <SpriteImage style="3d-static" className="dexnav-target-sprite" spriteId={toSpriteId(target.species)} alt={target.species} />
               </RarityGlow>
@@ -94,26 +95,23 @@ function DexNavPanel({ wildLevel, disabled, labOpen, onHunt }: Props): React.JSX
             <div className="dexnav-info">
               <div className="dexnav-chain-row">
                 <span className="dexnav-chain-label">
-                  Chain <strong>{state.chain}</strong>
+                  {t('dexnav.chain')} <strong>{state.chain}</strong>
                   {state.chain >= state.maxChain && <span className="dexnav-chain-max">MAX</span>}
                 </span>
-                <span className="dexnav-stat" title="How often it turns up in a wild battle where it lives">
-                  Appears <strong>{percent(dexNavChance(state.chain, state.maxChain))}</strong>
+                <span className="dexnav-stat" title={t('dexnav.appearsTip')}>
+                  {t('dexnav.appears')} <strong>{percent(dexNavChance(state.chain, state.maxChain))}</strong>
                 </span>
-                <span className="dexnav-stat" title="Its shiny odds, on top of every other boost">
-                  Shiny <strong>×{dexNavShinyMultiplier(state.chain, state.maxChain).toFixed(2)}</strong>
+                <span className="dexnav-stat" title={t('dexnav.shinyTip')}>
+                  {t('dexnav.shiny')} <strong>×{dexNavShinyMultiplier(state.chain, state.maxChain).toFixed(2)}</strong>
                 </span>
               </div>
-              <span
-                className="dexnav-chain-bar"
-                title={`Beat or catch it to grow the chain (up to ${state.maxChain}) - running from it or losing breaks it`}
-              >
+              <span className="dexnav-chain-bar" title={t('dexnav.chainTip', { max: state.maxChain })}>
                 <span style={{ width: `${(Math.min(state.chain, state.maxChain) / state.maxChain) * 100}%` }} />
               </span>
               {tooLow ? (
-                <span className="dexnav-warning">Turns up from wild level {target.minLevel} - raise the wild level to hunt it</span>
+                <span className="dexnav-warning">{t('dexnav.tooLow', { level: target.minLevel })}</span>
               ) : labLocked ? (
-                <span className="dexnav-warning">Only found in the Lab - it opens once every boss is beaten</span>
+                <span className="dexnav-warning">{t('dexnav.labOnly')}</span>
               ) : (
                 <div className="dexnav-areas">
                   {areas.map((loc) => (
@@ -121,11 +119,15 @@ function DexNavPanel({ wildLevel, disabled, labOpen, onHunt }: Props): React.JSX
                       key={loc.id}
                       className="dexnav-area"
                       disabled={disabled}
-                      title={`Battle in ${loc.id === 'all' ? 'any area' : loc.label} - ${percent(dexNavChance(state.chain, state.maxChain))} chance it's ${target.species}`}
+                      title={t('dexnav.battleIn', {
+                        area: loc.id === 'all' ? t('dexnav.anyArea') : loc.label,
+                        chance: percent(dexNavChance(state.chain, state.maxChain)),
+                        name: target.species
+                      })}
                       onClick={() => onHunt(loc.id)}
                     >
                       <img className="dexnav-area-icon" src={locationIconUrl(loc.id)} alt="" />
-                      {loc.id === 'all' ? 'Anywhere' : loc.label}
+                      {loc.id === 'all' ? t('location.anywhere') : loc.label}
                       <span className="dexnav-area-go">▸</span>
                     </button>
                   ))}
@@ -133,19 +135,19 @@ function DexNavPanel({ wildLevel, disabled, labOpen, onHunt }: Props): React.JSX
               )}
             </div>
             <div className="dexnav-actions">
-              <button className="dexnav-action dexnav-action-change" onClick={() => setPicking(true)} title="Hunt a different Pokémon">
+              <button className="dexnav-action dexnav-action-change" onClick={() => setPicking(true)} title={t('dexnav.changeTip')}>
                 <span className="dexnav-action-icon">
                   <svg viewBox="0 0 12 12" aria-hidden="true">
                     <path d="M2 4h7.5M7.5 2l2 2-2 2M10 8H2.5M4.5 6l-2 2 2 2" />
                   </svg>
                 </span>
-                Change
+                {t('dexnav.change')}
               </button>
               <button
                 className={`dexnav-action dexnav-action-stop${confirmStop ? ' dexnav-action-confirm' : ''}`}
                 onClick={stopHunting}
                 onMouseLeave={() => setConfirmStop(false)}
-                title={state.chain > 0 ? `Stop hunting - your chain of ${state.chain} is lost` : 'Stop hunting'}
+                title={state.chain > 0 ? t('dexnav.stopTipChain', { n: state.chain }) : t('dexnav.stopTip')}
               >
                 <span className="dexnav-action-icon">
                   <svg viewBox="0 0 12 12" aria-hidden="true">
@@ -156,14 +158,14 @@ function DexNavPanel({ wildLevel, disabled, labOpen, onHunt }: Props): React.JSX
                     )}
                   </svg>
                 </span>
-                {confirmStop ? 'Sure?' : 'Stop'}
+                {confirmStop ? t('dexnav.sure') : t('dexnav.stop')}
               </button>
             </div>
           </>
         ) : (
           <button className="dexnav-pick" onClick={() => setPicking(true)}>
             <img src="./sprites/misc/dexnav.png" alt="" />
-            Pick a Pokémon to hunt ▸
+            {t('dexnav.pick')}
           </button>
         )}
       </div>
@@ -212,9 +214,9 @@ function DexNavPicker({ current, chain, wildLevel, onPick, onClose }: PickerProp
         <div className="pokedex-header">
           <h2>DexNav</h2>
           <span className="dexnav-picker-note">
-            {current && chain > 0 ? `A new target starts over your chain of ${chain}` : 'Pick a Pokémon to hunt'}
+            {current && chain > 0 ? t('dexnav.newTarget', { n: chain }) : t('dexnav.pickNote')}
           </span>
-          <SearchBar className="pokedex-search" placeholder="Search name or number…" value={search} onChange={setSearch} autoFocus />
+          <SearchBar className="pokedex-search" placeholder={t('pokedex.search')} value={search} onChange={setSearch} autoFocus />
         </div>
         <div className="pokedex-grid">
           {!candidates && <ModalSpinner />}
@@ -227,10 +229,15 @@ function DexNavPicker({ current, chain, wildLevel, onPick, onClose }: PickerProp
                 lift
                 dimmed={c.minLevel > wildLevel}
                 className={`pokedex-cell dexnav-cell${c.species === current ? ' dexnav-cell-current' : ''}`}
-                title={`#${c.num} ${c.species}\nFound: ${areas.length ? areas.map((l) => l.label).join(', ') : 'Anywhere'}\nFrom wild level ${c.minLevel}`}
+                title={t('dexnav.cellTip', {
+                  num: c.num,
+                  name: c.species,
+                  where: areas.length ? areas.map((l) => l.label).join(', ') : t('location.anywhere'),
+                  level: c.minLevel
+                })}
                 onClick={() => onPick(c.species)}
               >
-                <span className="dexnav-cell-level">Lv {c.minLevel}+</span>
+                <span className="dexnav-cell-level">{t('dexnav.lv', { level: c.minLevel })}</span>
                 <RarityGlow size={56}>
                   <SpriteImage style="3d-static" className="pokedex-sprite" spriteId={toSpriteId(c.species)} alt={c.species} />
                 </RarityGlow>
@@ -244,14 +251,14 @@ function DexNavPicker({ current, chain, wildLevel, onPick, onClose }: PickerProp
             )
           })}
           {candidates && candidates.length === 0 && (
-            <p className="box-empty-hint">Register Pokémon found in the wild to hunt them here.</p>
+            <p className="box-empty-hint">{t('dexnav.none')}</p>
           )}
           {candidates && candidates.length > 0 && shown.length === 0 && (
-            <p className="box-empty-hint">No Pokémon match that search.</p>
+            <p className="box-empty-hint">{t('pokedex.noMatch')}</p>
           )}
         </div>
         <div className="editor-actions">
-          <button onClick={onClose}>Close</button>
+          <button onClick={onClose}>{t('common.close')}</button>
         </div>
       </div>
     </div>,

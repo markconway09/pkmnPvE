@@ -5,6 +5,7 @@ import { BLACKJACK_PAYOUT, BLACKJACK_WIN_PAYOUT, type GameCornerPerks } from '..
 import CoinIcon from './CoinIcon'
 import Tooltip from './Tooltip'
 import { IS_MOBILE_LAYOUT } from './platform'
+import { numberLocale, t } from './i18n'
 
 interface Props {
   // The bet as placed (already kept between 1 and max - see placedBet).
@@ -123,14 +124,14 @@ function BetSlider({ bet, max, disabled, step = 10, onChange, info }: Props): Re
   }, [disabled])
   const infoIcon = info && (
     <Tooltip className="game-corner-info" placement="above" content={<div className="tooltip-panel game-corner-info-panel">{info}</div>}>
-      <span className="game-corner-info-icon" aria-label="How to play">
+      <span className="game-corner-info-icon" aria-label={t('bet.howToPlay')}>
         i
       </span>
     </Tooltip>
   )
   const controls = (
     <>
-      <button className="slots-bet-step" title="Bet less" disabled={disabled || bet <= 1} onClick={() => onChange(lower)}>
+      <button className="slots-bet-step" title={t('bet.less')} disabled={disabled || bet <= 1} onClick={() => onChange(lower)}>
         −
       </button>
       <input
@@ -142,7 +143,7 @@ function BetSlider({ bet, max, disabled, step = 10, onChange, info }: Props): Re
         disabled={disabled}
         onChange={(e) => onChange(steps[Number(e.target.value)])}
       />
-      <button className="slots-bet-step" title="Bet more" disabled={disabled || bet >= max} onClick={() => onChange(higher)}>
+      <button className="slots-bet-step" title={t('bet.more')} disabled={disabled || bet >= max} onClick={() => onChange(higher)}>
         +
       </button>
     </>
@@ -151,10 +152,10 @@ function BetSlider({ bet, max, disabled, step = 10, onChange, info }: Props): Re
     return (
       <>
         {infoIcon}
-        <span className="slots-bet-label">Bet</span>
+        <span className="slots-bet-label">{t('bet.label')}</span>
         <button className="bet-open-button" disabled={disabled} onClick={() => setOpen(true)}>
           <CoinIcon />
-          {bet.toLocaleString('en-US')}
+          {bet.toLocaleString(numberLocale())}
           <span className="bet-open-caret">▾</span>
         </button>
         {open &&
@@ -167,25 +168,25 @@ function BetSlider({ bet, max, disabled, step = 10, onChange, info }: Props): Re
               }}
             >
               <div className="modal-panel bet-modal" onMouseDown={(e) => e.stopPropagation()}>
-                <h3 className="bet-modal-title">Your bet</h3>
+                <h3 className="bet-modal-title">{t('bet.yours')}</h3>
                 <div className="bet-modal-value">
                   <CoinIcon />
-                  {bet.toLocaleString('en-US')}
+                  {bet.toLocaleString(numberLocale())}
                 </div>
                 <div className="bet-modal-row">{controls}</div>
                 <div className="bet-modal-row">
                   <button className="bet-modal-quick" disabled={disabled} onClick={() => onChange(1)}>
-                    Min
+                    {t('bet.min')}
                   </button>
                   <button className="bet-modal-quick" disabled={disabled} onClick={() => onChange(Math.max(1, Math.floor(max / 2)))}>
-                    Half
+                    {t('bet.half')}
                   </button>
                   <button className="bet-modal-quick slots-bet-max" disabled={disabled} onClick={() => onChange(max)}>
-                    Max
+                    {t('bet.max')}
                   </button>
                 </div>
                 <button className="bet-modal-done" onClick={() => setOpen(false)}>
-                  Done
+                  {t('common.done')}
                 </button>
               </div>
             </div>,
@@ -197,9 +198,9 @@ function BetSlider({ bet, max, disabled, step = 10, onChange, info }: Props): Re
   return (
     <>
       {infoIcon}
-      <span className="slots-bet-label">Bet</span>
+      <span className="slots-bet-label">{t('bet.label')}</span>
       {controls}
-      <label className="slots-bet-value" title={`Type a bet (1 up to ${max.toLocaleString('en-US')})`}>
+      <label className="slots-bet-value" title={t('bet.typeTip', { max })}>
         <CoinIcon />
         <input
           className="slots-bet-input"
@@ -215,7 +216,7 @@ function BetSlider({ bet, max, disabled, step = 10, onChange, info }: Props): Re
         />
       </label>
       <button className="slots-bet-max" disabled={disabled} onClick={() => onChange(max)}>
-        Max
+        {t('bet.max')}
       </button>
     </>
   )

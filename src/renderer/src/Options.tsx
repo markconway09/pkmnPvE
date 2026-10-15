@@ -1,16 +1,16 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
-import { SPRITE_STYLES, SPRITE_STYLE_LABELS, spriteUrl, type SpriteStyle } from './spriteStyle'
+import { SPRITE_STYLES, spriteUrl, type SpriteStyle } from './spriteStyle'
 import UpdatesSection from './UpdatesSection'
 import BackgroundSection from './BackgroundSection'
 import SavesModal from './SavesModal'
 import SpriteCreditsModal from './SpriteCreditsModal'
 import WelcomeGuide from './WelcomeGuide'
-import { BUG_REPORT_URL, FAN_GAME_NOTICE } from '../../shared/about'
+import LanguagePicker from './LanguagePicker'
+import { BUG_REPORT_URL } from '../../shared/about'
 import { playSfx, setSfxOn, setSfxVolume, sfxLevel, sfxOn } from './sfx'
 import { cryOn, cryVolume, playCry, setCryOn, setCryVolume } from './cries'
 import {
-  MUSIC_SOURCE_LABELS,
   chooseMusicFolder,
   musicState,
   rescanMusicFolder,
@@ -23,9 +23,10 @@ import {
 } from './music'
 import TabStrip from './TabStrip'
 import { cornerSoundsOn, setCornerSoundsOn } from './ticks'
-import { ANIM_SPEEDS, ANIM_SPEED_LABELS, animSpeed, setAnimSpeed, type AnimSpeed } from './animSpeed'
+import { ANIM_SPEEDS, animSpeed, setAnimSpeed, type AnimSpeed } from './animSpeed'
 import { IS_MOBILE } from './platform'
-import { UI_SCALE_CHOICES, UI_SCALE_LABELS, type UiScaleState } from '../../shared/ui-scale'
+import { UI_SCALE_CHOICES, type UiScaleChoice, type UiScaleState } from '../../shared/ui-scale'
+import { useT, type Translate } from './i18n'
 
 interface Props {
   username: string
@@ -44,30 +45,24 @@ const MUSIC_SOURCES: MusicSource[] = IS_MOBILE ? ['freetouse', 'links'] : ['free
 
 /** Where the music comes from (see music.ts): Free To Use's lofi, the player's own links, or a folder. */
 function MusicSourceSettings(): React.JSX.Element {
+  const t = useT()
   const music = useSyncExternalStore(subscribeMusic, musicState)
   // The links being typed - only used once "Use these links" is pressed.
   const [draft, setDraft] = useState(music.links)
-  const count = `${music.trackCount} track${music.trackCount === 1 ? '' : 's'}`
+  const count = t('music.tracks', { count: music.trackCount })
 
   return (
     <div className="options-music-source">
       <TabStrip
         className="options-music-tabs"
-        tabs={MUSIC_SOURCES.map((id) => ({ id, label: MUSIC_SOURCE_LABELS[id] }))}
+        tabs={MUSIC_SOURCES.map((id) => ({ id, label: t(`music.source.${id}`) }))}
         current={music.source}
         onSwitch={setMusicSource}
       />
-      {music.source === 'freetouse' && (
-        <p className="editor-hint">
-          {count} of free lofi from freetouse.com, streamed - so no music while offline.
-        </p>
-      )}
+      {music.source === 'freetouse' && <p className="editor-hint">{t('music.freetouseHint', { tracks: count })}</p>}
       {music.source === 'links' && (
         <>
-          <p className="editor-hint">
-            One link per line: direct audio files (.mp3, .ogg...) or internet radio streams, played in
-            order. Pages like YouTube or Spotify won't work - the link has to be the audio itself.
-          </p>
+          <p className="editor-hint">{t('music.linksHint')}</p>
           <textarea
             className="options-music-links"
             rows={4}
@@ -78,7 +73,7 @@ function MusicSourceSettings(): React.JSX.Element {
           />
           <div className="options-music-row">
             <button disabled={draft === music.links} onClick={() => setMusicLinks(draft)}>
-              Use these links
+              {t('music.useLinks')}
             </button>
             <span className="editor-hint">{count}</span>
           </div>
@@ -86,24 +81,21 @@ function MusicSourceSettings(): React.JSX.Element {
       )}
       {music.source === 'folder' && (
         <>
-          <p className="editor-hint">
-            Plays the music files in a folder on this computer (and its subfolders), shuffled. Works
-            offline.
-          </p>
+          <p className="editor-hint">{t('music.folderHint')}</p>
           <div className="options-music-row">
-            <button onClick={() => void chooseMusicFolder()}>Choose folder…</button>
+            <button onClick={() => void chooseMusicFolder()}>{t('music.chooseFolder')}</button>
             {music.folder && (
               <button disabled={music.scanning} onClick={rescanMusicFolder}>
-                Look again
+                {t('music.lookAgain')}
               </button>
             )}
           </div>
           <p className="options-music-folder" title={music.folder}>
             {!music.folder
-              ? 'No folder chosen yet.'
+              ? t('music.noFolder')
               : music.scanning
-                ? `Looking through ${music.folder}…`
-                : `${music.folder} - ${music.trackCount ? count : 'no music files found'}`}
+                ? t('music.scanning', { folder: music.folder })
+                : `${music.folder} - ${music.trackCount ? count : t('music.noFiles')}`}
           </p>
         </>
       )}
@@ -111,8 +103,16 @@ function MusicSourceSettings(): React.JSX.Element {
   )
 }
 
+/** A screen size's tab: Auto and Mobile are words, the fixed sizes just their zoom. */
+function screenSizeLabel(choice: UiScaleChoice, t: Translate): string {
+  if (choice === 'auto') return t('screen.auto')
+  if (choice === 'mobile') return t('screen.mobile')
+  return `${choice}%`
+}
+
 /** Options → Screen size: Auto fits the game to the screen, or a fixed zoom. */
 function ScreenSizeSection(): React.JSX.Element {
+  const t = useT()
   const [state, setState] = useState<UiScaleState | null>(null)
 
   useEffect(() => {
@@ -121,12 +121,12 @@ function ScreenSizeSection(): React.JSX.Element {
 
   return (
     <section className="options-section">
-      <h2 className="options-heading">Screen size</h2>
+      <h2 className="options-heading">{t('screen.title')}</h2>
       {state && (
         <>
           <TabStrip
             className="options-scale-tabs"
-            tabs={UI_SCALE_CHOICES.map((id) => ({ id, label: UI_SCALE_LABELS[id] }))}
+            tabs={UI_SCALE_CHOICES.map((id) => ({ id, label: screenSizeLabel(id, t) }))}
             current={state.choice}
             onSwitch={(next) => {
               setState({ ...state, choice: next })
@@ -135,10 +135,10 @@ function ScreenSizeSection(): React.JSX.Element {
           />
           <p className="editor-hint">
             {state.choice === 'auto'
-              ? `Fits the game to this screen - ${Math.round(state.zoom * 100)}% here.`
+              ? t('screen.autoHint', { percent: Math.round(state.zoom * 100) })
               : state.choice === 'mobile'
-                ? 'The phone layout, in a phone-shaped window fitted to this screen. Switching reloads the game.'
-                : 'The game always draws at this size; the window is never bigger than the screen.'}
+                ? t('screen.mobileHint')
+                : t('screen.fixedHint')}
           </p>
         </>
       )}
@@ -148,13 +148,15 @@ function ScreenSizeSection(): React.JSX.Element {
 
 /** The on/off switch at the start of each sound row. */
 function SoundSwitch({ label, on, onToggle }: { label: string; on: boolean; onToggle: (on: boolean) => void }): React.JSX.Element {
+  const t = useT()
+  const name = label.toLowerCase()
   return (
     <button
       className={`options-sound-toggle${on ? ' options-sound-toggle-on' : ''}`}
       role="switch"
       aria-checked={on}
-      aria-label={`${label} sound`}
-      title={on ? `Turn ${label.toLowerCase()} off` : `Turn ${label.toLowerCase()} on`}
+      aria-label={t('sound.switch', { name: label })}
+      title={on ? t('sound.turnOff', { name }) : t('sound.turnOn', { name })}
       onClick={() => onToggle(!on)}
     >
       <span className="options-sound-toggle-knob" />
@@ -164,12 +166,13 @@ function SoundSwitch({ label, on, onToggle }: { label: string; on: boolean; onTo
 
 /** A sound row with just the switch: the Game Corner's sounds, which follow the Menus volume. */
 function SwitchRow({ label, on, onToggle }: { label: string; on: boolean; onToggle: (on: boolean) => void }): React.JSX.Element {
+  const t = useT()
   return (
     <>
       <SoundSwitch label={label} on={on} onToggle={onToggle} />
       <span className={`options-volume-label${on ? '' : ' options-volume-off'}`}>{label}</span>
       <span />
-      <span className={`options-volume-value${on ? '' : ' options-volume-off'}`}>{on ? 'On' : 'Off'}</span>
+      <span className={`options-volume-value${on ? '' : ' options-volume-off'}`}>{on ? t('common.on') : t('common.off')}</span>
     </>
   )
 }
@@ -190,10 +193,12 @@ function VolumeRow({
   onChange: (value: number) => void
   onRelease?: () => void
 }): React.JSX.Element {
+  const t = useT()
   // On the phone the slider is too small to drag: the volume shows on a button that opens
   // the slider in a small window (like the Game Corner's bet).
   const [open, setOpen] = useState(false)
-  const shown = !on ? 'Off' : value === 0 ? 'Muted' : `${value}%`
+  const shown = !on ? t('common.off') : value === 0 ? t('common.muted') : `${value}%`
+  const volumeLabel = t('sound.volume', { name: label })
   if (IS_MOBILE) {
     const nudge = (by: number): void => {
       onChange(Math.min(100, Math.max(0, value + by)))
@@ -218,7 +223,7 @@ function VolumeRow({
               }}
             >
               <div className="modal-panel bet-modal" onMouseDown={(e) => e.stopPropagation()}>
-                <h3 className="bet-modal-title">{label} volume</h3>
+                <h3 className="bet-modal-title">{volumeLabel}</h3>
                 <div className="bet-modal-value">{shown}</div>
                 <div className="bet-modal-row">
                   <button className="slots-bet-step" disabled={value <= 0} onClick={() => nudge(-5)}>
@@ -231,7 +236,7 @@ function VolumeRow({
                     max={100}
                     step={5}
                     value={value}
-                    aria-label={`${label} volume`}
+                    aria-label={volumeLabel}
                     onChange={(e) => onChange(Number(e.target.value))}
                     onPointerUp={onRelease}
                   />
@@ -240,7 +245,7 @@ function VolumeRow({
                   </button>
                 </div>
                 <button className="bet-modal-done" onClick={() => setOpen(false)}>
-                  Done
+                  {t('common.done')}
                 </button>
               </div>
             </div>,
@@ -260,7 +265,7 @@ function VolumeRow({
         step={5}
         value={value}
         disabled={!on}
-        aria-label={`${label} volume`}
+        aria-label={volumeLabel}
         onChange={(e) => onChange(Number(e.target.value))}
         onPointerUp={onRelease}
       />
@@ -278,6 +283,7 @@ function Options({
   onChangeBackground,
   onClose
 }: Props): React.JSX.Element {
+  const t = useT()
   const [loggingOut, setLoggingOut] = useState(false)
   const [savesOpen, setSavesOpen] = useState(false)
   const [creditsOpen, setCreditsOpen] = useState(false)
@@ -304,8 +310,8 @@ function Options({
     <div className="modal-overlay" onMouseDown={onClose}>
       <div className="modal-panel options-modal" onMouseDown={(e) => e.stopPropagation()}>
         <div className="options-modal-header">
-          <h2>Options</h2>
-          <button className="options-modal-close" data-sfx="close" title="Close (Esc)" onClick={onClose}>
+          <h2>{t('options.title')}</h2>
+          <button className="options-modal-close" data-sfx="close" title={t('options.closeEsc')} onClick={onClose}>
             ×
           </button>
         </div>
@@ -315,10 +321,16 @@ function Options({
           </section>
 
           <section className="options-section">
-            <h2 className="options-heading">Sound</h2>
+            <h2 className="options-heading">{t('options.language')}</h2>
+            <LanguagePicker className="options-language-tabs" />
+            <p className="editor-hint">{t('options.languageHint')}</p>
+          </section>
+
+          <section className="options-section">
+            <h2 className="options-heading">{t('sound.title')}</h2>
             <div className="options-volume">
               <VolumeRow
-                label="Menus"
+                label={t('sound.menus')}
                 on={menuSoundsOn}
                 value={volume}
                 onToggle={(next) => {
@@ -333,7 +345,7 @@ function Options({
                 onRelease={() => playSfx('click')}
               />
               <VolumeRow
-                label="Cries"
+                label={t('sound.cries')}
                 on={criesOn}
                 value={cries}
                 onToggle={(next) => {
@@ -348,7 +360,7 @@ function Options({
                 onRelease={() => playCry('pikachu')}
               />
               <VolumeRow
-                label="Music"
+                label={t('sound.music')}
                 on={musicOn}
                 value={music}
                 onToggle={(next) => {
@@ -361,7 +373,7 @@ function Options({
                 }}
               />
               <SwitchRow
-                label="Game Corner"
+                label={t('sound.gameCorner')}
                 on={cornerOn}
                 onToggle={(next) => {
                   setCornerOn(next)
@@ -375,10 +387,10 @@ function Options({
           {!IS_MOBILE && <ScreenSizeSection />}
 
           <section className="options-section">
-            <h2 className="options-heading">Move animations</h2>
+            <h2 className="options-heading">{t('anim.title')}</h2>
             <TabStrip
               className="options-anim-tabs"
-              tabs={ANIM_SPEEDS.map((id) => ({ id, label: ANIM_SPEED_LABELS[id] }))}
+              tabs={ANIM_SPEEDS.map((id) => ({ id, label: t(`anim.${id}`) }))}
               current={moveAnims}
               onSwitch={(next) => {
                 setMoveAnims(next)
@@ -390,7 +402,7 @@ function Options({
           {/* The phone app only ships the 3D stills. */}
           {!IS_MOBILE && (
           <section className="options-section">
-          <h2 className="options-heading">Sprite style</h2>
+          <h2 className="options-heading">{t('sprites.title')}</h2>
           <div className="sprite-style-grid">
             {SPRITE_STYLES.map((style) => (
               <button
@@ -401,9 +413,9 @@ function Options({
                 <img
                   className="sprite-style-preview"
                   src={spriteUrl(style, 'front', PREVIEW_SPECIES_ID)}
-                  alt={SPRITE_STYLE_LABELS[style]}
+                  alt={t(`sprites.${style}`)}
                 />
-                <span>{SPRITE_STYLE_LABELS[style]}</span>
+                <span>{t(`sprites.${style}`)}</span>
               </button>
             ))}
           </div>
@@ -415,46 +427,37 @@ function Options({
           </section>
 
           <section className="options-section">
-            <h2 className="options-heading">Saves</h2>
-            <p className="editor-hint">Move this save to another device, or back it up.</p>
-            <p className="editor-hint">
-              Your save lives only on this device. Export a save file now and then, and always before
-              reinstalling the game or switching devices - it&apos;s the only way to get it back.
-            </p>
+            <h2 className="options-heading">{t('saves.title')}</h2>
+            <p className="editor-hint">{t('saves.hint')}</p>
+            <p className="editor-hint">{t('saves.warning')}</p>
             <div>
-              <button onClick={() => setSavesOpen(true)}>Saves…</button>
+              <button onClick={() => setSavesOpen(true)}>{t('saves.button')}</button>
             </div>
             {savesOpen && <SavesModal onClose={() => setSavesOpen(false)} />}
           </section>
 
           <section className="options-section">
-            <h2 className="options-heading">About</h2>
-            <p className="editor-hint">{FAN_GAME_NOTICE}</p>
-            <p className="editor-hint">
-              Battles run on Pokémon Showdown (MIT License, © Guangcong Luo and contributors). The full
-              notices are in THIRD_PARTY_NOTICES.md on the game&apos;s GitHub page.
-            </p>
+            <h2 className="options-heading">{t('about.title')}</h2>
+            <p className="editor-hint">{t('about.fanNotice')}</p>
+            <p className="editor-hint">{t('about.showdown')}</p>
             <div className="options-about-buttons">
-              <button onClick={() => setGuideOpen(true)}>Welcome guide…</button>
-              <button onClick={() => setCreditsOpen(true)}>Sprite credits…</button>
+              <button onClick={() => setGuideOpen(true)}>{t('about.guide')}</button>
+              <button onClick={() => setCreditsOpen(true)}>{t('about.credits')}</button>
             </div>
             {guideOpen && <WelcomeGuide onClose={() => setGuideOpen(false)} />}
             {creditsOpen && <SpriteCreditsModal onClose={() => setCreditsOpen(false)} />}
-            <p className="editor-hint">
-              Found a bug? Report it on GitHub
-              {IS_MOBILE ? '.' : ' - and attach errors.log from the log folder, it shows what went wrong.'}
-            </p>
+            <p className="editor-hint">{IS_MOBILE ? t('about.bug') : t('about.bugWithLog')}</p>
             <div className="options-about-buttons">
-              <button onClick={() => window.open(BUG_REPORT_URL, '_blank')}>Report a bug</button>
+              <button onClick={() => window.open(BUG_REPORT_URL, '_blank')}>{t('about.reportBug')}</button>
               {!IS_MOBILE && (
-                <button onClick={() => void window.api.openLogFolder().catch(() => undefined)}>Open log folder</button>
+                <button onClick={() => void window.api.openLogFolder().catch(() => undefined)}>{t('about.openLogs')}</button>
               )}
             </div>
           </section>
 
           <section className="options-section">
-          <h2 className="options-heading">Account</h2>
-          <p className="editor-hint">Logged in as {username}</p>
+          <h2 className="options-heading">{t('account.title')}</h2>
+          <p className="editor-hint">{t('account.loggedInAs', { name: username })}</p>
           <div>
             <button
               disabled={loggingOut}
@@ -463,14 +466,14 @@ function Options({
                 void onLogout().finally(() => setLoggingOut(false))
               }}
             >
-              Log out
+              {t('account.logOut')}
             </button>
           </div>
           </section>
         </div>
 
         <div className="editor-actions">
-          <button onClick={onClose}>Close</button>
+          <button onClick={onClose}>{t('common.close')}</button>
         </div>
       </div>
     </div>,

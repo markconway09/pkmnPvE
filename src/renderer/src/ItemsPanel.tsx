@@ -20,12 +20,14 @@ import BuyButton, { BuyButtonGroup, SellButton } from './BuyButton'
 import SearchBar from './SearchBar'
 import GalarFossilPrompt from './GalarFossilPrompt'
 import CaseOpening from './CaseOpening'
+import { holdDexToasts } from './AchievementToasts'
 import { formatMoney, formatShort } from './money'
 import { errorMessage, pointOf, useFloatingNotes, type NotePoint } from './FloatingNotes'
 import ModalSpinner from './ModalSpinner'
 import CategoryJumpBar from './CategoryJumpBar'
 import RarityOddsTooltip from './RarityOddsTooltip'
-import { CLICK, IS_MOBILE_LAYOUT } from './platform'
+import { IS_MOBILE_LAYOUT } from './platform'
+import { clickWord, itemCategoryName, itemName, itemText, nameMatches, t } from './i18n'
 
 // The bulk buttons joined onto an item's own buy button.
 const BULK_AMOUNTS = [5, 10]
@@ -174,6 +176,13 @@ function ItemsPanel({ onChanged, onMoneyChange, onOpenCoinShop }: Props): React.
   const [picks, setPicks] = useState<Map<string, number> | null>(null)
   // A Random Pokemon / Random Legendary being opened, shown as a spinning case.
   const [opening, setOpening] = useState<{ item: BagItemView; result: OpenItemResult; seq: number } | null>(null)
+  // "New Pokemon registered" waits while the case spins, so it doesn't spoil the win.
+  const releaseDexToasts = useRef<(() => void) | null>(null)
+  function letDexToastsOut(): void {
+    releaseDexToasts.current?.()
+    releaseDexToasts.current = null
+  }
+  useEffect(() => letDexToastsOut, [])
   const [galarFossil, setGalarFossil] = useState<BagItemView | null>(null)
   // Results float up from whatever was last clicked.
   const notes = useFloatingNotes()
@@ -191,7 +200,7 @@ function ItemsPanel({ onChanged, onMoneyChange, onOpenCoinShop }: Props): React.
         window.api.getBattleEligibility()
       ])
       setCoinShopItems(coinShop.filter((i): i is BagItemView => i !== null))
-      setLockedUntil(eligibility.raidsUnlocked ? null : (eligibility.raidUnlockBoss ?? 'the right boss'))
+      setLockedUntil(eligibility.raidsUnlocked ? null : (eligibility.raidUnlockBoss ?? t('bag.theRightBoss')))
       // Key items have a tab of their own.
       setBag(items.filter((i) => i.category !== 'Key Items'))
       setCatalog(shop)
@@ -227,9 +236,9 @@ function ItemsPanel({ onChanged, onMoneyChange, onOpenCoinShop }: Props): React.
       const result = await window.api.buyItem(item.id, count)
       setMoney(result.money)
       onMoneyChange(result.money)
-      if (!result.success) notes.show('Not enough money for that', lastPoint.current, 'bad')
+      if (!result.success) notes.show(t('bag.noMoney'), lastPoint.current, 'bad')
       else {
-        say(`Bought ${count > 1 ? `${count}× ` : ''}${item.name} for ${formatMoney(shopTotal(item, count))}`)
+        say(t('bag.bought', { what: `${count > 1 ? `${count}× ` : ''}${itemName(item.name)}`, money: formatMoney(shopTotal(item, count)) }))
         await refresh()
         // The box re-counts its evolution items, so the merge window sees the new ones.
         onChanged()
@@ -244,7 +253,7 @@ function ItemsPanel({ onChanged, onMoneyChange, onOpenCoinShop }: Props): React.
   function sell(item: BagItemView, quantity: number): Promise<void> {
     return act(async () => {
       const result = await window.api.sellItems([{ itemId: item.id, quantity }])
-      return `Sold ${quantity > 1 ? `${quantity}× ` : ''}${item.name} for ${formatMoney(result.sold)}.`
+      return t('bag.sold', { what: `${quantity > 1 ? `${quantity}× ` : ''}${itemName(item.name)}`, money: formatMoney(result.sold) })
     })
   }
 
@@ -268,18 +277,14 @@ function ItemsPanel({ onChanged, onMoneyChange, onOpenCoinShop }: Props): React.
     try {
       const quick = await window.api.quickSellSelection()
       if (quick.length === 0) {
-        notes.show(
-          'Nothing for Quick sell - no sell-only items, spare berries, or Memories, Plates or Drives nobody can use.',
-          lastPoint.current,
-          'bad'
-        )
+        notes.show(t('bag.quickNone'), lastPoint.current, 'bad')
         return
       }
       startPicking(new Map(quick.map((p) => [p.itemId, p.quantity])))
       // Which berries it left alone, so it's clear they weren't missed.
       const kept = (bag ?? []).filter((i) => QUICK_SELL_KEPT_BERRY_IDS.has(i.id))
       if (kept.length > 0) {
-        notes.show(`Kept: ${kept.map((i) => `${i.name} ×${i.quantity}`).join(', ')}`, lastPoint.current)
+        notes.show(t('bag.kept', { list: kept.map((i) => `${itemName(i.name)} ×${i.quantity}`).join(', ') }), lastPoint.current)
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -293,7 +298,7 @@ function ItemsPanel({ onChanged, onMoneyChange, onOpenCoinShop }: Props): React.
     return act(async () => {
       const result = await window.api.sellItems(entries)
       setPicks(null)
-      return `Sold ${count} item${count === 1 ? '' : 's'} for ${formatMoney(result.sold)}.`
+      return t('bag.soldCount', { count, money: formatMoney(result.sold) })
     })
   }
 
@@ -302,18 +307,18 @@ function ItemsPanel({ onChanged, onMoneyChange, onOpenCoinShop }: Props): React.
   // The message for the case just closed (or just moved on from).
   function reportOpening(soldFor?: number): void {
     if (!opening) return
-    const itemName = opening.item.name
+    const opened = itemName(opening.item.name)
     const { result } = opening
     if (result.kind === 'item' && soldFor !== undefined) {
-      say(`Opened ${itemName}: you got ${result.name} and sold it for ${formatMoney(soldFor)}.`)
+      say(t('bag.openedSold', { item: opened, got: itemName(result.name), money: formatMoney(soldFor) }))
     } else if (result.kind === 'item') {
-      say(`Opened ${itemName}: you got ${result.name} - it's in your bag.`)
+      say(t('bag.openedItem', { item: opened, got: itemName(result.name) }))
     } else {
-      const got = result.shiny ? `a shiny ${result.name}` : result.name
+      const got = result.shiny ? t('bag.aShiny', { name: result.name }) : result.name
       say(
         soldFor !== undefined
-          ? `Opened ${itemName}: you got ${got} (Lv ${result.level}) and sold it for ${formatMoney(soldFor)}.`
-          : `Opened ${itemName}: you got ${got} (Lv ${result.level}) - it's waiting in your box.`
+          ? t('bag.openedMonSold', { item: opened, got, level: result.level, money: formatMoney(soldFor) })
+          : t('bag.openedMon', { item: opened, got, level: result.level })
       )
     }
   }
@@ -321,11 +326,14 @@ function ItemsPanel({ onChanged, onMoneyChange, onOpenCoinShop }: Props): React.
   async function openItem(item: BagItemView): Promise<void> {
     setBusy(true)
     setError(null)
+    letDexToastsOut()
+    releaseDexToasts.current = holdDexToasts()
     try {
       const result = await window.api.openBagItem(item.id)
       // A fresh case each time (seq), even when opening the same item again.
       setOpening((prev) => ({ item, result, seq: (prev?.seq ?? 0) + 1 }))
     } catch (e) {
+      letDexToastsOut()
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(false)
@@ -336,11 +344,13 @@ function ItemsPanel({ onChanged, onMoneyChange, onOpenCoinShop }: Props): React.
   function useExpCandiesUntilCap(item: BagItemView): Promise<void> {
     return act(async () => {
       const { used, results, allCapped } = await window.api.useExpCandiesUntilCap(item.id)
-      const levelUps = results.filter((r) => r.levelAfter > r.levelBefore).map((r) => `${r.species} → Lv ${r.levelAfter}`)
+      const levelUps = results
+        .filter((r) => r.levelAfter > r.levelBefore)
+        .map((r) => t('bag.levelUp', { name: r.species, level: r.levelAfter }))
       return [
-        `Used ${used}× ${item.name}.`,
+        t('bag.usedMany', { n: used, item: itemName(item.name) }),
         levelUps.length > 0 ? levelUps.join(', ') + '.' : '',
-        allCapped ? 'Your whole team is at the level cap.' : 'Out of candies.'
+        allCapped ? t('bag.allCapped') : t('bag.outOfCandies')
       ]
         .filter(Boolean)
         .join(' ')
@@ -351,12 +361,14 @@ function ItemsPanel({ onChanged, onMoneyChange, onOpenCoinShop }: Props): React.
     return act(async () => {
       const results = await window.api.useExpCandy(item.id)
       const gained = results.filter((r) => !r.cappedOut)
-      const levelUps = gained.filter((r) => r.levelAfter > r.levelBefore).map((r) => `${r.species} → Lv ${r.levelAfter}`)
+      const levelUps = gained
+        .filter((r) => r.levelAfter > r.levelBefore)
+        .map((r) => t('bag.levelUp', { name: r.species, level: r.levelAfter }))
       const capped = results.length - gained.length
       return [
-        `Used ${item.name}: ${gained.length} Pokemon gained ${item.teamExp?.toLocaleString('en-US')} exp.`,
+        t('bag.usedOne', { item: itemName(item.name), n: gained.length, exp: item.teamExp ?? 0 }),
         levelUps.length > 0 ? levelUps.join(', ') + '.' : '',
-        capped > 0 ? `${capped} at the level cap got nothing.` : ''
+        capped > 0 ? t('bag.cappedNothing', { n: capped }) : ''
       ]
         .filter(Boolean)
         .join(' ')
@@ -368,8 +380,8 @@ function ItemsPanel({ onChanged, onMoneyChange, onOpenCoinShop }: Props): React.
   }
 
   function describeRestore(result: RestoreFossilResult): string {
-    const got = result.shiny ? `a shiny ${result.species}` : result.species
-    return `Restored ${got} (Lv ${result.level}) - it's waiting in your box.`
+    const got = result.shiny ? t('bag.aShiny', { name: result.species }) : result.species
+    return t('bag.restored', { got, level: result.level })
   }
 
   // Arrow keys move between the cards: left/right through the list, up/down to the card
@@ -405,7 +417,7 @@ function ItemsPanel({ onChanged, onMoneyChange, onOpenCoinShop }: Props): React.
   const allRows = allGroups.flatMap(([, rows]) => rows)
   // Every item, the bag's and the shop's - except while picking to sell, which only looks at the bag.
   const matches = (row: ItemRow): boolean =>
-    (picks === null || row.owned !== null) && row.name.toLowerCase().includes(query.trim().toLowerCase())
+    (picks === null || row.owned !== null) && nameMatches(query.trim(), row.name, itemName(row.name))
   const groups = allGroups
     .map(([category, rows]) => [category, rows.filter(matches)] as [string, ItemRow[]])
     .filter(([, rows]) => rows.length > 0)
@@ -422,18 +434,14 @@ function ItemsPanel({ onChanged, onMoneyChange, onOpenCoinShop }: Props): React.
       {!loaded && !error && <ModalSpinner />}
       {loaded && (
         <div className="bag-toolbar">
-          <SearchBar value={query} onChange={setQuery} placeholder="Search items..." autoFocus />
+          <SearchBar value={query} onChange={setQuery} placeholder={t('bag.search')} autoFocus />
           {!picks && ownedCount > 0 && (
             <>
               <button disabled={busy} onClick={() => startPicking(new Map())}>
-                Select to sell
+                {t('bag.selectToSell')}
               </button>
-              <button
-                disabled={busy}
-                title="Picks sell-only items (Bottle Caps, Rare Bones...), berries except Sitrus, Lum and the pinch berries, and Memories, Plates and Drives nobody can use"
-                onClick={(e) => void startQuickSell(e)}
-              >
-                Quick sell
+              <button disabled={busy} title={t('bag.quickSellTip')} onClick={(e) => void startQuickSell(e)}>
+                {t('bag.quickSell')}
               </button>
             </>
           )}
@@ -444,16 +452,18 @@ function ItemsPanel({ onChanged, onMoneyChange, onOpenCoinShop }: Props): React.
         <div className="items-body">
           <div className="items-list">
             {/* A button per category, scrolling the list down to it. */}
-            <CategoryJumpBar categories={groups.map(([c, rows]) => [c, rows.length])} scrollRef={scrollRef} />
+            <CategoryJumpBar
+              categories={groups.map(([c, rows]) => [c, rows.length])}
+              scrollRef={scrollRef}
+              labelOf={itemCategoryName}
+            />
             {shownCount === 0 && (
-              <p className="box-empty-hint">
-                {query.trim() ? 'No items match.' : 'Nothing here.'}
-              </p>
+              <p className="box-empty-hint">{query.trim() ? t('bag.noMatch') : t('bag.nothing')}</p>
             )}
             <div ref={scrollRef} className="bag-scroll">
               {groups.map(([category, rows]) => (
                 <div key={category} data-category={category}>
-                  <h3 className="shop-category-heading">{category}</h3>
+                  <h3 className="shop-category-heading">{itemCategoryName(category)}</h3>
                   <div className="item-card-grid items-grid">
                     {rows.map((row) => (
                       <ItemCard
@@ -495,13 +505,13 @@ function ItemsPanel({ onChanged, onMoneyChange, onOpenCoinShop }: Props): React.
       {picks && (
         <div className="editor-actions bag-sell-bar">
           <span className="bag-sell-summary">
-            {pickedCount} item{pickedCount === 1 ? '' : 's'} selected · {formatMoney(pickedTotal)}
+            {t('bag.selected', { count: pickedCount, money: formatMoney(pickedTotal) })}
           </span>
           <button disabled={busy} onClick={() => setPicks(null)}>
-            Cancel
+            {t('common.cancel')}
           </button>
           <button disabled={busy || pickedCount === 0} onClick={(e) => void sellPicked(e)}>
-            Sell selected
+            {t('bag.sellSelected')}
           </button>
         </div>
       )}
@@ -510,9 +520,11 @@ function ItemsPanel({ onChanged, onMoneyChange, onOpenCoinShop }: Props): React.
         <CaseOpening
           key={opening.seq}
           itemId={opening.item.id}
-          itemName={opening.item.name}
+          itemName={itemName(opening.item.name)}
           result={opening.result}
+          onRevealed={letDexToastsOut}
           onClose={(soldFor) => {
+            letDexToastsOut()
             reportOpening(soldFor)
             setOpening(null)
             void refresh()
@@ -559,15 +571,15 @@ function ItemCard({ row, selected, picking, picked, onFocus, onActivate, onArrow
   const unsellable = picking && (row.owned?.sellPrice ?? null) === null
   const note = picking
     ? unsellable
-      ? "Can't be sold"
+      ? t('bag.cantSell')
       : picked
         ? `✓ ${formatMoney((row.owned?.sellPrice ?? 0) * (row.owned?.quantity ?? 0))}`
-        : `${CLICK} to pick`
+        : t('bag.toPick', { click: clickWord() })
     : row.shop
       ? formatMoney(row.shop.price)
       : row.coinShop
-        ? 'Coin Shop'
-        : 'Not sold in shop'
+        ? t('bag.coinShop')
+        : t('bag.notSold')
   return (
     <RarityCard
       tier={row.tier}
@@ -575,7 +587,7 @@ function ItemCard({ row, selected, picking, picked, onFocus, onActivate, onArrow
       role="button"
       tabIndex={0}
       aria-pressed={picking ? picked : selected}
-      aria-label={`${row.name}${row.owned ? `, ${row.owned.quantity} in bag` : ''}${row.shop ? `, ${formatMoney(row.shop.price)} in the shop` : ''}`}
+      aria-label={`${itemName(row.name)}${row.owned ? t('bag.ariaInBag', { n: row.owned.quantity }) : ''}${row.shop ? t('bag.ariaInShop', { money: formatMoney(row.shop.price) }) : ''}`}
       data-item-card=""
       className={`items-card${selected ? ' items-card-selected' : ''}${picking ? ' bag-card-picking' : ''}${picked ? ' bag-item-selected' : ''}${unsellable ? ' bag-item-unsellable' : ''}${row.owned ? '' : ' items-card-unowned'}`}
       onFocus={onFocus}
@@ -595,7 +607,7 @@ function ItemCard({ row, selected, picking, picked, onFocus, onActivate, onArrow
       <RarityGlow size={56}>
         <ItemSprite spritenum={row.spritenum} className="item-card-icon" />
       </RarityGlow>
-      <span className="item-card-name">{row.name}</span>
+      <span className="item-card-name">{itemName(row.name)}</span>
       <span className={`items-card-note${row.coinShop && !picking ? ' items-card-note-coins' : row.shop || picking ? '' : ' items-card-note-faint'}`}>{note}</span>
     </RarityCard>
   )
@@ -640,7 +652,7 @@ function ItemDetail({
   if (!row) {
     return (
       <aside className="items-detail items-detail-empty">
-        <p>Pick an item to see what it does, buy more or sell it.</p>
+        <p>{t('bag.pickHint')}</p>
       </aside>
     )
   }
@@ -658,18 +670,18 @@ function ItemDetail({
   if (owned?.teamExp != null) {
     use = (
       <>
-        <p className="items-detail-hint">+{owned.teamExp.toLocaleString('en-US')} exp to each Pokemon on your team.</p>
+        <p className="items-detail-hint">{t('bag.expEach', { exp: owned.teamExp })}</p>
         <div className="items-detail-buttons">
           <button className="items-detail-btn items-detail-btn-use" disabled={busy} onClick={click(() => onUseCandy(owned))}>
-            Use one
+            {t('bag.useOne')}
           </button>
           <button
             className="items-detail-btn items-detail-btn-use"
             disabled={busy}
-            title={`Keeps using them until your whole team is at the level cap, or you run out (×${owned.quantity} left)`}
+            title={t('bag.useToCapTip', { n: owned.quantity })}
             onClick={click(() => onUseCandiesToCap(owned))}
           >
-            Use to level cap
+            {t('bag.useToCap')}
           </button>
         </div>
       </>
@@ -679,7 +691,7 @@ function ItemDetail({
       <div className="items-detail-buttons">
         <RarityOddsTooltip source={{ kind: 'item', itemId: owned.id }}>
           <button className="items-detail-btn items-detail-btn-use" disabled={busy} onClick={click(() => onOpen(owned))}>
-            Open
+            {t('bag.open')}
           </button>
         </RarityOddsTooltip>
       </div>
@@ -689,17 +701,17 @@ function ItemDetail({
       <>
         <p className="items-detail-hint">
           {owned.fossil === 'single'
-            ? `Restores into ${owned.restoresTo}.`
-            : 'Restores together with another fossil - you pick which.'}
+            ? t('bag.restoresInto', { name: owned.restoresTo ?? '' })
+            : t('bag.restoresPair')}
         </p>
         <div className="items-detail-buttons">
           <button
             className="items-detail-btn items-detail-btn-use"
             disabled={busy || !canAffordRestore}
-            title={canAffordRestore ? undefined : `Restoring costs ${formatMoney(FOSSIL_RESTORE_COST)}`}
+            title={canAffordRestore ? undefined : t('bag.restoreCost', { money: formatMoney(FOSSIL_RESTORE_COST) })}
             onClick={click(() => onRestore(owned))}
           >
-            Restore · {formatMoney(FOSSIL_RESTORE_COST)}
+            {t('bag.restore', { money: formatMoney(FOSSIL_RESTORE_COST) })}
           </button>
         </div>
       </>
@@ -710,7 +722,7 @@ function ItemDetail({
     <aside className="items-detail" aria-live="polite">
       {/* On the phone: back to the bag (the back button does the same). */}
       {IS_MOBILE_LAYOUT && (
-        <button className="items-detail-close" aria-label="Back to the bag" data-back-close="" onClick={onClose}>
+        <button className="items-detail-close" aria-label={t('bag.backToBag')} data-back-close="" onClick={onClose}>
           ×
         </button>
       )}
@@ -718,37 +730,35 @@ function ItemDetail({
         <RarityGlow tier={row.tier} size={88}>
           <ItemSprite spritenum={row.spritenum} className="items-detail-icon" />
         </RarityGlow>
-        <h3 className="items-detail-name">{row.name}</h3>
+        <h3 className="items-detail-name">{itemName(row.name)}</h3>
         <span className="items-detail-meta">
-          {row.category} · {owned ? `${owned.quantity} in bag` : 'none in bag'}
+          {itemCategoryName(row.category)} · {owned ? t('bag.inBag', { n: owned.quantity }) : t('bag.noneInBag')}
         </span>
       </div>
-      <p className="items-detail-desc">{row.description}</p>
+      <p className="items-detail-desc">{itemText(row.id, row.description)}</p>
 
       {use && (
         <section className="items-detail-section">
-          <h4>Use</h4>
+          <h4>{t('bag.use')}</h4>
           {use}
         </section>
       )}
 
       {row.coinShop && (
         <section className="items-detail-section">
-          <h4>Get more</h4>
+          <h4>{t('bag.getMore')}</h4>
           {lockedUntil ? (
             <p className="items-detail-hint">
-              🔒 Beat {lockedUntil} to unlock the Coin Shop&apos;s {row.id === SHINY_PATCH_ITEM_ID ? 'daily Shiny Patch' : 'daily petals'}.
+              {t(row.id === SHINY_PATCH_ITEM_ID ? 'bag.lockedPatch' : 'bag.lockedPetals', { boss: lockedUntil })}
             </p>
           ) : (
             <>
               <p className="items-detail-hint">
-                {row.id === SHINY_PATCH_ITEM_ID
-                  ? 'Not sold here - the Game Corner\'s Coin Shop sells one a day for coins, and your first full Draft gauntlet (7 wins) each day gives one.'
-                  : 'Not sold here - the Game Corner\'s Coin Shop gives some free every day, with a pack for coins.'}
+                {row.id === SHINY_PATCH_ITEM_ID ? t('bag.patchWhere') : t('bag.petalsWhere')}
               </p>
               <div className="items-detail-buttons">
                 <button className="items-detail-btn items-detail-btn-coins" onClick={() => onOpenCoinShop(row.id)}>
-                  Go to the Coin Shop ›
+                  {t('bag.goCoinShop')}
                 </button>
               </div>
             </>
@@ -758,7 +768,7 @@ function ItemDetail({
 
       {shop && (
         <section className="items-detail-section">
-          <h4>Buy</h4>
+          <h4>{t('bag.buy')}</h4>
           {/* A row per amount: one, then the bulk amounts - a discounted one with its
               discount badge and the full price struck through beside its buy button. */}
           <div className="items-buy-options">
@@ -776,7 +786,7 @@ function ItemDetail({
                     currency="money"
                     held={money}
                     busy={busy}
-                    title={`Buy ${n === 1 ? 'one' : n} for ${formatMoney(total)}`}
+                    title={t('bag.buyTip', { n: n === 1 ? t('bag.one') : n, money: formatMoney(total) })}
                     onBuy={click(() => onBuy(shop, n))}
                   />
                 </div>
@@ -788,35 +798,35 @@ function ItemDetail({
 
       {owned && (
         <section className="items-detail-section">
-          <h4>Sell</h4>
+          <h4>{t('bag.sell')}</h4>
           {owned.sellPrice === null ? (
-            <p className="items-detail-hint">The shop doesn&apos;t buy this.</p>
+            <p className="items-detail-hint">{t('bag.notBought')}</p>
           ) : (
             <>
-              <p className="items-detail-hint">{formatMoney(owned.sellPrice)} each</p>
+              <p className="items-detail-hint">{t('bag.each', { money: formatMoney(owned.sellPrice) })}</p>
               <BuyButtonGroup>
                 {/* Sell one or the whole stack - each with what it pays underneath. */}
                 <SellButton
                   label={
                     <span className="items-sell-label">
-                      Sell one
+                      {t('bag.sellOne')}
                       <span className="items-sell-pays">+₽ {formatShort(owned.sellPrice)}</span>
                     </span>
                   }
                   busy={busy}
-                  title={`Sell one for ${formatMoney(owned.sellPrice)}`}
+                  title={t('bag.sellOneTip', { money: formatMoney(owned.sellPrice) })}
                   onSell={click(() => onSell(owned, 1))}
                 />
                 {owned.quantity > 1 && (
                   <SellButton
                     label={
                       <span className="items-sell-label">
-                        Sell all ×{owned.quantity}
+                        {t('bag.sellAll', { n: owned.quantity })}
                         <span className="items-sell-pays">+₽ {formatShort(owned.sellPrice * owned.quantity)}</span>
                       </span>
                     }
                     busy={busy}
-                    title={`Sell all ×${owned.quantity} for ${formatMoney(owned.sellPrice * owned.quantity)}`}
+                    title={t('bag.sellAllTip', { n: owned.quantity, money: formatMoney(owned.sellPrice * owned.quantity) })}
                     onSell={click(() => onSell(owned, owned.quantity))}
                   />
                 )}

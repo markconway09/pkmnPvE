@@ -1,6 +1,7 @@
 import { appVersion, copyFile, ensureDir, joinPath, listDirs, listFiles, pathExists, readText, removeFile, writeText } from '../platform'
 import { getCurrentPlayerSlug, playerDirFor } from './save-paths'
 import { reloadPlayerSave } from './player-session'
+import { t } from '../i18n'
 
 /**
  * A save as one file (.pkmnsave), to move it between the PC and the phone by hand -
@@ -26,7 +27,7 @@ interface SaveBundle {
 
 function currentSlug(): string {
   const slug = getCurrentPlayerSlug()
-  if (!slug) throw new Error('Not logged in')
+  if (!slug) throw new Error(t('err.notLoggedIn'))
   return slug
 }
 
@@ -100,13 +101,13 @@ export async function importSaveFile(data: Uint8Array): Promise<void> {
   try {
     bundle = JSON.parse(new TextDecoder().decode(await pipe(data, new DecompressionStream('gzip')))) as SaveBundle
   } catch {
-    throw new Error("That file couldn't be read - is it a .pkmnsave file?")
+    throw new Error(t('err.thatFileCouldnTBeRead'))
   }
   if (bundle.format !== SAVE_FORMAT || typeof bundle.files !== 'object' || !bundle.files['box.json']) {
-    throw new Error("That file isn't a pkmnPvE save")
+    throw new Error(t('err.thatFileIsnTAPkmnpve'))
   }
   const names = Object.keys(bundle.files)
-  if (!names.every(isSafeFileName)) throw new Error("That save file has files it shouldn't")
+  if (!names.every(isSafeFileName)) throw new Error(t('err.thatSaveFileHasFilesIt'))
   const decoder = new TextDecoder()
   const texts = names.map((name) => [name, decoder.decode(fromBase64(bundle.files[name]))] as const)
 
@@ -123,7 +124,7 @@ export async function importSaveFile(data: Uint8Array): Promise<void> {
       JSON.stringify({ ...imported, displayName: localProfile.displayName, admin: localProfile.admin === true })
     )
   }
-  if (!pathExists(joinPath(dir, 'box.json'))) throw new Error('The imported save has no box')
+  if (!pathExists(joinPath(dir, 'box.json'))) throw new Error(t('err.theImportedSaveHasNoBox'))
   // Every store re-reads the save.
   reloadPlayerSave()
 }

@@ -4,6 +4,7 @@ import { fetchMoveInfo } from './moveInfoCache'
 import { fetchItemSpritenum } from './itemSpritenumCache'
 import { itemIconStyle } from './itemIcon'
 import { effectivenessClass, effectivenessText, effectivenessWords } from './effectiveness'
+import { abilityName, itemName, moveName, natureName, t, typeName } from './i18n'
 
 interface Props {
   // A Pokemon out in battle also carries the stats it has right now (stat stages,
@@ -45,56 +46,59 @@ function PokemonTooltipContent({ pokemon }: Props): React.JSX.Element {
 
   // Green when a stat is currently above what it normally is, red when below.
   const current = pokemon.effectiveStats ?? pokemon.stats
-  const stat = (label: string, key: ShownStat): React.JSX.Element => {
+  const stat = (key: ShownStat): React.JSX.Element => {
     const base = pokemon.stats[key]
     const now = current[key]
-    return <span className={now > base ? 'stat-up' : now < base ? 'stat-down' : undefined}>{label} {now}</span>
+    return <span className={now > base ? 'stat-up' : now < base ? 'stat-down' : undefined}>{t(`stat.${key}`)} {now}</span>
   }
 
   return (
     <div className="tooltip-panel pokemon-tooltip">
       <div className="tooltip-title">
-        {pokemon.species} <span className="tooltip-level">Lv. {pokemon.level}</span>
+        {pokemon.species} <span className="tooltip-level">{t('mon.lv', { level: pokemon.level })}</span>
       </div>
       <div className="tooltip-row">
-        {pokemon.types.map((t) => (
-          <span key={t} className={`type-badge type-${t.toLowerCase()}`}>
-            {t}
+        {pokemon.types.map((type) => (
+          <span key={type} className={`type-badge type-${type.toLowerCase()}`}>
+            {typeName(type)}
           </span>
         ))}
       </div>
-      <div className="tooltip-row">Ability: {pokemon.ability || 'Unknown'}</div>
+      <div className="tooltip-row">{t('mon.ability', { name: pokemon.ability ? abilityName(pokemon.ability) : t('mon.unknown') })}</div>
       <div className="tooltip-row tooltip-row-item">
         {itemSpritenum !== null && <span style={itemIconStyle(itemSpritenum)} />}
-        Item: {pokemon.item || 'None'}
+        {t('mon.item', { name: pokemon.item ? itemName(pokemon.item) : t('mon.none') })}
       </div>
-      {pokemon.nature && <div className="tooltip-row">Nature: {pokemon.nature}</div>}
+      {pokemon.nature && <div className="tooltip-row">{t('mon.nature', { name: natureName(pokemon.nature) })}</div>}
       {pokemon.teraType && (
         <div className="tooltip-row">
-          Tera Type: <span className={`type-badge type-${pokemon.teraType.toLowerCase()}`}>{pokemon.teraType}</span>
+          {t('mon.teraType')}{' '}
+          <span className={`type-badge type-${pokemon.teraType.toLowerCase()}`}>{typeName(pokemon.teraType)}</span>
         </div>
       )}
       <div className="tooltip-stats">
-        <span>HP {pokemon.stats.hp}</span>
-        {stat('Atk', 'atk')}
-        {stat('Def', 'def')}
-        {stat('SpA', 'spa')}
-        {stat('SpD', 'spd')}
-        {stat('Spe', 'spe')}
+        <span>
+          {t('stat.hp')} {pokemon.stats.hp}
+        </span>
+        {stat('atk')}
+        {stat('def')}
+        {stat('spa')}
+        {stat('spd')}
+        {stat('spe')}
       </div>
       <div className="tooltip-moves">
         {pokemon.moveIds.map((id, i) => {
           const move = moves[i]
           return (
             <div key={id} className="tooltip-move-line">
-              {move ? move.name : id}
-              {move && <span className={`type-badge tooltip-move-type type-${move.type.toLowerCase()}`}>{move.type}</span>}
+              {moveName(move ? move.name : id)}
+              {move && <span className={`type-badge tooltip-move-type type-${move.type.toLowerCase()}`}>{typeName(move.type)}</span>}
               {/* In battle: how hard it hits each foe out, left to right as on screen. */}
               {pokemon.moveMatchups?.[id]?.map((chip, n) => (
                 <span
                   key={n}
                   className={`eff-chip ${effectivenessClass(chip.multiplier)}`}
-                  title={`vs ${chip.foeName}: ${effectivenessWords(chip.multiplier)}`}
+                  title={t('eff.vs', { name: chip.foeName, words: effectivenessWords(chip.multiplier) })}
                 >
                   {effectivenessText(chip.multiplier)}
                 </span>

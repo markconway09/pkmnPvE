@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { TRAINER_SPRITE_IDS, trainerSpriteUrl } from './trainerSprite'
 import { TRAINER_SPRITE_ARTISTS } from './trainerSpriteCredits'
 import SearchBar from './SearchBar'
+import { t } from './i18n'
 
 // Each credited sprite and its artist, in the same order as the sprite picker.
 const ARTIST_OF = new Map(Object.entries(TRAINER_SPRITE_ARTISTS).flatMap(([artist, ids]) => ids.map((id) => [id, artist] as const)))
@@ -37,9 +38,9 @@ function SpriteCreditsModal({ onClose }: { onClose: () => void }): React.JSX.Ele
     <div className="modal-overlay" onMouseDown={onClose}>
       <div className="modal-panel trainer-picker sprite-credits" onMouseDown={(e) => e.stopPropagation()}>
         <div className="trainer-picker-header">
-          <h2>Sprite credits</h2>
+          <h2>{t('credits.title')}</h2>
           <span className="trainer-picker-count">{shown.length} sprites</span>
-          <SearchBar className="trainer-picker-search" placeholder="Search sprites or artists..." value={query} onChange={setQuery} autoFocus />
+          <SearchBar className="trainer-picker-search" placeholder={t('credits.search')} value={query} onChange={setQuery} autoFocus />
         </div>
         <p className="editor-hint sprite-credits-intro">
           Trainer sprites from Pokémon Showdown&apos;s sprite collection, drawn by these artists. Thank you!
@@ -53,7 +54,7 @@ function SpriteCreditsModal({ onClose }: { onClose: () => void }): React.JSX.Ele
           ))}
         </div>
         <div className="editor-actions">
-          <button onClick={onClose}>Close</button>
+          <button onClick={onClose}>{t('common.close')}</button>
         </div>
       </div>
     </div>,

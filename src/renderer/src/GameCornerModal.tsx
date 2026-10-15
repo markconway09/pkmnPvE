@@ -8,6 +8,7 @@ import PlinkoBoard from './PlinkoBoard'
 import DiceGame from './DiceGame'
 import CoinShopPanel from './CoinShopPanel'
 import CoinIcon from './CoinIcon'
+import { numberLocale, t } from './i18n'
 
 interface Props {
   // The tab it opens on - the one played last.
@@ -81,8 +82,8 @@ function GameCornerModal({
   // The coins held - floating over the game in the window, beside the tabs on the page.
   const balance = (
     <div className="game-corner-balance">
-      <span className="slots-coins" title="Coins">
-        <CoinIcon /> {coins === null ? '…' : coins.toLocaleString('en-US')}
+      <span className="slots-coins" title={t('corner.coins')}>
+        <CoinIcon /> {coins === null ? '…' : coins.toLocaleString(numberLocale())}
       </span>
     </div>
   )

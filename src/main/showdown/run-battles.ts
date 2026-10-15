@@ -22,6 +22,7 @@ import {
   runTrainerTeamSize,
   runVillainId
 } from './run-store'
+import { t } from '../i18n'
 
 // Wild Pokemon come in anywhere from this many levels under the floor's level up to it.
 const WILD_LEVEL_SPREAD = 10
@@ -101,7 +102,7 @@ function runOpponent(choice: RunChoice, conditions: { hp: number; status: string
       location?.id === 'lab'
         ? generateLabWildMon(opponentLevel + 4)
         : (generateRandomWildMon(opponentLevel + 4, location) ?? generateRandomWildMon(opponentLevel + 4, null))
-    if (!wild) throw new Error('Could not find a wild Pokemon for this floor')
+    if (!wild) throw new Error(t('err.couldNotFindAWildPokemon2'))
     wild.level = Math.max(opponentLevel - WILD_LEVEL_SPREAD, Math.min(opponentLevel, wild.level))
     return { team: [wild], name: 'Wild', difficulty: rules.wildAi, run, startField: { weather: rollWildWeather(location?.id) } }
   }
@@ -109,7 +110,7 @@ function runOpponent(choice: RunChoice, conditions: { hp: number; status: string
     // Any regular trainer lends a name, a sprite and a difficulty; the team is a
     // random one sized and levelled for the floor.
     const trainer = pickOne(listTrainers().filter((t) => !t.isBoss && !t.rogueliteBoss))
-    if (!trainer) throw new Error('There are no trainers to fight')
+    if (!trainer) throw new Error(t('err.thereAreNoTrainersToFight'))
     const team = generateRandomTrainerTeam({ count: sized(runTrainerTeamSize(floor)), levelCap: opponentLevel })
     return {
       team,
@@ -132,7 +133,7 @@ function runOpponent(choice: RunChoice, conditions: { hp: number; status: string
     const isVillain = (t: { rogueliteClass?: string }): boolean =>
       !!ROGUELITE_BOSS_CLASSES.find((c) => c.id === t.rogueliteClass)?.villain
     const allBosses = listTrainers().filter((t) => t.rogueliteBoss && !isVillain(t))
-    if (allBosses.length === 0) throw new Error('There are no Battle Tower bosses - add some in Debug → Edit Battle Tower Bosses')
+    if (allBosses.length === 0) throw new Error(t('err.thereAreNoBattleTowerBosses'))
     const bossClass = rogueliteBossClassAt(bossesBeaten, difficulty)
     const inGeneration = (t: (typeof allBosses)[number]): boolean => generation === null || t.rogueliteGeneration === generation
     const candidates = [
@@ -164,7 +165,7 @@ function runOpponent(choice: RunChoice, conditions: { hp: number; status: string
     // A Villain Takeover's villain: one of their own teams at this floor's level, as big
     // as the next boss's - or a random one if they have none.
     const villain = listTrainers().find((t) => t.id === runVillainId())
-    if (!villain) throw new Error('The villain that took this floor over is gone')
+    if (!villain) throw new Error(t('err.theVillainThatTookThisFloor'))
     const selection = pickRandomPremadeTeam(villain.id, 100, 6, { anyLevel: true })
     const full = selection
       ? scaleTeamToLevel(selection.sets, opponentLevel)
@@ -179,5 +180,5 @@ function runOpponent(choice: RunChoice, conditions: { hp: number; status: string
       startField: { weather: villain.fieldWeather, terrain: villain.fieldTerrain, trickRoom: villain.fieldTrickRoom }
     }
   }
-  throw new Error(`A ${kind} floor isn't a battle`)
+  throw new Error(t('err.aFloorIsnTABattle', { a: kind }))
 }

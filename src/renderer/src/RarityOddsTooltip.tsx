@@ -2,13 +2,25 @@ import { useEffect, useState, type ReactNode } from 'react'
 import type { RarityTier } from '../../shared/battle-types'
 import { RARITY_TIERS, type RarityOddsReport, type RarityOddsSource } from '../../shared/rarity'
 import Tooltip from './Tooltip'
+import { t } from './i18n'
 
+// Each rarity's name, in the player's language (read whenever it's shown).
 export const TIER_LABELS: Record<RarityTier, string> = {
-  common: 'Common',
-  uncommon: 'Uncommon',
-  rare: 'Rare',
-  epic: 'Mythical',
-  legendary: 'Legendary'
+  get common() {
+    return t('rarity.common')
+  },
+  get uncommon() {
+    return t('rarity.uncommon')
+  },
+  get rare() {
+    return t('rarity.rare')
+  },
+  get epic() {
+    return t('rarity.epic')
+  },
+  get legendary() {
+    return t('rarity.legendary')
+  }
 }
 
 // Whole percents from 10% up, finer below so a rare gold still shows (0.25%, not 0%).
@@ -37,9 +49,9 @@ function OddsPanel({ source, heading }: { source: RarityOddsSource; heading?: Re
   return (
     <div className="tooltip-panel rarity-odds-panel">
       {heading && <div className="rarity-odds-heading">{heading}</div>}
-      <div className="tooltip-title">{odds && 'kinds' in odds ? 'Chances by type' : 'Rarity chances'}</div>
-      {odds === undefined && <div className="rarity-odds-note">Loading...</div>}
-      {odds === null && <div className="rarity-odds-note">Not available</div>}
+      <div className="tooltip-title">{odds && 'kinds' in odds ? t('odds.byType') : t('odds.byRarity')}</div>
+      {odds === undefined && <div className="rarity-odds-note">{t('common.loading')}</div>}
+      {odds === null && <div className="rarity-odds-note">{t('common.notAvailable')}</div>}
       {odds &&
         !('kinds' in odds) &&
         RARITY_TIERS.filter((tier) => odds[tier] > 0).map((tier) => (

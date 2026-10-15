@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { MenuPage } from './menuMode'
+import { useT } from './i18n'
 
 interface Props {
   page: MenuPage
@@ -47,6 +48,7 @@ function MenuRail({
   onRewards,
   onOptions
 }: Props): React.JSX.Element {
+  const t = useT()
   // The hovered button's name, in a tooltip to its right, centred on it. Hover goes by
   // the button's slot, so a locked (disabled) button still says what it is.
   const [tip, setTip] = useState<{ label: string; note?: string; top: number; left: number } | null>(null)
@@ -58,7 +60,7 @@ function MenuRail({
       const rect = e.currentTarget.getBoundingClientRect()
       setTip({
         label,
-        note: blocked ? 'Finish the game in play first' : undefined,
+        note: blocked ? t('nav.locked') : undefined,
         top: rect.top + rect.height / 2,
         left: rect.right + 12
       })
@@ -66,35 +68,35 @@ function MenuRail({
     onMouseLeave: () => setTip(null)
   })
   const pages: { id: MenuPage; label: string; icon: React.ReactNode; badge?: string }[] = [
-    { id: 'home', label: 'Home', icon: <HomeIcon /> },
-    { id: 'catch', label: 'Catch', icon: <img className="menu-rail-icon" src="./icons/nav/classic.png" alt="" /> },
-    { id: 'box', label: 'Box', icon: <img className="menu-rail-icon" src="./icons/nav/box.png" alt="" /> },
-    { id: 'classic', label: 'Battles', icon: <img className="menu-rail-icon menu-rail-icon-pixel" src="./icons/nav/challenge.png" alt="" /> },
+    { id: 'home', label: t('nav.home'), icon: <HomeIcon /> },
+    { id: 'catch', label: t('nav.catch'), icon: <img className="menu-rail-icon" src="./icons/nav/classic.png" alt="" /> },
+    { id: 'box', label: t('nav.box'), icon: <img className="menu-rail-icon" src="./icons/nav/box.png" alt="" /> },
+    { id: 'classic', label: t('nav.battles'), icon: <img className="menu-rail-icon menu-rail-icon-pixel" src="./icons/nav/challenge.png" alt="" /> },
     {
       id: 'roguelite',
-      label: 'Battle Tower',
+      label: t('nav.tower'),
       icon: <img className="menu-rail-icon menu-rail-icon-pixel" src="./icons/nav/roguelite.png" alt="" />,
       badge: runFloor !== null ? `F${runFloor}` : undefined
     },
-    { id: 'draft', label: 'Draft', icon: <img className="menu-rail-icon menu-rail-icon-draft" src="./icons/nav/draft.png" alt="" /> },
+    { id: 'draft', label: t('nav.draft'), icon: <img className="menu-rail-icon menu-rail-icon-draft" src="./icons/nav/draft.png" alt="" /> },
     {
       id: 'raid',
-      label: 'Max Raid',
+      label: t('nav.raid'),
       icon: <img className="menu-rail-icon" src="./sprites/misc/raidcrystal.png" alt="" />,
       badge: raidCrystals ? `×${raidCrystals}` : undefined
     },
-    { id: 'corner', label: 'Game Corner', icon: <img className="menu-rail-icon" src="./icons/nav/coin.png" alt="" /> }
+    { id: 'corner', label: t('nav.corner'), icon: <img className="menu-rail-icon" src="./icons/nav/coin.png" alt="" /> }
   ]
   const tools: { label: string; icon: React.ReactNode; action: () => void; badge?: number }[] = [
-    { label: 'Items', icon: <img className="menu-rail-icon" src="./icons/nav/bag.png" alt="" />, action: onItems },
-    { label: 'Pokédex', icon: <img className="menu-rail-icon" src="./icons/nav/pokedex.png" alt="" />, action: onPokedex },
+    { label: t('nav.items'), icon: <img className="menu-rail-icon" src="./icons/nav/bag.png" alt="" />, action: onItems },
+    { label: t('nav.pokedex'), icon: <img className="menu-rail-icon" src="./icons/nav/pokedex.png" alt="" />, action: onPokedex },
     {
-      label: 'Rewards',
+      label: t('nav.rewards'),
       icon: <img className="menu-rail-icon" src="./icons/nav/achievements.png" alt="" />,
       action: onRewards,
       badge: rewardsWaiting
     },
-    { label: 'Options', icon: <img className="menu-rail-icon" src="./icons/nav/options.png" alt="" />, action: onOptions }
+    { label: t('nav.options'), icon: <img className="menu-rail-icon" src="./icons/nav/options.png" alt="" />, action: onOptions }
   ]
 
   return (
@@ -125,11 +127,11 @@ function MenuRail({
       {/* Wrapped so the phone layout can move them to the top bar (on desktop the
           wrapper is invisible to the layout). */}
       <div className="menu-rail-tools">
-        {tools.map((t) => (
-          <div key={t.label} className="menu-rail-slot" {...tipHandlers(t.label, locked)}>
-            <button className="menu-rail-item menu-rail-tool" aria-label={t.label} disabled={locked} onClick={t.action}>
-              {t.icon}
-              {!!t.badge && <span className="menu-rail-badge menu-rail-badge-pulse">{t.badge}</span>}
+        {tools.map((tool) => (
+          <div key={tool.label} className="menu-rail-slot" {...tipHandlers(tool.label, locked)}>
+            <button className="menu-rail-item menu-rail-tool" aria-label={tool.label} disabled={locked} onClick={tool.action}>
+              {tool.icon}
+              {!!tool.badge && <span className="menu-rail-badge menu-rail-badge-pulse">{tool.badge}</span>}
             </button>
           </div>
         ))}

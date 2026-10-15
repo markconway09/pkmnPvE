@@ -8,7 +8,7 @@ import Tooltip from './Tooltip'
 import PokemonTooltipContent from './PokemonTooltipContent'
 import SpriteImage from './SpriteImage'
 import ItemSprite from './ItemSprite'
-import { CLICK } from './platform'
+import { abilityName, clickWord, itemName, moveName, t, typeName } from './i18n'
 
 // The box's rarity colours (grey, blue, purple, pink, gold) - a card back glows in its own.
 const RARITY_COLORS: Record<RarityTier, string> = {
@@ -77,21 +77,21 @@ function DraftOfferCard({ mon, tooltip }: { mon: DraftMonView; tooltip: boolean 
       <FitName className="draft-offer-species" text={mon.species} />
       <span className="draft-offer-set">{mon.setName}</span>
       <span className="draft-offer-types">
-        {mon.types.map((t) => (
-          <span key={t} className={`type-badge type-${t.toLowerCase()}`}>
-            {t}
+        {mon.types.map((type) => (
+          <span key={type} className={`type-badge type-${type.toLowerCase()}`}>
+            {typeName(type)}
           </span>
         ))}
       </span>
       <span className="draft-offer-line">
         {mon.itemSpritenum != null && <ItemSprite spritenum={mon.itemSpritenum} className="item-drop-icon" />}
-        {mon.item || 'No item'}
+        {mon.item ? itemName(mon.item) : t('draft.noItem')}
       </span>
-      <span className="draft-offer-line draft-offer-ability">{mon.ability}</span>
+      <span className="draft-offer-line draft-offer-ability">{abilityName(mon.ability ?? '')}</span>
       <span className="draft-offer-moves">
         {mon.moveList.map((m) => (
           <span key={m.name} className={`draft-move type-${m.type.toLowerCase()}`}>
-            {m.name}
+            {moveName(m.name)}
           </span>
         ))}
       </span>
@@ -297,7 +297,7 @@ export function DraftPackOpening({ pack, round, disabled, slotFor, requestPick, 
     <div
       ref={stageRef}
       className={`draft-pack-stage${phase === 'opening' ? ' draft-pack-stage-opening' : ''}`}
-      title={phase === 'opening' ? `${CLICK} to skip` : undefined}
+      title={phase === 'opening' ? t('case.skip', { click: clickWord() }) : undefined}
       onClick={() => phase === 'opening' && skip()}
     >
       {intro && (

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { LiveMovePower, MoveInfo } from '../../shared/battle-types'
 import { fetchMoveInfo } from './moveInfoCache'
-import { movePowerText } from './movePower'
+import { categoryName, movePowerText } from './movePower'
+import { moveName, moveText, t, typeName } from './i18n'
 
 interface Props {
   moveId: string
@@ -24,22 +25,23 @@ function MoveTooltipContent({ moveId, fallbackName, power }: Props): React.JSX.E
     }
   }, [moveId])
 
-  if (info === undefined) return <div className="tooltip-panel">Loading...</div>
-  if (info === null) return <div className="tooltip-panel">{fallbackName ?? moveId}</div>
+  if (info === undefined) return <div className="tooltip-panel">{t('common.loading')}</div>
+  if (info === null) return <div className="tooltip-panel">{moveName(fallbackName ?? moveId)}</div>
 
+  const type = power?.type ?? info.type
   return (
     <div className="tooltip-panel">
-      <div className="tooltip-title">{info.name}</div>
+      <div className="tooltip-title">{moveName(info.name)}</div>
       <div className="tooltip-row">
-        <span className={`type-badge type-${(power?.type ?? info.type).toLowerCase()}`}>{power?.type ?? info.type}</span>
-        <span className="tooltip-category">{info.category}</span>
+        <span className={`type-badge type-${type.toLowerCase()}`}>{typeName(type)}</span>
+        <span className="tooltip-category">{categoryName(info.category)}</span>
       </div>
       <div className="tooltip-row">
-        <span>Power: {movePowerText(power, info.basePower)}</span>
-        <span>Accuracy: {info.accuracy === true ? '—' : `${info.accuracy}%`}</span>
-        <span>PP: {info.pp}</span>
+        <span>{t('move.power', { n: movePowerText(power, info.basePower) })}</span>
+        <span>{t('move.accuracy', { n: info.accuracy === true ? '—' : `${info.accuracy}%` })}</span>
+        <span>{t('move.pp', { n: info.pp })}</span>
       </div>
-      {info.description && <div className="tooltip-desc">{info.description}</div>}
+      {info.description && <div className="tooltip-desc">{moveText(info.id, info.description)}</div>}
     </div>
   )
 }

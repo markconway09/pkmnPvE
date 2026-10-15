@@ -4,14 +4,15 @@ import { TM_TIERS, type TmInfo } from '../../shared/tms'
 import ItemSprite from './ItemSprite'
 import { TR_SPRITENUM } from './itemIcon'
 import { TmCard } from './TmBits'
+import { moveName, nameMatches, t, typeName } from './i18n'
 
 type Show = 'owned' | 'missing' | 'all'
 
 // Where a TM can be found, in a few words for its card.
 function whereFound(tm: TmInfo): string {
-  if (tm.coinOnly) return 'Coin Shop only'
+  if (tm.coinOnly) return t('tm.coinOnly')
   const areas = WILD_LOCATIONS.filter((l) => l.types && tm.locations.includes(l.id)).map((l) => l.label)
-  return areas.length > 0 ? `${areas.join(', ')}, Anywhere` : 'Anywhere'
+  return areas.length > 0 ? `${areas.join(', ')}, ${t('tm.anywhere')}` : t('tm.anywhere')
 }
 
 /**
@@ -35,10 +36,10 @@ function TMsPanel(): React.JSX.Element {
 
   // By type, then rarest first, then name.
   const listed = useMemo(() => {
-    const q = query.trim().toLowerCase()
+    const q = query.trim()
     return (catalog ?? [])
-      .filter((t) => (show === 'all' ? true : show === 'owned' ? owned.has(t.moveId) : !owned.has(t.moveId)))
-      .filter((t) => !q || t.name.toLowerCase().includes(q) || t.type.toLowerCase().includes(q))
+      .filter((tm) => (show === 'all' ? true : show === 'owned' ? owned.has(tm.moveId) : !owned.has(tm.moveId)))
+      .filter((tm) => !q || nameMatches(q, tm.name, moveName(tm.name), tm.type, typeName(tm.type)))
       .sort(
         (a, b) =>
           a.type.localeCompare(b.type) || TM_TIERS.indexOf(b.tier) - TM_TIERS.indexOf(a.tier) || a.name.localeCompare(b.name)
@@ -51,23 +52,28 @@ function TMsPanel(): React.JSX.Element {
     <div className="bag-scroll tms-panel">
       <div className="tms-toolbar">
         <span className="tms-count">
-          <strong>{owned.size}</strong> / {catalog.length} TMs
+          {t('tm.count', { n: owned.size, of: catalog.length })}
         </span>
         <span className="tms-filter">
           {(['owned', 'missing', 'all'] as Show[]).map((s) => (
             <button key={s} className={show === s ? 'tms-filter-on' : undefined} onClick={() => setShow(s)}>
-              {s === 'owned' ? 'Owned' : s === 'missing' ? 'Missing' : 'All'}
+              {t(`tm.${s}`)}
             </button>
           ))}
         </span>
-        <input className="tms-search" placeholder="Search moves or types" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <input
+          className="tms-search"
+          placeholder={t('tm.searchPlaceholder')}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
       </div>
       {listed.length === 0 ? (
         <div className="tms-empty">
           <span className="tms-empty-icon">
             <ItemSprite spritenum={TR_SPRITENUM} />
           </span>
-          <p>{show === 'owned' && owned.size === 0 ? 'No TMs yet - search the wild areas in Classic to find some.' : 'Nothing here.'}</p>
+          <p>{show === 'owned' && owned.size === 0 ? t('tm.noneYet') : t('tm.nothingHere')}</p>
         </div>
       ) : (
         <div className="tms-grid">

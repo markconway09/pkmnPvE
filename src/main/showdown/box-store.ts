@@ -89,6 +89,7 @@ import { hasTitle, monSellPrice } from './title-perks'
 import { ALCHEMIST_ITEM_CHANCE } from '../../shared/titles'
 import { buildAutoSet, listAutoSets } from './auto-sets'
 import { getTmCatalog, lockedTmMoves } from './tm-store'
+import { itemName as localItemName, moveName, t } from '../i18n'
 
 interface StoredMon {
   id: string
@@ -404,7 +405,7 @@ function mergeEvolutionFor(
   const from = dexFormOf(set.species)
   if (from === line.form) return { ready: true, items: [] }
   const index = line.ancestors.indexOf(from)
-  if (index < 0) return { ready: false, items: [], reason: `It isn't in ${keeperSpecies}'s line` }
+  if (index < 0) return { ready: false, items: [], reason: t('evo.notInLine', { species: keeperSpecies }) }
   const steps = [...line.ancestors.slice(0, index).reverse(), line.form]
   const reserved = new Map<string, number>()
   const left = (id: string): number => (stock.get(id) ?? getItemQuantity(id)) - (reserved.get(id) ?? 0)
@@ -447,11 +448,11 @@ function mergeEvolutionFor(
     }
     if (!option) {
       const path = evolutionPathsFor(current).find((p) => dexFormOf(p.species) === step)
-      return { ready: false, items: [], reason: path ? `${current.species}: ${path.method}` : `${current.species} can't evolve into ${step}` }
+      return { ready: false, items: [], reason: path ? `${current.species}: ${path.method}` : t('evo.cantInto', { species: current.species, target: step }) }
     }
     if (option.requiredItems) {
       const item = option.requiredItems.find((id) => left(id) > 0)
-      if (!item) return { ready: false, items: [], reason: `Needs a ${itemName(option.requiredItems[0])}` }
+      if (!item) return { ready: false, items: [], reason: t('evo.needs', { item: itemName(option.requiredItems[0]) }) }
       reserved.set(item, (reserved.get(item) ?? 0) + 1)
       items.push(item)
     }
@@ -607,10 +608,10 @@ function companionUnlocked(): boolean {
  * (see awardFriendshipToTeam).
  */
 export function setCompanion(id: string): BoxState {
-  if (!companionUnlocked()) throw new Error('The companion slot unlocks with the Best Friends achievement')
+  if (!companionUnlocked()) throw new Error(t('err.theCompanionSlotUnlocksWithThe'))
   const box = getState()
   const mon = box.mons.find((m) => m.id === id)
-  if (!mon) throw new Error(`Unknown Pokemon id: ${id}`)
+  if (!mon) throw new Error(t('err.unknownPokemonId', { a: id }))
   box.companionId = mon.id
   // A new companion starts at the size its height gives it.
   box.companionSize = undefined
@@ -620,7 +621,7 @@ export function setCompanion(id: string): BoxState {
 
 /** How big the companion is drawn: S, M, L or XL, or 'auto' - by its height. */
 export function setCompanionSize(size: CompanionSizeChoice): BoxState {
-  if (size !== 'auto' && !COMPANION_SIZES.includes(size)) throw new Error('Pick a size: Auto, S, M, L or XL')
+  if (size !== 'auto' && !COMPANION_SIZES.includes(size)) throw new Error(t('err.pickASizeAutoSM'))
   getState().companionSize = size === 'auto' ? undefined : size
   persist()
   return getBoxState()
@@ -636,7 +637,7 @@ function companionSizeNow(): CompanionSize {
 /** No companion any more (the Pokemon itself was in the box all along). */
 export function returnCompanion(): BoxState {
   const box = getState()
-  if (!box.companionId) throw new Error('There is no companion')
+  if (!box.companionId) throw new Error(t('err.thereIsNoCompanion'))
   box.companionId = null
   persist()
   return getBoxState()
@@ -722,9 +723,9 @@ function alchemistFinds(count: number): string[] {
 export function sellMon(id: string): { sold: number; species: string; money: number; box: BoxState; found: string[] } {
   const box = getState()
   const index = box.mons.findIndex((m) => m.id === id)
-  if (index === -1) throw new Error(`Unknown Pokemon id: ${id}`)
-  if (box.mons.length <= 1) throw new Error("That's your last Pokemon - it can't be sold")
-  if (box.mons[index].fusedWith) throw new Error('Unfuse it first - its partner would be sold with it')
+  if (index === -1) throw new Error(t('err.unknownPokemonId', { a: id }))
+  if (box.mons.length <= 1) throw new Error(t('err.thatSYourLastPokemonIt'))
+  if (box.mons[index].fusedWith) throw new Error(t('err.unfuseItFirstItsPartnerWould'))
   const [mon] = box.mons.splice(index, 1)
   box.team = box.team.map((slot) => (slot === id ? null : slot))
   const sold = monSellPrice(speciesRarityTier(mon.set.species), !!mon.set.shiny, mon.copies)
@@ -744,10 +745,10 @@ export function sellMons(ids: string[]): { sold: number; count: number; money: n
   const box = getState()
   const wanted = new Set(ids)
   const selling = box.mons.filter((m) => wanted.has(m.id))
-  if (selling.length === 0) throw new Error('Nothing to sell')
-  if (selling.length !== wanted.size) throw new Error('One of those Pokemon is no longer in the box')
-  if (selling.some((m) => m.fusedWith)) throw new Error('Unfuse it first - its partner would be sold with it')
-  if (box.mons.length - selling.length < 1) throw new Error("You can't sell every Pokemon - keep at least one")
+  if (selling.length === 0) throw new Error(t('err.nothingToSell'))
+  if (selling.length !== wanted.size) throw new Error(t('err.oneOfThosePokemonIsNo'))
+  if (selling.some((m) => m.fusedWith)) throw new Error(t('err.unfuseItFirstItsPartnerWould'))
+  if (box.mons.length - selling.length < 1) throw new Error(t('err.youCanTSellEveryPokemon'))
   box.mons = box.mons.filter((m) => !wanted.has(m.id))
   box.team = box.team.map((slot) => (slot && wanted.has(slot) ? null : slot))
   const sold = selling.reduce((sum, m) => sum + monSellPrice(speciesRarityTier(m.set.species), !!m.set.shiny, m.copies), 0)
@@ -760,13 +761,13 @@ export function sellMons(ids: string[]): { sold: number; count: number; money: n
 }
 
 export function setTeam(team: (string | null)[]): BoxState {
-  if (team.length !== 6) throw new Error('Team must have exactly 6 slots')
+  if (team.length !== 6) throw new Error(t('err.teamMustHaveExactly6Slots'))
   const knownIds = new Set(getState().mons.map((m) => m.id))
   const seen = new Set<string>()
   for (const id of team) {
     if (id === null) continue
-    if (!knownIds.has(id)) throw new Error(`Unknown Pokemon id: ${id}`)
-    if (seen.has(id)) throw new Error(`Pokemon ${id} assigned to multiple team slots`)
+    if (!knownIds.has(id)) throw new Error(t('err.unknownPokemonId', { a: id }))
+    if (seen.has(id)) throw new Error(t('err.pokemonAssignedToMultipleTeamSlots', { a: id }))
     seen.add(id)
   }
   getState().team = [...team]
@@ -777,13 +778,13 @@ export function setTeam(team: (string | null)[]): BoxState {
 /** A detached copy of a box Pokemon's set - for a Battle Tower run, which must never change the original. */
 export function copyBoxMonSet(id: string): PokemonSet {
   const mon = getState().mons.find((m) => m.id === id)
-  if (!mon) throw new Error(`Unknown Pokemon id: ${id}`)
+  if (!mon) throw new Error(t('err.unknownPokemonId', { a: id }))
   return structuredClone(mon.set)
 }
 
 export function getMonSet(id: string): EditablePokemonSet {
   const mon = getState().mons.find((m) => m.id === id)
-  if (!mon) throw new Error(`Unknown Pokemon id: ${id}`)
+  if (!mon) throw new Error(t('err.unknownPokemonId', { a: id }))
   return { ...toEditableSet(mon.set), mergeStars: mergeStarsFor(mon.copies) }
 }
 
@@ -792,7 +793,7 @@ export function getMonSet(id: string): EditablePokemonSet {
 // admin bypass - only a genuine player edit reconciles held items against it.
 export function updateMon(id: string, input: EditablePokemonSet, admin = false): BoxState {
   const mon = getState().mons.find((m) => m.id === id)
-  if (!mon) throw new Error(`Unknown Pokemon id: ${id}`)
+  if (!mon) throw new Error(t('err.unknownPokemonId', { a: id }))
   const previousSpecies = mon.set.species
   const previousLevel = mon.set.level
   const previousItem = mon.set.item
@@ -803,14 +804,14 @@ export function updateMon(id: string, input: EditablePokemonSet, admin = false):
     const blocked = input.moves.find((m) => locked.has(toID(m)))
     if (blocked) {
       const name = getTmCatalog().find((t) => t.moveId === toID(blocked))?.name ?? blocked
-      throw new Error(`${name} needs its TM - find it first`)
+      throw new Error(t('err.needsItsTmFindItFirst', { a: moveName(name) }))
     }
   }
   if (!admin && newItem !== previousItem) {
     // Check the new item before touching anything else, so a failed equip
     // (item not actually in the bag) leaves the mon and bag both untouched.
     if (newItem && !removeItem(toID(newItem), 1)) {
-      throw new Error(`You don't have a ${newItem} in your bag`)
+      throw new Error(t('err.youDonTHaveAIn', { a: localItemName(newItem) }))
     }
     if (previousItem) addItem(toID(previousItem), 1)
   }
@@ -844,7 +845,7 @@ export function updateMon(id: string, input: EditablePokemonSet, admin = false):
 // Merging is late game: it opens with Max Raids, once the boss flagged to unlock late
 // items is beaten.
 function requireMergeUnlocked(): void {
-  if (!lateItemsUnlocked()) throw new Error("Merging isn't unlocked yet - it opens with Max Raids")
+  if (!lateItemsUnlocked()) throw new Error(t('err.mergingIsnTUnlockedYetIt'))
 }
 
 export function mergeMons(keeperId: string, fodderIds: string[]): BoxState {
@@ -861,28 +862,28 @@ export function mergeMons(keeperId: string, fodderIds: string[]): BoxState {
 function mergeInto(keeperId: string, fodderIds: string[], boosts: MergeBoosts = {}): number {
   const box = getState()
   const keeper = box.mons.find((m) => m.id === keeperId)
-  if (!keeper) throw new Error(`Unknown Pokemon id: ${keeperId}`)
+  if (!keeper) throw new Error(t('err.unknownPokemonId', { a: keeperId }))
   const wanted = new Set(fodderIds)
-  if (wanted.size === 0) throw new Error('Pick at least one Pokemon to merge in')
-  if (wanted.has(keeperId)) throw new Error("A Pokemon can't be merged into itself")
+  if (wanted.size === 0) throw new Error(t('err.pickAtLeastOnePokemonTo'))
+  if (wanted.has(keeperId)) throw new Error(t('err.aPokemonCanTBeMerged'))
   const fodder = box.mons.filter((m) => wanted.has(m.id))
-  if (fodder.length !== wanted.size) throw new Error('One of those Pokemon is no longer in the box')
+  if (fodder.length !== wanted.size) throw new Error(t('err.oneOfThosePokemonIsNo'))
   // Only the same form: an alternate form (Alolan, Therian, a Rotom appliance) is its own species here.
   const species = dexFormOf(keeper.set.species)
   if (fodder.some((m) => !canMergeInto(keeper.set.species, m.set.species))) {
-    throw new Error(`Only another ${species}, or one of its pre-evolutions, can be merged in`)
+    throw new Error(t('err.onlyAnotherOrOneOfIts', { a: species }))
   }
   if (fodder.some((m) => !mergesInto(keeper, m))) {
-    throw new Error("An Everstone-locked Pokemon can't evolve - it only merges into its own form")
+    throw new Error(t('err.anEverstoneLockedPokemonCanT'))
   }
-  if (fodder.some((m) => m.fusedWith)) throw new Error('Unfuse it first - its partner would be merged away with it')
-  if (fodder.some(isMergeMaxed)) throw new Error(`A ${MERGE_MAX_STARS}-star Pokemon can't be merged into another`)
+  if (fodder.some((m) => m.fusedWith)) throw new Error(t('err.unfuseItFirstItsPartnerWould2'))
+  if (fodder.some(isMergeMaxed)) throw new Error(t('err.aStarPokemonCanTBe', { a: MERGE_MAX_STARS }))
   if (fodder.some((m) => m.id === box.companionId)) {
-    throw new Error("Your companion can't be merged into anything - take it out of the companion slot first")
+    throw new Error(t('err.yourCompanionCanTBeMerged'))
   }
-  if ((keeper.copies ?? 1) >= MERGE_MAX_COPIES) throw new Error(`${keeper.set.species} is already at ${MERGE_MAX_STARS} stars`)
+  if ((keeper.copies ?? 1) >= MERGE_MAX_COPIES) throw new Error(t('err.isAlreadyAtStars', { a: keeper.set.species, b: MERGE_MAX_STARS }))
   if (!takesMerges(keeper)) {
-    throw new Error(`${keeper.set.species} has to be fully evolved (or locked with an Everstone) to take merges`)
+    throw new Error(t('err.hasToBeFullyEvolvedOr', { a: keeper.set.species }))
   }
   // A pre-evolution evolves on its way in - everything it needs for that, with the bag's
   // items shared out among them in turn.
@@ -890,7 +891,7 @@ function mergeInto(keeperId: string, fodderIds: string[], boosts: MergeBoosts = 
   const evolveItems = new Map<string, string[]>()
   for (const m of fodder) {
     const evolution = mergeEvolutionFor(m.set, keeper.set.species, stock, boosts)
-    if (!evolution.ready) throw new Error(`${m.set.species} can't merge in yet - ${evolution.reason}`)
+    if (!evolution.ready) throw new Error(t('err.canTMergeInYet', { a: m.set.species, b: evolution.reason ?? '' }))
     evolveItems.set(m.id, evolution.items)
   }
   const plan = planMerge(
@@ -987,7 +988,7 @@ export function mergeSelectedMons(ids: string[], boosts: MergeBoosts = {}): { bo
     )
     results.push({ species: keeper.set.species, stars: mergeStarsFor(keeper.copies) })
   }
-  if (merged === 0) throw new Error('Pick at least two of the same Pokemon to merge')
+  if (merged === 0) throw new Error(t('err.pickAtLeastTwoOfThe'))
   return { box: getBoxState(), merged, results }
 }
 
@@ -1031,7 +1032,7 @@ export function mergeKeeperPreview(monId: string): { species: string; stars: num
 export function autoMergeMon(monId: string): { box: BoxState; species: string; stars: number } {
   requireMergeUnlocked()
   const keeper = bestMergeKeeperFor(monId)
-  if (!keeper) throw new Error('There is nothing in the box for it to merge into')
+  if (!keeper) throw new Error(t('err.thereIsNothingInTheBox'))
   mergeInto(keeper.id, [monId])
   return { box: getBoxState(), species: keeper.set.species, stars: mergeStarsFor(keeper.copies) }
 }
@@ -1086,7 +1087,7 @@ function readSavedTeamMons(playerSlug: string): StoredMon[] {
     saved = JSON.parse(readText(joinPath(playerDirFor(playerSlug), 'box.json'))) as StoredBox
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return []
-    throw new Error("That player's save couldn't be read")
+    throw new Error(t('err.thatPlayerSSaveCouldnT'))
   }
   if (!Array.isArray(saved.mons) || !Array.isArray(saved.team)) return []
   const byId = new Map(saved.mons.map((m) => [m.id, m]))
@@ -1113,7 +1114,7 @@ export function scaleTeamToLevel(team: PokemonSet[], level: number): PokemonSet[
 const STARTER_LEVEL = 5
 
 export function addStarter(species: string): BoxState {
-  if (getState().mons.length > 0) throw new Error('The box is not empty')
+  if (getState().mons.length > 0) throw new Error(t('err.theBoxIsNotEmpty'))
   const speciesName = species === 'random' ? pickRandomUnevolvedSpecies() : species
   const set = { ...buildBasicSet(speciesName, STARTER_LEVEL), happiness: 0, shiny: rollGiftShiny() }
   const id = randomUUID()
@@ -1162,13 +1163,13 @@ export function awardExpToTeam(totalExp: number): ExpGainResult[] {
 // would do nothing.
 export function useExpCandy(itemId: string): ExpGainResult[] {
   const amount = EXP_CANDY_EXP[itemId]
-  if (!amount) throw new Error("That isn't an Exp. Candy")
+  if (!amount) throw new Error(t('err.thatIsnTAnExpCandy'))
   const levelCap = getProgression().levelCap
   const byId = new Map(getState().mons.map((m) => [m.id, m]))
   const team = getState().team.flatMap((id) => (id && byId.get(id) ? [byId.get(id)!] : []))
-  if (team.length === 0) throw new Error('Your team is empty')
-  if (team.every((m) => m.set.level >= levelCap)) throw new Error('Your whole team is already at the level cap')
-  if (!removeItem(itemId, 1)) throw new Error("You don't have that item")
+  if (team.length === 0) throw new Error(t('err.yourTeamIsEmpty'))
+  if (team.every((m) => m.set.level >= levelCap)) throw new Error(t('err.yourWholeTeamIsAlreadyAt'))
+  if (!removeItem(itemId, 1)) throw new Error(t('err.youDonTHaveThatItem'))
   return awardExpToTeam(amount)
 }
 
@@ -1222,16 +1223,16 @@ export function awardFriendshipToTeam(baseAmount = FRIENDSHIP_PER_BATTLE): void 
 
 export function evolveMon(id: string, targetSpecies: string): BoxState {
   const mon = getState().mons.find((m) => m.id === id)
-  if (!mon) throw new Error(`Unknown Pokemon id: ${id}`)
-  if (mon.everstone) throw new Error(`${mon.set.species} is locked with an Everstone - it never evolves`)
+  if (!mon) throw new Error(t('err.unknownPokemonId', { a: id }))
+  if (mon.everstone) throw new Error(t('err.isLockedWithAnEverstoneIt', { a: mon.set.species }))
   const chosen = evolutionOptionsFor(mon.set).find((o) => o.species === targetSpecies)
-  if (!chosen) throw new Error(`${mon.set.species} cannot evolve into ${targetSpecies} right now`)
+  if (!chosen) throw new Error(t('err.cannotEvolveIntoRightNow', { a: mon.set.species, b: targetSpecies }))
   if (chosen.requiredItems) {
     // Any one of the accepted items will do (Milcery takes any Sweet) - spend
     // whichever the player actually has.
     const owned = chosen.requiredItems.find(hasItem)
     if (!owned || !removeItem(owned, 1)) {
-      throw new Error(`You don't have the item needed for this evolution`)
+      throw new Error(t('err.youDonTHaveTheItem'))
     }
   }
   // A Sweet's cream - or, now and then, a rare one (see rollMilceryCream).
@@ -1248,9 +1249,9 @@ export function evolveMon(id: string, targetSpecies: string): BoxState {
  */
 export function setEverstone(id: string, locked: boolean): BoxState {
   const mon = getState().mons.find((m) => m.id === id)
-  if (!mon) throw new Error(`Unknown Pokemon id: ${id}`)
-  if (locked && isFullyEvolved(mon.set.species)) throw new Error(`${mon.set.species} is fully evolved - there's nothing to lock`)
-  if (!locked && (mon.copies ?? 1) > 1) throw new Error(`${mon.set.species} has taken merges - its Everstone stays for good`)
+  if (!mon) throw new Error(t('err.unknownPokemonId', { a: id }))
+  if (locked && isFullyEvolved(mon.set.species)) throw new Error(t('err.isFullyEvolvedThereSNothing', { a: mon.set.species }))
+  if (!locked && (mon.copies ?? 1) > 1) throw new Error(t('err.hasTakenMergesItsEverstoneStays', { a: mon.set.species }))
   if (locked) mon.everstone = true
   else delete mon.everstone
   persist()
@@ -1263,9 +1264,9 @@ export function setEverstone(id: string, locked: boolean): BoxState {
 // as battle exp so it can't be used to skip past current progression.
 export function levelUpMon(id: string): BoxState {
   const mon = getState().mons.find((m) => m.id === id)
-  if (!mon) throw new Error(`Unknown Pokemon id: ${id}`)
-  if (mon.set.level >= getProgression().levelCap) throw new Error(`${mon.set.species} is already at the level cap`)
-  if (!removeItem(RARE_CANDY_ITEM_ID, 1)) throw new Error(`You don't have a Rare Candy`)
+  if (!mon) throw new Error(t('err.unknownPokemonId', { a: id }))
+  if (mon.set.level >= getProgression().levelCap) throw new Error(t('err.isAlreadyAtTheLevelCap', { a: mon.set.species }))
+  if (!removeItem(RARE_CANDY_ITEM_ID, 1)) throw new Error(t('err.youDonTHaveARare'))
   mon.set.level += 1
   mon.exp = totalExpForSpeciesLevel(mon.set.species, mon.set.level)
   persist()
@@ -1277,8 +1278,9 @@ export function levelUpMon(id: string): BoxState {
  * up), with the new form's best Smogon set - moves, ability, nature, EVs and IVs - fitted
  * to its level. Its held item stays.
  */
+// In the game's language, for its lines.
 function itemName(itemId: string): string {
-  return getEditorOptions().items.find((i) => i.id === itemId)?.name ?? itemId
+  return localItemName(getEditorOptions().items.find((i) => i.id === itemId)?.name ?? itemId)
 }
 
 // The fusion menu entries for a Pokemon: the partners in the box a plain Necrozma, Kyurem
@@ -1321,11 +1323,11 @@ export function fuseMon(id: string, partnerId: string): BoxState {
   const box = getState()
   const mon = box.mons.find((m) => m.id === id)
   const partner = box.mons.find((m) => m.id === partnerId)
-  if (!mon || !partner || mon === partner) throw new Error('Unknown Pokemon')
-  if (mon.fusedWith || partner.fusedWith) throw new Error('One of those is already fused')
+  if (!mon || !partner || mon === partner) throw new Error(t('err.unknownPokemon'))
+  if (mon.fusedWith || partner.fusedWith) throw new Error(t('err.oneOfThoseIsAlreadyFused'))
   const rule = FUSIONS.find((f) => f.base === mon.set.species && f.partner === baseSpeciesOf(partner.set.species))
-  if (!rule) throw new Error(`${mon.set.species} can't fuse with ${partner.set.species}`)
-  if (!hasItem(rule.itemId)) throw new Error(`You don't have the ${itemName(rule.itemId)}`)
+  if (!rule) throw new Error(t('err.canTFuseWith', { a: mon.set.species, b: partner.set.species }))
+  if (!hasItem(rule.itemId)) throw new Error(t('err.youDonTHaveThe', { a: itemName(rule.itemId) }))
   box.mons = box.mons.filter((m) => m !== partner)
   box.team = box.team.map((slot) => (slot === partner.id ? null : slot))
   mon.fusedWith = partner
@@ -1338,10 +1340,10 @@ export function fuseMon(id: string, partnerId: string): BoxState {
 export function unfuseMon(id: string): BoxState {
   const box = getState()
   const mon = box.mons.find((m) => m.id === id)
-  if (!mon?.fusedWith) throw new Error("That Pokemon isn't fused")
+  if (!mon?.fusedWith) throw new Error(t('err.thatPokemonIsnTFused'))
   const rule = FUSIONS.find((f) => f.result === mon.set.species)
-  if (!rule) throw new Error(`${mon.set.species} can't be unfused`)
-  if (!hasItem(rule.itemId)) throw new Error(`You don't have the ${itemName(rule.itemId)}`)
+  if (!rule) throw new Error(t('err.canTBeUnfused', { a: mon.set.species }))
+  if (!hasItem(rule.itemId)) throw new Error(t('err.youDonTHaveThe', { a: itemName(rule.itemId) }))
   const partner = mon.fusedWith
   delete mon.fusedWith
   mon.set = withSmogonSet(mon.set, rule.base)
@@ -1358,10 +1360,10 @@ export function unfuseMon(id: string): BoxState {
  */
 export function changeForm(id: string, form: string): BoxState {
   const mon = getState().mons.find((m) => m.id === id)
-  if (!mon) throw new Error(`Unknown Pokemon id: ${id}`)
+  if (!mon) throw new Error(t('err.unknownPokemonId', { a: id }))
   const change = formChangeFor(mon.set.species)
-  if (!change || !change.forms.includes(form)) throw new Error(`${mon.set.species} can't change into ${form}`)
-  if (!hasItem(change.itemId)) throw new Error(`You don't have the ${itemName(change.itemId)}`)
+  if (!change || !change.forms.includes(form)) throw new Error(t('err.canTChangeInto', { a: mon.set.species, b: form }))
+  if (!hasItem(change.itemId)) throw new Error(t('err.youDonTHaveThe', { a: itemName(change.itemId) }))
   // Alcremie's creams and Pikachu's outfits are the same Pokemon otherwise: it keeps its whole set.
   const lookOnly = change.itemId === DECORATION_BOX_ITEM_ID || change.itemId === FASHION_CASE_ITEM_ID
   mon.set = lookOnly ? { ...mon.set, species: form } : withSmogonSet(mon.set, form)
@@ -1372,9 +1374,9 @@ export function changeForm(id: string, form: string): BoxState {
 // Spends a Shiny Patch from the bag to make one Pokemon shiny for good.
 export function useShinyPatch(id: string): BoxState {
   const mon = getState().mons.find((m) => m.id === id)
-  if (!mon) throw new Error(`Unknown Pokemon id: ${id}`)
-  if (mon.set.shiny) throw new Error(`${mon.set.species} is already shiny`)
-  if (!removeItem(SHINY_PATCH_ITEM_ID, 1)) throw new Error(`You don't have a Shiny Patch`)
+  if (!mon) throw new Error(t('err.unknownPokemonId', { a: id }))
+  if (mon.set.shiny) throw new Error(t('err.isAlreadyShiny', { a: mon.set.species }))
+  if (!removeItem(SHINY_PATCH_ITEM_ID, 1)) throw new Error(t('err.youDonTHaveAShiny'))
   mon.set.shiny = true
   persist()
   return getBoxState()
@@ -1383,9 +1385,9 @@ export function useShinyPatch(id: string): BoxState {
 // Spends a Friendship Petal from the bag to max out one Pokemon's friendship.
 export function useFriendshipPetal(id: string): BoxState {
   const mon = getState().mons.find((m) => m.id === id)
-  if (!mon) throw new Error(`Unknown Pokemon id: ${id}`)
-  if (atMaxFriendship(mon)) throw new Error(`${mon.set.species}'s friendship is already maxed`)
-  if (!removeItem(FRIENDSHIP_PETAL_ITEM_ID, 1)) throw new Error(`You don't have a Friendship Petal`)
+  if (!mon) throw new Error(t('err.unknownPokemonId', { a: id }))
+  if (atMaxFriendship(mon)) throw new Error(t('err.sFriendshipIsAlreadyMaxed', { a: mon.set.species }))
+  if (!removeItem(FRIENDSHIP_PETAL_ITEM_ID, 1)) throw new Error(t('err.youDonTHaveAFriendship'))
   mon.set.happiness = MAX_HAPPINESS
   persist()
   return getBoxState()
@@ -1394,7 +1396,7 @@ export function useFriendshipPetal(id: string): BoxState {
 // Favorites are listed first in the box and carry a star badge.
 export function toggleFavorite(id: string): BoxState {
   const mon = getState().mons.find((m) => m.id === id)
-  if (!mon) throw new Error(`Unknown Pokemon id: ${id}`)
+  if (!mon) throw new Error(t('err.unknownPokemonId', { a: id }))
   if (mon.favorite) delete mon.favorite
   else mon.favorite = true
   persist()

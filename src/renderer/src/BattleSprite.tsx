@@ -18,6 +18,7 @@ import { gmaxSpriteCandidates, spriteCandidates, type SpriteStyle } from './spri
 import ItemSprite from './ItemSprite'
 import ShinyIcon from './ShinyIcon'
 import { playCry } from './cries'
+import { abilityName, itemName, statusLabel, t, typeName } from './i18n'
 
 interface Props {
   pokemon: ActivePokemonView | null
@@ -85,24 +86,6 @@ const CANT_MOVE_PIECES: Partial<Record<NonNullable<FeedbackEvent['emphasis']>, {
   poison: { glyph: '●', staggerMs: 120 }
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  par: 'PAR',
-  brn: 'BRN',
-  psn: 'PSN',
-  tox: 'PSN',
-  slp: 'SLP',
-  frz: 'FRZ'
-}
-
-const BOOST_LABELS: Record<BoostStat, string> = {
-  atk: 'ATK',
-  def: 'DEF',
-  spa: 'SpA',
-  spd: 'SpD',
-  spe: 'SPE',
-  accuracy: 'ACC',
-  evasion: 'EVA'
-}
 
 // A move or ability has changed its types (Soak, Forest's Curse, Color Change,
 // Terastallizing, ...) - as opposed to a form change, which is just a different Pokemon.
@@ -273,7 +256,7 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
         {screens && screens.length > 0 && <SideScreens screens={screens} />}
         {/* Seeded: little green orbs on the ground at its feet, like the hazards. */}
         {displayed.volatiles.some((b) => b.id === 'leechseed') && (
-          <div className="leech-seed-orbs" title="Leech Seed">
+          <div className="leech-seed-orbs" title={t('sprite.leechSeed')}>
             {Array.from({ length: 3 }).map((_, i) => (
               <span key={i} className="leech-seed-orb" />
             ))}
@@ -340,13 +323,13 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
               key={shownAbility.ability + shownAbility.slot}
               className={`ability-popup ability-popup-${align}${shownAbility.itemSpritenum !== undefined ? ' ability-popup-item' : ''}`}
             >
-              <span className="ability-popup-mon">{shownAbility.pokemon}&apos;s</span>
+              <span className="ability-popup-mon">{t('sprite.abilityOf', { name: shownAbility.pokemon })}</span>
               <span className="ability-popup-name">
                 {/* A held item at work shows its icon. */}
                 {shownAbility.itemSpritenum !== undefined && (
                   <ItemSprite spritenum={shownAbility.itemSpritenum} className="ability-popup-icon" />
                 )}
-                {shownAbility.ability}
+                {shownAbility.itemSpritenum !== undefined ? itemName(shownAbility.ability) : abilityName(shownAbility.ability)}
               </span>
             </div>
           )}
@@ -380,53 +363,54 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
         <div className="sprite-name-row">
           <span className="sprite-name">{displayed.species}</span>
           {displayed.caughtBefore && (
-            <span className="sprite-caught" title="Caught before">
+            <span className="sprite-caught" title={t('sprite.caughtBefore')}>
               <ItemSprite spritenum={POKE_BALL_SPRITENUM} />
             </span>
           )}
           {displayed.shiny && <ShinyIcon />}
-          <span className="sprite-level">Lv{displayed.level}</span>
+          <span className="sprite-level">{t('sprite.lv', { level: displayed.level })}</span>
           {!!displayed.mergeStars && (
-            <span className="sprite-merge-stars" title={`${displayed.mergeStars} merge stars - its stats are raised`}>
+            <span className="sprite-merge-stars" title={t('sprite.mergeStars', { n: displayed.mergeStars })}>
               ★{displayed.mergeStars}
             </span>
           )}
           {displayed.status && (
-            <span className={`status-badge status-${displayed.status}`}>
-              {STATUS_LABELS[displayed.status] ?? displayed.status.toUpperCase()}
-            </span>
+            <span className={`status-badge status-${displayed.status}`}>{statusLabel(displayed.status)}</span>
           )}
         </div>
         {displayed.terastallized || displayed.megaEvolved || displayed.dynamaxed ? (
           // Shown whether or not it changed its types - a Fire Tera on a Fire type is still a Tera.
           <div className="sprite-types">
             {displayed.dynamaxed && (
-              <span className="type-badge gimmick-badge dynamax-badge" title={displayed.gigantamax ? 'Gigantamaxed' : 'Dynamaxed'}>
-                {displayed.gigantamax ? 'G-Max' : 'Dynamax'}
+              <span
+                className="type-badge gimmick-badge dynamax-badge"
+                title={displayed.gigantamax ? t('sprite.gigantamaxed') : t('sprite.dynamaxed')}
+              >
+                {displayed.gigantamax ? t('sprite.gmax') : t('sprite.dynamax')}
               </span>
             )}
             {displayed.megaEvolved && (
-              <span className="type-badge gimmick-badge mega-badge" title="Mega Evolved">
+              <span className="type-badge gimmick-badge mega-badge" title={t('sprite.megaEvolved')}>
                 <img className="gimmick-badge-icon" src="./sprites/misc/mega-icon.webp" alt="" />
-                Mega
+                {t('sprite.mega')}
               </span>
             )}
             {displayed.terastallized && (
               <span
                 className={`type-badge gimmick-badge tera-badge type-${displayed.terastallized.toLowerCase()}`}
-                title={`Terastallized into the ${displayed.terastallized} type`}
+                title={t('sprite.terastallized', { type: typeName(displayed.terastallized) })}
               >
                 <img className="gimmick-badge-icon tera-badge-icon" src="./sprites/misc/tera-icon.png" alt="" />
-                {displayed.terastallized}
+                {typeName(displayed.terastallized)}
               </span>
             )}
           </div>
         ) : (
           typesChanged(displayed) && (
-            <div className="sprite-types" title="Its type has changed">
+            <div className="sprite-types" title={t('sprite.typeChanged')}>
               {displayed.types.map((type) => (
                 <span key={type} className={`type-badge type-${type.toLowerCase().replace(/[^a-z]/g, '')}`}>
-                  {type}
+                  {typeName(type)}
                 </span>
               ))}
             </div>
@@ -442,7 +426,7 @@ function BattleSprite({ pokemon, facing, align, spriteStyle, slotIndex = 0, haza
               .filter(([, amount]) => amount !== 0)
               .map(([stat, amount]) => (
                 <span key={stat} className={`boost-badge ${amount > 0 ? 'boost-up' : 'boost-down'}`}>
-                  {BOOST_LABELS[stat]}
+                  {t(`boost.${stat}`)}
                   {amount > 0 ? '+' : ''}
                   {amount}
                 </span>

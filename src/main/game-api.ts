@@ -5,6 +5,7 @@
  * push the online battle's screens back to the one that started it.
  */
 import { appVersion, randomUUID } from './platform'
+import { setGameLocale, t } from './i18n'
 import type {
   BattleEligibility,
   BossRematchInfo,
@@ -343,7 +344,7 @@ export function scheduleAchievementCheck(): void {
 }
 handle('battle:start', async (_event, locationId?: WildLocationId, levelCapOverride?: number) => {
   const p1team = getTeamPokemonSets()
-  if (p1team.length === 0) throw new Error('Your team is empty - add Pokemon and assign them to your team first')
+  if (p1team.length === 0) throw new Error(t('err.yourTeamIsEmptyAddPokemon'))
   const levelCap = getProgression().levelCap
   // The slider only ever lowers the wild pool, never raises it past what the
   // player's actual progression allows - clamped here rather than trusting
@@ -352,14 +353,14 @@ handle('battle:start', async (_event, locationId?: WildLocationId, levelCapOverr
     levelCapOverride != null ? Math.min(Math.max(15, Math.floor(levelCapOverride)), levelCap) : levelCap
   const location = WILD_LOCATIONS.find((l) => l.id === locationId) ?? null
   if (location?.requiresAllBosses && !allBossesDefeated()) {
-    throw new Error(`${location.label} opens once every boss is beaten`)
+    throw new Error(t('err.opensOnceEveryBossIsBeaten', { a: location.label }))
   }
   // The DexNav's hunted Pokemon first, at its chain's chance - otherwise the usual roll.
   const huntedMon = rollDexNavEncounter(location, effectiveLevelCap)
   const wildMon =
     huntedMon ??
     (location?.id === 'lab' ? generateLabWildMon(effectiveLevelCap) : generateRandomWildMon(effectiveLevelCap, location))
-  if (!wildMon) throw new Error('Could not find a wild Pokemon for your current level cap in that location')
+  if (!wildMon) throw new Error(t('err.couldNotFindAWildPokemon'))
   const wildDrop = getWildDropFor(wildMon.species)
   // A Pokemon with a friendship evolution can drop a Friendship Petal, on top of its own drop -
   // once petals are unlocked (a late game item).
@@ -386,7 +387,7 @@ handle('battle:start', async (_event, locationId?: WildLocationId, levelCapOverr
 
 handle('battle:startTrainer', async (_event, boss: boolean, rematchTrainerId?: string) => {
   const p1team = getTeamPokemonSets()
-  if (p1team.length === 0) throw new Error('Your team is empty - add Pokemon and assign them to your team first')
+  if (p1team.length === 0) throw new Error(t('err.yourTeamIsEmptyAddPokemon'))
   const progression = getProgression()
   const levelCap = progression.levelCap
 
@@ -397,23 +398,23 @@ handle('battle:startTrainer', async (_event, boss: boolean, rematchTrainerId?: s
     // mission or stat progress, and no boss progress.
     const inOrder = progression.bossOrder.some((step) => step.trainerId === rematchTrainerId)
     if (!inOrder || !progression.bossesDefeated.includes(rematchTrainerId)) {
-      throw new Error('Only a boss you have already beaten can be rematched')
+      throw new Error(t('err.onlyABossYouHaveAlready'))
     }
     trainer = listTrainers().find((t) => t.id === rematchTrainerId) ?? null
-    if (!trainer) throw new Error('That boss trainer no longer exists')
+    if (!trainer) throw new Error(t('err.thatBossTrainerNoLongerExists'))
   } else if (boss) {
     const next = getNextBoss()
-    if (!next) throw new Error('No boss trainer is queued up yet - add one in the Progression editor')
+    if (!next) throw new Error(t('err.noBossTrainerIsQueuedUp'))
     if (progression.trainerWinsSinceLastBoss < next.requiredTrainerWins) {
       const remaining = next.requiredTrainerWins - progression.trainerWinsSinceLastBoss
-      throw new Error(`Beat ${remaining} more trainer${remaining === 1 ? '' : 's'} before this boss will fight you`)
+      throw new Error(t('err.beatMoreTrainers', { count: remaining }))
     }
     trainer = listTrainers().find((t) => t.id === next.trainerId) ?? null
-    if (!trainer) throw new Error('The next boss trainer no longer exists')
+    if (!trainer) throw new Error(t('err.theNextBossTrainerNoLonger'))
   } else {
     const eligible = eligibleRandomTrainers(levelCap, p1team.length)
     if (eligible.length === 0) {
-      throw new Error(isRocketEventActive() ? 'No Team Rocket trainers available right now' : 'No trainers available right now')
+      throw new Error(t(isRocketEventActive() ? 'err.noRocketTrainers' : 'err.noTrainers'))
     }
     trainer = eligible[Math.floor(Math.random() * eligible.length)]
   }
@@ -436,7 +437,7 @@ handle('battle:startTrainer', async (_event, boss: boolean, rematchTrainerId?: s
             }
             return selection?.sets ?? []
           })()
-  if (p2team.length === 0) throw new Error(`${trainer.name}'s team is empty`)
+  if (p2team.length === 0) throw new Error(t('err.sTeamIsEmpty', { a: trainer.name }))
   activeBattle = new WildBattle(p1team, isDoubleBattle ? 'gen9doublescustomgame' : 'gen9customgame', 'gen9randombattle', {
     team: p2team,
     name: trainer.name,
@@ -462,13 +463,13 @@ handle('battle:startTrainer', async (_event, boss: boolean, rematchTrainerId?: s
 // Singles or doubles, and with `stars` both sides get their merge star boosts.
 handle('battle:startPlayer', async (_event, username: string, doubles = false, stars = false) => {
   const p1team = getTeamPokemonSets()
-  if (p1team.length === 0) throw new Error('Your team is empty - add Pokemon and assign them to your team first')
+  if (p1team.length === 0) throw new Error(t('err.yourTeamIsEmptyAddPokemon'))
   const problem = usernameProblem(username)
   if (problem) throw new Error(problem)
   const player = getPlayerSummary(username)
-  if (!player) throw new Error(`No player named "${normalizeUsername(username)}" has a save on this computer`)
+  if (!player) throw new Error(t('err.noPlayerNamedHasASave', { a: normalizeUsername(username) }))
   const savedTeam = readSavedTeamOf(player.slug)
-  if (savedTeam.length === 0) throw new Error(`${player.displayName} hasn't put any Pokemon on their team yet`)
+  if (savedTeam.length === 0) throw new Error(t('err.hasnTPutAnyPokemonOn', { a: player.displayName }))
   const p2team = scaleTeamToLevel(savedTeam, highestLevelOf(p1team))
   activeBattle = new WildBattle(p1team, doubles ? 'gen9doublescustomgame' : 'gen9customgame', 'gen9randombattle', {
     team: p2team,
@@ -486,24 +487,24 @@ handle('battle:startPlayer', async (_event, username: string, doubles = false, s
 })
 
 handle('battle:choose', async (_event, choice: string) => {
-  if (!activeBattle) throw new Error('No active battle')
+  if (!activeBattle) throw new Error(t('err.noActiveBattle'))
   return activeBattle.submitChoice(choice)
 })
 
 handle('battle:run', () => {
-  if (!activeBattle) throw new Error('No active battle')
+  if (!activeBattle) throw new Error(t('err.noActiveBattle'))
   activeBattle.runAway()
   activeBattle = null
 })
 
 // Gives up a draft match or a Battle Tower fight - it plays out as a loss, end screen and all.
 handle('battle:forfeit', () => {
-  if (!activeBattle) throw new Error('No active battle')
+  if (!activeBattle) throw new Error(t('err.noActiveBattle'))
   return activeBattle.forfeit()
 })
 
 handle('battle:catch', (_event, replaceRunMonId?: string) => {
-  if (!activeBattle) throw new Error('No active battle')
+  if (!activeBattle) throw new Error(t('err.noActiveBattle'))
   return activeBattle.catchWildPokemon(replaceRunMonId)
 })
 
@@ -512,7 +513,7 @@ handle('battle:catch', (_event, replaceRunMonId?: string) => {
 // This player as the friend sees them, and their current team.
 handle('online:self', (): OnlineSelf => {
   const session = getSessionInfo()
-  if (!session.username) throw new Error('Log in first')
+  if (!session.username) throw new Error(t('err.logInFirst'))
   return {
     player: { name: session.username, spriteId: session.trainerSprite ?? 'red', version: appVersion() },
     team: { team: getTeamPokemonSets(), mergeStars: getTeamMergeStars(), everstone: getTeamEverstones() }
@@ -526,7 +527,7 @@ function readOnlineTeam(input: OnlineTeam): { team: PokemonSet[]; mergeStars: nu
     (set): set is PokemonSet =>
       !!set && typeof set === 'object' && typeof (set as PokemonSet).species === 'string' && Array.isArray((set as PokemonSet).moves)
   )
-  if (team.length === 0) throw new Error("Your friend's team is empty")
+  if (team.length === 0) throw new Error(t('err.yourFriendSTeamIsEmpty'))
   const stars = Array.isArray(input.mergeStars) ? input.mergeStars : []
   const everstone = Array.isArray(input.everstone) ? input.everstone : []
   return {
@@ -548,9 +549,9 @@ function onlineViews(battle: WildBattle): OnlineViews {
 // or without both sides' merge star boosts, as the host picked.
 handle('online:start', async (event, friend: OnlinePlayer, friendTeam: OnlineTeam, doubles: boolean, stars = false): Promise<OnlineViews> => {
   const session = getSessionInfo()
-  if (!session.username) throw new Error('Log in first')
+  if (!session.username) throw new Error(t('err.logInFirst'))
   const hostTeam = getTeamPokemonSets()
-  if (hostTeam.length === 0) throw new Error('Your team is empty - add Pokemon and assign them to your team first')
+  if (hostTeam.length === 0) throw new Error(t('err.yourTeamIsEmptyAddPokemon'))
   const guest = readOnlineTeam(friendTeam)
   const level = Math.max(highestLevelOf(hostTeam), highestLevelOf(guest.team))
   // The battle tells its two sides apart by name, so the friend can't share the host's.
@@ -617,7 +618,7 @@ handle('online:draftEnd', () => endOnlineDraft())
 // first), with both sides' modifiers - nothing paid out.
 handle('online:draftBattle', async (event, friend: OnlinePlayer, hostOrder: number[], guestOrder: number[]): Promise<OnlineViews> => {
   const session = getSessionInfo()
-  if (!session.username) throw new Error('Log in first')
+  if (!session.username) throw new Error(t('err.logInFirst'))
   const match = beginOnlineDraftBattle(hostOrder, guestOrder)
   const friendName = String(friend?.name ?? 'Friend').slice(0, 24) || 'Friend'
   const guestName = friendName === session.username ? `${friendName} (2)` : friendName
@@ -640,7 +641,7 @@ handle('online:draftBattle', async (event, friend: OnlinePlayer, hostOrder: numb
 
 // Either player's choice for the turn (side 0 is the host, 1 the friend).
 handle('online:choose', async (_event, side: 0 | 1, choice: string) => {
-  if (!onlineBattle) throw new Error('No online battle')
+  if (!onlineBattle) throw new Error(t('err.noOnlineBattle'))
   await onlineBattle.chooseFor(side === 1 ? 1 : 0, String(choice))
 })
 
@@ -669,11 +670,11 @@ handle('raid:bosses', () => getRaidBossPreviews())
 handle('battle:startRaid', async () => {
   if (!lateItemsUnlocked()) {
     const boss = raidUnlockBossName()
-    throw new Error(`Max Raids open up once you beat ${boss ?? 'the right boss'}`)
+    throw new Error(t('err.maxRaidsOpenUpOnceYou', { a: boss ?? 'the right boss' }))
   }
   const p1team = getTeamPokemonSets()
-  if (p1team.length === 0) throw new Error('Your team is empty - add Pokemon and assign them to your team first')
-  if (!hasItem(WISHING_PIECE_ITEM_ID)) throw new Error('You need a Raid Crystal to start a Max Raid - the Shop and the Game Corner sell them')
+  if (p1team.length === 0) throw new Error(t('err.yourTeamIsEmptyAddPokemon'))
+  if (!hasItem(WISHING_PIECE_ITEM_ID)) throw new Error(t('err.youNeedARaidCrystalTo'))
   const battle = raidBattleAgainst(p1team, generateRaidBoss(getProgression().levelCap))
   removeItem(WISHING_PIECE_ITEM_ID, 1)
   activeBattle = battle
@@ -684,7 +685,7 @@ handle('battle:startRaid', async () => {
 handle('debug:startRaid', (_event, species: string, level: number, shiny: boolean) => {
   requireAdmin()
   const p1team = getTeamPokemonSets()
-  if (p1team.length === 0) throw new Error('Your team is empty - add Pokemon and assign them to your team first')
+  if (p1team.length === 0) throw new Error(t('err.yourTeamIsEmptyAddPokemon'))
   activeBattle = raidBattleAgainst(p1team, debugRaidBoss(species, level, shiny))
   return activeBattle.getInitialView()
 })
@@ -868,12 +869,12 @@ const readStatus = (status: unknown): string | null => (typeof status === 'strin
 // friend's run team as their copy sent it, on the host's co-op run.
 handle('coop:battle', async (event, friend: OnlinePlayer, guestTeam: OnlineCoopTeam): Promise<OnlineViews> => {
   const session = getSessionInfo()
-  if (!session.username) throw new Error('Log in first')
+  if (!session.username) throw new Error(t('err.logInFirst'))
   const sets = (Array.isArray(guestTeam?.sets) ? guestTeam.sets : []).slice(0, COOP_MAX_TEAM).filter(
     (set): set is PokemonSet =>
       !!set && typeof set === 'object' && typeof (set as PokemonSet).species === 'string' && Array.isArray((set as PokemonSet).moves)
   )
-  if (sets.length === 0) throw new Error("Your friend's run team is empty")
+  if (sets.length === 0) throw new Error(t('err.yourFriendSRunTeamIs'))
   const conditions = sets.map((_, i) => {
     const condition = guestTeam.conditions?.[i]
     return { hp: Math.max(0, Math.min(1, Number(condition?.hp ?? 1))), status: readStatus(condition?.status) }
@@ -886,7 +887,7 @@ handle('coop:battle', async (event, friend: OnlinePlayer, guestTeam: OnlineCoopT
   const battle = inRunSlot('coop', () => {
     const run = getRunView()
     const choice = run?.status === 'active' ? run.choices[0] : undefined
-    if (!choice || (choice.kind !== 'boss' && choice.kind !== 'villain')) throw new Error('Your run isn\'t at a boss or villain')
+    if (!choice || (choice.kind !== 'boss' && choice.kind !== 'villain')) throw new Error(t('err.yourRunIsnTAtA'))
     return createCoopRunBattle(choice.kind, guest, {
       battleId: randomUUID(),
       hostName: session.username!,
@@ -1174,6 +1175,9 @@ handle('progression:reset', () => {
   resetProgression()
   return getProgression()
 })
+
+// The language the screens are in, for the lines the game writes itself.
+handle('locale:set', (_event, locale: string) => setGameLocale(locale))
 
 handle('auth:session', () => getSessionInfo())
 handle('auth:login', (_event, username: string, remember: boolean) => {

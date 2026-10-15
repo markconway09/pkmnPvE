@@ -1,4 +1,5 @@
 import type { Platform } from './types'
+import { t } from '../i18n'
 
 export type { Platform } from './types'
 export { randomInt, randomUUID } from './random'
@@ -11,7 +12,7 @@ export function installPlatform(platform: Platform): void {
 }
 
 function platform(): Platform {
-  if (!current) throw new Error('No platform installed')
+  if (!current) throw new Error(t('err.noPlatformInstalled'))
   return current
 }
 

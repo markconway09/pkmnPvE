@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import CoinIcon from './CoinIcon'
 import { formatMoney, formatShort } from './money'
+import { t } from './i18n'
 
 interface Props {
   // What it costs, in coins or Poke Dollars.
@@ -43,8 +44,8 @@ function BuyButton({
   const missing = held === null ? 0 : price - held
   const shortTitle = short
     ? currency === 'coins'
-      ? `${missing.toLocaleString('en-US')} more coins needed`
-      : `${formatMoney(missing)} more needed`
+      ? t('buy.coinsNeeded', { n: missing })
+      : t('buy.moneyNeeded', { money: formatMoney(missing) })
     : undefined
   // The price with its thousands as k ("₽ 1.5k", "25k") - the exact amount on hover.
   const priceLabel =
@@ -55,7 +56,7 @@ function BuyButton({
     ) : (
       `₽ ${formatShort(price)}`
     )
-  const exactPrice = currency === 'coins' ? `${price.toLocaleString('en-US')} coins` : formatMoney(price)
+  const exactPrice = currency === 'coins' ? t('buy.coins', { n: price }) : formatMoney(price)
   return (
     <button
       className={`buy-button${compact ? ' buy-button-compact' : ''}${short ? ' buy-button-short' : ''}`}
@@ -64,7 +65,7 @@ function BuyButton({
       title={shortTitle ?? title ?? exactPrice}
       onClick={onBuy}
     >
-      {soldOut ? 'Sold out' : (label ?? priceLabel)}
+      {soldOut ? t('buy.soldOut') : (label ?? priceLabel)}
     </button>
   )
 }

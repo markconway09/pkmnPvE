@@ -6,6 +6,7 @@ import { getItemQuantity, removeItem } from './bag-store'
 import { getMoney, spendMoney } from './money-store'
 import { getProgression } from './progression-store'
 import { addCaughtMon } from './box-store'
+import { itemName as localItemName, t } from '../i18n'
 
 // A restored Pokemon arrives a little under the current level cap (never
 // below level 5, never above the cap) - a level-5 Aerodactyl is no use
@@ -15,8 +16,9 @@ export function restoredLevel(): number {
   return Math.min(levelCap, Math.max(5, levelCap - 10))
 }
 
+// In the game's language, for its lines.
 function itemName(itemId: string): string {
-  return getEditorOptions().items.find((i) => i.id === itemId)?.name ?? itemId
+  return localItemName(getEditorOptions().items.find((i) => i.id === itemId)?.name ?? itemId)
 }
 
 /** The fossils a Galar fossil pairs with, owned or not, and what each pairing restores. */
@@ -41,17 +43,17 @@ export function restoreFossil(itemId: string, secondItemId?: string): RestoreFos
   let species: string | null
   if (secondItemId) {
     species = galarPairSpecies(itemId, secondItemId)
-    if (!species) throw new Error("Those two fossils don't fit together")
+    if (!species) throw new Error(t('err.thoseTwoFossilsDonTFit'))
   } else {
     species = singleFossilSpecies(itemId)
-    if (!species) throw new Error(`${itemName(itemId)} needs a second fossil to be restored`)
+    if (!species) throw new Error(t('err.needsASecondFossilToBe', { a: itemName(itemId) }))
   }
 
   const used = secondItemId ? [itemId, secondItemId] : [itemId]
   for (const id of used) {
-    if (getItemQuantity(id) < 1) throw new Error(`You don't have a ${itemName(id)}`)
+    if (getItemQuantity(id) < 1) throw new Error(t('err.youDonTHaveA', { a: itemName(id) }))
   }
-  if (getMoney() < FOSSIL_RESTORE_COST) throw new Error(`Restoring a fossil costs ₽${FOSSIL_RESTORE_COST}`)
+  if (getMoney() < FOSSIL_RESTORE_COST) throw new Error(t('err.restoringAFossilCosts', { a: FOSSIL_RESTORE_COST }))
 
   spendMoney(FOSSIL_RESTORE_COST)
   for (const id of used) removeItem(id, 1)

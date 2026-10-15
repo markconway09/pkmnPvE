@@ -18,6 +18,7 @@ import { lateItemsUnlocked } from './progression-store'
 import { bulkShopPrice, shopPrice } from './title-perks'
 import { shopTotal } from '../../shared/battle-types'
 import { TYCOON_BULK_MIN } from '../../shared/titles'
+import { t } from '../i18n'
 
 // What this player can actually buy right now - the late-game items stay out
 // until they're unlocked. The admin price editor still sees everything. Prices are what
@@ -58,7 +59,7 @@ export function listShopPrices(): ShopPriceEntry[] {
 
 /** Changes one item's shop price (null puts it back to the default). Returns the updated list. */
 export function setShopPrice(itemId: string, price: number | null): ShopPriceEntry[] {
-  if (!getDefaultShopCatalog().some((i) => i.id === itemId)) throw new Error("That item isn't sold in the shop")
+  if (!getDefaultShopCatalog().some((i) => i.id === itemId)) throw new Error(t('err.thatItemIsnTSoldIn'))
   setShopPriceOverride(itemId, price)
   resetShopCatalogCache()
   return listShopPrices()
@@ -72,8 +73,8 @@ export interface PurchaseResult {
 /** Sells one of an item from the bag for half its shop price. */
 export function sellItem(itemId: string): SellResult {
   const price = sellPriceFor(itemId)
-  if (price === null) throw new Error("That item can't be sold")
-  if (!removeItem(itemId, 1)) throw new Error("You don't have that item")
+  if (price === null) throw new Error(t('err.thatItemCanTBeSold'))
+  if (!removeItem(itemId, 1)) throw new Error(t('err.youDonTHaveThatItem'))
   addMoney(price)
   return { sold: price, money: getMoney() }
 }
@@ -86,10 +87,10 @@ export function sellItems(entries: ItemQuantity[]): SellResult {
   const priced = entries
     .map((e) => ({ itemId: e.itemId, quantity: Math.floor(e.quantity), price: sellPriceFor(e.itemId) }))
     .filter((e) => e.quantity > 0)
-  if (priced.length === 0) throw new Error('Nothing to sell')
+  if (priced.length === 0) throw new Error(t('err.nothingToSell'))
   for (const e of priced) {
-    if (e.price === null) throw new Error("One of those items can't be sold")
-    if (getItemQuantity(e.itemId) < e.quantity) throw new Error("You don't have that many of one of those items")
+    if (e.price === null) throw new Error(t('err.oneOfThoseItemsCanT'))
+    if (getItemQuantity(e.itemId) < e.quantity) throw new Error(t('err.youDonTHaveThatMany'))
   }
   let sold = 0
   for (const e of priced) {

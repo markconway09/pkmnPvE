@@ -84,6 +84,7 @@ import { buildAutoSet, fillMoveset, listAutoSets, recommendedLearnableMoves } fr
 import { playerPathFor } from './save-paths'
 import { onPlayerChange } from './player-session'
 import { listTrainers } from './trainer-store'
+import { abilityName, moveName, t, typeName } from '../i18n'
 
 /**
  * Battle Tower mode: a run is a string of floors fought with copies of the player's
@@ -426,7 +427,7 @@ function seededRandom(text: string): () => number {
 
 function activeRun(): StoredRun {
   const current = getRun()
-  if (!current || current.status !== 'active') throw new Error('No run is in progress')
+  if (!current || current.status !== 'active') throw new Error(t('err.noRunIsInProgress'))
   return current
 }
 
@@ -729,9 +730,9 @@ export function startRun(
   // A co-op run's partner and shared seed (the 'coop' slot's run).
   coop?: CoopRunInfo
 ): RunView {
-  if (getRun()?.status === 'active') throw new Error('A run is already in progress')
+  if (getRun()?.status === 'active') throw new Error(t('err.aRunIsAlreadyInProgress'))
   if (generation !== null && !completeRunGenerations().includes(generation)) {
-    throw new Error(`Generation ${generation} doesn't have a Gym Leader, an Elite Four member and a Champion yet`)
+    throw new Error(t('err.generationDoesnTHaveAGym', { a: generation }))
   }
   const source = copyBoxMonSet(boxMonId)
   const set: PokemonSet = { ...source, level: ROGUELITE_START_LEVEL, item: '' }
@@ -857,13 +858,13 @@ function nextFloor(current: StoredRun): void {
  */
 export function runChoiceAt(index: number): RunChoice {
   const current = activeRun()
-  if (current.itemOffer) throw new Error('Pick an item first')
-  if (current.displacedItem) throw new Error('Choose who gets the item that was replaced first')
-  if (current.pickOffer) throw new Error('Pick an ability or move first')
-  if (current.swapOffer) throw new Error('Choose what to swap first')
-  if (current.monOffer) throw new Error('Pick your reward Pokémon first')
+  if (current.itemOffer) throw new Error(t('err.pickAnItemFirst'))
+  if (current.displacedItem) throw new Error(t('err.chooseWhoGetsTheItemThat'))
+  if (current.pickOffer) throw new Error(t('err.pickAnAbilityOrMoveFirst'))
+  if (current.swapOffer) throw new Error(t('err.chooseWhatToSwapFirst'))
+  if (current.monOffer) throw new Error(t('err.pickYourRewardPokemonFirst'))
   const choice = current.choices[index]
-  if (!choice) throw new Error("This floor doesn't offer that")
+  if (!choice) throw new Error(t('err.thisFloorDoesnTOfferThat'))
   if (choice.kind !== 'villain') {
     const cost = takeoverTileCost(current)
     if (cost > 0) {
@@ -930,8 +931,8 @@ export function takeItemNode(): RunView {
 export function rerollRunItems(): RunView {
   const current = activeRun()
   const reason = current.itemOfferReason ?? 'floor'
-  if (!current.itemOffer || (reason !== 'floor' && reason !== 'shop')) throw new Error('Only an item floor or the shop New Item can be rerolled')
-  if (current.itemRerolled) throw new Error('This floor has already been rerolled')
+  if (!current.itemOffer || (reason !== 'floor' && reason !== 'shop')) throw new Error(t('err.onlyAnItemFloorOrThe'))
+  if (current.itemRerolled) throw new Error(t('err.thisFloorHasAlreadyBeenRerolled'))
   current.itemOffer = rollItemOffer(current, ITEM_FLOOR_CHANCES)
   current.itemRerolled = true
   persist()
@@ -941,7 +942,7 @@ export function rerollRunItems(): RunView {
 /** Turns down the items on offer and moves on (an item floor still gives its level). */
 export function skipRunItem(): RunView {
   const current = activeRun()
-  if (!current.itemOffer) throw new Error('No items are on offer')
+  if (!current.itemOffer) throw new Error(t('err.noItemsAreOnOffer'))
   finishItemOffer(current)
   return getRunView()!
 }
@@ -968,9 +969,9 @@ function finishItemOffer(current: StoredRun): void {
 /** Gives the chosen offered item to a team member (replacing what it held) and moves on. */
 export function giveRunItem(itemId: string, runMonId: string): RunView {
   const current = activeRun()
-  if (!current.itemOffer?.includes(itemId)) throw new Error("That item isn't on offer")
+  if (!current.itemOffer?.includes(itemId)) throw new Error(t('err.thatItemIsnTOnOffer'))
   const mon = current.team.find((m) => m.id === runMonId)
-  if (!mon) throw new Error('That Pokemon is not on the run team')
+  if (!mon) throw new Error(t('err.thatPokemonIsNotOnThe'))
   // Stored by name, the same as box Pokemon hold theirs.
   const previous = mon.set.item
   mon.set.item = itemOfferView([itemId])[0]?.itemName ?? itemId
@@ -992,12 +993,12 @@ export function giveRunItem(itemId: string, runMonId: string): RunView {
 export function placeDisplacedItem(runMonId: string | null): RunView {
   const current = activeRun()
   const displaced = current.displacedItem
-  if (!displaced) throw new Error('No item is waiting for a holder')
+  if (!displaced) throw new Error(t('err.noItemIsWaitingForA'))
   if (runMonId === null) {
     finishItemOffer(current)
     return getRunView()!
   }
-  if (runMonId === displaced.fromMonId) throw new Error('That Pokemon just gave this item up')
+  if (runMonId === displaced.fromMonId) throw new Error(t('err.thatPokemonJustGaveThisItem'))
   const mon = runMon(current, runMonId)
   const previous = mon.set.item
   mon.set.item = displaced.item
@@ -1013,10 +1014,10 @@ export function placeDisplacedItem(runMonId: string | null): RunView {
 /** Moves a run Pokemon's held item to another - swapping, if that one holds something too. */
 export function moveRunItem(fromMonId: string, toMonId: string): RunView {
   const current = activeRun()
-  if (fromMonId === toMonId) throw new Error('Pick a different Pokemon')
+  if (fromMonId === toMonId) throw new Error(t('err.pickADifferentPokemon'))
   const from = runMon(current, fromMonId)
   const to = runMon(current, toMonId)
-  if (!from.set.item) throw new Error(`${from.set.species} isn't holding anything`)
+  if (!from.set.item) throw new Error(t('err.isnTHoldingAnything', { a: from.set.species }))
   ;[from.set.item, to.set.item] = [to.set.item ?? '', from.set.item]
   persist()
   return getRunView()!
@@ -1027,7 +1028,7 @@ export function reorderRunTeam(runMonIds: string[]): RunView {
   const current = activeRun()
   const byId = new Map(current.team.map((m) => [m.id, m]))
   if (runMonIds.length !== current.team.length || runMonIds.some((id) => !byId.has(id)) || new Set(runMonIds).size !== runMonIds.length) {
-    throw new Error("That isn't the run's team")
+    throw new Error(t('err.thatIsnTTheRunS'))
   }
   current.team = runMonIds.map((id) => byId.get(id)!)
   persist()
@@ -1036,7 +1037,7 @@ export function reorderRunTeam(runMonIds: string[]): RunView {
 
 function runMon(current: StoredRun, runMonId: string): RunMon {
   const mon = current.team.find((m) => m.id === runMonId)
-  if (!mon) throw new Error('That Pokemon is not on the run team')
+  if (!mon) throw new Error(t('err.thatPokemonIsNotOnThe'))
   return mon
 }
 
@@ -1054,7 +1055,7 @@ export function evolveRunMon(runMonId: string, targetSpecies: string, newMoves =
   const current = activeRun()
   const mon = runMon(current, runMonId)
   if (!runEvolutionOptions(mon.set).includes(targetSpecies)) {
-    throw new Error(`${mon.set.species} can't evolve into ${targetSpecies} yet`)
+    throw new Error(t('err.canTEvolveIntoYet', { a: mon.set.species, b: targetSpecies }))
   }
   mon.set = evolveSet(mon.set, targetSpecies)
   mon.exp = totalExpForSpeciesLevel(mon.set.species, mon.set.level)
@@ -1116,13 +1117,13 @@ export function updateRunMon(runMonId: string, input: RunMonEdit): RunView {
   const mon = runMon(current, runMonId)
   const allowed = new Set([...runLearnable(mon.set.species).map((m) => m.id), ...mon.set.moves.map((m) => toID(m))])
   const moves = [...new Set(input.moves.map((m) => toID(m)).filter(Boolean))]
-  if (moves.length === 0 || moves.length > 4) throw new Error('A Pokemon needs 1 to 4 moves')
+  if (moves.length === 0 || moves.length > 4) throw new Error(t('err.aPokemonNeeds1To4'))
   const unknown = moves.find((m) => !allowed.has(m))
-  if (unknown) throw new Error(`${mon.set.species} can't learn ${getMoveInfo(unknown)?.name ?? unknown}`)
+  if (unknown) throw new Error(t('err.canTLearn', { a: mon.set.species, b: moveName(getMoveInfo(unknown)?.name ?? unknown) }))
   mon.set.moves = moves
   mon.lockedMoves = input.lockedMoves.map((m) => toID(m)).filter((m) => moves.includes(m))
   if (input.teraType) {
-    if (!getEditorOptions().types.includes(input.teraType)) throw new Error(`${input.teraType} isn't a Tera Type`)
+    if (!getEditorOptions().types.includes(input.teraType)) throw new Error(t('err.isnTATeraType', { a: typeName(input.teraType) }))
     mon.set.teraType = input.teraType
   }
   persist()
@@ -1202,9 +1203,9 @@ function finishSwap(current: StoredRun): RunView {
 /** Random Swap: this team member is replaced by a completely random Pokemon. */
 export function swapRunMon(runMonId: string): RunView {
   const current = activeRun()
-  if (!current.swapOffer) throw new Error("There's no swap on offer")
+  if (!current.swapOffer) throw new Error(t('err.thereSNoSwapOnOffer'))
   const index = current.team.findIndex((m) => m.id === runMonId)
-  if (index === -1) throw new Error("That Pokemon isn't on your run team")
+  if (index === -1) throw new Error(t('err.thatPokemonIsnTOnYour2'))
   current.team[index] = swappedInMon(current, swapKind(), current.team[index])
   return finishSwap(current)
 }
@@ -1212,7 +1213,7 @@ export function swapRunMon(runMonId: string): RunView {
 /** Random Swap: the whole team is replaced, one for one - now and then all restricted legendaries. */
 export function swapRunTeam(): RunView {
   const current = activeRun()
-  if (!current.swapOffer) throw new Error("There's no swap on offer")
+  if (!current.swapOffer) throw new Error(t('err.thereSNoSwapOnOffer'))
   const allRestricted = Math.random() < SWAP_ALL_RESTRICTED_CHANCE
   current.team = current.team.map((mon) => swappedInMon(current, allRestricted ? 'restricted' : swapKind(), mon))
   return finishSwap(current)
@@ -1221,7 +1222,7 @@ export function swapRunTeam(): RunView {
 /** Turns the swap down and moves on. */
 export function skipRunSwap(): RunView {
   const current = activeRun()
-  if (!current.swapOffer) throw new Error("There's no swap on offer")
+  if (!current.swapOffer) throw new Error(t('err.thereSNoSwapOnOffer'))
   return finishSwap(current)
 }
 
@@ -1255,10 +1256,10 @@ function rollVillainReward(current: StoredRun): PokemonSet[] {
 export function takeRunRewardMon(index: number, replaceRunMonId?: string): RunView {
   const current = activeRun()
   const set = current.monOffer?.[index]
-  if (!set) throw new Error("That Pokémon isn't on offer")
+  if (!set) throw new Error(t('err.thatPokemonIsnTOnOffer'))
   const full = current.team.length >= teamLimit(current)
   const replaceAt = replaceRunMonId ? current.team.findIndex((m) => m.id === replaceRunMonId) : -1
-  if (full && replaceAt === -1) throw new Error('Your run team is full - choose who to replace')
+  if (full && replaceAt === -1) throw new Error(t('err.yourRunTeamIsFullChoose'))
   const newcomer: RunMon = { ...offeredMon(structuredClone(set), index), id: randomUUID() }
   current.monOffer = null
   if (replaceAt >= 0) {
@@ -1281,7 +1282,7 @@ export function takeRunRewardMon(index: number, replaceRunMonId?: string): RunVi
 /** Turns a beaten villain's reward Pokemon down and moves on. */
 export function skipRunRewardMon(): RunView {
   const current = activeRun()
-  if (!current.monOffer) throw new Error('No Pokémon are on offer')
+  if (!current.monOffer) throw new Error(t('err.noPokemonAreOnOffer'))
   current.monOffer = null
   nextFloor(current)
   persist()
@@ -1316,7 +1317,7 @@ function finishPick(current: StoredRun): RunView {
 export function giveRunAbility(abilityId: string, runMonId: string): RunView {
   const current = activeRun()
   if (current.pickOffer?.kind !== 'ability' || !current.pickOffer.options.includes(abilityId)) {
-    throw new Error("That ability isn't on offer")
+    throw new Error(t('err.thatAbilityIsnTOnOffer'))
   }
   const mon = runMon(current, runMonId)
   const name = abilityInfo(abilityId)?.name ?? abilityId
@@ -1339,7 +1340,7 @@ function resetAbilityFor(mon: RunMon): string {
 export function resetRunAbility(runMonId: string): RunView {
   const current = activeRun()
   const mon = runMon(current, runMonId)
-  if (!mon.lockedAbility) throw new Error(`${mon.set.species} has no New Ability pick to reset`)
+  if (!mon.lockedAbility) throw new Error(t('err.hasNoNewAbilityPickTo', { a: mon.set.species }))
   mon.set.ability = resetAbilityFor(mon)
   mon.lockedAbility = undefined
   mon.originalAbility = undefined
@@ -1355,14 +1356,14 @@ export function resetRunAbility(runMonId: string): RunView {
 export function teachRunMove(moveId: string, runMonId: string, replaceMoveId: string | null): RunView {
   const current = activeRun()
   if (current.pickOffer?.kind !== 'move' || !current.pickOffer.options.includes(moveId)) {
-    throw new Error("That move isn't on offer")
+    throw new Error(t('err.thatMoveIsnTOnOffer'))
   }
   const mon = runMon(current, runMonId)
   const moves = [...mon.set.moves]
-  if (moves.some((m) => toID(m) === moveId)) throw new Error(`${mon.set.species} already knows that move`)
+  if (moves.some((m) => toID(m) === moveId)) throw new Error(t('err.alreadyKnowsThatMove', { a: mon.set.species }))
   let slot = replaceMoveId ? moves.findIndex((m) => toID(m) === replaceMoveId) : -1
   if (slot === -1) {
-    if (moves.length >= 4) throw new Error('Choose which move to replace')
+    if (moves.length >= 4) throw new Error(t('err.chooseWhichMoveToReplace'))
     slot = moves.length
   }
   moves[slot] = moveId
@@ -1374,7 +1375,7 @@ export function teachRunMove(moveId: string, runMonId: string, replaceMoveId: st
 /** Passes on a New Ability / New Move floor (it still counts, and gives its level). */
 export function skipRunPick(): RunView {
   const current = activeRun()
-  if (!current.pickOffer) throw new Error('Nothing is on offer')
+  if (!current.pickOffer) throw new Error(t('err.nothingIsOnOffer'))
   return finishPick(current)
 }
 
@@ -1427,7 +1428,7 @@ export function runFloorInfo(): {
 /** The villain waiting on this taken-over floor - met now, so later takeovers pick someone new. */
 export function runVillainId(): string {
   const current = activeRun()
-  if (!current.takeover) throw new Error('No villain has taken this floor over')
+  if (!current.takeover) throw new Error(t('err.noVillainHasTakenThisFloor'))
   const { villainId } = current.takeover
   if (!current.usedBossIds.includes(villainId)) current.usedBossIds.push(villainId)
   persist()
@@ -1554,10 +1555,10 @@ export function finishRunBattleFled(outcome: RunBattleOutcome[]): void {
 export function addRunCatch(set: PokemonSet, replaceRunMonId?: string): void {
   const current = getRun()
   // The battle's win already moved the run on (or ended it, if that was the last floor).
-  if (!current) throw new Error('No run is in progress')
+  if (!current) throw new Error(t('err.noRunIsInProgress'))
   const full = current.team.length >= teamLimit(current)
   const replaceAt = replaceRunMonId ? current.team.findIndex((m) => m.id === replaceRunMonId) : -1
-  if (full && replaceAt === -1) throw new Error(`Your run team is full - choose who to replace`)
+  if (full && replaceAt === -1) throw new Error(t('err.yourRunTeamIsFullChoose'))
   const caught: PokemonSet = { ...structuredClone(set), item: '' }
   // It arrives with a run moveset (Smogon first).
   refreshMoves(caught)
@@ -1623,9 +1624,9 @@ function reviveLevel(current: StoredRun): number {
 }
 
 function requireConsumableAllowed(current: StoredRun, id: RunConsumableId): void {
-  if (!RUN_CONSUMABLES.some((c) => c.id === id)) throw new Error("That isn't a run item")
+  if (!RUN_CONSUMABLES.some((c) => c.id === id)) throw new Error(t('err.thatIsnTARunItem'))
   if (runLockedConsumables(current.difficulty ?? 'normal').includes(id)) {
-    throw new Error(`${RUN_CONSUMABLES.find((c) => c.id === id)!.name} can't be used on ${runDifficultyInfo(current.difficulty).label}`)
+    throw new Error(t('err.canTBeUsedOn', { a: RUN_CONSUMABLES.find((c) => c.id === id)!.name, b: runDifficultyInfo(current.difficulty).label }))
   }
 }
 
@@ -1633,7 +1634,7 @@ function requireConsumableAllowed(current: StoredRun, id: RunConsumableId): void
 function spendConsumable(current: StoredRun, id: RunConsumableId): void {
   requireConsumableAllowed(current, id)
   const have = current.consumables?.[id] ?? 0
-  if (have < 1) throw new Error(`You don't have a ${RUN_CONSUMABLES.find((c) => c.id === id)!.name}`)
+  if (have < 1) throw new Error(t('err.youDonTHaveA', { a: RUN_CONSUMABLES.find((c) => c.id === id)!.name }))
   current.consumables = { ...current.consumables, [id]: have - 1 }
 }
 
@@ -1641,7 +1642,7 @@ function spendConsumable(current: StoredRun, id: RunConsumableId): void {
 export function useRunFullRestore(runMonId: string): RunView {
   const current = activeRun()
   const mon = runMon(current, runMonId)
-  if (mon.hp >= 1 && !mon.status) throw new Error(`${mon.set.species} is already fully healthy`)
+  if (mon.hp >= 1 && !mon.status) throw new Error(t('err.isAlreadyFullyHealthy', { a: mon.set.species }))
   spendConsumable(current, 'fullrestore')
   mon.hp = 1
   mon.status = null
@@ -1657,11 +1658,11 @@ export function useRunFullRestore(runMonId: string): RunView {
 export function useRunRevive(faintedId: string, replaceId?: string): RunView {
   const current = activeRun()
   const full = current.team.length >= teamLimit(current)
-  if (full && !replaceId) throw new Error('Your run team is full - pick who leaves to make room')
+  if (full && !replaceId) throw new Error(t('err.yourRunTeamIsFullPick'))
   const replaceAt = full ? current.team.findIndex((m) => m.id === replaceId) : -1
-  if (full && replaceAt === -1) throw new Error("That Pokemon isn't on your run team")
+  if (full && replaceAt === -1) throw new Error(t('err.thatPokemonIsnTOnYour2'))
   const index = (current.fainted ?? []).findIndex((m) => m.id === faintedId)
-  if (index === -1) throw new Error("That Pokemon hasn't fainted this run")
+  if (index === -1) throw new Error(t('err.thatPokemonHasnTFaintedThis'))
   spendConsumable(current, 'revive')
   const [mon] = current.fainted!.splice(index, 1)
   const level = reviveLevel(current)
@@ -1686,8 +1687,8 @@ export function useRunAbilityCapsule(runMonId: string, abilityId: string): RunVi
   const current = activeRun()
   const mon = runMon(current, runMonId)
   const choice = speciesAbilityChoices(mon.set.species).find((a) => a.id === toID(abilityId))
-  if (!choice) throw new Error(`${mon.set.species} can't have that ability`)
-  if (toID(mon.set.ability) === choice.id) throw new Error(`${mon.set.species} already has ${choice.name}`)
+  if (!choice) throw new Error(t('err.canTHaveThatAbility', { a: mon.set.species }))
+  if (toID(mon.set.ability) === choice.id) throw new Error(t('err.alreadyHas', { a: mon.set.species, b: abilityName(choice.name) }))
   spendConsumable(current, 'abilitycapsule')
   // It replaces a New Ability pick too - that one no longer carries through evolution.
   mon.set.ability = choice.name
@@ -1699,15 +1700,15 @@ export function useRunAbilityCapsule(runMonId: string, abilityId: string): RunVi
 
 // The shop is on boss floors, and not while something else is waiting on a choice.
 function requireShop(current: StoredRun): void {
-  if (!isBossFloor(current.floor)) throw new Error('The shop is only on boss floors')
+  if (!isBossFloor(current.floor)) throw new Error(t('err.theShopIsOnlyOnBoss'))
   if (current.itemOffer || current.displacedItem || current.pickOffer || current.swapOffer || current.monOffer) {
-    throw new Error('Finish what you picked first')
+    throw new Error(t('err.finishWhatYouPickedFirst'))
   }
 }
 
 function spendGems(current: StoredRun, price: number): void {
   const gems = current.gems ?? 0
-  if (gems < price) throw new Error(`That costs ${price} gem${price === 1 ? '' : 's'} - you have ${gems}`)
+  if (gems < price) throw new Error(t('err.costsGems', { count: price, gems }))
   current.gems = gems - price
 }
 
@@ -1731,7 +1732,7 @@ export function buyRunRareCandy(runMonId: string): RunView {
   const current = activeRun()
   requireShop(current)
   const mon = runMon(current, runMonId)
-  if (mon.set.level >= 100) throw new Error(`${mon.set.species} is already level 100`)
+  if (mon.set.level >= 100) throw new Error(t('err.isAlreadyLevel100', { a: mon.set.species }))
   spendGems(current, RUN_RARE_CANDY_PRICE)
   mon.set.level += 1
   mon.exp = totalExpForSpeciesLevel(mon.set.species, mon.set.level)
@@ -1747,8 +1748,8 @@ export function buyRunRareCandy(runMonId: string): RunView {
 export function buyRunShopTile(tile: RunShopTile): RunView {
   const current = activeRun()
   requireShop(current)
-  if (!(tile in RUN_SHOP_TILE_PRICES)) throw new Error("The shop doesn't sell that")
-  if (current.shopTilesUsed?.includes(tile)) throw new Error('Already bought on this floor')
+  if (!(tile in RUN_SHOP_TILE_PRICES)) throw new Error(t('err.theShopDoesnTSellThat'))
+  if (current.shopTilesUsed?.includes(tile)) throw new Error(t('err.alreadyBoughtOnThisFloor'))
   spendGems(current, RUN_SHOP_TILE_PRICES[tile])
   current.shopTilesUsed = [...(current.shopTilesUsed ?? []), tile]
   if (tile === 'item') {

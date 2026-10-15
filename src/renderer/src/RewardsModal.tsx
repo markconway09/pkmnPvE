@@ -4,6 +4,7 @@ import type { MissionsState } from '../../shared/missions'
 import TabStrip from './TabStrip'
 import MissionsPanel from './MissionsPanel'
 import AchievementsPanel from './AchievementsPanel'
+import { t } from './i18n'
 
 export type RewardsTab = 'missions' | 'achievements'
 
@@ -61,12 +62,12 @@ function RewardsModal({
           tabs={[
             {
               id: 'missions',
-              label: label('Daily Missions', './icons/nav/missions.png', missionsWaiting),
+              label: label(t('rewards.tabMissions'), './icons/nav/missions.png', missionsWaiting),
               className: missionsWaiting > 0 ? 'rewards-tab-glow' : undefined
             },
             {
               id: 'achievements',
-              label: label('Achievements', './icons/nav/achievements.png', achievementsWaiting),
+              label: label(t('rewards.tabAchievements'), './icons/nav/achievements.png', achievementsWaiting),
               className: achievementsWaiting > 0 ? 'rewards-tab-glow' : undefined
             }
           ]}

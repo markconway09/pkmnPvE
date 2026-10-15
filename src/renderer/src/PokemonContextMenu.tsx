@@ -5,7 +5,8 @@ import ItemSprite from './ItemSprite'
 import ShinyIcon from './ShinyIcon'
 import { MenuIcon, PokemonMenuAction, PokemonMenuHeader, PokemonMenuSection } from './PokemonMenuParts'
 import type { BoxPokemonView, EvolutionItemUse } from '../../shared/battle-types'
-import { CLICK } from './platform'
+import { formatMoney } from './money'
+import { clickWord, itemName, t } from './i18n'
 
 // The Poke Ball item icon - an evolution already in the Pokedex.
 const POKE_BALL_SPRITENUM = 345
@@ -120,21 +121,31 @@ function PokemonContextMenu({
           }
         />
 
-        <PokemonMenuSection label="Manage">
-          {onEdit && <PokemonMenuAction tone="edit" icon={<MenuIcon name="edit" />} label="Edit" detail="Moves, item, ability and more" onClick={onEdit} />}
-          {onAdminEdit && <PokemonMenuAction tone="admin" icon={<MenuIcon name="admin" />} label="Admin Edit" detail="Change anything" onClick={onAdminEdit} />}
+        <PokemonMenuSection label={t('pm.manage')}>
+          {onEdit && (
+            <PokemonMenuAction tone="edit" icon={<MenuIcon name="edit" />} label={t('pm.edit')} detail={t('pm.editDetail')} onClick={onEdit} />
+          )}
+          {onAdminEdit && (
+            <PokemonMenuAction
+              tone="admin"
+              icon={<MenuIcon name="admin" />}
+              label={t('pm.adminEdit')}
+              detail={t('pm.adminDetail')}
+              onClick={onAdminEdit}
+            />
+          )}
           {onMerge && mergeCount > 0 && (
             <PokemonMenuAction
               tone="merge"
               icon={<MenuIcon name="merge" />}
-              label="Merge"
-              detail={`${mergeCount} duplicate${mergeCount === 1 ? '' : 's'} in your box`}
+              label={t('pm.merge')}
+              detail={t('pm.duplicates', { count: mergeCount })}
               onClick={onMerge}
             />
           )}
         </PokemonMenuSection>
 
-        <PokemonMenuSection label="Transform">
+        <PokemonMenuSection label={t('pm.transform')}>
           {onChoose &&
             evolutions.map((target) => {
               const item = evolutionItems[target]
@@ -145,9 +156,9 @@ function PokemonContextMenu({
                   icon={<MenuIcon name="evolve" />}
                   label={
                     <>
-                      Evolve into {target}
+                      {t('pm.evolveInto', { name: target })}
                       {registered.includes(target) && (
-                        <span className="context-menu-caught" title="Already in your Pokédex">
+                        <span className="context-menu-caught" title={t('pm.inDex')}>
                           <ItemSprite spritenum={POKE_BALL_SPRITENUM} />
                         </span>
                       )}
@@ -157,7 +168,7 @@ function PokemonContextMenu({
                     item && (
                       <>
                         <ItemSprite spritenum={item.spritenum} />
-                        Uses {item.name} (×{item.quantity})
+                        {t('pm.uses', { item: itemName(item.name), n: item.quantity })}
                       </>
                     )
                   }
@@ -169,8 +180,8 @@ function PokemonContextMenu({
             <PokemonMenuAction
               tone="form"
               icon={<ItemSprite spritenum={formChanges.spritenum} />}
-              label="Change Form"
-              detail={`${formChanges.forms.length} form${formChanges.forms.length === 1 ? '' : 's'}, uses the ${formChanges.itemName}`}
+              label={t('pm.changeForm')}
+              detail={t('pm.forms', { count: formChanges.forms.length, item: itemName(formChanges.itemName) })}
               onClick={onOpenForms}
             />
           )}
@@ -180,13 +191,12 @@ function PokemonContextMenu({
                 key={fusion.partnerId}
                 tone="fuse"
                 icon={<MenuIcon name="fuse" />}
-                label={`Fuse into ${fusion.result}`}
-                detail={
-                  <>
-                    With {fusion.partnerFavorite && '❤️ '}
-                    {fusion.partnerSpecies} (Lv{fusion.partnerLevel}), uses the {fusion.itemName}
-                  </>
-                }
+                label={t('pm.fuseInto', { name: fusion.result })}
+                detail={t('pm.fuseWith', {
+                  name: `${fusion.partnerFavorite ? '❤️ ' : ''}${fusion.partnerSpecies}`,
+                  level: fusion.partnerLevel,
+                  item: itemName(fusion.itemName)
+                })}
                 onClick={() => onFuse(fusion.partnerId)}
               />
             ))}
@@ -194,8 +204,8 @@ function PokemonContextMenu({
             <PokemonMenuAction
               tone="fuse"
               icon={<MenuIcon name="unfuse" />}
-              label="Unfuse"
-              detail={`Get ${unfuse.partnerSpecies} back, uses the ${unfuse.itemName}`}
+              label={t('pm.unfuse')}
+              detail={t('pm.unfuseDetail', { name: unfuse.partnerSpecies, item: itemName(unfuse.itemName) })}
               onClick={onUnfuse}
             />
           )}
@@ -203,11 +213,12 @@ function PokemonContextMenu({
             <PokemonMenuAction
               tone="shiny"
               icon={<ShinyIcon />}
-              label={confirmingPatch ? `${CLICK} again to turn Shiny` : 'Turn Shiny'}
+              label={confirmingPatch ? t('pm.shinyConfirm', { click: clickWord() }) : t('pm.turnShiny')}
               detail={
                 <>
                   <ItemSprite spritenum={SHINY_PATCH_SPRITENUM} />
-                  Uses up a Shiny Patch{shinyPatches !== undefined && ` (×${shinyPatches})`}
+                  {t('pm.usesPatch')}
+                  {shinyPatches !== undefined && ` (×${shinyPatches})`}
                 </>
               }
               confirming={confirmingPatch}
@@ -221,8 +232,8 @@ function PokemonContextMenu({
             <PokemonMenuAction
               tone="item"
               icon={<ItemSprite spritenum={FRIENDSHIP_PETAL_SPRITENUM} />}
-              label="Max friendship"
-              detail={`Uses up a Friendship Petal (×${friendshipPetals})`}
+              label={t('pm.maxFriendship')}
+              detail={t('pm.usesPetal', { n: friendshipPetals })}
               onClick={onUseFriendshipPetal}
             />
           )}
@@ -233,11 +244,11 @@ function PokemonContextMenu({
             <PokemonMenuAction
               tone="sell"
               icon={<MenuIcon name="sell" />}
-              label={confirmingSell ? `${CLICK} again to sell` : 'Sell'}
+              label={confirmingSell ? t('pm.sellConfirm', { click: clickWord() }) : t('pm.sell')}
               detail={
                 confirmingSell
-                  ? `This ${shiny ? 'shiny ' : ''}${species}, for ₽${sellPrice.toLocaleString('en-US')}`
-                  : `₽${sellPrice.toLocaleString('en-US')}`
+                  ? t(shiny ? 'pm.sellThisShiny' : 'pm.sellThis', { name: species, money: formatMoney(sellPrice) })
+                  : formatMoney(sellPrice)
               }
               confirming={confirmingSell}
               onClick={() => {

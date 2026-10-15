@@ -17,6 +17,7 @@ import { addMoney, getMoney } from './money-store'
 import { getEditorOptions, nationalDexSpecies } from './sim-access'
 import { tmAchievementStats } from './tm-store'
 import { getTrainerProfile } from './trainer-profile'
+import { achievementName, formatNumber, itemName as localItemName, t, titleName } from '../i18n'
 
 /**
  * Achievements: works out every tally they're measured by, unlocks the ones that have
@@ -167,22 +168,22 @@ function claimedTitles(): string[] {
 function rewardText(def: AchievementDef): string {
   const names = new Map(getEditorOptions().items.map((i) => [i.id, i.name]))
   const parts: string[] = []
-  for (const { itemId, count } of def.reward.items ?? []) parts.push(`${count > 1 ? `${count}× ` : 'a '}${names.get(itemId) ?? itemId}`)
-  for (const keyItem of def.reward.keyItems ?? []) parts.push(`the ${names.get(keyItem) ?? keyItem}`)
-  for (const { species, level, shiny } of def.reward.pokemon ?? []) parts.push(`${shiny ? 'a shiny' : 'a'} ${level ? `Lv. ${level} ` : ''}${species}`)
-  if (def.reward.money) parts.push(`₽${def.reward.money.toLocaleString('en-US')}`)
-  if (def.reward.coins) parts.push(`${def.reward.coins.toLocaleString('en-US')} coins`)
-  if (def.reward.title) parts.push(`the title "${def.reward.title}"`)
+  for (const { itemId, count } of def.reward.items ?? []) parts.push(t(count > 1 ? 'reward.items' : 'reward.item', { count, item: localItemName(names.get(itemId) ?? itemId) }))
+  for (const keyItem of def.reward.keyItems ?? []) parts.push(t('reward.keyItem', { item: localItemName(names.get(keyItem) ?? keyItem) }))
+  for (const { species, level, shiny } of def.reward.pokemon ?? []) parts.push(t(shiny ? (level ? 'reward.shinyMonLv' : 'reward.shinyMon') : level ? 'reward.monLv' : 'reward.mon', { species, level: level ?? 0 }))
+  if (def.reward.money) parts.push(`₽${formatNumber(def.reward.money)}`)
+  if (def.reward.coins) parts.push(t('rewards.coins', { n: def.reward.coins }))
+  if (def.reward.title) parts.push(t('reward.title', { title: titleName(def.reward.title) }))
   return parts.join(', ')
 }
 
 /** Hands over an unlocked achievement's reward - once. */
 export function claimAchievement(id: string): AchievementClaimResult {
   const def = ACHIEVEMENTS.find((a) => a.id === id)
-  if (!def) throw new Error(`Unknown achievement: ${id}`)
+  if (!def) throw new Error(t('err.unknownAchievement', { a: id }))
   const progress = getAchievementProgress()
-  if (!progress.unlocked.includes(id)) throw new Error(`${def.name} isn't unlocked yet`)
-  if (progress.claimed.includes(id)) throw new Error(`${def.name}'s reward has already been claimed`)
+  if (!progress.unlocked.includes(id)) throw new Error(t('err.isnTUnlockedYet', { a: achievementName(def.id, def.name) }))
+  if (progress.claimed.includes(id)) throw new Error(t('err.sRewardHasAlreadyBeenClaimed', { a: achievementName(def.id, def.name) }))
   // A new title starts on - unless it clashes with one that's already on.
   const title = def.reward.title
   const clash = title ? titleClash(title) : undefined
@@ -212,7 +213,7 @@ function titleOn(title: string): boolean {
  */
 export function setTitleActive(title: string, active: boolean): AchievementsState {
   const claimed = claimedTitles()
-  if (!claimed.includes(title)) throw new Error("You haven't earned that title")
+  if (!claimed.includes(title)) throw new Error(t('err.youHavenTEarnedThatTitle'))
   const progress = getAchievementProgress()
   const off = new Set(progress.disabledTitles)
   const set = (t: string, on: boolean): void => {
@@ -237,7 +238,7 @@ export function setTitleActive(title: string, active: boolean): AchievementsStat
 
 /** Shows one of the claimed titles beside the player's name (null: none) - just for show. */
 export function setAchievementTitle(title: string | null): AchievementsState {
-  if (title !== null && !claimedTitles().includes(title)) throw new Error("You haven't earned that title")
+  if (title !== null && !claimedTitles().includes(title)) throw new Error(t('err.youHavenTEarnedThatTitle'))
   getAchievementProgress().title = title
   persistAchievementProgress()
   return getAchievements()

@@ -13,6 +13,7 @@ import {
 import { getProgression } from './progression-store'
 import { listTrainers } from './trainer-store'
 import { savePathFor } from './save-paths'
+import { t } from '../i18n'
 
 const MAX_TEAM_SIZE = 6
 
@@ -107,7 +108,7 @@ function persist(): void {
 
 function findTeam(teamId: string): StoredPremadeTeam {
   const team = getState().find((t) => t.id === teamId)
-  if (!team) throw new Error(`Unknown premade team id: ${teamId}`)
+  if (!team) throw new Error(t('err.unknownPremadeTeamId', { a: teamId }))
   return team
 }
 
@@ -240,9 +241,9 @@ const NEW_TEAM_MON_LEVEL = 50
  */
 export function addSpeciesToTeam(teamId: string, species: string): PremadeTeamSummary[] {
   const team = findTeam(teamId)
-  if (team.mons.length >= MAX_TEAM_SIZE) throw new Error(`A team can have at most ${MAX_TEAM_SIZE} Pokemon`)
+  if (team.mons.length >= MAX_TEAM_SIZE) throw new Error(t('err.aTeamCanHaveAtMost', { a: MAX_TEAM_SIZE }))
   const name = canonicalSpeciesName(species)
-  if (!name) throw new Error(`There's no Pokemon called "${species}"`)
+  if (!name) throw new Error(t('err.thereSNoPokemonCalled', { a: species }))
   const level = team.mons.length > 0 ? Math.max(...team.mons.map((m) => m.set.level)) : NEW_TEAM_MON_LEVEL
   team.mons.push({ id: randomUUID(), set: buildBasicSet(name, level) })
   persist()
@@ -264,7 +265,7 @@ export function reorderTeamMons(teamId: string, monIds: string[]): PremadeTeamSu
   const team = findTeam(teamId)
   const byId = new Map(team.mons.map((m) => [m.id, m]))
   if (monIds.length !== team.mons.length || new Set(monIds).size !== monIds.length || !monIds.every((id) => byId.has(id))) {
-    throw new Error('That is not the same set of Pokemon as the team')
+    throw new Error(t('err.thatIsNotTheSameSet'))
   }
   team.mons = monIds.map((id) => byId.get(id)!)
   persist()
@@ -274,7 +275,7 @@ export function reorderTeamMons(teamId: string, monIds: string[]): PremadeTeamSu
 export function getTeamMonSet(teamId: string, monId: string): EditablePokemonSet {
   const team = findTeam(teamId)
   const mon = team.mons.find((m) => m.id === monId)
-  if (!mon) throw new Error(`Unknown Pokemon id: ${monId}`)
+  if (!mon) throw new Error(t('err.unknownPokemonId', { a: monId }))
   return {
     ...toEditableSet(withLevelAtCap(mon.set, getProgression().levelCap)),
     capOffset: mon.set.capOffset ?? null,
@@ -285,7 +286,7 @@ export function getTeamMonSet(teamId: string, monId: string): EditablePokemonSet
 export function updateTeamMon(teamId: string, monId: string, input: EditablePokemonSet): PremadeTeamSummary[] {
   const team = findTeam(teamId)
   const mon = team.mons.find((m) => m.id === monId)
-  if (!mon) throw new Error(`Unknown Pokemon id: ${monId}`)
+  if (!mon) throw new Error(t('err.unknownPokemonId', { a: monId }))
   const updated: TeamSet = { ...applyEditableSet(mon.set, input) }
   if (typeof input.capOffset === 'number' && Number.isFinite(input.capOffset)) {
     // "Level follows the cap": always this many levels under whatever the cap is.

@@ -11,6 +11,7 @@ import SpriteImage from './SpriteImage'
 import { toSpriteId } from '../../shared/battle-types'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
 import { playCornerClunk, playCornerTick } from './ticks'
+import { numberLocale, t } from './i18n'
 
 // One symbol's cell on a reel.
 const CELL = 96
@@ -190,7 +191,7 @@ function SlotMachine({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorner
     if (result.payout > 0 && spinButtonRef.current) {
       const rect = spinButtonRef.current.getBoundingClientRect()
       const jackpot = result.wins.some((w) => w.symbol === 'gholdengo')
-      notes.show(`${jackpot ? 'JACKPOT! ' : ''}+${result.payout.toLocaleString('en-US')} coins`, {
+      notes.show(`${jackpot ? t('slots.jackpot') : ''}${t('corner.plusCoins', { n: result.payout })}`, {
         x: rect.left + rect.width / 2,
         y: rect.top
       })
@@ -243,11 +244,7 @@ function SlotMachine({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorner
       <div className="slots-controls">
         <BetSlider bet={bet} max={maxBet(coins, perks.betCap)}
           step={betStep(perks.betCap)} disabled={spinning || !coins} onChange={setBet}
-          info={
-            <>
-              Every spin plays five lines - the three rows and both diagonals. Each winning line pays the amount below times your bet (single and double cherries count on the rows only).
-            </>
-          }
+          info={<>{t('slots.info')}</>}
         />
         <button
           ref={spinButtonRef}
@@ -255,15 +252,15 @@ function SlotMachine({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorner
           disabled={spinning || coins === null || coins < bet}
           onClick={() => void spin()}
         >
-          {spinning ? 'Spinning…' : 'Spin'}
+          {spinning ? t('slots.spinning') : t('slots.spin')}
         </button>
       </div>
       {error && <p className="editor-error">{error}</p>}
       {coins !== null && coins < 1 && !spinning && (
         <p className="editor-hint">
-          You&apos;re out of coins.{' '}
+          {t('corner.outOfCoins')}{' '}
           <button className="link-button" onClick={onOpenCoinShop}>
-            Buy some at the Coin Shop
+            {t('corner.buyCoins')}
           </button>
         </p>
       )}
@@ -276,7 +273,7 @@ function SlotMachine({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorner
               <SymbolIcon symbol={symbol} pokemon={rules.pokemon} />
               <SymbolIcon symbol={symbol} pokemon={rules.pokemon} />
             </span>
-            <span>×{rules.payouts[symbol].toLocaleString('en-US')}</span>
+            <span>×{rules.payouts[symbol].toLocaleString(numberLocale())}</span>
           </div>
         ))}
         <div className="slots-pay">
@@ -284,7 +281,7 @@ function SlotMachine({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorner
             <SymbolIcon symbol="cherry" pokemon={rules.pokemon} />
           </span>
           <span>
-            ×{rules.cherryOne} · two: ×{rules.cherryTwo} · three: ×{rules.payouts.cherry}
+            {t('slots.cherries', { one: rules.cherryOne, two: rules.cherryTwo, three: rules.payouts.cherry })}
           </span>
         </div>
       </div>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { BossRematchInfo } from '../../shared/battle-types'
 import { trainerSpriteUrl } from './trainerSprite'
+import { t } from './i18n'
 
 interface Props {
   onRematch: (trainerId: string) => void
@@ -23,14 +24,14 @@ function BossRematchModal({ onRematch, onClose }: Props): React.JSX.Element {
   return createPortal(
     <div className="modal-overlay" onMouseDown={onClose}>
       <div className="modal-panel boss-rematch-modal" onMouseDown={(e) => e.stopPropagation()}>
-        <h2>Boss Rematch</h2>
+        <h2>{t('rematch.title')}</h2>
         <div className="boss-rematch-grid">
           {(bosses ?? []).map((boss) => (
             <button
               key={boss.number}
               className="boss-rematch-cell"
               disabled={!boss.defeated}
-              title={boss.defeated ? `Fight ${boss.trainerName} again` : 'Not beaten yet'}
+              title={boss.defeated ? t('rematch.fight', { name: boss.trainerName }) : t('rematch.notYet')}
               onClick={() => onRematch(boss.trainerId)}
             >
               <span className="boss-rematch-number">#{boss.number}</span>
@@ -38,10 +39,10 @@ function BossRematchModal({ onRematch, onClose }: Props): React.JSX.Element {
               <span className="boss-rematch-name">{boss.trainerName}</span>
             </button>
           ))}
-          {bosses && bosses.length === 0 && <p className="box-empty-hint">No bosses in the boss order.</p>}
+          {bosses && bosses.length === 0 && <p className="box-empty-hint">{t('rematch.none')}</p>}
         </div>
         <div className="editor-actions">
-          <button onClick={onClose}>Close</button>
+          <button onClick={onClose}>{t('common.close')}</button>
         </div>
       </div>
     </div>,

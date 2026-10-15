@@ -7,16 +7,6 @@ export type UiScaleChoice = 'auto' | '75' | '90' | '100' | '125' | '150' | 'mobi
 
 export const UI_SCALE_CHOICES: UiScaleChoice[] = ['auto', '75', '90', '100', '125', '150', 'mobile']
 
-export const UI_SCALE_LABELS: Record<UiScaleChoice, string> = {
-  auto: 'Auto',
-  '75': '75%',
-  '90': '90%',
-  '100': '100%',
-  '125': '125%',
-  '150': '150%',
-  mobile: 'Mobile'
-}
-
 export interface UiScaleState {
   choice: UiScaleChoice
   // The zoom in use right now (1 = 100%) - for Auto, what it worked out for this screen.

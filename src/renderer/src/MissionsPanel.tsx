@@ -6,6 +6,7 @@ import CoinIcon from './CoinIcon'
 import { formatMoney } from './money'
 import { errorMessage, pointOf, useFloatingNotes } from './FloatingNotes'
 import type { NotePoint } from './FloatingNotes'
+import { itemName, missionText, numberLocale, t } from './i18n'
 
 interface Props {
   state: MissionsState
@@ -14,7 +15,7 @@ interface Props {
   onClaimed: (money: number) => void
 }
 
-const TIER_LABELS: Record<MissionTier, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' }
+const tierLabel = (tier: MissionTier): string => t(`missions.${tier}`)
 
 function countdown(ms: number): string {
   const minutes = Math.max(0, Math.ceil(ms / 60000))
@@ -32,7 +33,7 @@ function RewardList({ reward, items }: { reward: MissionReward; items: Map<strin
         return (
           <li key={itemId}>
             <span className="mission-reward-icon">{item && <ItemSprite spritenum={item.spritenum} />}</span>
-            <span className="mission-reward-name">{item?.name ?? itemId}</span>
+            <span className="mission-reward-name">{itemName(item?.name ?? itemId)}</span>
             {count > 1 && <span className="mission-reward-count">×{count}</span>}
           </li>
         )
@@ -48,7 +49,7 @@ function RewardList({ reward, items }: { reward: MissionReward; items: Map<strin
           <span className="mission-reward-icon">
             <CoinIcon />
           </span>
-          <span className="mission-reward-name">{reward.coins.toLocaleString('en-US')} coins</span>
+          <span className="mission-reward-name">{t('rewards.coins', { n: reward.coins })}</span>
         </li>
       )}
     </ul>
@@ -62,8 +63,10 @@ function MissionBar({ value, goal, done, claimed }: { value: number; goal: numbe
   return (
     <div className={`mission-progress${done ? ' mission-progress-done' : ''}${claimed ? ' mission-progress-claimed' : ''}`}>
       <div className="mission-progress-count">
-        <strong>{shown.toLocaleString('en-US')}</strong> / {goal.toLocaleString('en-US')}
-        <span className="mission-progress-state">{done ? (claimed ? 'Claimed' : 'Complete!') : `${Math.floor((shown / Math.max(1, goal)) * 100)}%`}</span>
+        <strong>{shown.toLocaleString(numberLocale())}</strong> / {goal.toLocaleString(numberLocale())}
+        <span className="mission-progress-state">
+          {done ? (claimed ? t('missions.claimedState') : t('missions.complete')) : `${Math.floor((shown / Math.max(1, goal)) * 100)}%`}
+        </span>
       </div>
       <div className="mission-progress-bar">
         <div className="mission-progress-fill" style={{ width: `${goal > 0 ? (shown / goal) * 100 : 0}%` }} />
@@ -109,7 +112,7 @@ function MissionsPanel({ state, onChange, onClaimed }: Props): React.JSX.Element
       const result = await window.api.claimMission(slot)
       onChange(result.state)
       onClaimed(result.money)
-      notes.show(`Got ${result.rewardText}`, at)
+      notes.show(t('rewards.got', { reward: result.rewardText }), at)
     })
 
   const claimBonus = (e: React.MouseEvent): Promise<void> =>
@@ -117,7 +120,7 @@ function MissionsPanel({ state, onChange, onClaimed }: Props): React.JSX.Element
       const result = await window.api.claimMissionBonus()
       onChange(result.state)
       onClaimed(result.money)
-      notes.show(`Got ${result.rewardText}`, at)
+      notes.show(t('rewards.got', { reward: result.rewardText }), at)
     })
 
   const reroll = (e: React.MouseEvent, slot: number): Promise<void> =>
@@ -134,7 +137,7 @@ function MissionsPanel({ state, onChange, onClaimed }: Props): React.JSX.Element
       <div className="missions-summary">
         <div className="missions-summary-count">
           <strong>{finished}</strong>
-          <span>/ {state.missions.length} done today</span>
+          <span>{t('missions.doneToday', { n: state.missions.length })}</span>
         </div>
         <div className="missions-summary-segments">
           {state.missions.map((m) => (
@@ -145,10 +148,10 @@ function MissionsPanel({ state, onChange, onClaimed }: Props): React.JSX.Element
           ))}
         </div>
         <div className="missions-summary-tags">
-          <span className="missions-tag" title="Swap an unfinished mission for another of the same difficulty">
-            🎲 {state.rerollsLeft} reroll{state.rerollsLeft === 1 ? '' : 's'}
+          <span className="missions-tag" title={t('missions.rerollTip')}>
+            {t('missions.rerolls', { count: state.rerollsLeft })}
           </span>
-          <span className="missions-tag" title="Missions refresh at midnight - an unclaimed reward is lost when they do">
+          <span className="missions-tag" title={t('missions.refreshTip')}>
             ⏳ {countdown(remaining)}
           </span>
         </div>
@@ -163,28 +166,28 @@ function MissionsPanel({ state, onChange, onClaimed }: Props): React.JSX.Element
               key={m.slot}
               className={`mission-col mission-col-${m.tier}${done && !m.claimed ? ' mission-col-ready' : ''}${m.claimed ? ' mission-col-claimed' : ''}`}
             >
-              <span className="mission-col-tier">{TIER_LABELS[m.tier]}</span>
-              <p className="mission-col-text">{m.text}</p>
+              <span className="mission-col-tier">{tierLabel(m.tier)}</span>
+              <p className="mission-col-text">{missionText(m.templateId, m.text)}</p>
               <MissionBar value={m.progress} goal={m.goal} done={done} claimed={m.claimed} />
               <div className="mission-col-rewards">
-                <span className="mission-col-label">Reward</span>
+                <span className="mission-col-label">{t('rewards.reward')}</span>
                 <RewardList reward={m.reward} items={items} />
               </div>
               <div className="mission-col-action">
                 {m.claimed ? (
-                  <span className="mission-col-done">✓ Claimed</span>
+                  <span className="mission-col-done">{t('rewards.claimed')}</span>
                 ) : done ? (
                   <button className="mission-claim" disabled={busy} onClick={(e) => void claim(e, m.slot)}>
-                    Claim reward
+                    {t('rewards.claimReward')}
                   </button>
                 ) : (
                   <button
                     className="mission-reroll"
                     disabled={busy || state.rerollsLeft < 1}
-                    title={state.rerollsLeft < 1 ? 'No rerolls left today' : 'Swap it for another mission of the same difficulty'}
+                    title={state.rerollsLeft < 1 ? t('missions.noRerolls') : t('missions.rerollOne')}
                     onClick={(e) => void reroll(e, m.slot)}
                   >
-                    🎲 Reroll
+                    {t('missions.reroll')}
                   </button>
                 )}
               </div>
@@ -198,8 +201,8 @@ function MissionsPanel({ state, onChange, onClaimed }: Props): React.JSX.Element
         className={`mission-bonus${state.bonusReady && !state.bonusClaimed ? ' mission-bonus-ready' : ''}${state.bonusClaimed ? ' mission-bonus-claimed' : ''}`}
       >
         <div className="mission-bonus-head">
-          <span className="mission-col-tier mission-bonus-tier">Bonus</span>
-          <span className="mission-bonus-text">Finish all three</span>
+          <span className="mission-col-tier mission-bonus-tier">{t('missions.bonus')}</span>
+          <span className="mission-bonus-text">{t('missions.allThree')}</span>
           <span className="mission-bonus-pips">
             {state.missions.map((m) => (
               <span key={m.slot} className={`mission-bonus-pip${m.progress >= m.goal ? ' mission-bonus-pip-on' : ''}`} />
@@ -209,16 +212,16 @@ function MissionsPanel({ state, onChange, onClaimed }: Props): React.JSX.Element
         <RewardList reward={state.bonusReward} items={items} />
         <div className="mission-bonus-action">
           {state.bonusClaimed ? (
-            <span className="mission-col-done">✓ Claimed</span>
+            <span className="mission-col-done">{t('rewards.claimed')}</span>
           ) : (
             <button className="mission-claim" disabled={busy || !state.bonusReady} onClick={(e) => void claimBonus(e)}>
-              Claim bonus
+              {t('missions.claimBonus')}
             </button>
           )}
         </div>
       </div>
 
-      <p className="editor-hint missions-hint">Missions refresh at midnight - an unclaimed reward is lost when they do.</p>
+      <p className="editor-hint missions-hint">{t('missions.hint')}</p>
       {notes.layer}
     </div>
   )

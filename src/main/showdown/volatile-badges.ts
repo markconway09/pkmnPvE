@@ -1,4 +1,5 @@
 import type { VolatileBadge } from '../../shared/battle-types'
+import { moveName, t, tOr } from '../i18n'
 
 /**
  * The badges shown under a battler's HP bar for the temporary conditions on it -
@@ -116,17 +117,22 @@ export function badgeFor(rawEffect: string, detail?: string): VolatileBadge | nu
   const known = BADGES[id]
   if (known) {
     // Disable names the move it disabled.
-    const label = id === 'disable' && detail && !detail.startsWith('[') ? `Disabled: ${detail.replace(/^move: /, '')}` : known[0]
+    const label =
+      id === 'disable' && detail && !detail.startsWith('[')
+        ? t('vol.disabledMove', { move: moveName(detail.replace(/^move: /, '')) })
+        : tOr(`vol.${id}`, known[0])
     return { id, label, kind: known[1] }
   }
   for (const [prefix, [label, kind]] of Object.entries(COUNTED)) {
     const count = id.startsWith(prefix) ? id.slice(prefix.length) : null
-    if (count !== null && /^\d$/.test(count)) return { id: prefix, label: `${label} ${count}`, kind }
+    if (count !== null && /^\d$/.test(count)) return { id: prefix, label: `${tOr(`vol.${prefix}`, label)} ${count}`, kind }
   }
   for (const [prefix, label] of Object.entries(STAT_BOOSTING)) {
     if (id.startsWith(prefix)) {
-      const stat = STAT_LABELS[id.slice(prefix.length)]
-      return { id: prefix, label: stat ? `${label}: ${stat}` : label, kind: 'good' }
+      const statId = id.slice(prefix.length)
+      const stat = STAT_LABELS[statId] && tOr(`vol.stat.${statId}`, STAT_LABELS[statId])
+      const name = tOr(`vol.${prefix}`, label)
+      return { id: prefix, label: stat ? `${name}: ${stat}` : name, kind: 'good' }
     }
   }
   return null

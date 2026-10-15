@@ -1,3 +1,5 @@
+import { t } from './i18n'
+
 /**
  * What a window shows while its contents load: a spinner filling the space they'll take.
  * The window itself is given its loaded size meanwhile (a `modal-panel-loading` class on
@@ -6,7 +8,7 @@
  */
 function ModalSpinner(): React.JSX.Element {
   return (
-    <div className="modal-spinner" role="status" aria-label="Loading">
+    <div className="modal-spinner" role="status" aria-label={t('common.loading')}>
       <span className="modal-spinner-ring" />
     </div>
   )

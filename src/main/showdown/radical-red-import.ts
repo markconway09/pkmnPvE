@@ -6,6 +6,7 @@ import { addImportedPremadeTeam } from './premade-teams-store'
 import { setBossOrder } from './progression-store'
 import { speciesStatsAndTypes } from './sim-access'
 import type { TeamSet } from './premade-teams-store'
+import { t } from '../i18n'
 
 // Shape of the data/radical-red-*.json files, produced by
 // scripts/build-radical-red-bosses.mjs (which also documents where the data
@@ -174,7 +175,7 @@ const POST_GAME_CAP = 100
 export function buildRadicalRedBossOrder(trainerIdForKey: (key: string) => string | undefined): Omit<BossStep, 'id'>[] {
   return STORY_BOSSES.map((boss, i) => {
     const trainerId = trainerIdForKey(boss.key)
-    if (!trainerId) throw new Error(`${boss.label} hasn't been imported (${boss.key})`)
+    if (!trainerId) throw new Error(t('err.hasnTBeenImported', { a: boss.label, b: boss.key }))
     return {
       trainerId,
       requiredTrainerWins: boss.requiredTrainerWins,

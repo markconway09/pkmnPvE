@@ -5,6 +5,7 @@ import type { BoxPokemonView, BoxState, LoadoutView } from '../../shared/battle-
 import { toSpriteId } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
 import { errorMessage, pointOf, useFloatingNotes } from './FloatingNotes'
+import { t } from './i18n'
 
 interface Props {
   team: (string | null)[]
@@ -23,7 +24,9 @@ function TeamPreview({ team, monsById }: { team: (string | null)[]; monsById: Ma
           <div
             key={i}
             className={`loadout-preview-slot${mon ? ` loadout-preview-filled rarity-card rarity-tier-${mon.rarityTier ?? 'common'}` : ''}`}
-            title={mon ? `${mon.species} · Lv ${mon.level}` : id ? 'No longer in your box' : 'Empty'}
+            title={
+              mon ? t('loadouts.monTitle', { name: mon.species, level: mon.level }) : id ? t('loadouts.gone') : t('loadouts.empty')
+            }
           >
             {mon && (
               <RarityGlow size={null} className="loadout-preview-glow">
@@ -77,13 +80,13 @@ function LoadoutsModal({ team, monsById, onApplied, onClose }: Props): React.JSX
   function saveCurrentTeam(e: React.MouseEvent | null): void {
     const name = newName.trim()
     if (!name) {
-      notes.show('Give this loadout a name', { x: window.innerWidth / 2, y: window.innerHeight / 3 }, 'bad')
+      notes.show(t('loadouts.needName'), { x: window.innerWidth / 2, y: window.innerHeight / 3 }, 'bad')
       return
     }
     void act(e, async () => {
       setLoadouts(await window.api.saveLoadout(name))
       setNewName('')
-      return `Saved "${name}"`
+      return t('loadouts.saved', { name })
     })
   }
 
@@ -103,32 +106,30 @@ function LoadoutsModal({ team, monsById, onApplied, onClose }: Props): React.JSX
     <div className="modal-overlay" onMouseDown={onClose}>
       <div className="modal-panel loadouts-modal" onMouseDown={(e) => e.stopPropagation()}>
         <div className="shop-header">
-          <h2>Loadouts</h2>
-          {loadouts && <span className="loadouts-count">{loadouts.length} saved</span>}
+          <h2>{t('loadouts.title')}</h2>
+          {loadouts && <span className="loadouts-count">{t('loadouts.count', { n: loadouts.length })}</span>}
         </div>
 
-        <h3 className="shop-category-heading">Current team</h3>
+        <h3 className="shop-category-heading">{t('loadouts.current')}</h3>
         <div className="loadout-card loadout-card-current">
           <TeamPreview team={team} monsById={monsById} />
           <div className="loadout-save-row">
             <input
               className="loadout-name-input"
-              placeholder="Name this team…"
+              placeholder={t('loadouts.namePlaceholder')}
               value={newName}
               maxLength={40}
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && saveCurrentTeam(null)}
             />
             <button disabled={busy || teamSize === 0} onClick={(e) => saveCurrentTeam(e)}>
-              Save as loadout
+              {t('loadouts.saveAs')}
             </button>
           </div>
         </div>
 
-        <h3 className="shop-category-heading">Saved loadouts</h3>
-        {loadouts && loadouts.length === 0 && (
-          <p className="box-empty-hint">No loadouts yet - name your current team above to save it.</p>
-        )}
+        <h3 className="shop-category-heading">{t('loadouts.savedHeading')}</h3>
+        {loadouts && loadouts.length === 0 && <p className="box-empty-hint">{t('loadouts.none')}</p>}
         <div className="loadout-list">
           {loadouts?.map((loadout) => {
             const current = sameTeam(loadout.team, team)
@@ -151,7 +152,7 @@ function LoadoutsModal({ team, monsById, onApplied, onClose }: Props): React.JSX
                   ) : (
                     <button
                       className="loadout-name"
-                      title="Click to rename"
+                      title={t('loadouts.rename')}
                       onClick={() => {
                         setRenamingId(loadout.id)
                         setRenameValue(loadout.name)
@@ -160,7 +161,7 @@ function LoadoutsModal({ team, monsById, onApplied, onClose }: Props): React.JSX
                       {loadout.name} <span className="loadout-name-edit">✎</span>
                     </button>
                   )}
-                  {current && <span className="loadout-current-badge">In use</span>}
+                  {current && <span className="loadout-current-badge">{t('loadouts.inUse')}</span>}
                 </div>
                 <div className="loadout-card-body">
                   <TeamPreview team={loadout.team} monsById={monsById} />
@@ -175,19 +176,19 @@ function LoadoutsModal({ team, monsById, onApplied, onClose }: Props): React.JSX
                         })
                       }
                     >
-                      Load
+                      {t('loadouts.load')}
                     </button>
                     <button
                       disabled={busy || current || teamSize === 0}
-                      title="Replace this loadout with your current team"
+                      title={t('loadouts.overwriteTip')}
                       onClick={(e) =>
                         void act(e, async () => {
                           setLoadouts(await window.api.updateLoadout(loadout.id))
-                          return `Updated "${loadout.name}"`
+                          return t('loadouts.updated', { name: loadout.name })
                         })
                       }
                     >
-                      Overwrite
+                      {t('loadouts.overwrite')}
                     </button>
                     <button
                       className={confirmingDelete === loadout.id ? 'loadout-delete-confirm' : undefined}
@@ -200,11 +201,11 @@ function LoadoutsModal({ team, monsById, onApplied, onClose }: Props): React.JSX
                         setConfirmingDelete(null)
                         void act(e, async () => {
                           setLoadouts(await window.api.deleteLoadout(loadout.id))
-                          return `Deleted "${loadout.name}"`
+                          return t('loadouts.deleted', { name: loadout.name })
                         })
                       }}
                     >
-                      {confirmingDelete === loadout.id ? 'Sure?' : 'Delete'}
+                      {confirmingDelete === loadout.id ? t('loadouts.sure') : t('loadouts.delete')}
                     </button>
                   </div>
                 </div>
@@ -214,7 +215,7 @@ function LoadoutsModal({ team, monsById, onApplied, onClose }: Props): React.JSX
         </div>
 
         <div className="editor-actions">
-          <button onClick={onClose}>Close</button>
+          <button onClick={onClose}>{t('common.close')}</button>
         </div>
         {notes.layer}
       </div>

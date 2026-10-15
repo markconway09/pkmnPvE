@@ -14,7 +14,7 @@ import {
   subscribeOnline,
   type OnlineState
 } from './online'
-import { CLICK } from './platform'
+import { clickWord, t } from './i18n'
 import { trainerSpriteUrl } from './trainerSprite'
 import DraftPanel from './DraftPanel'
 
@@ -70,17 +70,17 @@ function OnlineSection({ disabled }: Props): React.JSX.Element {
     <div className="classic-challenge online-section">
       <div className="classic-section-head">
         <img className="classic-section-icon" src="./icons/nav/challenge.png" alt="" />
-        <span className="run-hud-label">Online battle</span>
+        <span className="run-hud-label">{t('online.title')}</span>
         {/* Both teams are set to the level of the higher one's best Pokemon. */}
-        <span className="classic-section-sub">Battle a friend · no exp, money or drops</span>
+        <span className="classic-section-sub">{t('online.sub')}</span>
       </div>
 
       {online.phase === 'idle' && (
         <div className="online-row">
           <button disabled={disabled} onClick={() => void hostRoom()}>
-            Host a room
+            {t('online.host')}
           </button>
-          <span className="online-or">or</span>
+          <span className="online-or">{t('online.or')}</span>
           <form
             className="online-join"
             onSubmit={(e) => {
@@ -90,7 +90,7 @@ function OnlineSection({ disabled }: Props): React.JSX.Element {
           >
             <input
               type="text"
-              placeholder="Room code"
+              placeholder={t('online.roomCode')}
               value={code}
               maxLength={ROOM_CODE_LENGTH}
               onChange={(e) => {
@@ -99,7 +99,7 @@ function OnlineSection({ disabled }: Props): React.JSX.Element {
               }}
             />
             <button type="submit" disabled={disabled || code.trim().length !== ROOM_CODE_LENGTH}>
-              Join
+              {t('online.join')}
             </button>
           </form>
         </div>
@@ -107,20 +107,20 @@ function OnlineSection({ disabled }: Props): React.JSX.Element {
 
       {online.phase === 'connecting' && (
         <div className="online-row">
-          <span className="online-status">{online.role === 'host' ? 'Opening a room...' : `Joining room ${online.code}...`}</span>
-          <button onClick={leaveRoom}>Cancel</button>
+          <span className="online-status">{online.role === 'host' ? t('online.opening') : t('online.joining', { code: online.code ?? '' })}</span>
+          <button onClick={leaveRoom}>{t('common.cancel')}</button>
         </div>
       )}
 
       {online.phase === 'waiting' && (
         <div className="online-row">
-          <span className="online-status">Room code</span>
-          <button className="online-code" title="Copy the code" onClick={copyCode}>
+          <span className="online-status">{t('online.roomCode')}</span>
+          <button className="online-code" title={t('online.copyTip')} onClick={copyCode}>
             {online.code}
           </button>
-          <span className="online-status">{copied ? 'Copied!' : 'Give it to your friend - waiting for them to join...'}</span>
+          <span className="online-status">{copied ? t('online.copied') : t('online.giveCode')}</span>
           <button className="online-leave" onClick={leaveRoom}>
-            Close room
+            {t('online.closeRoom')}
           </button>
         </div>
       )}
@@ -132,18 +132,16 @@ function OnlineSection({ disabled }: Props): React.JSX.Element {
             <img className="online-friend-sprite" src={trainerSpriteUrl(online.friend.spriteId)} alt="" />
             <span className="online-friend-name">{online.friend.name}</span>
             {online.draft ? (
-              <span className="online-status">Chaos draft</span>
+              <span className="online-status">{t('online.draft')}</span>
             ) : online.coop ? (
-              <span className="online-status">Co-op Battle Tower</span>
+              <span className="online-status">{t('online.coop')}</span>
             ) : (
               online.role !== 'host' && (
-                <span className="online-status">
-                  Waiting for {online.friend.name} to start a battle, a chaos draft or a co-op Battle Tower run...
-                </span>
+                <span className="online-status">{t('online.waitingHost', { name: online.friend.name })}</span>
               )
             )}
             <button className="online-leave" onClick={leaveRoom}>
-              Leave
+              {t('online.leave')}
             </button>
           </div>
           {/* Host: the two games, one per line - a battle with its own options, or a chaos draft. */}
@@ -151,16 +149,16 @@ function OnlineSection({ disabled }: Props): React.JSX.Element {
             <>
               <div className="online-mode">
                 <span className="online-mode-text">
-                  <strong>Battle</strong>
-                  <span>Your current teams</span>
+                  <strong>{t('online.battle')}</strong>
+                  <span>{t('online.currentTeams')}</span>
                 </span>
                 <span className="online-mode-options">
                   <label className="challenge-doubles">
-                    <input type="checkbox" checked={doubles} onChange={(e) => setDoubles(e.target.checked)} /> Double battle
+                    <input type="checkbox" checked={doubles} onChange={(e) => setDoubles(e.target.checked)} /> {t('online.doubles')}
                   </label>
                   {/* Merge stars: each team member's +10% stats per star, on both sides. */}
-                  <label className="challenge-doubles" title="Both teams get their merge star stat boosts">
-                    <input type="checkbox" checked={stars} onChange={(e) => setStars(e.target.checked)} /> Use stars
+                  <label className="challenge-doubles" title={t('online.starsTip')}>
+                    <input type="checkbox" checked={stars} onChange={(e) => setStars(e.target.checked)} /> {t('online.stars')}
                   </label>
                 </span>
                 <button
@@ -168,33 +166,33 @@ function OnlineSection({ disabled }: Props): React.JSX.Element {
                   disabled={disabled || online.starting || online.phase !== 'lobby'}
                   onClick={() => startOnlineBattle(doubles, stars)}
                 >
-                  {online.starting ? 'Starting...' : 'Start battle'}
+                  {online.starting ? t('online.starting') : t('online.startBattle')}
                 </button>
               </div>
               {/* A game of its own: the doubles and stars options don't apply to it. */}
               <div className="online-mode">
                 <span className="online-mode-text">
-                  <strong>Chaos draft</strong>
-                  <span>Both draft a chaos team at the same time, then battle - first to 4 wins</span>
+                  <strong>{t('online.draft')}</strong>
+                  <span>{t('online.draftHint')}</span>
                 </span>
                 <button
                   className="online-start online-draft-start"
                   disabled={online.starting || online.phase !== 'lobby'}
                   onClick={() => void startOnlineDraft()}
                 >
-                  Start draft
+                  {t('online.startDraft')}
                 </button>
               </div>
               {/* Co-op Battle Tower: carry on the run saved with this friend, or start one. */}
               <div className="online-mode">
                 <span className="online-mode-text">
-                  <strong>Co-op Battle Tower</strong>
+                  <strong>{t('online.coop')}</strong>
                   <span>
                     {savedWithFriend && savedActive
-                      ? `Carry on: floor ${savedActive.floor}, ${runDifficultyInfo(savedActive.difficulty).label}`
+                      ? t('online.carryOn', { floor: savedActive.floor, difficulty: runDifficultyInfo(savedActive.difficulty).label })
                       : savedActive
-                        ? `Your co-op run with ${savedActive.coop?.partnerName ?? 'someone else'} is still going`
-                        : 'Climb together - your own teams of 3, every boss fought side by side'}
+                        ? t('online.otherRun', { name: savedActive.coop?.partnerName ?? t('online.someoneElse') })
+                        : t('online.coopHint')}
                   </span>
                 </span>
                 {!savedActive && (
@@ -202,7 +200,7 @@ function OnlineSection({ disabled }: Props): React.JSX.Element {
                     <select
                       className="coop-select"
                       value={coopDifficulty}
-                      title="Difficulty"
+                      title={t('online.difficulty')}
                       onChange={(e) => setCoopDifficulty(e.target.value as RunDifficulty)}
                     >
                       {RUN_DIFFICULTIES.map((d) => (
@@ -214,13 +212,13 @@ function OnlineSection({ disabled }: Props): React.JSX.Element {
                     <select
                       className="coop-select"
                       value={coopGeneration ?? ''}
-                      title="Where the bosses come from"
+                      title={t('online.genTip')}
                       onChange={(e) => setCoopGeneration(e.target.value ? Number(e.target.value) : null)}
                     >
-                      <option value="">Any generation</option>
+                      <option value="">{t('online.anyGen')}</option>
                       {coopGenerations.map((g) => (
                         <option key={g} value={g}>
-                          Generation {g}
+                          {t('online.gen', { n: g })}
                         </option>
                       ))}
                     </select>
@@ -244,7 +242,7 @@ function OnlineSection({ disabled }: Props): React.JSX.Element {
                         .catch(() => {})
                     }}
                   >
-                    {confirmingCoopForfeit ? `Give it up? ${CLICK} again` : 'Forfeit it'}
+                    {confirmingCoopForfeit ? t('online.giveUp', { click: clickWord() }) : t('online.forfeit')}
                   </button>
                 ) : (
                   <button
@@ -255,7 +253,7 @@ function OnlineSection({ disabled }: Props): React.JSX.Element {
                       else startCoopRun(coopDifficulty, coopGeneration)
                     }}
                   >
-                    {savedWithFriend ? 'Continue' : 'Start co-op'}
+                    {savedWithFriend ? t('online.continue') : t('online.startCoop')}
                   </button>
                 )}
               </div>

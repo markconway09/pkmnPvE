@@ -5,6 +5,8 @@
 // Real casino odds: every bet pays back 36/37 of what's staked over time (97.3%) - the
 // zero is the house's edge, and every outside bet loses when it comes up.
 
+import { tr } from './i18n/current'
+
 export const ROULETTE_NUMBERS = 37
 
 // Each spot on the board takes up to the bet cap, and a spin up to this many times it
@@ -30,16 +32,31 @@ export function pocketColor(n: number): PocketColor {
 export type RouletteBetKey = string
 export const EVEN_MONEY_BETS = ['low', 'even', 'red', 'black', 'odd', 'high'] as const
 
+// The board's words, in the language in use (read each time they're shown).
 export const BET_LABELS: Record<string, string> = {
   low: '1-18',
-  even: 'Even',
-  red: 'Red',
-  black: 'Black',
-  odd: 'Odd',
+  get even() {
+    return tr('roulette.even')
+  },
+  get red() {
+    return tr('roulette.red')
+  },
+  get black() {
+    return tr('roulette.black')
+  },
+  get odd() {
+    return tr('roulette.odd')
+  },
   high: '19-36',
-  'dozen:1': '1st 12',
-  'dozen:2': '2nd 12',
-  'dozen:3': '3rd 12',
+  get 'dozen:1'() {
+    return tr('roulette.dozen1')
+  },
+  get 'dozen:2'() {
+    return tr('roulette.dozen2')
+  },
+  get 'dozen:3'() {
+    return tr('roulette.dozen3')
+  },
   'column:1': '2:1',
   'column:2': '2:1',
   'column:3': '2:1'
@@ -48,7 +65,7 @@ export const BET_LABELS: Record<string, string> = {
 /** A bet's name for a message ("17", "Red", "2nd 12"...). */
 export function betLabel(key: RouletteBetKey): string {
   if (key.startsWith('n:')) return key.slice(2)
-  if (key.startsWith('column:')) return `Column ${key.slice(7)}`
+  if (key.startsWith('column:')) return tr('roulette.column', { n: key.slice(7) })
   return BET_LABELS[key] ?? key
 }
 

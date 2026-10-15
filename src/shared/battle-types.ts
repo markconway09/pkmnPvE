@@ -1,4 +1,5 @@
 import type { TmInfo } from './tms'
+import { tr } from './i18n/current'
 import type { ChoiceRequest } from 'pokemon-showdown/dist/sim/side.js'
 import type { DraftBattleResult } from './draft'
 
@@ -262,17 +263,17 @@ export interface WildLocationConfig {
 // Weather and terrain a battle can start with (a boss's Field setting, or the chance of
 // weather in a wild area): up from the first turn, and lasting until something replaces it.
 export const FIELD_START_WEATHERS: { id: string; label: string }[] = [
-  { id: 'sunnyday', label: 'Sun' },
-  { id: 'raindance', label: 'Rain' },
-  { id: 'sandstorm', label: 'Sandstorm' },
-  { id: 'snowscape', label: 'Snow' }
+  { id: 'sunnyday', get label() { return tr('weather.sunnyday') } },
+  { id: 'raindance', get label() { return tr('weather.raindance') } },
+  { id: 'sandstorm', get label() { return tr('weather.sandstorm') } },
+  { id: 'snowscape', get label() { return tr('weather.snowscape') } }
 ]
 
 export const FIELD_START_TERRAINS: { id: string; label: string }[] = [
-  { id: 'electricterrain', label: 'Electric' },
-  { id: 'grassyterrain', label: 'Grassy' },
-  { id: 'mistyterrain', label: 'Misty' },
-  { id: 'psychicterrain', label: 'Psychic' }
+  { id: 'electricterrain', get label() { return tr('terrain.electricterrain') } },
+  { id: 'grassyterrain', get label() { return tr('terrain.grassyterrain') } },
+  { id: 'mistyterrain', get label() { return tr('terrain.mistyterrain') } },
+  { id: 'psychicterrain', get label() { return tr('terrain.psychicterrain') } }
 ]
 
 // The chance a wild battle starts with a random one of those weathers - anywhere but
@@ -290,7 +291,9 @@ export function rollWildWeather(location: WildLocationId | null | undefined): st
 export const WILD_LOCATIONS: WildLocationConfig[] = [
   {
     id: 'cave',
-    label: 'Cave',
+    get label() {
+      return tr('location.cave')
+    },
     icon: '🗻',
     types: ['Rock', 'Dark', 'Steel', 'Ground'],
     eggGroups: ['Mineral', 'Amorphous'],
@@ -298,7 +301,9 @@ export const WILD_LOCATIONS: WildLocationConfig[] = [
   },
   {
     id: 'mountain',
-    label: 'Mountain',
+    get label() {
+      return tr('location.mountain')
+    },
     icon: '⛰️',
     types: ['Rock', 'Ice', 'Fire', 'Dragon'],
     eggGroups: ['Monster', 'Dragon'],
@@ -306,7 +311,9 @@ export const WILD_LOCATIONS: WildLocationConfig[] = [
   },
   {
     id: 'forest',
-    label: 'Forest',
+    get label() {
+      return tr('location.forest')
+    },
     icon: '🌲',
     types: ['Grass', 'Bug', 'Fairy', 'Normal', 'Flying'],
     eggGroups: ['Grass', 'Bug', 'Field'],
@@ -314,7 +321,9 @@ export const WILD_LOCATIONS: WildLocationConfig[] = [
   },
   {
     id: 'city',
-    label: 'City',
+    get label() {
+      return tr('location.city')
+    },
     icon: '🏙️',
     types: ['Fighting', 'Psychic', 'Poison', 'Fairy', 'Normal'],
     eggGroups: ['Human-Like', 'Fairy'],
@@ -322,7 +331,9 @@ export const WILD_LOCATIONS: WildLocationConfig[] = [
   },
   {
     id: 'industry',
-    label: 'Industry',
+    get label() {
+      return tr('location.industry')
+    },
     icon: '🏭',
     types: ['Electric', 'Steel', 'Fighting', 'Fire', 'Poison'],
     eggGroups: ['Mineral', 'Amorphous'],
@@ -330,7 +341,9 @@ export const WILD_LOCATIONS: WildLocationConfig[] = [
   },
   {
     id: 'cemetery',
-    label: 'Graveyard',
+    get label() {
+      return tr('location.cemetery')
+    },
     icon: '🪦',
     types: ['Ground', 'Ghost', 'Bug', 'Dark'],
     eggGroups: ['Amorphous'],
@@ -338,7 +351,9 @@ export const WILD_LOCATIONS: WildLocationConfig[] = [
   },
   {
     id: 'ocean',
-    label: 'Ocean',
+    get label() {
+      return tr('location.ocean')
+    },
     icon: '🌊',
     types: ['Water', 'Ice', 'Flying'],
     // Dragon deliberately left out here too (see exceptionBaseSpecies) - the
@@ -348,14 +363,18 @@ export const WILD_LOCATIONS: WildLocationConfig[] = [
   },
   {
     id: 'all',
-    label: 'All',
+    get label() {
+      return tr('location.all')
+    },
     icon: '🌐',
     types: null,
     exceptionBaseSpecies: []
   },
   {
     id: 'lab',
-    label: 'Lab',
+    get label() {
+      return tr('location.lab')
+    },
     icon: '🧪',
     types: null,
     exceptionBaseSpecies: [],
@@ -732,11 +751,11 @@ export type RogueliteBossClass = 'gymLeader' | 'eliteFour' | 'champion' | 'villa
 // The villains are no boss floor's: they're met in a Villain Takeover (see run-store), so
 // a generation never needs any to be picked for a run.
 export const ROGUELITE_BOSS_CLASSES: { id: RogueliteBossClass; label: string; villain?: boolean }[] = [
-  { id: 'gymLeader', label: 'Gym Leader' },
-  { id: 'eliteFour', label: 'Elite Four' },
-  { id: 'champion', label: 'Champion' },
-  { id: 'villainGrunt', label: 'Villain Grunt', villain: true },
-  { id: 'villainElite', label: 'Villain Elite', villain: true }
+  { id: 'gymLeader', get label() { return tr('bossClass.gymLeader') } },
+  { id: 'eliteFour', get label() { return tr('bossClass.eliteFour') } },
+  { id: 'champion', get label() { return tr('bossClass.champion') } },
+  { id: 'villainGrunt', get label() { return tr('bossClass.villainGrunt') }, villain: true },
+  { id: 'villainElite', get label() { return tr('bossClass.villainElite') }, villain: true }
 ]
 
 /** The class of a run's n-th boss (0 = the first): Gym Leaders, the Elite Four, then the Champion. */
@@ -751,9 +770,9 @@ export function rogueliteBossClassAt(bossIndex: number, difficulty?: RunDifficul
 export function rogueliteBossLabelAt(bossIndex: number, difficulty?: RunDifficulty): string {
   const { gymLeaders, eliteFour } = runDifficultyInfo(difficulty)
   const bossClass = rogueliteBossClassAt(bossIndex, difficulty)
-  if (bossClass === 'gymLeader') return `Gym Leader ${bossIndex + 1}/${gymLeaders}`
-  if (bossClass === 'eliteFour') return `Elite Four ${bossIndex - gymLeaders + 1}/${eliteFour}`
-  return 'Champion'
+  if (bossClass === 'gymLeader') return tr('bossClass.gymLeaderAt', { n: bossIndex + 1, of: gymLeaders })
+  if (bossClass === 'eliteFour') return tr('bossClass.eliteFourAt', { n: bossIndex - gymLeaders + 1, of: eliteFour })
+  return tr('bossClass.champion')
 }
 
 /** How many bosses a run on this difficulty has, the Champion last. */
@@ -1688,9 +1707,15 @@ export interface RunDifficultyInfo {
 export const RUN_DIFFICULTIES: RunDifficultyInfo[] = [
   {
     id: 'easy',
-    label: 'Easy',
-    rules: 'A short run: 4 Gym Leaders and 2 Elite Four before the Champion. Trainers and bosses use the Normal AI, you start with a Full Restore, and trainer and boss wins pay 1 extra gem.',
-    rewardText: 'Per boss: Exp. Candy S and ₽1,000. Beating the Champion: a Random Pokémon.',
+    get label() {
+      return tr('difficulty.easy')
+    },
+    get rules() {
+      return tr('difficulty.easy.rules')
+    },
+    get rewardText() {
+      return tr('difficulty.easy.rewards')
+    },
     reward: { money: 1000, expCandy: 'expcandys', randomPokemon: ['champion'] },
     aiOverride: 'normal',
     wildAi: 'easy',
@@ -1702,9 +1727,15 @@ export const RUN_DIFFICULTIES: RunDifficultyInfo[] = [
   },
   {
     id: 'normal',
-    label: 'Normal',
-    rules: 'A shorter run: 6 Gym Leaders and 3 Elite Four before the Champion.',
-    rewardText: 'Per boss: Exp. Candy M and ₽5,000. Each Elite Four member and the Champion: a Random Pokémon and a Raid Crystal.',
+    get label() {
+      return tr('difficulty.normal')
+    },
+    get rules() {
+      return tr('difficulty.normal.rules')
+    },
+    get rewardText() {
+      return tr('difficulty.normal.rewards')
+    },
     reward: {
       money: 5000,
       expCandy: 'expcandym',
@@ -1721,9 +1752,15 @@ export const RUN_DIFFICULTIES: RunDifficultyInfo[] = [
   },
   {
     id: 'hard',
-    label: 'Hard',
-    rules: 'Trainers and bosses use the Hard AI, wild Pokémon the Normal AI, and every team has one more Pokémon.',
-    rewardText: 'Per boss: a Random Pokémon, a Raid Crystal, Exp. Candy M and ₽10,000. Beating the Champion: a Random Legendary.',
+    get label() {
+      return tr('difficulty.hard')
+    },
+    get rules() {
+      return tr('difficulty.hard.rules')
+    },
+    get rewardText() {
+      return tr('difficulty.hard.rewards')
+    },
     reward: {
       money: 10000,
       expCandy: 'expcandym',
@@ -1741,9 +1778,15 @@ export const RUN_DIFFICULTIES: RunDifficultyInfo[] = [
   },
   {
     id: 'extreme',
-    label: 'Extreme',
-    rules: 'Everything in Hard, but wild Pokémon use the Hard AI too, every boss brings 6 Pokémon, and there is no healing at all.',
-    rewardText: 'Per boss: a Random Legendary, 2 Raid Crystals, Exp. Candy L and ₽20,000.',
+    get label() {
+      return tr('difficulty.extreme')
+    },
+    get rules() {
+      return tr('difficulty.extreme.rules')
+    },
+    get rewardText() {
+      return tr('difficulty.extreme.rewards')
+    },
     reward: { money: 20000, expCandy: 'expcandyl', randomLegendary: 'all', raidCrystals: { from: 'all', count: 2 } },
     aiOverride: 'hard',
     wildAi: 'hard',
@@ -1873,20 +1916,32 @@ export interface RunConsumableInfo {
 export const RUN_CONSUMABLES: RunConsumableInfo[] = [
   {
     id: 'fullrestore',
-    name: 'Full Restore',
-    description: 'Fully heals one Pokémon: all its HP back and no status.',
+    get name() {
+      return tr('consumable.fullrestore')
+    },
+    get description() {
+      return tr('consumable.fullrestore.desc')
+    },
     icon: './icons/run-fullrestore.png'
   },
   {
     id: 'revive',
-    name: 'Revive',
-    description: "Brings back a Pokémon that fainted this run, at half HP and this floor's opponent level.",
+    get name() {
+      return tr('consumable.revive')
+    },
+    get description() {
+      return tr('consumable.revive.desc')
+    },
     icon: './icons/run-revive.png'
   },
   {
     id: 'abilitycapsule',
-    name: 'Ability Capsule',
-    description: "Changes a Pokémon's ability to one of its species' normal or hidden abilities.",
+    get name() {
+      return tr('consumable.abilitycapsule')
+    },
+    get description() {
+      return tr('consumable.abilitycapsule.desc')
+    },
     icon: './icons/run-abilitycapsule.png'
   }
 ]

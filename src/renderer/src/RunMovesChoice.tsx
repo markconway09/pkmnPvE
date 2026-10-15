@@ -1,5 +1,6 @@
 import { createPortal } from 'react-dom'
 import type { MoveInfo, RunMovesPreview } from '../../shared/battle-types'
+import { moveName, t, typeName } from './i18n'
 
 interface Props {
   // "Mudkip starts the run", "Charmander evolves into Charmeleon"...
@@ -17,11 +18,11 @@ function MoveColumn({ heading, moves }: { heading: string; moves: MoveInfo[] }):
       <h3>{heading}</h3>
       {moves.map((move) => (
         <div key={move.id} className="run-moves-row">
-          <span className={`type-badge type-${move.type.toLowerCase()}`}>{move.type}</span>
-          <span>{move.name}</span>
+          <span className={`type-badge type-${move.type.toLowerCase()}`}>{typeName(move.type)}</span>
+          <span>{moveName(move.name)}</span>
         </div>
       ))}
-      {moves.length === 0 && <p className="box-empty-hint">No moves</p>}
+      {moves.length === 0 && <p className="box-empty-hint">{t('runMoves.none')}</p>}
     </div>
   )
 }
@@ -33,20 +34,20 @@ function RunMovesChoice({ title, preview, busy, onKeep, onNew, onCancel }: Props
     <div className="modal-overlay" onMouseDown={onCancel}>
       <div className="modal-panel run-moves-modal" onMouseDown={(e) => e.stopPropagation()}>
         <h2>{title}</h2>
-        <p className="box-empty-hint">Keep its moves, or take a new run moveset?</p>
+        <p className="box-empty-hint">{t('runMoves.question')}</p>
         <div className="run-moves-columns">
-          <MoveColumn heading="Current moves" moves={preview.current} />
-          <MoveColumn heading="New moves" moves={preview.proposed} />
+          <MoveColumn heading={t('runMoves.current')} moves={preview.current} />
+          <MoveColumn heading={t('runMoves.new')} moves={preview.proposed} />
         </div>
         <div className="editor-actions">
           <button disabled={busy} onClick={onCancel}>
-            Cancel
+            {t('common.cancel')}
           </button>
           <button disabled={busy} onClick={onKeep}>
-            Keep current moves
+            {t('runMoves.keep')}
           </button>
           <button disabled={busy} onClick={onNew}>
-            Use new moves
+            {t('runMoves.use')}
           </button>
         </div>
       </div>

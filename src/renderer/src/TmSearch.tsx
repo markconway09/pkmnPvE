@@ -5,6 +5,7 @@ import TmSearchModal from './TmSearchModal'
 import ItemSprite from './ItemSprite'
 import { TR_SPRITENUM } from './itemIcon'
 import RarityOddsTooltip from './RarityOddsTooltip'
+import { t } from './i18n'
 
 /**
  * Classic's TM search: the searches left in each area today, and the search window while
@@ -61,8 +62,8 @@ export function TmSearchStrip({ location, state, disabled, onSearch }: StripProp
       source={{ kind: 'tm', location: location.id }}
       heading={
         left > 0
-          ? `Search ${location.label} for a TM - ${left} left today · ${Math.max(0, TM_PITY_SEARCHES - pity)} more without a purple and the next is sure to be one`
-          : 'No searches left here today - back tomorrow'
+          ? t('tm.searchTip', { area: location.label, left, pity: Math.max(0, TM_PITY_SEARCHES - pity) })
+          : t('tm.noneLeft')
       }
     >
       <button
@@ -73,7 +74,7 @@ export function TmSearchStrip({ location, state, disabled, onSearch }: StripProp
         <span className="tm-search-strip-icon">
           <ItemSprite spritenum={TR_SPRITENUM} />
         </span>
-        <span className="tm-search-strip-label">TM search</span>
+        <span className="tm-search-strip-label">{t('tm.search')}</span>
         <span className="tm-search-strip-left">
           {left}/{TM_SEARCH_CHARGES_PER_DAY}
         </span>

@@ -2,6 +2,8 @@
 // doubles target picker) - see moveTypeEffectiveness in sim-access.ts for where
 // the numbers come from.
 
+import { t } from './i18n'
+
 export interface EffectivenessChip {
   // Who it's against, for the chip's tooltip.
   foeName: string
@@ -23,10 +25,10 @@ export function effectivenessText(multiplier: number): string {
 }
 
 export function effectivenessWords(multiplier: number): string {
-  if (multiplier === 0) return 'No effect'
-  if (multiplier > 1) return 'Super effective'
-  if (multiplier < 1) return 'Not very effective'
-  return 'Neutral'
+  if (multiplier === 0) return t('eff.none')
+  if (multiplier > 1) return t('eff.super')
+  if (multiplier < 1) return t('eff.notVery')
+  return t('eff.neutral')
 }
 
 export function effectivenessClass(multiplier: number): string {

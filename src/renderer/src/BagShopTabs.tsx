@@ -1,6 +1,7 @@
 import TabStrip from './TabStrip'
 import ItemSprite from './ItemSprite'
 import { TR_SPRITENUM } from './itemIcon'
+import { t } from './i18n'
 
 export type BagShopTab = 'items' | 'keys' | 'tms'
 
@@ -23,8 +24,8 @@ function BagShopTabs({ current, onSwitch, onClose }: Props): React.JSX.Element {
     <TabStrip
       className="bag-shop-tabs"
       tabs={[
-        { id: 'items', label: label('Items', './icons/nav/bag.png') },
-        { id: 'keys', label: label('Key Items', './sprites/misc/shinycharm.png') },
+        { id: 'items', label: label(t('bag.tabItems'), './icons/nav/bag.png') },
+        { id: 'keys', label: label(t('bag.tabKeys'), './sprites/misc/shinycharm.png') },
         {
           id: 'tms',
           // The TR from the item sheet, as on a Battle Tower run's new-move floor.
@@ -33,7 +34,7 @@ function BagShopTabs({ current, onSwitch, onClose }: Props): React.JSX.Element {
               <span className="bag-shop-tab-icon bag-shop-tab-sheet-icon">
                 <ItemSprite spritenum={TR_SPRITENUM} />
               </span>
-              TMs
+              {t('bag.tabTms')}
             </>
           )
         }

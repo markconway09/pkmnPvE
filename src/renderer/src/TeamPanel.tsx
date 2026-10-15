@@ -9,6 +9,7 @@ import PokemonTooltipContent from './PokemonTooltipContent'
 import Tooltip from './Tooltip'
 import { fetchItemSpritenum } from './itemSpritenumCache'
 import { defensiveClass, effectivenessClass, effectivenessText, type EffectivenessChip } from './effectiveness'
+import { itemName, statusLabel, t } from './i18n'
 
 // A team member's matchup against the foes out, each list left to right as on screen:
 // how well its own types hit them, and how hard their types hit it.
@@ -27,15 +28,6 @@ interface TeamMemberProps {
   partner?: string
 }
 
-// Same shorthand BattleSprite flashes on the active Pokemon's HP bar.
-const STATUS_LABELS: Record<string, string> = {
-  par: 'PAR',
-  brn: 'BRN',
-  psn: 'PSN',
-  tox: 'PSN',
-  slp: 'SLP',
-  frz: 'FRZ'
-}
 
 function TeamMember({ mon, isActive, disabled, onClick, matchup, partner }: TeamMemberProps): React.JSX.Element {
   const spriteId = toSpriteId(mon.species)
@@ -82,39 +74,37 @@ function TeamMember({ mon, isActive, disabled, onClick, matchup, partner }: Team
             <div className="team-member-name-row">
               <FitName className="team-member-name" text={mon.species} />
               {partner && (
-                <span className="team-member-owner" title={`${partner}'s Pokémon - they pick for it`}>
+                <span className="team-member-owner" title={t('team.partnerTip', { name: partner })}>
                   {partner}
                 </span>
               )}
-              {mon.status && (
-                <span className={`status-badge status-${mon.status}`}>{STATUS_LABELS[mon.status] ?? mon.status.toUpperCase()}</span>
-              )}
+              {mon.status && <span className={`status-badge status-${mon.status}`}>{statusLabel(mon.status)}</span>}
             </div>
             <span className="team-member-item">
               {itemSpritenum !== null && <ItemSprite spritenum={itemSpritenum} className="team-member-item-icon" />}
-              <span className="team-member-item-name">{mon.item || 'No item'}</span>
+              <span className="team-member-item-name">{mon.item ? itemName(mon.item) : t('team.noItem')}</span>
             </span>
             {matchup && (matchup.offense.length > 0 || matchup.defense.length > 0) && (
               <div className="team-member-matchups">
-                <span className="matchup-group" title="How hard its own types hit each foe">
+                <span className="matchup-group" title={t('team.offenseTip')}>
                   ⚔
                   {matchup.offense.map((chip, i) => (
                     <span
                       key={i}
                       className={`eff-chip ${effectivenessClass(chip.multiplier)}`}
-                      title={`Its types vs ${chip.foeName}: best ${effectivenessText(chip.multiplier)}`}
+                      title={t('team.offenseChip', { name: chip.foeName, mult: effectivenessText(chip.multiplier) })}
                     >
                       {effectivenessText(chip.multiplier)}
                     </span>
                   ))}
                 </span>
-                <span className="matchup-group" title="How hard each foe's types hit it">
+                <span className="matchup-group" title={t('team.defenseTip')}>
                   🛡
                   {matchup.defense.map((chip, i) => (
                     <span
                       key={i}
                       className={`eff-chip ${defensiveClass(chip.multiplier)}`}
-                      title={`${chip.foeName}'s types vs it: worst ${effectivenessText(chip.multiplier)}`}
+                      title={t('team.defenseChip', { name: chip.foeName, mult: effectivenessText(chip.multiplier) })}
                     >
                       {effectivenessText(chip.multiplier)}
                     </span>

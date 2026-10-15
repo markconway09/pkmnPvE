@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import type { BoxPokemonView } from '../../shared/battle-types'
 import PokemonIcon from './PokemonIcon'
+import { t } from './i18n'
 
 interface Props {
   mons: BoxPokemonView[]
@@ -67,7 +68,7 @@ function BoxGrid({ mons, onEdit, onContextMenu, emptyHint, selection, onToggleSe
   return (
     <div className="box-grid-frame">
       <div ref={setGridRef} className={classes}>
-        {mons.length === 0 && <p className="box-empty-hint">{emptyHint ?? 'No Pokemon in the box yet.'}</p>}
+        {mons.length === 0 && <p className="box-empty-hint">{emptyHint ?? t('box.empty')}</p>}
         {mons.map((mon) => (
           <PokemonIcon
             key={mon.id}
@@ -93,7 +94,7 @@ function BoxGrid({ mons, onEdit, onContextMenu, emptyHint, selection, onToggleSe
       <button
         className={`box-scroll-button box-scroll-top${canUp ? '' : ' box-scroll-button-hidden'}`}
         onClick={scrollToTop}
-        title="Back to the top"
+        title={t('box.toTop')}
         tabIndex={canUp ? 0 : -1}
       >
         {/* A bar with an arrow up to it: "to the top". */}
@@ -105,7 +106,7 @@ function BoxGrid({ mons, onEdit, onContextMenu, emptyHint, selection, onToggleSe
       <button
         className={`box-scroll-button box-scroll-down${canDown ? '' : ' box-scroll-button-hidden'}`}
         onClick={scrollDown}
-        title={`Down ${ROWS_PER_STEP} rows`}
+        title={t('box.downRows', { n: ROWS_PER_STEP })}
         tabIndex={canDown ? 0 : -1}
       >
         {/* Two stacked arrows down: "a page down". */}

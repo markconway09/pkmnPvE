@@ -7,14 +7,7 @@ import { toSpriteId } from '../../shared/battle-types'
 import SpriteImage from './SpriteImage'
 import ModalSpinner from './ModalSpinner'
 import SearchBar from './SearchBar'
-
-// The hint icons, spelled out for the header's legend.
-const LEGEND = [
-  '🗻 Cave · ⛰️ Mountain · 🌲 Forest · 🏙️ City',
-  '🏭 Industry · 🪦 Graveyard · 🌊 Ocean (Wild Battle locations)',
-  '🧪 Lab · ⭐ Max Raids · 🦴 Restore a fossil',
-  '🔄 Form change · ⤴️ Evolve · 🎁 Random Pokémon / Legendary'
-].join('\n')
+import { t } from './i18n'
 
 interface Props {
   onClose: () => void
@@ -69,14 +62,14 @@ function PokedexModal({ onClose, focus }: Props): React.JSX.Element {
     <div className="modal-overlay" onMouseDown={onClose}>
       <div className={`modal-panel pokedex-modal${entries ? '' : ' modal-panel-loading'}`} onMouseDown={(e) => e.stopPropagation()}>
         <RarityCard tier={complete ? 'legendary' : 'common'} framed={complete} className={`pokedex-header${complete ? ' pokedex-header-complete' : ''}`}>
-          <h2>Pokédex{complete && <span className="pokedex-complete-badge">★ Complete</span>}</h2>
+          <h2>
+            {t('pokedex.title')}
+            {complete && <span className="pokedex-complete-badge">{t('pokedex.complete')}</span>}
+          </h2>
           {entries && (
-            <span className="pokedex-count" title="Species in their usual form · alternate forms">
+            <span className="pokedex-count" title={t('pokedex.countTip')}>
               {registeredCount}/{species.length}
-              <span className="pokedex-count-forms">
-                {' '}
-                · Forms {registeredForms}/{forms.length}
-              </span>
+              <span className="pokedex-count-forms">{t('pokedex.forms', { n: registeredForms, of: forms.length })}</span>
             </span>
           )}
           {/* How much of the Dex is registered, as a bar. */}
@@ -85,10 +78,10 @@ function PokedexModal({ onClose, focus }: Props): React.JSX.Element {
               <span style={{ width: `${(registeredCount / species.length) * 100}%` }} />
             </span>
           )}
-          <span className="pokedex-legend" title={LEGEND}>
-            Where to find?
+          <span className="pokedex-legend" title={t('pokedex.legend')}>
+            {t('pokedex.whereToFind')}
           </span>
-          <SearchBar className="pokedex-search" placeholder="Search name or number…" value={search} onChange={setSearch} autoFocus />
+          <SearchBar className="pokedex-search" placeholder={t('pokedex.search')} value={search} onChange={setSearch} autoFocus />
         </RarityCard>
         <div ref={gridRef} className={`pokedex-grid${entries ? '' : ' pokedex-grid-loading'}`}>
           {!entries && <ModalSpinner />}
@@ -102,7 +95,7 @@ function PokedexModal({ onClose, focus }: Props): React.JSX.Element {
               key={e.species}
               data-species={e.species}
               className={`pokedex-cell rarity-card rarity-tier-${e.registered ? e.rarityTier : 'common'}${e.registered ? '' : ' pokedex-cell-unknown'}${e.form ? ' pokedex-cell-form' : ''}`}
-              title={`#${e.num} ${e.species}${e.hints.length ? `\nFound: ${e.hints.map((h) => h.label).join(', ')}` : ''}`}
+              title={`#${e.num} ${e.species}${e.hints.length ? `\n${t('pokedex.found', { where: e.hints.map((h) => h.label).join(', ') })}` : ''}`}
             >
               {formName && <span className="pokedex-form-tag">{formName}</span>}
               {e.registered ? (
@@ -123,10 +116,10 @@ function PokedexModal({ onClose, focus }: Props): React.JSX.Element {
             </div>
             )
           })}
-          {entries && shown.length === 0 && <p className="box-empty-hint">No Pokémon match that search.</p>}
+          {entries && shown.length === 0 && <p className="box-empty-hint">{t('pokedex.noMatch')}</p>}
         </div>
         <div className="editor-actions">
-          <button onClick={onClose}>Close</button>
+          <button onClick={onClose}>{t('common.close')}</button>
         </div>
       </div>
     </div>,

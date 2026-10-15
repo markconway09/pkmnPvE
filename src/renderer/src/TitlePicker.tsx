@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { titlePerk } from '../../shared/titles'
+import { titlePerk, type Title } from '../../shared/titles'
+import { titleName, titlePerkText } from './i18n'
 
 export interface TitleOption {
   title: string
@@ -85,7 +86,7 @@ function TitlePicker({ value, options, emptyLabel, noneLabel, showPerks, onChang
           setOpen((o) => !o)
         }}
       >
-        <span className="title-picker-value">{disabled ? (noneLabel ?? emptyLabel) : (value ?? emptyLabel)}</span>
+        <span className="title-picker-value">{disabled ? (noneLabel ?? emptyLabel) : (value ? titleName(value) : emptyLabel)}</span>
         <span className="title-picker-caret" aria-hidden>
           ▾
         </span>
@@ -113,10 +114,10 @@ function TitlePicker({ value, options, emptyLabel, noneLabel, showPerks, onChang
                 onClick={() => pick(o.title)}
               >
                 <span className="title-picker-option-head">
-                  <span className="title-picker-option-name">{o.title}</span>
+                  <span className="title-picker-option-name">{titleName(o.title)}</span>
                   {o.note && <span className="title-picker-option-note">{o.note}</span>}
                 </span>
-                {showPerks && <span className="title-picker-option-perk">{titlePerk(o.title)}</span>}
+                {showPerks && <span className="title-picker-option-perk">{titlePerkText(o.title as Title, titlePerk(o.title))}</span>}
               </button>
             ))}
           </div>,

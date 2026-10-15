@@ -5,6 +5,7 @@ import SpriteImage from './SpriteImage'
 import ItemSprite from './ItemSprite'
 import ShinyIcon from './ShinyIcon'
 import { RarityGlow } from './RarityCard'
+import { t } from './i18n'
 
 interface Props {
   mon: BoxPokemonView
@@ -36,7 +37,7 @@ function PokemonIconVisual({ mon }: Props): React.JSX.Element {
       {(mon.favorite || mon.shiny || mon.companion) && (
         <span className="box-icon-badges">
           {mon.companion && (
-            <span className="box-icon-companion" title="Your companion - it can't be merged into anything while it's in the slot">
+            <span className="box-icon-companion" title={t('mon.companionBadge')}>
               <svg viewBox="0 0 16 16" aria-hidden="true">
                 <ellipse cx="8" cy="11" rx="3.6" ry="3" />
                 <ellipse cx="3.2" cy="7" rx="1.6" ry="2" />
@@ -46,12 +47,15 @@ function PokemonIconVisual({ mon }: Props): React.JSX.Element {
               </svg>
             </span>
           )}
-          {mon.favorite && <span className="box-icon-favorite" title="Favorite">❤️</span>}
+          {mon.favorite && <span className="box-icon-favorite" title={t('pm.favorite')}>❤️</span>}
           {mon.shiny && <ShinyIcon />}
         </span>
       )}
       {!!mon.mergeStars && (
-        <span className="box-icon-stars" title={`Merged ★${mon.mergeStars}: ${mergeBonusText(mon.mergeStars, mon.rarityTier)} to all stats but HP in classic battles`}>
+        <span
+          className="box-icon-stars"
+          title={t('mon.merged', { stars: mon.mergeStars, bonus: mergeBonusText(mon.mergeStars, mon.rarityTier) })}
+        >
           {/* A star each - or, where that doesn't fit (the phone's team dock), "3★". */}
           <span className="box-icon-stars-full">{'★'.repeat(mon.mergeStars)}</span>
           <span className="box-icon-stars-short">{mon.mergeStars}★</span>
@@ -64,7 +68,7 @@ function PokemonIconVisual({ mon }: Props): React.JSX.Element {
       )}
       <FitName className="box-icon-name" text={mon.species} />
       {mon.expPercent !== undefined && (
-        <div className="exp-bar-track" title={`${mon.expPercent}% to next level`}>
+        <div className="exp-bar-track" title={t('mon.toNext', { n: mon.expPercent })}>
           <div className="exp-bar-fill" style={{ width: `${mon.expPercent}%` }} />
         </div>
       )}

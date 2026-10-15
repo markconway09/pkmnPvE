@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { t } from './i18n'
 import { Peer, type DataConnection } from 'peerjs'
 import type { BattleView, CoopBattleResult, RunDifficulty, RunView } from '../../shared/battle-types'
 import type { DraftView } from '../../shared/draft'
@@ -207,19 +208,19 @@ function randomCode(): string {
 
 // Turns PeerJS's errors into something a player can act on.
 function errorText(type: string, fallback: string): string {
-  if (type === 'peer-unavailable') return 'No room with that code - check it and try again'
+  if (type === 'peer-unavailable') return t('online.noRoom')
   if (type === 'network' || type === 'server-error' || type === 'socket-error' || type === 'socket-closed' || type === 'disconnected') {
-    return "Couldn't reach the matchmaking server - check your internet connection, or try again in a minute"
+    return t('online.noServer')
   }
   if (type === 'webrtc') return BLOCKED_TEXT
-  if (type === 'browser-incompatible') return "Online play isn't supported here"
+  if (type === 'browser-incompatible') return t('online.unsupported')
   return fallback
 }
 
 // The two devices talk to each other directly; some networks (school, work, some mobile
 // data and hotspots) block that, and the room then just never connects.
 const BLOCKED_TEXT =
-  "Couldn't connect to your friend - one of your networks may be blocking direct connections (common on school, work and some mobile networks). Try another network, e.g. home Wi-Fi."
+  t('online.blocked')
 
 // Gives up on a room that hasn't opened (host) or reached the friend (guest) in time.
 function startConnectTimer(message: string): void {
@@ -244,7 +245,7 @@ function reset(error: string | null = null): void {
   conn = null
   peer = null
   lastView = null
-  for (const pending of pendingChoices.values()) pending.reject(new Error('Disconnected'))
+  for (const pending of pendingChoices.values()) pending.reject(new Error(t('online.disconnected')))
   pendingChoices.clear()
   if (state.draft) void window.api.endOnlineDraft()
   resetDraftProgress()
@@ -270,7 +271,7 @@ function openRoom(triesLeft: number): void {
   const code = randomCode()
   const room = new Peer(ROOM_ID_PREFIX + code)
   peer = room
-  startConnectTimer("Couldn't reach the matchmaking server - check your internet connection, or try again in a minute")
+  startConnectTimer(t('online.noServer'))
   keepSignedIn(room)
   room.on('open', () => {
     clearTimeout(connectTimer)
@@ -294,7 +295,7 @@ function openRoom(triesLeft: number): void {
     // One friend per room.
     if (conn) {
       incoming.on('open', () => {
-        void incoming.send({ type: 'reject', reason: 'That room already has two players' } satisfies OnlineMessage)
+        void incoming.send({ type: 'reject', reason: t('online.roomFull') } satisfies OnlineMessage)
         setTimeout(() => incoming.close(), 500)
       })
       return
@@ -308,7 +309,7 @@ export async function joinRoom(rawCode: string): Promise<void> {
   if (state.phase !== 'idle') return
   const code = rawCode.trim().toUpperCase()
   if (code.length !== ROOM_CODE_LENGTH || [...code].some((c) => !ROOM_CODE_ALPHABET.includes(c))) {
-    setState({ error: `A room code is ${ROOM_CODE_LENGTH} letters and numbers` })
+    setState({ error: t('online.badCode', { n: ROOM_CODE_LENGTH }) })
     return
   }
   setState({ ...IDLE, phase: 'connecting', role: 'guest', code })
@@ -350,7 +351,7 @@ function attach(connection: DataConnection): void {
 
 // The friend went away (closed the game, lost their connection or left the room).
 function friendLeft(): void {
-  const name = state.friend?.name ?? 'Your friend'
+  const name = state.friend?.name ?? t('online.yourFriend')
   // A co-op fight cut off part-way counts for neither run: both runs are still at the
   // boss, saved, and the fight starts over when the two meet up again.
   const coopCutOff = !!state.coop && state.phase === 'battle' && !!lastView && !lastView.ended
@@ -373,13 +374,13 @@ function friendLeft(): void {
       starting: false,
       draft: null,
       coop: null,
-      error: state.coop ? `${name} left the room - your co-op run is saved, carry it on when they're back` : `${name} left the room`
+      error: state.coop ? t('online.leftCoop', { name }) : t('online.left', { name })
     })
     return
   }
   if (coopCutOff) {
     closeBattle()
-    reset(`Lost the connection to ${name} - your co-op run is saved, carry it on when you're back`)
+    reset(t('online.lostCoop', { name }))
     return
   }
   // The friend's copy can't go on without the host's: an unfinished battle just stops.
@@ -388,7 +389,7 @@ function friendLeft(): void {
     lastView = view
     for (const listener of viewListeners) listener(view, false)
   }
-  reset(`Lost the connection to ${name}`)
+  reset(t('online.lost', { name }))
 }
 
 async function receive(message: OnlineMessage): Promise<void> {
@@ -398,7 +399,7 @@ async function receive(message: OnlineMessage): Promise<void> {
       const friend = message.player
       if (!self || !friend) return
       if (friend.version !== self.version) {
-        const reason = `Different game versions (${self.version} here, ${friend.version} there) - both players need the same one`
+        const reason = t('online.versions', { mine: self.version, theirs: friend.version })
         if (state.role === 'host') send({ type: 'reject', reason })
         if (state.role === 'host') {
           setTimeout(() => conn?.close(), 500)
@@ -416,7 +417,7 @@ async function receive(message: OnlineMessage): Promise<void> {
     case 'teamRequest': {
       try {
         const { team } = await window.api.getOnlineSelf()
-        if (team.team.length === 0) send({ type: 'teamError', reason: `${self?.name ?? 'Your friend'} has no Pokemon on their team` })
+        if (team.team.length === 0) send({ type: 'teamError', reason: t('online.noTeam', { name: self?.name ?? t('online.yourFriend') }) })
         else send({ type: 'team', team })
       } catch (e) {
         send({ type: 'teamError', reason: e instanceof Error ? e.message : String(e) })
@@ -466,7 +467,7 @@ async function receive(message: OnlineMessage): Promise<void> {
     case 'coopLeave':
       if (state.coop) {
         friendCoopTeam = null
-        setState({ coop: null, error: `${state.friend?.name ?? 'Your friend'} left the co-op run - it's saved, carry it on later` })
+        setState({ coop: null, error: t('online.leftCoopRun', { name: state.friend?.name ?? t('online.yourFriend') }) })
       }
       return
     case 'draftStart': {
@@ -495,7 +496,7 @@ async function receive(message: OnlineMessage): Promise<void> {
       startDraftBattleIfReady()
       return
     case 'draftLeave':
-      if (state.draft) endDraft(`${state.friend?.name ?? 'Your friend'} left the chaos draft`)
+      if (state.draft) endDraft(t('online.leftDraft', { name: state.friend?.name ?? t('online.yourFriend') }))
       return
     case 'view':
       if (state.role === 'guest') showView(message.view, message.from)
@@ -683,8 +684,8 @@ export async function resumeCoopRun(run: RunView): Promise<void> {
 
 // The friend's copy: the host started (or carried on) a co-op run - joined if this copy can.
 async function joinCoop(setup: CoopSetup, resume: boolean, lastBattle: CoopBattleResult | null): Promise<void> {
-  const friendName = state.friend?.name ?? 'Your friend'
-  const myName = self?.name ?? 'Your friend'
+  const friendName = state.friend?.name ?? t('online.yourFriend')
+  const myName = self?.name ?? t('online.yourFriend')
   let run: RunView | null = null
   try {
     run = await window.api.coopRun.getRun()
@@ -693,13 +694,13 @@ async function joinCoop(setup: CoopSetup, resume: boolean, lastBattle: CoopBattl
   }
   const sameRun = run?.coop?.seed === setup.seed
   if (resume && !sameRun) {
-    send({ type: 'coopRefuse', reason: `${myName} has no save of this co-op run` })
-    setState({ error: `${friendName} wanted to carry on a co-op run you have no save of` })
+    send({ type: 'coopRefuse', reason: t('online.noCoopSave', { name: myName }) })
+    setState({ error: t('online.wantedCoop', { name: friendName }) })
     return
   }
   if (!resume && run?.status === 'active' && !sameRun) {
-    send({ type: 'coopRefuse', reason: `${myName} has another co-op run going - they need to forfeit it first` })
-    setState({ error: `${friendName} started a co-op run - forfeit your other co-op run (with ${run.coop?.partnerName ?? 'someone else'}) to join` })
+    send({ type: 'coopRefuse', reason: t('online.otherCoop', { name: myName }) })
+    setState({ error: t('online.forfeitOther', { name: friendName, partner: run.coop?.partnerName ?? t('online.someoneElse') }) })
     return
   }
   friendCoopTeam = null

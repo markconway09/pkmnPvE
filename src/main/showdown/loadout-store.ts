@@ -3,6 +3,7 @@ import type { BoxState, LoadoutView } from '../../shared/battle-types'
 import { getBoxState, setTeam } from './box-store'
 import { playerPathFor } from './save-paths'
 import { onPlayerChange } from './player-session'
+import { t } from '../i18n'
 
 function load(): LoadoutView[] {
   try {
@@ -35,7 +36,7 @@ function persist(): void {
 
 function requireName(name: string): string {
   const trimmed = name.trim()
-  if (!trimmed) throw new Error('Give this loadout a name')
+  if (!trimmed) throw new Error(t('err.giveThisLoadoutAName'))
   return trimmed
 }
 
@@ -53,7 +54,7 @@ export function saveLoadout(name: string): LoadoutView[] {
 // Overwrites an existing loadout with the team as it stands right now.
 export function updateLoadout(id: string): LoadoutView[] {
   const loadout = getState().find((l) => l.id === id)
-  if (!loadout) throw new Error('Unknown loadout')
+  if (!loadout) throw new Error(t('err.unknownLoadout'))
   loadout.team = [...getBoxState().team]
   persist()
   return listLoadouts()
@@ -61,7 +62,7 @@ export function updateLoadout(id: string): LoadoutView[] {
 
 export function renameLoadout(id: string, name: string): LoadoutView[] {
   const loadout = getState().find((l) => l.id === id)
-  if (!loadout) throw new Error('Unknown loadout')
+  if (!loadout) throw new Error(t('err.unknownLoadout'))
   loadout.name = requireName(name)
   persist()
   return listLoadouts()
@@ -70,7 +71,7 @@ export function renameLoadout(id: string, name: string): LoadoutView[] {
 export function deleteLoadout(id: string): LoadoutView[] {
   const list = getState()
   const index = list.findIndex((l) => l.id === id)
-  if (index === -1) throw new Error('Unknown loadout')
+  if (index === -1) throw new Error(t('err.unknownLoadout'))
   list.splice(index, 1)
   persist()
   return listLoadouts()
@@ -80,7 +81,7 @@ export function deleteLoadout(id: string): LoadoutView[] {
 // before a box reset simply leaves those slots empty instead of failing.
 export function applyLoadout(id: string): BoxState {
   const loadout = getState().find((l) => l.id === id)
-  if (!loadout) throw new Error('Unknown loadout')
+  if (!loadout) throw new Error(t('err.unknownLoadout'))
   const knownIds = new Set(getBoxState().mons.map((m) => m.id))
   const team = loadout.team.map((slotId) => (slotId && knownIds.has(slotId) ? slotId : null))
   return setTeam(team)

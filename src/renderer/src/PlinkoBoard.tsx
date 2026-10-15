@@ -7,6 +7,7 @@ import GameCornerTitles from './GameCornerTitles'
 import type { GameCornerGameProps } from './GameCornerTabs'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
 import { playCornerClunk, playCornerTick } from './ticks'
+import { numberLocale, t } from './i18n'
 
 // The board's geometry, in SVG units: the gap between pegs, and between rows.
 const GAP = 34
@@ -143,7 +144,7 @@ function PlinkoBoard({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorner
           const at = rect
             ? { x: rect.left + (ballX(PLINKO_ROWS, ball.drop.slot) / WIDTH) * rect.width, y: rect.bottom - 40 }
             : { x: window.innerWidth / 2, y: 400 }
-          if (net !== 0) notes.show(`${net > 0 ? '+' : ''}${net.toLocaleString('en-US')}`, at, net > 0 ? 'good' : 'bad')
+          if (net !== 0) notes.show(`${net > 0 ? '+' : ''}${net.toLocaleString(numberLocale())}`, at, net > 0 ? 'good' : 'bad')
         }
         setBalls((all) => all.filter((b) => !landed.includes(b)))
       }
@@ -244,8 +245,8 @@ function PlinkoBoard({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorner
 
   return (
     <div className="game-corner-game plinko-game">
-      <div className="plinko-risk" title="Higher risk: bigger edge slots, smaller middle ones - the same payback over time">
-        Risk
+      <div className="plinko-risk" title={t('plinko.riskTip')}>
+        {t('plinko.risk')}
         {PLINKO_RISKS.map((r) => (
           <button
             key={r}
@@ -306,17 +307,12 @@ function PlinkoBoard({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorner
       <div className="slots-controls">
         <BetSlider bet={bet} max={maxBet(coins, perks.betCap)}
           step={betStep(perks.betCap)} disabled={dropping || !coins} onChange={setBet}
-          info={
-            <>
-              The ball bounces left or right at every peg - most land near the middle, a few reach the edges. Each slot pays
-              its multiplier times your bet.
-            </>
-          }
+          info={<>{t('plinko.info')}</>}
         />
         <button
           className="slots-spin"
           disabled={dropping || coins === null || coins < bet}
-          title="Hold to keep dropping"
+          title={t('plinko.holdTip')}
           onPointerDown={(e) => {
             if (e.button === 0) void holdDrop()
           }}
@@ -325,11 +321,11 @@ function PlinkoBoard({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorner
             if (e.detail === 0) void drop(1)
           }}
         >
-          Drop
+          {t('plinko.drop')}
         </button>
         <button
           disabled={dropping || coins === null || coins < bet}
-          title={`Drops ${MULTI_COUNT} balls one after another, each bet on its own`}
+          title={t('plinko.multiTip', { n: MULTI_COUNT })}
           onClick={() => void drop(MULTI_COUNT)}
         >
           ×{MULTI_COUNT}
@@ -338,9 +334,9 @@ function PlinkoBoard({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorner
       {error && <p className="editor-error">{error}</p>}
       {coins !== null && coins < 1 && !dropping && (
         <p className="editor-hint">
-          You&apos;re out of coins.{' '}
+          {t('corner.outOfCoins')}{' '}
           <button className="link-button" onClick={onOpenCoinShop}>
-            Buy some at the Coin Shop
+            {t('corner.buyCoins')}
           </button>
         </p>
       )}

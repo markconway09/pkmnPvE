@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { t } from './i18n'
 import { IS_MOBILE } from './platform'
 
 interface Props {
@@ -15,7 +16,7 @@ interface Props {
  * The bag's and shop's search box: a magnifier, the text, and a button to clear it
  * (Esc clears it too).
  */
-function SearchBar({ value, onChange, placeholder = 'Search...', autoFocus, className }: Props): React.JSX.Element {
+function SearchBar({ value, onChange, placeholder, autoFocus, className }: Props): React.JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null)
   return (
     <div className={`search-bar${className ? ` ${className}` : ''}`} onClick={() => inputRef.current?.focus()}>
@@ -27,7 +28,7 @@ function SearchBar({ value, onChange, placeholder = 'Search...', autoFocus, clas
         ref={inputRef}
         type="text"
         value={value}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t('common.search')}
         autoFocus={autoFocus && !IS_MOBILE}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
@@ -42,7 +43,7 @@ function SearchBar({ value, onChange, placeholder = 'Search...', autoFocus, clas
         <button
           type="button"
           className="search-bar-clear"
-          title="Clear the search"
+          title={t('common.clearSearch')}
           onClick={(e) => {
             e.stopPropagation()
             onChange('')

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { IS_MOBILE } from './platform'
+import { t as translate, useT } from './i18n'
 
 // A gallery picture's longest side once shrunk - a phone photo is far bigger than the screen.
 const MAX_SIDE = 1920
@@ -7,7 +8,7 @@ const MAX_SIDE = 1920
 /** A picture from the phone's gallery, shrunk and turned into a JPEG data: URL. */
 async function shrinkPicture(file: File): Promise<string> {
   const bitmap = await createImageBitmap(file).catch(() => {
-    throw new Error("That picture couldn't be opened")
+    throw new Error(translate('background.cantOpen'))
   })
   const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height))
   const canvas = document.createElement('canvas')
@@ -27,6 +28,7 @@ interface Props {
 // the player's own save folder (see src/main/showdown/background-store.ts), so
 // each player has their own and updates leave it alone.
 function BackgroundSection({ background, onChange }: Props): React.JSX.Element {
+  const t = useT()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const galleryRef = useRef<HTMLInputElement>(null)
@@ -45,19 +47,19 @@ function BackgroundSection({ background, onChange }: Props): React.JSX.Element {
 
   return (
     <>
-      <h2 className="options-heading">Background</h2>
+      <h2 className="options-heading">{t('background.title')}</h2>
       <div className="background-option-row">
         <div
           className="background-preview"
           style={background ? { backgroundImage: `url("${background}")` } : undefined}
         >
-          {!background && <span>Default</span>}
+          {!background && <span>{t('background.default')}</span>}
         </div>
         {IS_MOBILE ? (
           // The phone: a picture from the gallery.
           <>
             <button disabled={busy} onClick={() => galleryRef.current?.click()}>
-              Choose from gallery…
+              {t('background.gallery')}
             </button>
             <input
               ref={galleryRef}
@@ -81,7 +83,7 @@ function BackgroundSection({ background, onChange }: Props): React.JSX.Element {
               })
             }
           >
-            Choose image…
+            {t('background.chooseImage')}
           </button>
         )}
         {background && (
@@ -94,7 +96,7 @@ function BackgroundSection({ background, onChange }: Props): React.JSX.Element {
               })
             }
           >
-            Reset to default
+            {t('background.reset')}
           </button>
         )}
       </div>

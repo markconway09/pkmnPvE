@@ -57,6 +57,7 @@ import { listTrainers } from './trainer-store'
 import { playerPathFor } from './save-paths'
 import { onPlayerChange } from './player-session'
 import { sim } from './ps'
+import { moveName, t } from '../i18n'
 
 const { Dex } = sim
 
@@ -325,7 +326,7 @@ function firstWinToday(): boolean {
 function activeDraft(status: DraftView['status'], online = false): StoredDraft {
   const current = draftOf(online)
   if (!current || current.status !== status) {
-    throw new Error(status === 'drafting' ? "You're not drafting right now" : 'No draft gauntlet in progress')
+    throw new Error(t(status === 'drafting' ? 'err.notDrafting' : 'err.noGauntlet'))
   }
   return current
 }
@@ -545,7 +546,7 @@ function isTutorMove(id: string): boolean {
 export function chaosTutorMoves(pickIndex: number, online = false): ChaosTutorMove[] {
   const current = activeDraft('modifier', online)
   const pick = current.picks[pickIndex]
-  if (!pick) throw new Error("That Pokémon isn't on your team")
+  if (!pick) throw new Error(t('err.thatPokemonIsnTOnYour'))
   const known = new Set(pick.set.moves.map((m) => Dex.moves.get(m).id))
   return Dex.moves
     .all()
@@ -565,9 +566,9 @@ function wildCardTier(current: StoredDraft): string {
 /** Chaos: a fresh pack, or a fresh modifier offer, in place of this one - once per step. */
 export function rerollDraftPack(online = false): DraftView {
   const current = draftOf(online)
-  if (!current || (current.status !== 'drafting' && current.status !== 'modifier')) throw new Error("There's nothing to reroll right now")
-  if (formatOf(current) !== 'chaos') throw new Error('Only chaos drafts can reroll')
-  if (current.rerolled) throw new Error(current.status === 'modifier' ? 'Already rerolled these modifiers' : 'Already rerolled this draft phase')
+  if (!current || (current.status !== 'drafting' && current.status !== 'modifier')) throw new Error(t('err.thereSNothingToRerollRight'))
+  if (formatOf(current) !== 'chaos') throw new Error(t('err.onlyChaosDraftsCanReroll'))
+  if (current.rerolled) throw new Error(t(current.status === 'modifier' ? 'err.rerolledModifiers' : 'err.rerolledPhase'))
   current.rerolled = true
   if (current.status === 'modifier') current.modifierOffer = rollModifierOffer(current)
   else current.pack = offerPack(setFormatsOf(current), current.picks, !current.online)
@@ -578,11 +579,11 @@ export function rerollDraftPack(online = false): DraftView {
 /** Chaos: any useful held item on one of the team - once per modifier step, not a modifier. */
 export function swapChaosItem(pickIndex: number, itemId: string, online = false): DraftView {
   const current = activeDraft('modifier', online)
-  if (current.itemSwapped) throw new Error('Already swapped an item this round')
+  if (current.itemSwapped) throw new Error(t('err.alreadySwappedAnItemThisRound'))
   const pick = current.picks[pickIndex]
-  if (!pick) throw new Error('Pick one of your Pokémon')
+  if (!pick) throw new Error(t('err.pickOneOfYourPokemon'))
   const item = Dex.items.get(itemId)
-  if (!isUsefulHeldItem(item.id)) throw new Error('Pick an item')
+  if (!isUsefulHeldItem(item.id)) throw new Error(t('err.pickAnItem'))
   pick.set.item = item.name
   current.itemSwapped = true
   save(current)
@@ -593,7 +594,7 @@ export function swapChaosItem(pickIndex: number, itemId: string, online = false)
 export function chooseChaosModifier(index: number, target?: ChaosModifierTarget, online = false): DraftView {
   const current = activeDraft('modifier', online)
   const modifier = current.modifierOffer?.[index]
-  if (!modifier) throw new Error("That modifier isn't on offer")
+  if (!modifier) throw new Error(t('err.thatModifierIsnTOnOffer'))
   const field = chaosFieldOf(current)
   if (modifier.kind === 'weather') field.weather = modifier.id
   else if (modifier.kind === 'terrain') field.terrain = modifier.id
@@ -606,17 +607,17 @@ export function chooseChaosModifier(index: number, target?: ChaosModifierTarget,
   else if (modifier.kind === 'hazard') field.spikes = Math.min(CHAOS_MAX_SPIKES, (field.spikes ?? 0) + 1)
   else {
     const pick = target ? current.picks[target.pick] : undefined
-    if (!pick) throw new Error('Pick one of your Pokémon')
+    if (!pick) throw new Error(t('err.pickOneOfYourPokemon'))
     const pin = chaosModifierPin(modifier)
-    if (pin !== undefined && target!.pick !== pin) throw new Error('That modifier is for another Pokémon')
-    if ((pick.modifiers ?? 0) >= CHAOS_MON_MODIFIER_CAP) throw new Error(`That Pokémon already has ${CHAOS_MON_MODIFIER_CAP} modifiers`)
+    if (pin !== undefined && target!.pick !== pin) throw new Error(t('err.thatModifierIsForAnotherPokemon'))
+    if ((pick.modifiers ?? 0) >= CHAOS_MON_MODIFIER_CAP) throw new Error(t('err.thatPokemonAlreadyHasModifiers', { a: CHAOS_MON_MODIFIER_CAP }))
     if (modifier.kind === 'ability') {
       const ability = Dex.abilities.get(target?.ability ?? '')
-      if (!ability.exists || !chaosAbilityChoices().some((a) => a.id === ability.id)) throw new Error("That ability can't be given")
+      if (!ability.exists || !chaosAbilityChoices().some((a) => a.id === ability.id)) throw new Error(t('err.thatAbilityCanTBeGiven'))
       pick.set.ability = ability.name
     } else if (modifier.kind === 'stat') {
       const stat = target?.stat
-      if (!stat || !(stat in CHAOS_STAT_LABELS)) throw new Error('Pick a stat to boost')
+      if (!stat || !(stat in CHAOS_STAT_LABELS)) throw new Error(t('err.pickAStatToBoost'))
       pick.boosts = { ...pick.boosts, [stat]: (pick.boosts?.[stat] ?? 0) + 1 }
     } else if (modifier.kind === 'glasscannon') {
       pick.glassCannon = (pick.glassCannon ?? 0) + 1
@@ -625,15 +626,15 @@ export function chooseChaosModifier(index: number, target?: ChaosModifierTarget,
     } else if (modifier.kind === 'tutor') {
       const slot = target?.moveSlot ?? -1
       const learned = Dex.moves.get(target?.newMove ?? '')
-      if (!pick.set.moves[slot]) throw new Error('Pick a move to forget')
-      if (!isTutorMove(learned.id) || pick.set.moves.some((m) => Dex.moves.get(m).id === learned.id)) throw new Error('Pick a move it can learn')
+      if (!pick.set.moves[slot]) throw new Error(t('err.pickAMoveToForget'))
+      if (!isTutorMove(learned.id) || pick.set.moves.some((m) => Dex.moves.get(m).id === learned.id)) throw new Error(t('err.pickAMoveItCanLearn'))
       pick.set.moves = pick.set.moves.map((m, i) => (i === slot ? learned.name : m))
     } else if (modifier.kind === 'lockon') {
       pick.lockOn = (pick.lockOn ?? 0) + 1
     } else if (modifier.kind === 'wildcard') {
       // A new Pokemon in its place - the stat modifiers (and Lock-Ons) on that spot stay.
       const [replacement] = rollMons([wildCardTier(current)], 1, current.picks)
-      if (!replacement) throw new Error('No Pokémon left to swap in')
+      if (!replacement) throw new Error(t('err.noPokemonLeftToSwapIn'))
       current.picks[target!.pick] = {
         ...replacement,
         boosts: pick.boosts,
@@ -674,9 +675,9 @@ function chaosTags(pick: DraftPick): string[] | undefined {
   const tags = (Object.entries(pick.boosts ?? {}) as [keyof StatBlock, number][]).map(
     ([stat, count]) => `${CHAOS_STAT_LABELS[stat]}${count > 1 ? ` x${count}` : ''}`
   )
-  if (pick.glassCannon) tags.push(`Glass Cannon${pick.glassCannon > 1 ? ` x${pick.glassCannon}` : ''}`)
-  if (pick.fortress) tags.push(`Fortress${pick.fortress > 1 ? ` x${pick.fortress}` : ''}`)
-  if (pick.lockOn) tags.push(`Lock-On${pick.lockOn > 1 ? ` x${pick.lockOn}` : ''}`)
+  if (pick.glassCannon) tags.push(`${t('mod.glasscannon')}${pick.glassCannon > 1 ? ` x${pick.glassCannon}` : ''}`)
+  if (pick.fortress) tags.push(`${t('mod.fortress')}${pick.fortress > 1 ? ` x${pick.fortress}` : ''}`)
+  if (pick.lockOn) tags.push(`${t('mod.lockon')}${pick.lockOn > 1 ? ` x${pick.lockOn}` : ''}`)
   return tags.length > 0 ? tags : undefined
 }
 
@@ -688,21 +689,21 @@ function opponentModifiersView(mine: ChaosField, theirs: ChaosField | undefined,
   const field = theirs
     ? [
         theirs.weather ? label(FIELD_START_WEATHERS, theirs.weather) : null,
-        theirs.terrain ? `${label(FIELD_START_TERRAINS, theirs.terrain)} Terrain` : null,
-        theirs.trickRoom ? (mine.trickRoom ? 'Trick Room (cancels out yours)' : 'Trick Room') : null,
-        theirs.tailwind ? 'Tailwind on their side (4 turns)' : null,
-        theirs.screens ? 'Reflect + Light Screen on their side (5 turns)' : null,
-        theirs.stealthRock ? 'Stealth Rock on your side' : null,
-        theirs.stickyWeb ? 'Sticky Web on your side' : null,
-        theirs.spikes ? `Spikes on your side${theirs.spikes > 1 ? ` x${theirs.spikes}` : ''}` : null,
-        theirs.intimidate ? 'Your lead starts at -1 Attack, Sp. Atk and Speed' : null
+        theirs.terrain ? t('draft.terrain', { name: label(FIELD_START_TERRAINS, theirs.terrain) }) : null,
+        theirs.trickRoom ? (mine.trickRoom ? t('chaos.trickRoomCancels') : moveName('Trick Room')) : null,
+        theirs.tailwind ? t('chaos.tailwind') : null,
+        theirs.screens ? t('chaos.screens') : null,
+        theirs.stealthRock ? t('chaos.stealthRock') : null,
+        theirs.stickyWeb ? t('chaos.stickyWeb') : null,
+        theirs.spikes ? `${t('chaos.spikes')}${theirs.spikes > 1 ? ` x${theirs.spikes}` : ''}` : null,
+        theirs.intimidate ? t('chaos.intimidate') : null
       ].filter((w): w is string => !!w)
     : []
   const mons = team.flatMap((pick) => {
     const boosts = (Object.entries(pick.boosts ?? {}) as [keyof StatBlock, number][])
       .filter(([, count]) => count > 0)
       .map(([stat, count]) => `+${Math.round((CHAOS_STAT_BOOST ** count - 1) * 100)}% ${CHAOS_STAT_LABELS[stat]}`)
-    if (pick.lockOn) boosts.push(pick.lockOn > 1 ? 'Lock-On x2 (never misses, +1 crit stage)' : 'Lock-On (never misses)')
+    if (pick.lockOn) boosts.push(pick.lockOn > 1 ? t('chaos.lockOn2') : t('chaos.lockOn'))
     return boosts.length > 0 ? [{ species: pick.set.species, boosts }] : []
   })
   return { field, mons }
@@ -821,9 +822,9 @@ export function draftEntryFee(): number {
 
 /** Pays the entry fee and opens the first pack of a singles, doubles or chaos draft. */
 export function startDraft(format: DraftFormat): DraftView {
-  if (format !== 'singles' && format !== 'doubles' && format !== 'chaos') throw new Error('Pick singles, doubles or chaos')
+  if (format !== 'singles' && format !== 'doubles' && format !== 'chaos') throw new Error(t('err.pickSinglesDoublesOrChaos'))
   const current = getDraft()
-  if (current && current.status !== 'finished') throw new Error('Finish (or abandon) your current draft first')
+  if (current && current.status !== 'finished') throw new Error(t('err.finishOrAbandonYourCurrentDraft'))
   changeCoins(-draftEntryFee())
   const setFormats = format === 'doubles' ? DOUBLES_SET_FORMATS : rollSinglesTiers()
   draft = {
@@ -849,7 +850,7 @@ export function startDraft(format: DraftFormat): DraftView {
 export function pickDraftMon(index: number, online = false): DraftView {
   const current = activeDraft('drafting', online)
   const pick = current.pack[index]
-  if (!pick) throw new Error("That Pokémon isn't in the pack")
+  if (!pick) throw new Error(t('err.thatPokemonIsnTInThe'))
   current.picks.push(pick)
   // A friendly online draft costs nothing, so it doesn't count for achievements.
   if (!current.online) {
@@ -879,7 +880,7 @@ export function pickDraftMon(index: number, online = false): DraftView {
 /** Ends the draft now - paid for the wins it has (nothing while still drafting). */
 export function abandonDraft(): DraftView {
   const current = getDraft()
-  if (!current || current.status === 'finished') throw new Error('No draft in progress')
+  if (!current || current.status === 'finished') throw new Error(t('err.noDraftInProgress'))
   current.modifierOffer = []
   finish(current)
   persist()
@@ -908,11 +909,11 @@ export function beginDraftBattle(bring: number[]): {
   }
 } {
   const current = activeDraft('battling')
-  if (!current.opponent) throw new Error('No opponent lined up')
+  if (!current.opponent) throw new Error(t('err.noOpponentLinedUp'))
   const format = formatOf(current)
   const count = draftBring(format, current.picks.length)
   if (bring.length !== count || new Set(bring).size !== count || bring.some((i) => !current.picks[i])) {
-    throw new Error(`Pick ${count} different Pokémon to bring`)
+    throw new Error(t('err.pickDifferentPokemonToBring', { a: count }))
   }
   const theirs = current.opponent.team.map((_, i) => i)
   const theirPicks: number[] = []
@@ -971,7 +972,7 @@ export function finishDraftBattle(won: boolean, flawless = false): DraftBattleRe
 /** Starts an online chaos draft: the host's copy rolls the tiers, the friend's is given them. */
 export function startOnlineDraft(setFormats?: string[]): { view: DraftView; setFormats: string[] } {
   const formats = setFormats === undefined ? rollSinglesTiers() : setFormats.filter((f) => SINGLES_TIERS.includes(f))
-  if (formats.length === 0) throw new Error("The draft's tiers didn't come through")
+  if (formats.length === 0) throw new Error(t('err.theDraftSTiersDidnT'))
   onlineDraft = {
     status: 'drafting',
     format: 'chaos',
@@ -1028,7 +1029,7 @@ function readFriendPicks(input: unknown): DraftPick[] {
       }
     ]
   })
-  if (picks.length === 0) throw new Error("Your friend's team didn't come through")
+  if (picks.length === 0) throw new Error(t('err.yourFriendSTeamDidnT'))
   return picks
 }
 
@@ -1054,9 +1055,9 @@ function readFriendField(input: unknown): ChaosField {
  */
 export function setOnlineDraftOpponent(stage: number, name: string, spriteId: string, team: OnlineDraftTeam): DraftView {
   const current = onlineDraft
-  if (!current) throw new Error('No online draft going')
+  if (!current) throw new Error(t('err.noOnlineDraftGoing'))
   const played = playedOf(current)
-  if (stage !== played && stage !== played + 1) throw new Error('That team is for another battle')
+  if (stage !== played && stage !== played + 1) throw new Error(t('err.thatTeamIsForAnotherBattle'))
   current.opponent = {
     name: String(name || 'Friend').slice(0, 24),
     spriteId: String(spriteId || 'red'),
@@ -1087,10 +1088,10 @@ export function beginOnlineDraftBattle(
 } {
   const current = activeDraft('battling', true)
   const foe = current.opponent
-  if (!foe || current.opponentStage !== playedOf(current)) throw new Error("Your friend's team hasn't arrived yet")
+  if (!foe || current.opponentStage !== playedOf(current)) throw new Error(t('err.yourFriendSTeamHasnT'))
   const check = (order: number[], size: number): void => {
     if (!Array.isArray(order) || order.length !== size || new Set(order).size !== size || order.some((i) => !(i >= 0 && i < size))) {
-      throw new Error('Both teams go in whole - pick a lead')
+      throw new Error(t('err.bothTeamsGoInWholePick'))
     }
   }
   check(hostOrder, current.picks.length)

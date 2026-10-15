@@ -15,6 +15,7 @@ import GameCornerTitles from './GameCornerTitles'
 import type { GameCornerGameProps } from './GameCornerTabs'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
 import CoinIcon from './CoinIcon'
+import { numberLocale, t } from './i18n'
 
 // How long the arrow takes to travel from 0 to the roll: a moment, plus longer the further
 // it goes. It slows to a crawl near the end, for the suspense.
@@ -45,11 +46,11 @@ function save(key: string, value: string): void {
 
 // How bold a bet is, by its chance to win.
 function riskOf(chance: number): { label: string; tone: string } {
-  if (chance <= DICE_LONG_SHOT_CHANCE) return { label: '★ Long shot', tone: 'longshot' }
-  if (chance < 20) return { label: 'Bold', tone: 'bold' }
-  if (chance < 45) return { label: 'Risky', tone: 'risky' }
-  if (chance < 80) return { label: 'Coin flip', tone: 'even' }
-  return { label: 'Safe bet', tone: 'safe' }
+  if (chance <= DICE_LONG_SHOT_CHANCE) return { label: t('dice.longShot'), tone: 'longshot' }
+  if (chance < 20) return { label: t('dice.bold'), tone: 'bold' }
+  if (chance < 45) return { label: t('dice.risky'), tone: 'risky' }
+  if (chance < 80) return { label: t('dice.coinFlip'), tone: 'even' }
+  return { label: t('dice.safe'), tone: 'safe' }
 }
 
 // This visit's rolls, for the strip across the top.
@@ -204,10 +205,10 @@ function DiceGame({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCornerGam
       if (controlsRef.current) {
         const rect = controlsRef.current.getBoundingClientRect()
         const at = { x: rect.left + rect.width / 2, y: rect.top }
-        if (result.refunded) notes.show('Refunded by Long Shot!', at)
-        else if (result.doubled) notes.show(`Doubled by Long Shot! +${won.toLocaleString('en-US')} coins`, at)
-        else if (won > 0) notes.show(`+${won.toLocaleString('en-US')} coins`, at)
-        else if (won < 0) notes.show(`${won.toLocaleString('en-US')} coins`, at, 'bad')
+        if (result.refunded) notes.show(t('dice.refunded'), at)
+        else if (result.doubled) notes.show(t('dice.doubled', { n: won }), at)
+        else if (won > 0) notes.show(t('corner.plusCoins', { n: won }), at)
+        else if (won < 0) notes.show(t('corner.netCoins', { n: won }), at, 'bad')
       }
     } catch (e) {
       setError(errorMessage(e))
@@ -226,42 +227,48 @@ function DiceGame({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCornerGam
   // What the last roll did, in words, under the line.
   const lastLine =
     landed && last
-      ? `Rolled ${last.roll.toFixed(2)} - ${last.won ? 'a win' : 'a loss'} rolling ${last.over ? 'over' : 'under'} ${last.target.toFixed(2)}${
-          last.refunded ? ' (bet refunded by Long Shot)' : last.doubled ? ' (winnings doubled by Long Shot)' : ''
-        }`
+      ? `${t(last.won ? 'dice.rolledWin' : 'dice.rolledLoss', {
+          roll: last.roll.toFixed(2),
+          side: last.over ? t('dice.over') : t('dice.under'),
+          target: last.target.toFixed(2)
+        })}${last.refunded ? t('dice.refundedNote') : last.doubled ? t('dice.doubledNote') : ''}`
       : rolling
-        ? 'Rolling…'
-        : 'Drag the divider, pick a side, and roll'
+        ? t('dice.rolling')
+        : t('dice.start')
 
   return (
     <div className="game-corner-game dice-game">
-      <div className="dice-session" title="Since opening Dice">
+      <div className="dice-session" title={t('dice.sessionTip')}>
         <div className="dice-session-cell">
-          <span>Rolls</span>
+          <span>{t('dice.rolls')}</span>
           <strong>{session.rolls}</strong>
         </div>
         <div className="dice-session-cell">
-          <span>Won</span>
+          <span>{t('dice.won')}</span>
           <strong>
             {session.wins}
             {session.rolls > 0 && <small> ({Math.round((session.wins / session.rolls) * 100)}%)</small>}
           </strong>
         </div>
         <div className="dice-session-cell">
-          <span>Net</span>
+          <span>{t('dice.net')}</span>
           <strong className={session.net > 0 ? 'dice-good' : session.net < 0 ? 'dice-bad' : ''}>
             {session.net > 0 ? '+' : ''}
-            {session.net.toLocaleString('en-US')}
+            {session.net.toLocaleString(numberLocale())}
           </strong>
         </div>
         <div className="dice-session-cell">
-          <span>Best win</span>
+          <span>{t('dice.best')}</span>
           <strong>{session.best > 0 ? `×${session.best.toFixed(2)}` : '-'}</strong>
         </div>
         <div className="dice-session-cell">
-          <span>Streak</span>
+          <span>{t('dice.streak')}</span>
           <strong className={session.streak > 0 ? 'dice-good' : session.streak < 0 ? 'dice-bad' : ''}>
-            {session.streak === 0 ? '-' : session.streak > 0 ? `${session.streak} won` : `${-session.streak} lost`}
+            {session.streak === 0
+              ? '-'
+              : session.streak > 0
+                ? t('dice.streakWon', { n: session.streak })
+                : t('dice.streakLost', { n: -session.streak })}
           </strong>
         </div>
       </div>
@@ -272,7 +279,10 @@ function DiceGame({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCornerGam
             <span
               key={history.length - i}
               className={`dice-history-chip${h.won ? ' dice-history-won' : ''}`}
-              title={`${h.over ? 'Over' : 'Under'} ${h.target.toFixed(2)} at ×${h.multiplier.toFixed(2)}`}
+              title={t(h.over ? 'dice.historyOver' : 'dice.historyUnder', {
+                target: h.target.toFixed(2),
+                mult: h.multiplier.toFixed(2)
+              })}
             >
               {h.roll.toFixed(2)}
             </span>
@@ -312,7 +322,7 @@ function DiceGame({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCornerGam
             step={0.5}
             value={target}
             disabled={rolling}
-            aria-label="Divider"
+            aria-label={t('dice.divider')}
             // The line runs 0-100 but the divider stops short of the ends (see clampDiceTarget).
             onChange={(e) => moveTarget(Number(e.target.value))}
           />
@@ -328,7 +338,7 @@ function DiceGame({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCornerGam
         <div className="dice-last">{lastLine}</div>
 
         <div className="dice-presets">
-          <span className="dice-presets-label">Quick pick</span>
+          <span className="dice-presets-label">{t('dice.quickPick')}</span>
           {PRESETS.map((m) => (
             <button
               key={m}
@@ -339,42 +349,45 @@ function DiceGame({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCornerGam
               ×{m}
             </button>
           ))}
-          <span className={`dice-risk dice-risk-${risk.tone}`} title={chance <= DICE_LONG_SHOT_CHANCE ? 'A win at 5% or less counts for Against the Odds' : undefined}>
+          <span
+            className={`dice-risk dice-risk-${risk.tone}`}
+            title={chance <= DICE_LONG_SHOT_CHANCE ? t('dice.longShotTip') : undefined}
+          >
             {risk.label}
           </span>
         </div>
 
         <div className="dice-stats">
           <label className="dice-stat">
-            <span className="dice-stat-label">Multiplier</span>
+            <span className="dice-stat-label">{t('dice.multiplier')}</span>
             <span className="dice-stat-value">
               ×<NumberField value={multiplier} decimals={4} disabled={rolling} onCommit={setMultiplier} />
             </span>
-            <span className="dice-stat-sub">99 ÷ {chance.toFixed(1)}% chance</span>
+            <span className="dice-stat-sub">{t('dice.multSub', { chance: chance.toFixed(1) })}</span>
           </label>
           <label className="dice-stat">
-            <span className="dice-stat-label">Win chance</span>
+            <span className="dice-stat-label">{t('dice.winChance')}</span>
             <span className="dice-stat-value">
               <NumberField value={chance} decimals={2} disabled={rolling} onCommit={setChance} />%
             </span>
             <span className="dice-chance-bar">
               <span style={{ width: `${chance}%` }} />
             </span>
-            <span className="dice-stat-sub">about 1 in {(100 / chance).toFixed(chance >= 50 ? 2 : 1)}</span>
+            <span className="dice-stat-sub">{t('dice.oneIn', { n: (100 / chance).toFixed(chance >= 50 ? 2 : 1) })}</span>
           </label>
-          <button className="dice-stat dice-flip" disabled={rolling} onClick={flip} title="Switch sides (keeps the same chance)">
-            <span className="dice-stat-label">Roll {over ? 'Over' : 'Under'} ⇄</span>
+          <button className="dice-stat dice-flip" disabled={rolling} onClick={flip} title={t('dice.flipTip')}>
+            <span className="dice-stat-label">{over ? t('dice.rollOver') : t('dice.rollUnder')}</span>
             <span className="dice-stat-value">{target.toFixed(2)}</span>
-            <span className="dice-stat-sub">wins on {over ? `${target.toFixed(2)} - 100` : `0 - ${target.toFixed(2)}`}</span>
+            <span className="dice-stat-sub">
+              {t('dice.winsOn', { range: over ? `${target.toFixed(2)} - 100` : `0 - ${target.toFixed(2)}` })}
+            </span>
           </button>
           <div className="dice-stat">
-            <span className="dice-stat-label">Profit on win</span>
+            <span className="dice-stat-label">{t('dice.profit')}</span>
             <span className="dice-stat-value dice-good">
-              +<CoinIcon /> {(pays - bet).toLocaleString('en-US')}
+              +<CoinIcon /> {(pays - bet).toLocaleString(numberLocale())}
             </span>
-            <span className="dice-stat-sub">
-              pays {pays.toLocaleString('en-US')} for {bet.toLocaleString('en-US')}
-            </span>
+            <span className="dice-stat-sub">{t('dice.pays', { pays, bet })}</span>
           </div>
         </div>
       </div>
@@ -386,24 +399,18 @@ function DiceGame({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCornerGam
           step={betStep(perks.betCap)}
           disabled={rolling || !coins}
           onChange={setBet}
-          info={
-            <>
-              Drag the divider along the line (or type a multiplier or chance) and bet the roll (0 to 100) lands over or
-              under it. The smaller your side, the bigger the payout: 99 divided by your chance to win. Landing right on
-              the divider loses.
-            </>
-          }
+          info={<>{t('dice.info')}</>}
         />
         <button className="slots-spin" disabled={rolling || coins === null || coins < bet} onClick={() => void roll()}>
-          Roll
+          {t('dice.roll')}
         </button>
       </div>
       {error && <p className="editor-error">{error}</p>}
       {coins !== null && coins < 1 && !rolling && (
         <p className="editor-hint">
-          You&apos;re out of coins.{' '}
+          {t('corner.outOfCoins')}{' '}
           <button className="link-button" onClick={onOpenCoinShop}>
-            Buy some at the Coin Shop
+            {t('corner.buyCoins')}
           </button>
         </p>
       )}

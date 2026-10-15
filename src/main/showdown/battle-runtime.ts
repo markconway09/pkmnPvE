@@ -57,6 +57,7 @@ import { RAID_PLACEHOLDER_NAME, raidPlaceholderSet } from './raid'
 import { RAID_LEADER_EXTRA_COPIES } from '../../shared/titles'
 import { countAchievement } from './achievement-progress'
 import { AIPlayer, type AiMovePower } from './battle-ai'
+import { t } from '../i18n'
 
 // Moves that only work on the user's first turn after coming out.
 const FIRST_TURN_ONLY_MOVES = new Set(['fakeout', 'firstimpression', 'matblock'])
@@ -185,65 +186,65 @@ function computeFeedbackEvent(line: string): FeedbackEvent | null {
     // No target listed means the move never picked one to begin with (e.g. it
     // just fizzled) - nothing to flash.
     const slot = slotKeyFromIdent(parts[2])
-    return slot && { slot, label: 'Missed', tone: 'neutral' }
+    return slot && { slot, label: t('fb.missed'), tone: 'neutral' }
   }
   if (cmd === '-immune') {
     const slot = slotKeyFromIdent(parts[1])
-    return slot && { slot, label: 'Immune', tone: 'neutral' }
+    return slot && { slot, label: t('fb.immune'), tone: 'neutral' }
   }
   if (cmd === '-crit') {
     const slot = slotKeyFromIdent(parts[1])
-    return slot && { slot, label: 'Critical hit!', tone: 'bad', emphasis: 'crit' }
+    return slot && { slot, label: t('fb.crit'), tone: 'bad', emphasis: 'crit' }
   }
   // "It hurt itself in its confusion!"
   if (cmd === '-damage' && parts.includes('[from] confusion')) {
     const slot = slotKeyFromIdent(parts[1])
-    return slot && { slot, label: 'Hurt itself!', tone: 'bad', emphasis: 'confusion' }
+    return slot && { slot, label: t('fb.hurtSelf'), tone: 'bad', emphasis: 'confusion' }
   }
   // A burn or poison (bad poison too - the sim calls both "psn" here) hurting it at the end of the turn.
   if (cmd === '-damage' && parts.includes('[from] brn')) {
     const slot = slotKeyFromIdent(parts[1])
-    return slot && { slot, label: 'Hurt by its burn', tone: 'bad', emphasis: 'burn' }
+    return slot && { slot, label: t('fb.burn'), tone: 'bad', emphasis: 'burn' }
   }
   if (cmd === '-damage' && parts.includes('[from] psn')) {
     const slot = slotKeyFromIdent(parts[1])
-    return slot && { slot, label: 'Hurt by poison', tone: 'bad', emphasis: 'poison' }
+    return slot && { slot, label: t('fb.poison'), tone: 'bad', emphasis: 'poison' }
   }
   if (cmd === '-supereffective') {
     const slot = slotKeyFromIdent(parts[1])
-    return slot && { slot, label: 'Super-effective', tone: 'bad' }
+    return slot && { slot, label: t('fb.superEffective'), tone: 'bad' }
   }
   if (cmd === '-resisted') {
     const slot = slotKeyFromIdent(parts[1])
-    return slot && { slot, label: 'Resisted', tone: 'neutral' }
+    return slot && { slot, label: t('fb.resisted'), tone: 'neutral' }
   }
   if (cmd === '-fail') {
     const slot = slotKeyFromIdent(parts[1])
-    return slot && { slot, label: 'Failed', tone: 'neutral' }
+    return slot && { slot, label: t('fb.failed'), tone: 'neutral' }
   }
   if (cmd === '-block') {
     const slot = slotKeyFromIdent(parts[1])
-    return slot && { slot, label: 'Blocked', tone: 'neutral' }
+    return slot && { slot, label: t('fb.blocked'), tone: 'neutral' }
   }
   if (cmd === 'cant') {
     const slot = slotKeyFromIdent(parts[1])
-    if (slot && parts[2] === 'flinch') return { slot, label: 'Flinched!', tone: 'bad', emphasis: 'flinch' }
+    if (slot && parts[2] === 'flinch') return { slot, label: t('fb.flinched'), tone: 'bad', emphasis: 'flinch' }
     // "It's paralyzed! It can't move!"
-    if (slot && parts[2] === 'par') return { slot, label: 'Fully paralyzed!', tone: 'bad', emphasis: 'paralysis' }
+    if (slot && parts[2] === 'par') return { slot, label: t('fb.paralyzed'), tone: 'bad', emphasis: 'paralysis' }
     // "It's fast asleep." / "It's frozen solid!"
-    if (slot && parts[2] === 'slp') return { slot, label: 'Fast asleep', tone: 'bad', emphasis: 'sleep' }
-    if (slot && parts[2] === 'frz') return { slot, label: 'Frozen solid!', tone: 'bad', emphasis: 'freeze' }
+    if (slot && parts[2] === 'slp') return { slot, label: t('fb.asleep'), tone: 'bad', emphasis: 'sleep' }
+    if (slot && parts[2] === 'frz') return { slot, label: t('fb.frozen'), tone: 'bad', emphasis: 'freeze' }
   }
   if (cmd === '-activate') {
     const slot = slotKeyFromIdent(parts[1])
     if (!slot) return null
     const effect = parts[2] ?? ''
-    if (effect === 'confusion') return { slot, label: 'Confused', tone: 'neutral', emphasis: 'confusion' }
-    if (effect === 'item: Sturdy') return { slot, label: 'Endured', tone: 'good' }
+    if (effect === 'confusion') return { slot, label: t('fb.confused'), tone: 'neutral', emphasis: 'confusion' }
+    if (effect === 'item: Sturdy') return { slot, label: t('fb.endured'), tone: 'good' }
     if (effect.startsWith('move: ')) {
       const moveId = toID(effect.slice('move: '.length))
-      if (moveId === 'endure') return { slot, label: 'Endured', tone: 'good' }
-      if (PROTECT_MOVE_IDS.has(moveId)) return { slot, label: 'Protected', tone: 'good' }
+      if (moveId === 'endure') return { slot, label: t('fb.endured'), tone: 'good' }
+      if (PROTECT_MOVE_IDS.has(moveId)) return { slot, label: t('fb.protected'), tone: 'good' }
     }
   }
   return null
@@ -582,7 +583,7 @@ export class WildBattle {
     // (they count as fully evolved, so an Eviolite does nothing for them).
     mergeStars: { p1?: number[]; p2?: number[]; everstone?: { p1?: boolean[]; p2?: boolean[] } } = {}
   ) {
-    if (p1team.length === 0) throw new Error('Cannot start a battle with an empty team')
+    if (p1team.length === 0) throw new Error(t('err.cannotStartABattleWithAn'))
     this.opponent = opponent
     this.mergeStars = { p1: mergeStars.p1 ?? [], p2: mergeStars.p2 ?? [] }
     this.everstone = { p1: mergeStars.everstone?.p1 ?? [], p2: mergeStars.everstone?.p2 ?? [] }
@@ -1585,10 +1586,10 @@ export class WildBattle {
   }
 
   catchWildPokemon(replaceRunMonId?: string): CatchResult {
-    if (!this.ended || this.winner !== this.p1Name) throw new Error('You have not won this battle yet')
-    if (this.opponent?.raid) throw new Error('A raid boss is caught as soon as it is beaten')
-    if (this.opponent?.trainerId) throw new Error('Only a wild Pokemon can be caught')
-    if (this.caught) throw new Error('This Pokemon has already been caught')
+    if (!this.ended || this.winner !== this.p1Name) throw new Error(t('err.youHaveNotWonThisBattle'))
+    if (this.opponent?.raid) throw new Error(t('err.aRaidBossIsCaughtAs'))
+    if (this.opponent?.trainerId) throw new Error(t('err.onlyAWildPokemonCanBe'))
+    if (this.caught) throw new Error(t('err.thisPokemonHasAlreadyBeenCaught'))
     if (this.opponent?.run) {
       // A run catch is free and joins the run's team, not the box.
       const run = this.opponent.run
@@ -1608,7 +1609,7 @@ export class WildBattle {
     } else {
       // Bought at the Shop's price - with Tycoon's discount.
       const price = shopPrice(pokeballPrice())
-      if (!spendMoney(price)) throw new Error(`Not enough money to buy a Poke Ball (need ${price})`)
+      if (!spendMoney(price)) throw new Error(t('err.notEnoughMoneyToBuyA', { a: price }))
     }
     addCaughtMon(this.p2team[0])
     this.caught = true
@@ -1619,10 +1620,10 @@ export class WildBattle {
   // What running costs here, or null if it isn't allowed: a wild encounter is free, an
   // ordinary trainer battle costs TRAINER_RUN_COST, and there's no running from a boss
   // or from a Battle Tower run's trainers. There's no reward, exp or catch for a battle
-  // you walked away from - it's simply abandoned. A wild Pokemon an ambush woke can't
-  // be run from either.
+  // you walked away from - it's simply abandoned (a run's wild floor still counts as
+  // passed). A wild Pokemon an ambush woke can't be run from either, nor can a co-op fight.
   private runCost(): number | null {
-    if (this.opponent?.noRun || this.opponent?.online) return null
+    if (this.opponent?.noRun || this.opponent?.online || this.opponent?.coop) return null
     if (!this.opponent?.trainerId) return 0
     if (this.opponent.isBoss || this.opponent.run || this.opponent.draft) return null
     // A friendly match (another player's team) has nothing riding on it, and the
@@ -1638,15 +1639,15 @@ export class WildBattle {
   }
 
   assertCanRun(): void {
-    if (this.runCost() === null) throw new Error("You can't run from this battle")
+    if (this.runCost() === null) throw new Error(t('err.youCanTRunFromThis'))
   }
 
   /** Runs away (paying for it, from a trainer). In a run, the floor still counts as cleared, and the team keeps the damage it took. */
   runAway(): void {
     const cost = this.runCost()
-    if (cost === null) throw new Error("You can't run from this battle")
+    if (cost === null) throw new Error(t('err.youCanTRunFromThis'))
     if (cost > 0 && !this.ended && !spendMoney(cost)) {
-      throw new Error(`Running from a trainer costs ₽${cost.toLocaleString('en-US')} - you don't have enough`)
+      throw new Error(t('err.runningFromATrainerCostsYou', { a: cost }))
     }
     const run = this.opponent?.run
     if (run && !this.ended) inRunSlot(run.slot ?? 'solo', () => finishRunBattleFled(this.p1Outcome()))
@@ -1655,8 +1656,10 @@ export class WildBattle {
   }
 
   // A draft match or a Battle Tower fight can't be run from, but it can be given up: the
-  // player simply loses, so a draft match counts as lost and a run is over.
+  // player simply loses, so a draft match counts as lost and a run is over. A run's wild
+  // Pokemon can be run from instead (no exp), so there's nothing to forfeit there.
   private canForfeit(): boolean {
+    if (this.opponent?.run && this.runCost() !== null) return false
     return !!(this.opponent?.run || this.opponent?.draft || this.opponent?.online)
   }
 
@@ -1771,11 +1774,11 @@ export class WildBattle {
     for (const [i, controller] of controllers.entries()) {
       if (controller !== who) continue
       const part = parts[i]
-      if (!part || part === 'partner') throw new Error('Pick for each of your Pokémon')
+      if (!part || part === 'partner') throw new Error(t('err.pickForEachOfYourPokemon'))
       // Only their own Pokemon can be sent in (or brought back).
       const switchTo = /^switch (\d+)$/.exec(part)
       if (switchTo && this.coopOwnerOf(side.pokemon[Number(switchTo[1]) - 1]) !== who) {
-        throw new Error("That's your partner's Pokémon")
+        throw new Error(t('err.thatSYourPartnerSPokemon'))
       }
       pending[i] = part
     }
@@ -1884,7 +1887,7 @@ export class WildBattle {
 
   /** Gives up the battle: the sim declares the player beaten, and the usual loss follows. */
   async forfeit(): Promise<BattleView> {
-    if (!this.canForfeit()) throw new Error("You can't forfeit this battle")
+    if (!this.canForfeit()) throw new Error(t('err.youCanTForfeitThisBattle'))
     if (!this.ended) {
       void this.streams.omniscient.write('>forcelose p1')
       while (!this.ended) await this.waitForUpdate(this.human.version)

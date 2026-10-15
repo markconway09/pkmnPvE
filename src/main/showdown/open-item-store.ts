@@ -19,6 +19,7 @@ import { addItem, getItemQuantity, removeItem } from './bag-store'
 import { addCaughtMon, hasRegisteredSpecies, lastAddedMonId, mergeKeeperPreview } from './box-store'
 import { restoredLevel } from './fossil-store'
 import { listShop } from './shop-store'
+import { t } from '../i18n'
 
 // The case-opening reel: this many cards, with the one actually won near the end so
 // the strip has a long way to spin first.
@@ -46,9 +47,9 @@ export function openBagItem(itemId: string): OpenItemResult {
   let pickSpecies: () => string
   if (itemId === RANDOM_POKEMON_ITEM_ID) pickSpecies = pickRandomUnevolvedAnySpecies
   else if (itemId === RANDOM_LEGENDARY_ITEM_ID) pickSpecies = pickRandomLegendarySpecies
-  else throw new Error("That item can't be opened")
+  else throw new Error(t('err.thatItemCanTBeOpened'))
 
-  if (getItemQuantity(itemId) < 1) throw new Error("You don't have that item")
+  if (getItemQuantity(itemId) < 1) throw new Error(t('err.youDonTHaveThatItem'))
   // The Legend Keeper title: a Random Legendary is sometimes drawn from the box
   // legendaries (Mewtwo, Kyogre, Koraidon...) alone.
   const legendKeeperDraw =
@@ -143,9 +144,9 @@ export function openItemRarityOdds(itemId: string): RarityOdds | null {
 }
 
 function openLockCapsule(): OpenItemResult {
-  if (getItemQuantity(LOCK_CAPSULE_ITEM_ID) < 1) throw new Error("You don't have that item")
+  if (getItemQuantity(LOCK_CAPSULE_ITEM_ID) < 1) throw new Error(t('err.youDonTHaveThatItem'))
   const pool = capsulePool()
-  if (pool.length === 0) throw new Error('The shop has nothing to give')
+  if (pool.length === 0) throw new Error(t('err.theShopHasNothingToGive'))
   const item = pickCapsuleItem(pool)
   const isNew = getItemQuantity(item.id) === 0
   removeItem(LOCK_CAPSULE_ITEM_ID, 1)

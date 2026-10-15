@@ -1,5 +1,6 @@
 import type { FieldEffectView } from '../../shared/battle-types'
 import { INTENSE_WEATHER, OVERLAY_STYLES, overlayImageUrl } from './battleScenery'
+import { t } from './i18n'
 
 interface Props {
   effects: FieldEffectView[]
@@ -8,11 +9,11 @@ interface Props {
 const KIND_ORDER: FieldEffectView['kind'][] = ['weather', 'terrain', 'field', 'side']
 
 function turnsText(turnsLeft: number): string {
-  return `(${turnsLeft} turn${turnsLeft === 1 ? '' : 's'})`
+  return t('field.turns', { count: turnsLeft })
 }
 
 function badgeLabel(effect: FieldEffectView): string {
-  const name = effect.side === 'p2' ? `Foe's ${effect.name}` : effect.name
+  const name = effect.side === 'p2' ? t('field.foes', { name: effect.name }) : effect.name
   return effect.turnsLeft != null ? `${name} ${turnsText(effect.turnsLeft)}` : name
 }
 

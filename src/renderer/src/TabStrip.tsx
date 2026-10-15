@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { t } from './i18n'
 
 export interface TabStripTab<T extends string> {
   id: T
@@ -96,7 +97,7 @@ function TabStrip<T extends string>({
         ))}
     </div>
     {onClose && (
-      <button className="tab-strip-close" data-sfx="close" title="Close" aria-label="Close" disabled={closeDisabled} onClick={onClose}>
+      <button className="tab-strip-close" data-sfx="close" title={t('common.close')} aria-label={t('common.close')} disabled={closeDisabled} onClick={onClose}>
         <svg viewBox="0 0 16 16" aria-hidden="true">
           <path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
         </svg>

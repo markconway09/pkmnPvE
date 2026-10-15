@@ -6,6 +6,8 @@ import { SkillCheckRing, type SkillCheckResult } from './SkillCheck'
 import { formatMoney } from './money'
 import ItemSprite from './ItemSprite'
 import { IS_MOBILE } from './platform'
+import { itemName, moveName, t, typeName } from './i18n'
+import { categoryName } from './movePower'
 /** A TM's disc in its move's type colour (PokéSprite's TM icons). */
 export function tmIconUrl(type: string): string {
   return `./sprites/tms/${type.toLowerCase()}.png`
@@ -34,9 +36,9 @@ export function TmCard({
       <RarityGlow size={48} className="tm-card-art">
         <TmIcon type={tm.type} />
       </RarityGlow>
-      <span className="tm-card-name">{tm.name}</span>
+      <span className="tm-card-name">{moveName(tm.name)}</span>
       <span className="tm-card-sub">
-        {tm.type} · {tm.category}
+        {typeName(tm.type)} · {categoryName(tm.category)}
       </span>
       {children}
     </RarityCard>
@@ -47,9 +49,9 @@ export function TmCard({
 export function TmFindCard({ find }: { find: TmFind }): React.JSX.Element {
   return (
     <TmCard tm={find.tm} framed className="tm-find-card">
-      {find.upgraded && <span className="tm-find-upgraded">Great search - one rarity higher!</span>}
+      {find.upgraded && <span className="tm-find-upgraded">{t('tm.upgraded')}</span>}
       <span className={`tm-find-note${find.duplicate ? ' tm-find-note-dupe' : ''}`}>
-        {find.duplicate ? `Already had it · +${formatMoney(find.payout)}` : 'New TM!'}
+        {find.duplicate ? t('tm.duplicate', { money: formatMoney(find.payout) }) : t('tm.new')}
       </span>
     </TmCard>
   )
@@ -62,9 +64,9 @@ export function ItemFindCard({ item }: { item: NonNullable<TmQuickCheckResult['i
       <RarityGlow size={48} className="tm-card-art">
         <ItemSprite spritenum={item.spritenum} />
       </RarityGlow>
-      <span className="tm-card-name">{item.itemName}</span>
-      <span className="tm-card-sub">Item</span>
-      <span className="tm-find-note">No TM, but found an item!</span>
+      <span className="tm-card-name">{itemName(item.itemName)}</span>
+      <span className="tm-card-sub">{t('tm.item')}</span>
+      <span className="tm-find-note">{t('tm.itemFound')}</span>
     </RarityCard>
   )
 }
@@ -97,9 +99,9 @@ export function TmQuickCheck(): React.JSX.Element {
         <button className="tm-quick-check-start" onClick={() => setRunKey(1)}>
           <strong className="tm-quick-check-label">
             <ItemSprite spritenum={537} />
-            Search the area
+            {t('tm.searchArea')}
           </strong>
-          <span>One skill check - a Good or a Great might turn up a TM</span>
+          <span>{t('tm.quickHint')}</span>
         </button>
       ) : (
         <>
@@ -111,12 +113,16 @@ export function TmQuickCheck(): React.JSX.Element {
             <ItemFindCard item={outcome.item} />
           ) : outcome ? (
             <span className="tm-quick-check-note">
-              {outcome.result === 'miss' ? 'Nothing turned up.' : `A ${outcome.result === 'great' ? 'Great' : 'Good'} - but nothing turned up this time.`}
+              {outcome.result === 'miss'
+                ? t('tm.nothing')
+                : outcome.result === 'great'
+                  ? t('tm.greatNothing')
+                  : t('tm.goodNothing')}
             </span>
           ) : error ? (
             <span className="tm-quick-check-note">{error}</span>
           ) : (
-            <span className="tm-quick-check-note">{IS_MOBILE ? 'Tap on the zone' : 'Space / click on the zone'}</span>
+            <span className="tm-quick-check-note">{IS_MOBILE ? t('tm.tapZone') : t('tm.clickZone')}</span>
           )}
         </>
       )}

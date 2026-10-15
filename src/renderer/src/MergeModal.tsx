@@ -15,7 +15,7 @@ import PokemonIconVisual from './PokemonIconVisual'
 import ShinyIcon from './ShinyIcon'
 import { errorMessage } from './FloatingNotes'
 import ItemSprite from './ItemSprite'
-import { CLICK } from './platform'
+import { clickWord, itemName, t } from './i18n'
 
 interface Props {
   keeper: BoxPokemonView
@@ -47,7 +47,7 @@ function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
   const [error, setError] = useState<string | null>(null)
 
   // Its bonus at so many stars - red and gold Pokemon get less from each one.
-  const bonusText = (stars: number): string => `${mergeBonusText(stars, keeper.rarityTier)} to all stats but HP`
+  const bonusText = (stars: number): string => t('merge.bonus', { bonus: mergeBonusText(stars, keeper.rarityTier) })
   const candidates = keeper.mergeCandidates ?? []
   const chosen = candidates.filter((c) => picked.has(c.id))
   const copiesNow = keeper.copies ?? 1
@@ -77,7 +77,7 @@ function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
     }
   }
   const shortItem = [...itemsNeeded.values()].find((i) => i.count > i.owned)
-  const itemsText = [...itemsNeeded.values()].map((i) => `${i.count > 1 ? `${i.count}× ` : ''}${i.name}`).join(', ')
+  const itemsText = [...itemsNeeded.values()].map((i) => `${i.count > 1 ? `${i.count}× ` : ''}${itemName(i.name)}`).join(', ')
   const nextAt = nextStarAt(copiesNow)
 
   function toggle(id: string): void {
@@ -117,7 +117,7 @@ function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
   return createPortal(
     <div className="modal-overlay" onMouseDown={onClose}>
       <div className="modal-panel merge-modal" onMouseDown={(e) => e.stopPropagation()}>
-        <h2>Merge into {keeper.species}</h2>
+        <h2>{t('merge.title', { name: keeper.species })}</h2>
         <div className="merge-keeper">
           <div className="box-icon merge-keeper-icon">
             <div className={`box-icon-draggable rarity-card rarity-tier-${keeper.rarityTier ?? 'common'}`}>
@@ -127,25 +127,21 @@ function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
           <div className="merge-keeper-info">
             <span className="merge-stars">{starRow(starsNow)}</span>
             <span>
-              {copiesNow} cop{copiesNow === 1 ? 'y' : 'ies'}
-              {nextAt ? ` · ${nextAt - copiesNow} more for ★${starsNow + 1}` : ' · fully merged'}
+              {t('editor.copies', { count: copiesNow })}
+              {nextAt ? t('editor.moreForStar', { n: nextAt - copiesNow, star: starsNow + 1 }) : t('editor.fullyMerged')}
             </span>
             <span className="merge-bonus">
-              {starsNow > 0 ? `${bonusText(starsNow)} in classic battles` : 'No bonus yet - two copies make ★1'}
+              {starsNow > 0 ? t('merge.inClassic', { bonus: bonusText(starsNow) }) : t('merge.noBonus')}
             </span>
           </div>
         </div>
 
-        <p className="editor-hint">
-          Each star is {bonusText(1)} in Battles, not runs or friendly matches (skips 0-IV stats). Stars at 2, 4, 8, 16, 32 and 64 copies. Pre-evolutions
-          that could evolve now can go in too. Merged Pokémon leave your box; shiny, favorite, higher level and friendship carry over,
-          held items return to your bag.
-        </p>
+        <p className="editor-hint">{t('merge.help', { bonus: bonusText(1) })}</p>
 
         {keeperFull ? (
-          <p className="box-empty-hint">{keeper.species} is fully merged at ★{MERGE_MAX_STARS}.</p>
+          <p className="box-empty-hint">{t('merge.full', { name: keeper.species, stars: MERGE_MAX_STARS })}</p>
         ) : candidates.length === 0 ? (
-          <p className="box-empty-hint">No other {keeper.species} to merge in.</p>
+          <p className="box-empty-hint">{t('merge.noOthers', { name: keeper.species })}</p>
         ) : (
           <div className="merge-candidates">
             {candidates.map((c) => {
@@ -156,7 +152,7 @@ function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
                   className={`merge-candidate rarity-card rarity-tier-${keeper.rarityTier ?? 'common'}${picked.has(c.id) ? ' merge-candidate-picked' : ''}${c.notReady ? ' merge-candidate-not-ready' : ''}`}
                   // A pre-evolution that can't evolve into it yet can't go in.
                   disabled={busy || !!c.notReady}
-                  title={c.notReady ? `Can't merge in yet - ${c.notReady}` : undefined}
+                  title={c.notReady ? t('merge.notYet', { reason: c.notReady }) : undefined}
                   onClick={() => toggle(c.id)}
                 >
                   <RarityGlow size={56}>
@@ -168,15 +164,19 @@ function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
                     {c.shiny && <ShinyIcon />}
                   </span>
                   <span className="merge-candidate-meta">
-                    Lv {c.level}
+                    {t('merge.lv', { level: c.level })}
                     {stars > 0 && <span className="merge-stars"> {'★'.repeat(stars)}</span>}
-                    {c.copies > 1 && ` · ${c.copies} copies`}
+                    {c.copies > 1 && t('merge.copiesTail', { n: c.copies })}
                   </span>
                   {c.species !== keeper.species && !c.notReady && (
                     <span className="merge-candidate-evolves">
-                      Evolves on the way in
+                      {t('merge.evolvesIn')}
                       {(c.evolveItems ?? []).map((item) => (
-                        <span key={item.itemId} className="merge-candidate-evolve-item" title={`Uses a ${item.name}`}>
+                        <span
+                          key={item.itemId}
+                          className="merge-candidate-evolve-item"
+                          title={t('merge.usesA', { item: itemName(item.name) })}
+                        >
                           {item.spritenum !== null && <ItemSprite spritenum={item.spritenum} />}
                         </span>
                       ))}
@@ -185,7 +185,9 @@ function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
                   {c.notReady && <span className="merge-candidate-note merge-candidate-blocked">{c.notReady}</span>}
                   {(c.onTeam || c.item) && (
                     <span className="merge-candidate-note">
-                      {[c.onTeam && 'On your team', c.item && `${c.item} to bag`].filter(Boolean).join(' · ')}
+                      {[c.onTeam && t('merge.onTeam'), c.item && t('merge.itemToBag', { item: itemName(c.item) })]
+                        .filter(Boolean)
+                        .join(' · ')}
                     </span>
                   )}
                 </button>
@@ -196,25 +198,31 @@ function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
 
         {chosen.length > 0 && (
           <p className="merge-preview">
-            {`After: ${copiesAfter} copies · ${starRow(starsAfter)}${starsAfter > starsNow ? ` (${bonusText(starsAfter)})` : ''}${levelAfter > keeper.level ? ` · Lv ${keeper.level} → ${levelAfter}` : ''}${becomesShiny ? ' · becomes shiny' : ''}${becomesFavorite ? ' · becomes a favorite' : ''}`}
+            {t('merge.after', { copies: copiesAfter, stars: starRow(starsAfter) })}
+            {starsAfter > starsNow ? ` (${bonusText(starsAfter)})` : ''}
+            {levelAfter > keeper.level ? t('merge.afterLevel', { from: keeper.level, to: levelAfter }) : ''}
+            {becomesShiny ? t('merge.becomesShiny') : ''}
+            {becomesFavorite ? t('merge.becomesFavorite') : ''}
             {partial && plan.partial && (
               <span className="merge-overflow">
-                {partial.species} (Lv {partial.level}) gives {plan.partial.given} and keeps {plan.partial.left} cop
-                {plan.partial.left === 1 ? 'y' : 'ies'}
+                {t('merge.partial', {
+                  name: partial.species,
+                  level: partial.level,
+                  given: plan.partial.given,
+                  count: plan.partial.left
+                })}
                 {mergeStarsFor(plan.partial.left) > 0 ? ` · ★${mergeStarsFor(plan.partial.left)}` : ''}
               </span>
             )}
             {itemsText && (
               <span className={`merge-overflow${shortItem ? ' editor-error' : ''}`}>
                 {shortItem
-                  ? `Needs ${shortItem.count} ${shortItem.name} - you have ${shortItem.owned}`
-                  : `Uses ${itemsText} for the evolutions`}
+                  ? t('merge.needs', { count: shortItem.count, item: itemName(shortItem.name), owned: shortItem.owned })
+                  : t('merge.uses', { items: itemsText })}
               </span>
             )}
             {plan.unused.length > 0 && (
-              <span className="merge-overflow">
-                {plan.unused.length} not needed - it&apos;s full before {plan.unused.length === 1 ? 'it goes' : 'they go'} in
-              </span>
+              <span className="merge-overflow">{t('merge.unused', { count: plan.unused.length })}</span>
             )}
           </p>
         )}
@@ -223,11 +231,11 @@ function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
         <div className="editor-actions">
           {!keeperFull && selectable.length > 0 && (
             <button className="merge-select-all" onClick={toggleAll} disabled={busy}>
-              {allPicked ? 'Deselect all' : 'Select all'}
+              {allPicked ? t('merge.deselectAll') : t('merge.selectAll')}
             </button>
           )}
           <button onClick={onClose} disabled={busy}>
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             className={confirming ? 'confirm-button' : undefined}
@@ -235,7 +243,11 @@ function MergeModal({ keeper, onMerged, onClose }: Props): React.JSX.Element {
             onClick={() => void merge()}
             onBlur={() => setConfirming(false)}
           >
-            {confirming ? `Merge a favorite / team member? ${CLICK} again` : `Merge ${chosen.length || ''}`.trim()}
+            {confirming
+              ? t('merge.confirm', { click: clickWord() })
+              : chosen.length
+                ? t('merge.goCount', { count: chosen.length })
+                : t('merge.go')}
           </button>
         </div>
       </div>

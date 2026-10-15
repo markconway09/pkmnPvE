@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { LiveMovePower, MoveInfo } from '../../shared/battle-types'
 import { fetchMoveInfo } from './moveInfoCache'
-import { movePowerLabel } from './movePower'
+import { categoryName, movePowerLabel } from './movePower'
+import { moveName, t, typeName } from './i18n'
 import MoveTooltipContent from './MoveTooltipContent'
 import Tooltip from './Tooltip'
 import { effectivenessClass, effectivenessText, effectivenessWords, type EffectivenessChip } from './effectiveness'
@@ -34,10 +35,10 @@ function stabKind(moveType: string, { own, tera }: { own: string[]; tera: string
 
 const STAB_LABELS = { stab: 'STAB', tera: 'Tera STAB', double: 'STAB ×2' }
 const STAB_TITLES = {
-  stab: 'Same type as the user: x1.5 power',
-  tera: 'Same type as its Tera type: x1.5 power',
-  double: 'Its own type and its Tera type: x2 power'
-}
+  stab: 'move.stabTitle',
+  tera: 'move.teraStabTitle',
+  double: 'move.doubleStabTitle'
+} as const
 
 function MoveButton({ id, name, pp, maxpp, disabled, power, effectiveness, stabTypes, onChoose }: Props): React.JSX.Element {
   const [info, setInfo] = useState<MoveInfo | null>(null)
@@ -74,16 +75,16 @@ function MoveButton({ id, name, pp, maxpp, disabled, power, effectiveness, stabT
             <img
               className="move-category-icon"
               src={`./sprites/misc/category-${info.category === 'Status' ? 'status' : info.category.toLowerCase()}.png`}
-              alt={info.category}
-              title={info.category}
+              alt={categoryName(info.category)}
+              title={categoryName(info.category)}
             />
-            {moveType}
+            {moveType && typeName(moveType)}
           </span>
         )}
         {stab && info?.category !== 'Status' && (
           <span
             className={`move-stab-corner${stab !== 'stab' ? ' move-stab-tera' : ''}`}
-            title={STAB_TITLES[stab]}
+            title={t(STAB_TITLES[stab])}
           >
             {STAB_LABELS[stab]}
           </span>
@@ -94,14 +95,14 @@ function MoveButton({ id, name, pp, maxpp, disabled, power, effectiveness, stabT
               <span
                 key={i}
                 className={`eff-chip ${effectivenessClass(chip.multiplier)}`}
-                title={`vs ${chip.foeName}: ${effectivenessWords(chip.multiplier)}`}
+                title={t('eff.vs', { name: chip.foeName, words: effectivenessWords(chip.multiplier) })}
               >
                 {effectivenessText(chip.multiplier)}
               </span>
             ))}
           </span>
         )}
-        {name}
+        {moveName(name)}
         <span className="move-pp">
           {pp}/{maxpp} PP
         </span>

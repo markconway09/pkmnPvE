@@ -2,6 +2,7 @@ import { GAME_CORNER_TITLES, TITLE_PERKS } from '../../shared/titles'
 import type { GameCornerGame } from './GameCornerTabs'
 import type { GameCornerPerks } from '../../shared/titles'
 import Tooltip from './Tooltip'
+import { titleName, titlePerkText } from './i18n'
 
 interface Props {
   game: GameCornerGame
@@ -18,8 +19,12 @@ function GameCornerTitles({ game, perks }: Props): React.JSX.Element | null {
   return (
     <div className="game-corner-titles">
       {titles.map((title) => (
-        <Tooltip key={title} placement="above" content={<div className="tooltip-panel game-corner-info-panel">{TITLE_PERKS[title]}</div>}>
-          <span className="game-corner-title-badge">★ {title}</span>
+        <Tooltip
+          key={title}
+          placement="above"
+          content={<div className="tooltip-panel game-corner-info-panel">{titlePerkText(title, TITLE_PERKS[title])}</div>}
+        >
+          <span className="game-corner-title-badge">★ {titleName(title)}</span>
         </Tooltip>
       ))}
     </div>

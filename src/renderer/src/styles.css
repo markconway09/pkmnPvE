@@ -24696,3 +24696,19 @@ html[data-layout='mobile'] .options-scale-tabs .tab-strip-tab {
 .welcome-guide-next {
   min-width: 90px;
 }
+
+/* Options and the login screen: the language tabs (English / Español). */
+.options-language-tabs,
+.login-language {
+  max-width: 240px;
+}
+
+.login-language {
+  margin-bottom: 12px;
+}
+
+/* The Pokemon editor's X beside Save: the same round close button as the item window's, a bit smaller. */
+.tab-strip-close.editor-close {
+  width: 34px;
+  height: 34px;
+}

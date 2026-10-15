@@ -8,7 +8,8 @@ import ShinyIcon from './ShinyIcon'
 import { formatMoney } from './money'
 import { playCornerTick } from './ticks'
 import RarityOddsTooltip from './RarityOddsTooltip'
-import { CLICK } from './platform'
+import { TIER_LABELS } from './RarityOddsTooltip'
+import { clickWord, itemName as shownItemName, t } from './i18n'
 
 interface Props {
   // What the Random Pokemon / Random Legendary was, and what it gave.
@@ -20,6 +21,8 @@ interface Props {
   onClose: (soldFor?: number) => void
   // Opens the next one of the same item, when there are more in the bag.
   onOpenAnother: (soldFor?: number) => void
+  // The strip has stopped (or was skipped) - the win is on show.
+  onRevealed?: () => void
 }
 
 // Each card's width plus the gap after it - the strip moves in steps of this.
@@ -30,13 +33,6 @@ const SPIN_MS = 6500
 // Starts fast, then crawls to a stop - the CS case-opening feel.
 const SPIN_EASING = 'cubic-bezier(0.08, 0.62, 0.12, 1)'
 
-const TIER_LABELS: Record<RarityTier, string> = {
-  common: 'Common',
-  uncommon: 'Uncommon',
-  rare: 'Rare',
-  epic: 'Mythical',
-  legendary: 'Legendary'
-}
 
 /**
  * Opening a Random Pokemon / Random Legendary / Lock Capsule, the way a CS case opens:
@@ -44,7 +40,7 @@ const TIER_LABELS: Record<RarityTier, string> = {
  * stop on the one won
  * (the game has already picked it - this only shows it). Click to skip to the end.
  */
-function CaseOpening({ itemId, itemName, result, onClose, onOpenAnother }: Props): React.JSX.Element {
+function CaseOpening({ itemId, itemName, result, onClose, onOpenAnother, onRevealed }: Props): React.JSX.Element {
   const viewportRef = useRef<HTMLDivElement>(null)
   const stripRef = useRef<HTMLDivElement>(null)
   const [offset, setOffset] = useState(0)
@@ -154,6 +150,11 @@ function CaseOpening({ itemId, itemName, result, onClose, onOpenAnother }: Props
     }
   }, [spinning, done])
 
+  useEffect(() => {
+    if (done) onRevealed?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [done])
+
   function skip(): void {
     if (done) return
     setDone(true)
@@ -196,7 +197,7 @@ function CaseOpening({ itemId, itemName, result, onClose, onOpenAnother }: Props
                       <ItemSprite spritenum={entry.spritenum ?? 0} />
                     </span>
                   )}
-                  <span className="case-card-name">{entry.name}</span>
+                  <span className="case-card-name">{entry.species ? entry.name : shownItemName(entry.name)}</span>
                 </div>
               )
             })}
@@ -211,9 +212,13 @@ function CaseOpening({ itemId, itemName, result, onClose, onOpenAnother }: Props
           <div className="case-result">
             <p className={`case-result-name case-tier-text-${winner.tier}`}>
               {result.shiny && <ShinyIcon className="shiny-icon-large" />}
-              {result.shiny ? `Shiny ${result.name}` : result.name}
+              {result.kind === 'item'
+                ? shownItemName(result.name)
+                : result.shiny
+                  ? t('case.shiny', { name: result.name })
+                  : result.name}
               {result.shiny && <ShinyIcon className="shiny-icon-large" />}
-              {result.isNew && <span className="case-new-badge">New</span>}
+              {result.isNew && <span className="case-new-badge">{t('case.new')}</span>}
               {result.kind === 'item' && !!result.price && (
                 <span className="case-result-price">{formatMoney(result.price)}</span>
               )}
@@ -221,13 +226,17 @@ function CaseOpening({ itemId, itemName, result, onClose, onOpenAnother }: Props
             <p className="box-empty-hint">
               {result.kind === 'item'
                 ? soldFor !== null
-                  ? `${TIER_LABELS[winner.tier]} · sold for ${formatMoney(soldFor)}`
-                  : `${TIER_LABELS[winner.tier]} · it's in your bag`
+                  ? t('case.itemSold', { tier: TIER_LABELS[winner.tier], money: formatMoney(soldFor) })
+                  : t('case.itemInBag', { tier: TIER_LABELS[winner.tier] })
                 : soldFor !== null
-                  ? `${TIER_LABELS[winner.tier]} · Lv ${result.level} · sold for ${formatMoney(soldFor)}${found.length ? ` · found a ${found.join(', ')}` : ''}`
+                  ? `${t('case.monSold', { tier: TIER_LABELS[winner.tier], level: result.level, money: formatMoney(soldFor) })}${
+                      found.length ? t('case.found', { list: found.map(shownItemName).join(', ') }) : ''
+                    }`
                   : mergedInto
-                    ? `${TIER_LABELS[winner.tier]} · Lv ${result.level} · merged into your ${mergedInto.species}${mergedInto.stars > 0 ? ` - now ★${mergedInto.stars}` : ''}`
-                    : `${TIER_LABELS[winner.tier]} · Lv ${result.level} · it's waiting in your box`}
+                    ? `${t('case.monMerged', { tier: TIER_LABELS[winner.tier], level: result.level, name: mergedInto.species })}${
+                        mergedInto.stars > 0 ? t('case.nowStars', { stars: mergedInto.stars }) : ''
+                      }`
+                    : t('case.monInBox', { tier: TIER_LABELS[winner.tier], level: result.level })}
             </p>
             {sellError && <p className="editor-error">{sellError}</p>}
             {/* Always the same four buttons in the same places - greyed out when they don't apply. */}
@@ -235,7 +244,7 @@ function CaseOpening({ itemId, itemName, result, onClose, onOpenAnother }: Props
               <button
                 className={confirmingSell ? 'confirm-button' : undefined}
                 disabled={selling || !canSell || settled}
-                title={!canSell ? "This can't be sold" : undefined}
+                title={!canSell ? t('case.cantSell') : undefined}
                 onClick={(e) => {
                   e.stopPropagation()
                   void sell()
@@ -243,26 +252,37 @@ function CaseOpening({ itemId, itemName, result, onClose, onOpenAnother }: Props
                 onBlur={() => setConfirmingSell(false)}
               >
                 {confirmingSell
-                  ? `Sell ${result.shiny ? 'this shiny' : TIER_LABELS[winner.tier]} ${result.name} for ${formatMoney(result.sellPrice!)}? ${CLICK} again`
+                  ? t('case.sellConfirm', {
+                      what: result.shiny ? t('case.thisShiny') : TIER_LABELS[winner.tier],
+                      name: result.kind === 'item' ? shownItemName(result.name) : result.name,
+                      money: formatMoney(result.sellPrice!),
+                      click: clickWord()
+                    })
                   : canSell
-                    ? `Sell (${formatMoney(result.sellPrice!)})`
-                    : 'Sell'}
+                    ? t('case.sellFor', { money: formatMoney(result.sellPrice!) })
+                    : t('case.sell')}
               </button>
               <button
                 disabled={selling || !canMerge || settled}
                 title={
                   canMerge
-                    ? `Merge it into your ${result.mergeKeeper!.species}${result.mergeKeeper!.stars > 0 ? ` (★${result.mergeKeeper!.stars})` : ''}${result.mergeKeeper!.uses.length ? ` - evolves on the way in, using ${result.mergeKeeper!.uses.join(', ')}` : ''}`
+                    ? `${t('case.mergeInto', { name: result.mergeKeeper!.species })}${
+                        result.mergeKeeper!.stars > 0 ? ` (★${result.mergeKeeper!.stars})` : ''
+                      }${
+                        result.mergeKeeper!.uses.length
+                          ? t('case.evolvesUsing', { list: result.mergeKeeper!.uses.map(shownItemName).join(', ') })
+                          : ''
+                      }`
                     : result.kind === 'pokemon'
-                      ? 'Nothing fully evolved in your box it can merge into yet'
-                      : 'Only a Pokémon can be merged'
+                      ? t('case.noKeeper')
+                      : t('case.onlyMon')
                 }
                 onClick={(e) => {
                   e.stopPropagation()
                   void merge()
                 }}
               >
-                Auto merge
+                {t('case.autoMerge')}
               </button>
               <RarityOddsTooltip source={{ kind: 'item', itemId }}>
                 <button
@@ -272,7 +292,7 @@ function CaseOpening({ itemId, itemName, result, onClose, onOpenAnother }: Props
                     onOpenAnother(soldFor ?? undefined)
                   }}
                 >
-                  Open another ({result.remaining} left)
+                  {t('case.openAnother', { n: result.remaining })}
                 </button>
               </RarityOddsTooltip>
               <button
@@ -281,12 +301,12 @@ function CaseOpening({ itemId, itemName, result, onClose, onOpenAnother }: Props
                   onClose(soldFor ?? undefined)
                 }}
               >
-                {settled ? 'Done' : 'Nice!'}
+                {settled ? t('case.done') : t('case.nice')}
               </button>
             </div>
           </div>
         ) : (
-          <p className="box-empty-hint case-skip-hint">{CLICK} to skip</p>
+          <p className="box-empty-hint case-skip-hint">{t('case.skip', { click: clickWord() })}</p>
         )}
         </div>
       </div>

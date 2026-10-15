@@ -5,6 +5,7 @@ import type { BagItemView, GalarFossilPartner, RestoreFossilResult } from '../..
 import ItemSprite from './ItemSprite'
 import { formatMoney } from './money'
 import ModalSpinner from './ModalSpinner'
+import { itemName, t } from './i18n'
 
 interface Props {
   fossil: BagItemView
@@ -47,11 +48,8 @@ function GalarFossilPrompt({ fossil, money, onClose, onRestored }: Props): React
   return createPortal(
     <div className="modal-overlay" onMouseDown={onClose}>
       <div className="modal-panel galar-prompt" onMouseDown={(e) => e.stopPropagation()}>
-        <h2>Restore {fossil.name}</h2>
-        <p className="box-empty-hint">
-          This fossil is only half a Pokemon. Choose a second fossil to combine it with - the pair decides which
-          Pokemon comes back.
-        </p>
+        <h2>{t('fossil.restore', { name: itemName(fossil.name) })}</h2>
+        <p className="box-empty-hint">{t('fossil.half')}</p>
 
         {!partners && !error && <ModalSpinner />}
         {partners && (
@@ -65,23 +63,23 @@ function GalarFossilPrompt({ fossil, money, onClose, onRestored }: Props): React
                 onClick={() => setSelectedId(p.itemId)}
               >
                 <ItemSprite spritenum={p.spritenum} className="bag-item-icon" />
-                <span className="galar-partner-name">{p.itemName}</span>
+                <span className="galar-partner-name">{itemName(p.itemName)}</span>
                 <span className="galar-partner-result">→ {p.species}</span>
-                <span className="galar-partner-qty">{p.quantity > 0 ? `x${p.quantity}` : 'Not owned'}</span>
+                <span className="galar-partner-qty">{p.quantity > 0 ? `x${p.quantity}` : t('fossil.notOwned')}</span>
               </button>
             ))}
           </div>
         )}
-        {partners && !anyOwned && (
-          <p className="editor-error">You don&apos;t have a second fossil to combine this one with.</p>
-        )}
-        {!canAfford && <p className="editor-error">Restoring costs {formatMoney(FOSSIL_RESTORE_COST)} - you don&apos;t have enough.</p>}
+        {partners && !anyOwned && <p className="editor-error">{t('fossil.noPartner')}</p>}
+        {!canAfford && <p className="editor-error">{t('fossil.cantAfford', { money: formatMoney(FOSSIL_RESTORE_COST) })}</p>}
         {error && <p className="editor-error">{error}</p>}
 
         <div className="editor-actions">
-          <button onClick={onClose}>Cancel</button>
+          <button onClick={onClose}>{t('common.cancel')}</button>
           <button disabled={!selected || !canAfford || busy} onClick={() => void restore()}>
-            {selected ? `Restore ${selected.species} (${formatMoney(FOSSIL_RESTORE_COST)})` : `Restore (${formatMoney(FOSSIL_RESTORE_COST)})`}
+            {selected
+              ? t('fossil.restoreAs', { name: selected.species, money: formatMoney(FOSSIL_RESTORE_COST) })
+              : t('fossil.restoreCost', { money: formatMoney(FOSSIL_RESTORE_COST) })}
           </button>
         </div>
       </div>

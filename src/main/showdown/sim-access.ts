@@ -82,6 +82,7 @@ import {
   STARLIGHT_RAID_CHARM_MULTIPLIER,
   STARLIGHT_RAID_MULTIPLIER
 } from '../../shared/titles'
+import { itemName as localItemName, moveName, t, tOr } from '../i18n'
 
 const { BattleStream, getPlayerStreams, Teams, Dex, toID } = sim
 const { BattlePlayer } = battleStream
@@ -551,9 +552,9 @@ const WEATHER_NAMES: Record<string, string> = {
 // conditions) as far as the Dex is concerned - this turns any of their ids
 // into the name a player would recognise.
 export function effectDisplayName(id: string): string {
-  if (WEATHER_NAMES[id]) return WEATHER_NAMES[id]
+  if (WEATHER_NAMES[id]) return tOr(`fx.${id}`, WEATHER_NAMES[id])
   const move = Dex.moves.get(id)
-  if (move.exists) return move.name
+  if (move.exists) return moveName(move.name)
   const condition = Dex.conditions.get(id)
   return condition.exists ? condition.name : id
 }
@@ -1992,7 +1993,7 @@ export function pickRaidSpecies(
 /** Debug: a species picked for a raid, by its proper name, and whether it can Gigantamax. */
 export function raidSpeciesInfo(speciesName: string): { species: string; gigantamax: boolean } {
   const s = Dex.species.get(speciesName)
-  if (!s.exists) throw new Error(`Unknown species: ${speciesName}`)
+  if (!s.exists) throw new Error(t('err.unknownSpecies', { a: speciesName }))
   return { species: s.name, gigantamax: !!s.canGigantamax }
 }
 
@@ -2103,10 +2104,10 @@ export function raidKindOdds(chances: { gigantamax: number; restricted: number }
   const secretChance = legendaryChance * RAID_SECRET_CHANCE
   const ordinaryChance = legendaryChance - secretChance
   return [
-    { label: 'Gigantamax', chance: gmaxChance, tone: 'gigantamax' },
-    { label: 'Red legendary', chance: ordinaryChance * (1 - chances.restricted), tone: 'epic' },
-    { label: 'Gold legendary', chance: ordinaryChance * chances.restricted, tone: 'legendary' },
-    { label: 'Secret', chance: secretChance, tone: 'secret' }
+    { label: t('raidOdds.gigantamax'), chance: gmaxChance, tone: 'gigantamax' },
+    { label: t('raidOdds.red'), chance: ordinaryChance * (1 - chances.restricted), tone: 'epic' },
+    { label: t('raidOdds.gold'), chance: ordinaryChance * chances.restricted, tone: 'legendary' },
+    { label: t('raidOdds.secret'), chance: secretChance, tone: 'secret' }
   ]
 }
 
@@ -2434,7 +2435,7 @@ export function generateHuntedMon(
 export function pokedexLocationHints(speciesName: string): PokedexHint[] {
   const species = Dex.species.get(speciesName)
   if (!species.exists) return []
-  if (isFossilLine(species.id)) return [{ icon: '🦴', label: 'Restore a fossil' }]
+  if (isFossilLine(species.id)) return [{ icon: '🦴', label: t('hint.fossil') }]
   const hints: PokedexHint[] = []
   const legendary = isLegendaryClass(species)
   const starter = isStarterLine(species.id)
@@ -2442,20 +2443,20 @@ export function pokedexLocationHints(speciesName: string): PokedexHint[] {
   const inLab =
     REGIONAL_STARTER_SPECIES.includes(species.name) ||
     [...pools.paradox, ...pools.ultraBeasts, ...pools.mythicals].includes(species.name)
-  if (inLab) hints.push({ icon: '🧪', label: 'Lab' })
+  if (inLab) hints.push({ icon: '🧪', label: t('hint.lab') })
   if (!legendary && !isBattleOnlyForme(species) && wildLineIds().has(species.id)) {
     for (const location of wildAreasFor(species)) {
-      hints.push({ icon: location.icon, label: starter ? `${location.label} (rare)` : location.label })
+      hints.push({ icon: location.icon, label: starter ? t('hint.rare', { place: location.label }) : location.label })
     }
   }
   if (legendary && species.evos.length === 0 && isPlainSpecies(species)) {
-    hints.push({ icon: '⭐', label: 'Max Raids' })
+    hints.push({ icon: '⭐', label: t('hint.raids') })
   }
   const formChange = formChangeFor(species.name)
-  if (formChange && species.forme) hints.push({ icon: '🔄', label: `Form change from ${species.baseSpecies}` })
-  if (hints.length === 0 && species.prevo) hints.push({ icon: '⤴️', label: `Evolve ${Dex.species.get(species.prevo).name}` })
+  if (formChange && species.forme) hints.push({ icon: '🔄', label: t('hint.formChange', { species: species.baseSpecies }) })
+  if (hints.length === 0 && species.prevo) hints.push({ icon: '⤴️', label: t('hint.evolve', { species: Dex.species.get(species.prevo).name }) })
   if (hints.length === 0 && !species.prevo && isPlainSpecies(species)) {
-    hints.push(legendary ? { icon: '🎁', label: 'Random Legendary' } : { icon: '🎁', label: 'Random Pokémon' })
+    hints.push(legendary ? { icon: '🎁', label: localItemName('Random Legendary') } : { icon: '🎁', label: localItemName('Random Pokemon') })
   }
   return hints
 }
@@ -2516,6 +2517,9 @@ export function megaStonesFor(speciesName: string): string[] {
 export function signatureItemsFor(speciesName: string): string[] {
   const self = Dex.species.get(speciesName)
   const base = self.baseSpecies
+  // A regional form is a Pokemon of its own here: plain Raichu doesn't get Alolan
+  // Raichu's Aloraichium Z (other forms - Arceus types, Ogerpon masks - still share).
+  const regionOf = (forme: string): string => /^(Alola|Galar|Hisui|Paldea)/.exec(forme)?.[1] ?? ''
   const forThisLine = Dex.items
     .all()
     .filter(
@@ -2524,7 +2528,10 @@ export function signatureItemsFor(speciesName: string): string[] {
         item.isNonstandard !== 'CAP' &&
         !!item.itemUser?.some((user) => {
           const userSpecies = Dex.species.get(user)
-          return userSpecies.name === self.name || userSpecies.baseSpecies === base
+          return (
+            userSpecies.name === self.name ||
+            (userSpecies.baseSpecies === base && regionOf(userSpecies.forme) === regionOf(self.forme))
+          )
         })
     )
     .map((item) => item.id)
@@ -2633,7 +2640,7 @@ export function evolutionLevelOf(speciesName: string): number | null {
  * evolutionOptionsFor (which says which of these it can do right now).
  */
 export function evolutionPathsFor(set: PokemonSet): { species: string; method: string }[] {
-  const itemNames = new Map(getEditorOptions().items.map((i) => [i.id, i.name]))
+  const itemNames = new Map(getEditorOptions().items.map((i) => [i.id, localItemName(i.name)]))
   return Dex.species
     .get(set.species)
     .evos.map((name) => Dex.species.get(name))
@@ -2641,13 +2648,13 @@ export function evolutionPathsFor(set: PokemonSet): { species: string; method: s
     // Alcremie: one path per Sweet, each to its own cream.
     .flatMap((evo) => (expandAlcremie(evo.name) ?? [null]).map((sweet) => ({ evo, sweet })))
     .map(({ evo, sweet }) => {
-      if (sweet) return { species: sweet.species, method: `Use a ${itemNames.get(sweet.items![0]) ?? sweet.items![0]}` }
+      if (sweet) return { species: sweet.species, method: t('evo.use', { item: itemNames.get(sweet.items![0]) ?? sweet.items![0] }) }
       const requiredItems = evolutionItemsFor(evo)
       let method: string
-      if (requiredItems) method = `Use a ${requiredItems.map((id) => itemNames.get(id) ?? id).join(' or ')}`
-      else if (evo.evoType === undefined) method = `Level ${evo.evoLevel ?? 1}`
-      else if (evo.evoType === 'useItem' || evo.evoType === 'levelHold') method = 'Any time'
-      else method = `Max friendship (${set.happiness ?? MAX_HAPPINESS}/${MAX_HAPPINESS})`
+      if (requiredItems) method = t('evo.use', { item: requiredItems.map((id) => itemNames.get(id) ?? id).join(t('game.or')) })
+      else if (evo.evoType === undefined) method = t('evo.level', { n: evo.evoLevel ?? 1 })
+      else if (evo.evoType === 'useItem' || evo.evoType === 'levelHold') method = t('evo.anyTime')
+      else method = t('evo.friendship', { n: set.happiness ?? MAX_HAPPINESS, max: MAX_HAPPINESS })
       return { species: evo.name, method }
     })
 }

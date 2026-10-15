@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { KeyItemView } from '../../shared/battle-types'
 import ItemSprite from './ItemSprite'
 import ModalSpinner from './ModalSpinner'
+import { achievementNameOf, itemName, itemText, t } from './i18n'
 
 /**
  * The Key Items tab of the Bag | Shop window (see BagShopModal): every key item, the ones
@@ -25,15 +26,21 @@ function KeyItemsPanel(): React.JSX.Element {
     <div
       key={item.id}
       className={`item-card shop-key-item${item.owned ? ' shop-key-item-owned' : ''}`}
-      title={`${item.description}\n\n${
-        item.owned ? 'You have it.' : item.coinShop ? 'Sold in the Game Corner\'s Coin Shop.' : `Unlocked by the achievement "${item.unlockedBy}".`
+      title={`${itemText(item.id, item.description)}\n\n${
+        item.owned
+          ? t('keys.have')
+          : item.coinShop
+            ? t('keys.coinShop')
+            : t('keys.unlockedBy', { name: achievementNameOf(item.unlockedBy ?? '') })
       }`}
     >
       <span className="item-card-art">
         <ItemSprite spritenum={item.spritenum} className="item-card-icon shop-item-icon" />
       </span>
-      <span className="item-card-name">{item.name}</span>
-      <span className="item-card-note shop-key-item-status">{item.owned ? '✓ Owned' : `🔒 ${item.coinShop ? 'Coin Shop' : item.unlockedBy}`}</span>
+      <span className="item-card-name">{itemName(item.name)}</span>
+      <span className="item-card-note shop-key-item-status">
+        {item.owned ? t('keys.owned') : `🔒 ${item.coinShop ? t('bag.coinShop') : achievementNameOf(item.unlockedBy ?? '')}`}
+      </span>
     </div>
   )
 
@@ -46,14 +53,14 @@ function KeyItemsPanel(): React.JSX.Element {
           {owned.length > 0 && (
             <>
               <h3 className="shop-category-heading">
-                Owned · {owned.length} of {items.length}
+                {t('keys.ownedHeading', { n: owned.length, of: items.length })}
               </h3>
               <div className="item-card-grid">{owned.map(card)}</div>
             </>
           )}
           {locked.length > 0 && (
             <>
-              <h3 className="shop-category-heading">Locked - unlocked by achievements or the Coin Shop</h3>
+              <h3 className="shop-category-heading">{t('keys.lockedHeading')}</h3>
               <div className="item-card-grid">{locked.map(card)}</div>
             </>
           )}

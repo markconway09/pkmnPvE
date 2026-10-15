@@ -1,6 +1,7 @@
 import { useDroppable } from '@dnd-kit/core'
 import type { BoxPokemonView } from '../../shared/battle-types'
 import PokemonIcon from './PokemonIcon'
+import { t } from './i18n'
 
 interface Props {
   team: (string | null)[]
@@ -29,7 +30,7 @@ function TeamSlot({ slot, mon, onEdit, onRemove, onContextMenu }: SlotProps): Re
       {mon ? (
         <PokemonIcon mon={mon} fill draggable onEdit={onEdit} onRemove={onRemove} onContextMenu={onContextMenu} />
       ) : (
-        <span className="team-slot-empty">Empty</span>
+        <span className="team-slot-empty">{t('team.empty')}</span>
       )}
     </div>
   )

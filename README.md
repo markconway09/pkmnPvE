@@ -191,7 +191,6 @@ Open after beating Boss Giovanni. Each raid uses one **Raid Crystal**.
 - A doubles battle: your two lead Pokemon against one Dynamaxed boss at your level cap.
 - The boss has extra HP, attacks twice a turn, and no single hit can take more than about a quarter of its HP at full strength.
 - Bosses are Gigantamax 50% of the time, otherwise a red Pokemon or (15%) a gold legendary.
-- **Secret boss:** a 1% chance that a legendary raid is Eternamax Eternatus instead.
 - **Winning catches the boss** with 3 merge stars, in its Gigantamax form if it had one.
 - The Max Raid page shows which Pokemon can appear and the odds of each kind.
 

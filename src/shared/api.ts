@@ -8,6 +8,7 @@ import type { CoopSetup, OnlineCoopTeam, OnlineDraftTeam, OnlinePlayer, OnlineSe
 import type { RarityOddsReport, RarityOddsSource } from './rarity'
 import type { LocalMusicFile } from './music'
 import type { UiScaleChoice, UiScaleState } from './ui-scale'
+import type { Locale } from './i18n'
 import type { CoinBalance, DailyCoinMon, DailyCoinMonPurchase, DailyCoinOffer, DailyPetalDeals, SlotRules, SlotSpinResult } from './slots'
 import type { BlackjackView } from './blackjack'
 import type { DiceRoll } from './dice'
@@ -77,6 +78,8 @@ export interface ApiTransport {
 
 export function createApi(transport: ApiTransport) {
   return {
+    // The language the screens are in, so the game writes its own lines in it too.
+    setLocale: (locale: Locale): Promise<void> => transport.invoke('locale:set', locale),
     getSession: (): Promise<SessionInfo> => transport.invoke('auth:session'),
     login: (username: string, remember: boolean): Promise<SessionInfo> => transport.invoke('auth:login', username, remember),
     logout: (): Promise<SessionInfo> => transport.invoke('auth:logout'),

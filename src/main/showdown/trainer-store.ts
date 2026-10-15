@@ -2,6 +2,7 @@ import { readText, writeText, randomUUID } from '../platform'
 import type { ItemDropConfig, Trainer } from '../../shared/battle-types'
 import { MAX_TRAINER_DROPS } from '../../shared/battle-types'
 import { savePathFor } from './save-paths'
+import { t } from '../i18n'
 
 // Keeps only real rewards (an item and a chance above 0), at most
 // MAX_TRAINER_DROPS of them, with the chance held to 0-100.
@@ -82,7 +83,7 @@ export function addTrainer(input: Omit<Trainer, 'id'>): Trainer {
 
 export function updateTrainer(id: string, input: Omit<Trainer, 'id'>): Trainer[] {
   const trainer = getState().find((t) => t.id === id)
-  if (!trainer) throw new Error(`Unknown trainer id: ${id}`)
+  if (!trainer) throw new Error(t('err.unknownTrainerId', { a: id }))
   Object.assign(trainer, input, { drops: cleanDrops(input.drops) })
   persist()
   return listTrainers()
@@ -91,7 +92,7 @@ export function updateTrainer(id: string, input: Omit<Trainer, 'id'>): Trainer[]
 /** A copy of a trainer under a new id ("Name (copy)") - its teams are copied separately. */
 export function duplicateTrainer(id: string): Trainer {
   const source = getState().find((t) => t.id === id)
-  if (!source) throw new Error(`Unknown trainer id: ${id}`)
+  if (!source) throw new Error(t('err.unknownTrainerId', { a: id }))
   // Not the importer's key: importing again would take the copy for the original.
   const { id: _id, importKey: _importKey, ...rest } = source
   const copy: Trainer = { ...structuredClone(rest), id: randomUUID(), name: `${source.name} (copy)` }

@@ -3,6 +3,7 @@ import type { RarityTier } from '../../shared/battle-types'
 import { DEFAULT_SKILL_CHECK, type SkillCheckResult, type SkillCheckSettings } from '../../shared/tms'
 import { playClunk, playTick } from './ticks'
 import { IS_MOBILE } from './platform'
+import { t } from './i18n'
 
 export type { SkillCheckResult }
 
@@ -35,7 +36,11 @@ export function judgeSkillCheck(angle: number, zoneStart: number, settings: Skil
   return 'miss'
 }
 
-const RESULT_LABELS: Record<SkillCheckResult, string> = { great: 'GREAT', good: 'GOOD', miss: 'MISSED' }
+const RESULT_LABELS: Record<SkillCheckResult, 'skill.great' | 'skill.good' | 'skill.miss'> = {
+  great: 'skill.great',
+  good: 'skill.good',
+  miss: 'skill.miss'
+}
 
 interface RingProps {
   // Raise it to start a check (0: none yet).
@@ -169,7 +174,7 @@ export function SkillCheckRing({ runKey, settings = DEFAULT_SKILL_CHECK, tier, o
         {showZone && <line className="skill-check-needle" x1={C} y1={C - R + 16} x2={C} y2={C - R - 12} />}
       </g>
       <text className="skill-check-key" x={C} y={C + 5} textAnchor="middle">
-        {result ? RESULT_LABELS[result] : phase === 'idle' ? idleLabel : IS_MOBILE ? 'TAP' : 'SPACE'}
+        {result ? t(RESULT_LABELS[result]) : phase === 'idle' ? idleLabel : IS_MOBILE ? t('skill.tap') : t('skill.space')}
       </text>
     </svg>
   )

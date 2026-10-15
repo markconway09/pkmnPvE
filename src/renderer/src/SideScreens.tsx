@@ -1,4 +1,5 @@
 import type { FieldEffectView } from '../../shared/battle-types'
+import { moveName, t } from './i18n'
 
 interface Props {
   screens: FieldEffectView[]
@@ -27,7 +28,7 @@ const SCREEN_OFFSETS: [number, number][] = [
 ]
 
 function turnsText(turnsLeft: number | null): string {
-  return turnsLeft != null ? ` (${turnsLeft} turn${turnsLeft === 1 ? '' : 's'})` : ''
+  return turnsLeft != null ? ` ${t('field.turns', { count: turnsLeft })}` : ''
 }
 
 // Reflect/Light Screen/Aurora Veil, drawn as translucent 16:9 panels over the
@@ -51,7 +52,7 @@ function SideScreens({ screens }: Props): React.JSX.Element | null {
               borderColor: SCREEN_COLORS[screen.id],
               transform: `translate(calc(-50% + ${dx}px), ${dy}px)`
             }}
-            title={`${SCREEN_LABELS[screen.id] ?? screen.name}${turnsText(screen.turnsLeft)}`}
+            title={`${moveName(SCREEN_LABELS[screen.id] ?? screen.name)}${turnsText(screen.turnsLeft)}`}
           />
         )
       })}

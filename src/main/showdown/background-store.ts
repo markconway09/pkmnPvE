@@ -2,6 +2,7 @@ import { copyFileSync, existsSync, readFileSync, readdirSync, rmSync } from 'nod
 import { extname, join } from 'node:path'
 import { BrowserWindow, dialog } from 'electron'
 import { getCurrentPlayerSlug, playerDirFor } from './save-paths'
+import { t } from '../i18n'
 
 /**
  * Options → Background: a picture of the player's own choosing behind every
@@ -21,7 +22,7 @@ const MIME: Record<string, string> = {
 
 function playerDir(): string {
   const slug = getCurrentPlayerSlug()
-  if (!slug) throw new Error('Not logged in')
+  if (!slug) throw new Error(t('err.notLoggedIn'))
   return playerDirFor(slug)
 }
 
@@ -48,15 +49,15 @@ export function getBackground(): string | null {
 /** Asks for a picture and makes it this player's background; null if they cancelled. */
 export async function chooseBackground(win: BrowserWindow | null): Promise<string | null> {
   const options: Electron.OpenDialogOptions = {
-    title: 'Choose a background picture',
+    title: t('dialog.background'),
     properties: ['openFile'],
-    filters: [{ name: 'Images', extensions: Object.keys(MIME).map((e) => e.slice(1)) }]
+    filters: [{ name: t('dialog.images'), extensions: Object.keys(MIME).map((e) => e.slice(1)) }]
   }
   const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
   const source = result.filePaths[0]
   if (result.canceled || !source) return null
   const ext = extname(source).toLowerCase()
-  if (!MIME[ext]) throw new Error('That file type is not supported - use PNG, JPG, WebP, GIF or BMP')
+  if (!MIME[ext]) throw new Error(t('err.thatFileTypeIsNotSupported'))
   const dir = playerDir()
   removeSavedBackgrounds(dir)
   const target = join(dir, `background${ext}`)

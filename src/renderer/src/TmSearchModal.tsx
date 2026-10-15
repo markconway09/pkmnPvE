@@ -6,14 +6,8 @@ import { SkillCheckRing, type SkillCheckResult } from './SkillCheck'
 import { TmFindCard } from './TmBits'
 import { locationIconUrl } from './battleScenery'
 import { IS_MOBILE } from './platform'
-
-const TIER_LABELS: Record<RarityTier, string> = {
-  common: 'Common',
-  uncommon: 'Uncommon',
-  rare: 'Rare',
-  epic: 'Mythical',
-  legendary: 'Legendary'
-}
+import { TIER_LABELS } from './RarityOddsTooltip'
+import { t } from './i18n'
 
 // The wait before each check pops up, so it can't be timed in advance.
 const MIN_GAP_MS = 700
@@ -102,27 +96,31 @@ function TmSearchModal({ location, onClose, onAmbush }: Props): React.JSX.Elemen
       <div className={`modal-panel tm-search-panel${start ? ` rarity-tier-${start.tier}` : ''}`}>
         <div className="tm-search-head">
           <img className="tm-search-loc-icon" src={locationIconUrl(location.id)} alt="" />
-          <span className="tm-search-title">Searching {location.id === 'all' ? 'anywhere' : `the ${location.label}`}</span>
+          <span className="tm-search-title">
+            {location.id === 'all' ? t('tm.searchingAnywhere') : t('tm.searchingIn', { area: location.label })}
+          </span>
         </div>
 
         {error ? (
           <p className="tm-search-error">{error}</p>
         ) : !start ? (
-          <p className="tm-search-note">Looking around...</p>
+          <p className="tm-search-note">{t('tm.lookingAround')}</p>
         ) : (
           <>
             <div className="tm-search-tier">
-              A <strong>{TIER_LABELS[start.tier]}</strong> TM is hidden here
-              {start.pityTriggered && <span className="tm-search-pity">Lucky find - your patience paid off</span>}
+              {t('tm.hiddenPre')}
+              <strong>{TIER_LABELS[start.tier]}</strong>
+              {t('tm.hiddenPost')}
+              {start.pityTriggered && <span className="tm-search-pity">{t('tm.lucky')}</span>}
             </div>
 
-            <div className="tm-search-bar" title={`${filled} of ${needed} checks`}>
+            <div className="tm-search-bar" title={t('tm.checksTip', { n: filled, of: needed })}>
               {Array.from({ length: needed }, (_, i) => (
                 <span key={i} className={`tm-search-step${i < filled ? ' tm-search-step-on' : ''}`} />
               ))}
             </div>
-            <div className="tm-search-misses" title="Misses make noise - too many and a wild Pokémon jumps out">
-              Noise
+            <div className="tm-search-misses" title={t('tm.noiseTip')}>
+              {t('tm.noise')}
               {Array.from({ length: start.maxMisses }, (_, i) => (
                 <span key={i} className={`tm-search-miss${i < misses ? ' tm-search-miss-on' : ''}`} />
               ))}
@@ -133,12 +131,12 @@ function TmSearchModal({ location, onClose, onAmbush }: Props): React.JSX.Elemen
             )}
 
             {done && progress?.find && <TmFindCard find={progress.find} />}
-            {done && progress?.refunded && <p className="tm-search-refund">Specialist - this search was given back</p>}
-            {done && progress?.ambush && <p className="tm-search-ambush">Too much noise - a wild Pokémon heard you!</p>}
+            {done && progress?.refunded && <p className="tm-search-refund">{t('tm.refunded')}</p>}
+            {done && progress?.ambush && <p className="tm-search-ambush">{t('tm.ambush')}</p>}
 
             {!done && (
               <p className="tm-search-note">
-                {waiting ? 'Searching... get ready' : IS_MOBILE ? 'Tap on the zone' : 'Space / click on the zone'}
+                {waiting ? t('tm.getReady') : IS_MOBILE ? t('tm.tapZone') : t('tm.clickZone')}
               </p>
             )}
           </>
@@ -147,10 +145,10 @@ function TmSearchModal({ location, onClose, onAmbush }: Props): React.JSX.Elemen
         <div className="editor-actions">
           {done && progress?.ambush ? (
             <button className="confirm-button" onClick={() => onAmbush(location.id)}>
-              Fight!
+              {t('tm.fight')}
             </button>
           ) : (
-            <button onClick={leave}>{running ? 'Give up (the search is spent)' : 'Done'}</button>
+            <button onClick={leave}>{running ? t('tm.giveUp') : t('common.done')}</button>
           )}
         </div>
       </div>

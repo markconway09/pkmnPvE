@@ -3,13 +3,13 @@ import { createPortal } from 'react-dom'
 import type { LeagueMilestone, TrainerProfile } from '../../shared/battle-types'
 import { runDifficultyInfo } from '../../shared/battle-types'
 import type { AchievementsState } from '../../shared/achievements'
-import { titleClash, titlePerk } from '../../shared/titles'
+import { titleClash, titlePerk, type Title } from '../../shared/titles'
 import { TITLE_CHANGED_EVENT } from './BetSlider'
 import { trainerSpriteUrl } from './trainerSprite'
 import TitlePicker from './TitlePicker'
 import TrainerSpritePicker from './TrainerSpritePicker'
 import RarityCard from './RarityCard'
-import { CLICK } from './platform'
+import { clickWord, numberLocale, t, titleName, titlePerkText } from './i18n'
 
 interface Props {
   username: string
@@ -78,8 +78,8 @@ function PlayerTrainerModal({
   function clashNote(title: string): string | undefined {
     const clash = titleClash(title)
     if (!clash) return undefined
-    if (title === clash.lead) return `Turns off ${clash.rivals.join(', ')}`
-    return `Turns off ${clash.lead}`
+    if (title === clash.lead) return t('card.turnsOff', { names: clash.rivals.map(titleName).join(', ') })
+    return t('card.turnsOff', { names: titleName(clash.lead) })
   }
 
   const league = profile?.league ?? []
@@ -92,9 +92,9 @@ function PlayerTrainerModal({
       <div className="modal-panel player-trainer-modal" onMouseDown={(e) => e.stopPropagation()}>
         {/* A full Pokedex puts the name in a gold card. */}
         {titles?.dexComplete ? (
-          <RarityCard tier="legendary" framed className="trainer-card-name-gold" title="Pokédex complete">
+          <RarityCard tier="legendary" framed className="trainer-card-name-gold" title={t('card.dexComplete')}>
             <h2>{username}</h2>
-            <span className="trainer-card-name-badge">★ Pokédex complete</span>
+            <span className="trainer-card-name-badge">{t('card.dexCompleteBadge')}</span>
           </RarityCard>
         ) : (
           <h2>{username}</h2>
@@ -104,20 +104,20 @@ function PlayerTrainerModal({
             <img className="trainer-sprite-current-img" src={trainerSpriteUrl(trainerSprite)} alt={trainerSprite} />
             <div className="trainer-sprite-current-info">
               <span>{trainerSprite}</span>
-              <span className="trainer-sprite-change-hint">{CLICK} to change</span>
+              <span className="trainer-sprite-change-hint">{t('card.toChange', { click: clickWord() })}</span>
             </div>
           </button>
           {/* The title shown beside the name - earned from achievements, just for show. */}
           <div className="trainer-card-title">
-            <span>Title</span>
+            <span>{t('card.title')}</span>
             <TitlePicker
               value={titles?.title ?? null}
               options={titles?.titles.map((title) => ({ title })) ?? []}
-              emptyLabel="No title"
-              noneLabel="None earned yet"
+              emptyLabel={t('card.noTitle')}
+              noneLabel={t('card.noneEarned')}
               onChange={(title) => void chooseTitle(title)}
             />
-            <span className="trainer-card-perk-hint">Shown beside your name - just for show</span>
+            <span className="trainer-card-perk-hint">{t('card.titleHint')}</span>
           </div>
         </div>
         {error && <p className="editor-error">{error}</p>}
@@ -130,11 +130,11 @@ function PlayerTrainerModal({
             disabled={earned.length === 0}
             onClick={() => setPerksOpen((o) => !o)}
           >
-            <span className="title-perks-toggle-name">Title Perks</span>
+            <span className="title-perks-toggle-name">{t('card.perks')}</span>
             <span className="title-perks-toggle-count">
-              {earned.length === 0 ? 'Earned from achievements' : `${onCount} of ${earned.length} on`}
+              {earned.length === 0 ? t('card.perksEarned') : t('card.perksOn', { on: onCount, n: earned.length })}
             </span>
-            {earned.length > 0 && <span className="title-perks-toggle-action">{perksOpen ? 'Hide' : 'Show'}</span>}
+            {earned.length > 0 && <span className="title-perks-toggle-action">{perksOpen ? t('card.hide') : t('card.show')}</span>}
             <span className="title-picker-caret" aria-hidden>
               ▾
             </span>
@@ -147,8 +147,8 @@ function PlayerTrainerModal({
                 return (
                   <label key={title} className={`title-perk-row${on ? '' : ' title-perk-row-off'}`}>
                     <span className="title-perk-text">
-                      <span className="title-perk-name">{title}</span>
-                      <span className="title-perk-desc">{titlePerk(title)}</span>
+                      <span className="title-perk-name">{titleName(title)}</span>
+                      <span className="title-perk-desc">{titlePerkText(title as Title, titlePerk(title))}</span>
                       {note && <span className="title-perk-clash">{note}</span>}
                     </span>
                     <input
@@ -166,13 +166,13 @@ function PlayerTrainerModal({
 
         {profile && (
           <div className="editor-section">
-            <h3>Road to the League</h3>
+            <h3>{t('card.league')}</h3>
             <div className="league-bar">
               {league.map((m, i) => (
                 <div
                   key={i}
                   className={`league-notch league-notch-${m.group}${m.defeated ? ' league-notch-done' : ''}`}
-                  title={`${m.label}${m.defeated ? ' - defeated' : m.defeated === null ? ' - not in the trainer list' : ' - not yet'}`}
+                  title={t(m.defeated ? 'card.defeated' : m.defeated === null ? 'card.notListed' : 'card.notYet', { label: m.label })}
                 >
                   <div className="league-notch-fill" />
                   <img className="league-notch-sprite" src={trainerSpriteUrl(m.spriteId)} alt={m.label} />
@@ -180,35 +180,38 @@ function PlayerTrainerModal({
               ))}
             </div>
             <p className="league-summary">
-              Badges {countBeaten('gym')}/8 · Elite Four {countBeaten('eliteFour')}/4 · Champion{' '}
-              {championBeaten ? '🏆' : '—'}
+              {t('card.leagueSummary', {
+                gym: countBeaten('gym'),
+                elite: countBeaten('eliteFour'),
+                champion: championBeaten ? '🏆' : '—'
+              })}
             </p>
           </div>
         )}
 
         {profile && (
           <div className="editor-section">
-            <h3>Statistics</h3>
+            <h3>{t('card.stats')}</h3>
             <div className="profile-stats">
               <div className="profile-stat">
-                <span className="profile-stat-value">{profile.stats.trainersDefeated.toLocaleString('en-US')}</span>
-                <span className="profile-stat-label">Trainers defeated</span>
+                <span className="profile-stat-value">{profile.stats.trainersDefeated.toLocaleString(numberLocale())}</span>
+                <span className="profile-stat-label">{t('card.trainers')}</span>
               </div>
               <div className="profile-stat">
-                <span className="profile-stat-value">{profile.stats.bossesDefeated.toLocaleString('en-US')}</span>
-                <span className="profile-stat-label">Bosses defeated</span>
+                <span className="profile-stat-value">{profile.stats.bossesDefeated.toLocaleString(numberLocale())}</span>
+                <span className="profile-stat-label">{t('card.bosses')}</span>
               </div>
               <div className="profile-stat">
-                <span className="profile-stat-value">{profile.stats.wildDefeated.toLocaleString('en-US')}</span>
-                <span className="profile-stat-label">Wild Pokémon defeated</span>
+                <span className="profile-stat-value">{profile.stats.wildDefeated.toLocaleString(numberLocale())}</span>
+                <span className="profile-stat-label">{t('card.wildDefeated')}</span>
               </div>
               <div className="profile-stat">
-                <span className="profile-stat-value">{profile.stats.wildCaught.toLocaleString('en-US')}</span>
-                <span className="profile-stat-label">Wild Pokémon caught</span>
+                <span className="profile-stat-value">{profile.stats.wildCaught.toLocaleString(numberLocale())}</span>
+                <span className="profile-stat-label">{t('card.wildCaught')}</span>
               </div>
               <div className="profile-stat">
-                <span className="profile-stat-value">{profile.stats.raidsWon.toLocaleString('en-US')}</span>
-                <span className="profile-stat-label">Max Raids won</span>
+                <span className="profile-stat-value">{profile.stats.raidsWon.toLocaleString(numberLocale())}</span>
+                <span className="profile-stat-label">{t('card.raids')}</span>
               </div>
               <div className="profile-stat">
                 <span className="profile-stat-value">
@@ -217,14 +220,14 @@ function PlayerTrainerModal({
                     ? ` (${runDifficultyInfo(profile.stats.bestFloorDifficulty).label})`
                     : ''}
                 </span>
-                <span className="profile-stat-label">Battle Tower best floor</span>
+                <span className="profile-stat-label">{t('card.bestFloor')}</span>
               </div>
             </div>
           </div>
         )}
 
         <div className="editor-actions">
-          <button onClick={onClose}>Close</button>
+          <button onClick={onClose}>{t('common.close')}</button>
         </div>
       </div>
 

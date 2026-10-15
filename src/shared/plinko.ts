@@ -3,13 +3,26 @@
 // the edges. Shared by the main process (which drops every ball - see plinko-store.ts)
 // and the renderer (which plays the ball down the path it took).
 
+import { tr } from './i18n/current'
+
 export const PLINKO_ROWS = 12
 // One more slot than rows: slot k is where a ball that bounced right k times lands.
 export const PLINKO_SLOTS = PLINKO_ROWS + 1
 
 export type PlinkoRisk = 'low' | 'medium' | 'high'
 export const PLINKO_RISKS: PlinkoRisk[] = ['low', 'medium', 'high']
-export const PLINKO_RISK_LABELS: Record<PlinkoRisk, string> = { low: 'Low', medium: 'Medium', high: 'High' }
+// In the language in use, read whenever they're shown.
+export const PLINKO_RISK_LABELS: Record<PlinkoRisk, string> = {
+  get low() {
+    return tr('plinko.low')
+  },
+  get medium() {
+    return tr('plinko.medium')
+  },
+  get high() {
+    return tr('plinko.high')
+  }
+}
 
 // What each slot pays, times the bet (rounded down to whole coins), left to right. Each
 // table pays back about 99.7% of what's bet over time - worked out exactly from the odds

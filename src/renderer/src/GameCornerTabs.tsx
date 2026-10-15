@@ -1,6 +1,7 @@
 import CoinIcon from './CoinIcon'
 import ModalSpinner from './ModalSpinner'
 import TabStrip, { type TabStripTab } from './TabStrip'
+import { t } from './i18n'
 
 export type GameCornerGame = 'slots' | 'blackjack' | 'roulette' | 'plinko' | 'dice'
 // The Game Corner window's tabs: its games, and the Coin Shop counter.
@@ -16,17 +17,18 @@ export interface GameCornerGameProps {
   onCoinsChange: (coins: number | null) => void
 }
 
-const TABS: TabStripTab<GameCornerTab>[] = [
-  { id: 'slots', label: '🎰 Slots' },
-  { id: 'blackjack', label: '🃏 Blackjack' },
-  { id: 'roulette', label: '🎡 Roulette' },
-  { id: 'plinko', label: '🔻 Plinko' },
-  { id: 'dice', label: '🎲 Dice' },
+// Built each time they're shown, so they follow the player's language.
+const tabs = (): TabStripTab<GameCornerTab>[] => [
+  { id: 'slots', label: t('corner.tab.slots') },
+  { id: 'blackjack', label: t('corner.tab.blackjack') },
+  { id: 'roulette', label: t('corner.tab.roulette') },
+  { id: 'plinko', label: t('corner.tab.plinko') },
+  { id: 'dice', label: t('corner.tab.dice') },
   {
     id: 'shop',
     label: (
       <>
-        <CoinIcon /> Coin Shop
+        <CoinIcon /> {t('corner.tab.shop')}
       </>
     )
   }
@@ -46,7 +48,7 @@ function GameCornerTabs({ current, disabled, onSwitch, onClose }: Props): React.
   return (
     <TabStrip
       className="game-corner-tabs"
-      tabs={TABS}
+      tabs={tabs()}
       current={current}
       disabled={disabled}
       onSwitch={onSwitch}

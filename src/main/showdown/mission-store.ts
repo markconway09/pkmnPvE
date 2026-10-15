@@ -11,6 +11,7 @@ import { getEditorOptions } from './sim-access'
 import { lateItemsUnlocked } from './progression-store'
 import { countAchievement } from './achievement-progress'
 import { hasTitle } from './title-perks'
+import { formatNumber, itemName as localItemName, t as msg } from '../i18n'
 
 /**
  * Daily missions (see shared/missions.ts), kept per player in missions.json. The day's
@@ -172,15 +173,15 @@ function pay(reward: MissionReward): string {
   const parts: string[] = []
   for (const { itemId, count } of reward.items ?? []) {
     addItem(itemId, count)
-    parts.push(`${count > 1 ? `${count}× ` : 'a '}${names.get(itemId) ?? itemId}`)
+    parts.push(msg(count > 1 ? 'reward.items' : 'reward.item', { count, item: localItemName(names.get(itemId) ?? itemId) }))
   }
   if (reward.money) {
     addMoney(reward.money)
-    parts.push(`₽${reward.money.toLocaleString('en-US')}`)
+    parts.push(`₽${formatNumber(reward.money)}`)
   }
   if (reward.coins) {
     changeCoins(reward.coins)
-    parts.push(`${reward.coins.toLocaleString('en-US')} coins`)
+    parts.push(msg('rewards.coins', { n: reward.coins }))
   }
   return parts.join(', ')
 }
@@ -190,9 +191,9 @@ export function claimMission(slot: number): MissionClaimResult {
   const s = current()
   const m = s.missions[slot]
   const t = m ? templateOf(m.templateId) : undefined
-  if (!m || !t) throw new Error('No such mission today')
-  if (m.progress < t.goal) throw new Error("That mission isn't finished yet")
-  if (m.claimed) throw new Error("That mission's reward has already been claimed")
+  if (!m || !t) throw new Error(msg('err.noSuchMissionToday'))
+  if (m.progress < t.goal) throw new Error(msg('err.thatMissionIsnTFinishedYet'))
+  if (m.claimed) throw new Error(msg('err.thatMissionSRewardHasAlready'))
   m.claimed = true
   persist()
   const rewardText = pay(t.reward)
@@ -202,8 +203,8 @@ export function claimMission(slot: number): MissionClaimResult {
 /** All three finished: the day's bonus (and a day towards the Diligent achievement). */
 export function claimMissionBonus(): MissionClaimResult {
   const s = current()
-  if (!allDone(s.missions)) throw new Error('Finish all three missions first')
-  if (s.bonusClaimed) throw new Error("Today's bonus has already been claimed")
+  if (!allDone(s.missions)) throw new Error(msg('err.finishAllThreeMissionsFirst'))
+  if (s.bonusClaimed) throw new Error(msg('err.todaySBonusHasAlreadyBeen'))
   s.bonusClaimed = true
   persist()
   const rewardText = pay(DAILY_BONUS_REWARD)
@@ -216,14 +217,14 @@ export function rerollMission(slot: number): MissionsState {
   const s = current()
   const m = s.missions[slot]
   const t = m ? templateOf(m.templateId) : undefined
-  if (!m || !t) throw new Error('No such mission today')
-  if (m.progress >= t.goal) throw new Error("That mission's already finished")
-  if (s.rerollsUsed >= rerollsAllowed()) throw new Error('No rerolls left today')
+  if (!m || !t) throw new Error(msg('err.noSuchMissionToday'))
+  if (m.progress >= t.goal) throw new Error(msg('err.thatMissionSAlreadyFinished'))
+  if (s.rerollsUsed >= rerollsAllowed()) throw new Error(msg('err.noRerollsLeftToday'))
   // Not one already on the list, nor one counting the same thing as the others.
   const taken = new Set(s.missions.map((x) => x.templateId))
   const otherStats = new Set(s.missions.filter((x) => x !== m).map((x) => templateOf(x.templateId)?.stat))
   const pool = eligible(t.tier).filter((x) => !taken.has(x.id) && !otherStats.has(x.stat))
-  if (pool.length === 0) throw new Error('There is no other mission to swap it for')
+  if (pool.length === 0) throw new Error(msg('err.thereIsNoOtherMissionTo'))
   const next = pool[Math.floor(Math.random() * pool.length)]
   s.missions[slot] = { templateId: next.id, progress: 0, claimed: false }
   s.rerollsUsed++

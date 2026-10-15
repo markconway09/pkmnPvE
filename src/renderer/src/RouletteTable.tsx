@@ -17,6 +17,7 @@ import CoinIcon from './CoinIcon'
 import { errorMessage, useFloatingNotes } from './FloatingNotes'
 import { playCornerClunk, playCornerTick } from './ticks'
 import { IS_MOBILE_LAYOUT } from './platform'
+import { numberLocale, t } from './i18n'
 
 const SPIN_MS = 4200
 const SEGMENT = 360 / WHEEL_ORDER.length
@@ -125,16 +126,16 @@ function RouletteTable({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorn
     const at = { x: e.clientX, y: e.clientY - 10 }
     // Up to the bet cap on each spot, and five times it on the whole board.
     if ((bets[key] ?? 0) + chip > perks.betCap) {
-      notes.show(`Each spot takes at most ${perks.betCap.toLocaleString('en-US')} coins`, at, 'bad')
+      notes.show(t('roulette.spotCap', { n: perks.betCap }), at, 'bad')
       return
     }
     const tableCap = perks.betCap * ROULETTE_MAX_FULL_BETS
     if (total + chip > tableCap) {
-      notes.show(`The table takes at most ${tableCap.toLocaleString('en-US')} coins a spin`, at, 'bad')
+      notes.show(t('roulette.tableCap', { n: tableCap }), at, 'bad')
       return
     }
     if (coins !== null && total + chip > coins) {
-      notes.show("You don't have that many coins", at, 'bad')
+      notes.show(t('roulette.noCoins'), at, 'bad')
       return
     }
     setResult(null)
@@ -228,11 +229,11 @@ function RouletteTable({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorn
         const net = outcome.totalReturned - outcome.totalBet
         const rect = boardRef.current?.getBoundingClientRect()
         const at = rect ? { x: rect.left + rect.width / 2, y: rect.top } : { x: window.innerWidth / 2, y: 200 }
-        if (outcome.refunded) notes.show('Refunded by the Croupier!', at)
-        else if (outcome.doubled) notes.show(`Doubled by the Croupier! +${net.toLocaleString('en-US')} coins`, at)
-        else if (net > 0) notes.show(`+${net.toLocaleString('en-US')} coins`, at)
-        else if (net < 0) notes.show(`${net.toLocaleString('en-US')} coins`, at, 'bad')
-        else notes.show('Broke even', at)
+        if (outcome.refunded) notes.show(t('roulette.refunded'), at)
+        else if (outcome.doubled) notes.show(t('roulette.doubled', { n: net }), at)
+        else if (net > 0) notes.show(t('corner.plusCoins', { n: net }), at)
+        else if (net < 0) notes.show(t('corner.netCoins', { n: net }), at, 'bad')
+        else notes.show(t('roulette.even2'), at)
       }, SPIN_MS)
     )
   }
@@ -283,25 +284,31 @@ function RouletteTable({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorn
         </div>
         <div className="roulette-side">
           <div className={`roulette-result${result ? ` roulette-result-${pocketColor(result.pocket)}` : ''}`}>
-            {spinning ? 'Spinning…' : result ? `${result.pocket} ${pocketColor(result.pocket)}` : 'Place your bets'}
+            {spinning
+              ? t('slots.spinning')
+              : result
+                ? `${result.pocket} ${t(`roulette.color.${pocketColor(result.pocket)}`)}`
+                : t('roulette.placeBets')}
           </div>
           {result && !spinning && (
             <div className="roulette-result-detail">
               {result.refunded
-                ? `No winning bets - but the Croupier gave all ${result.totalBet.toLocaleString('en-US')} back`
+                ? t('roulette.refundDetail', { n: result.totalBet })
                 : result.totalReturned > 0
-                ? `${result.bets
-                    .filter((b) => b.returned > 0)
-                    .map((b) => betLabel(b.key))
-                    .join(', ')} paid ${result.totalReturned.toLocaleString('en-US')} · ${
-                    result.totalReturned >= result.totalBet ? '+' : ''
-                  }${(result.totalReturned - result.totalBet).toLocaleString('en-US')} overall${
-                    result.doubled ? ' (winnings doubled by the Croupier)' : ''
-                  }`
-                : 'No winning bets'}
+                ? `${t('roulette.paid', {
+                    bets: result.bets
+                      .filter((b) => b.returned > 0)
+                      .map((b) => betLabel(b.key))
+                      .join(', '),
+                    paid: result.totalReturned,
+                    net: `${result.totalReturned >= result.totalBet ? '+' : ''}${(result.totalReturned - result.totalBet).toLocaleString(
+                      numberLocale()
+                    )}`
+                  })}${result.doubled ? t('roulette.doubledDetail') : ''}`
+                : t('roulette.noWin')}
             </div>
           )}
-          <div className="roulette-history" title="The last spins, newest first">
+          <div className="roulette-history" title={t('roulette.historyTip')}>
             {history.map((n, i) => (
               <span key={i} className={`roulette-history-pocket roulette-pocket-bg-${pocketColor(n)}`}>
                 {n}
@@ -309,7 +316,7 @@ function RouletteTable({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorn
             ))}
           </div>
           <div className="roulette-total">
-            On the board: <CoinIcon /> {total.toLocaleString('en-US')}
+            {t('roulette.onBoard')} <CoinIcon /> {total.toLocaleString(numberLocale())}
           </div>
         </div>
       </div>
@@ -326,13 +333,13 @@ function RouletteTable({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorn
               type="button"
               className={`roulette-cell${color ? ` roulette-cell-${color}` : ''}${won ? ' roulette-cell-won' : ''}${landed ? ' roulette-cell-landed' : ''}`}
               style={boardStyle(key)}
-              title={`${betLabel(key)} - pays ${betOdds(key)} to 1`}
+              title={t('roulette.cellTip', { bet: betLabel(key), odds: betOdds(key) })}
               disabled={spinning}
               onClick={(e) => place(key, e)}
               onContextMenu={(e) => takeBack(key, e)}
             >
               {n !== null ? n : BET_LABELS[key]}
-              {bets[key] && <span className="roulette-chip">{bets[key].toLocaleString('en-US')}</span>}
+              {bets[key] && <span className="roulette-chip">{bets[key].toLocaleString(numberLocale())}</span>}
             </button>
           )
         })}
@@ -341,37 +348,30 @@ function RouletteTable({ onOpenCoinShop, onBusyChange, onCoinsChange }: GameCorn
       <div className="slots-controls">
         <BetSlider bet={chip} max={maxBet(coins, perks.betCap)}
           step={betStep(perks.betCap)} disabled={spinning || !coins} onChange={setChip}
-          info={
-            <>
-              Click the board to place a chip (the bet on the slider), right-click to take a bet back. A number pays 35 to 1, a
-              dozen or column 2 to 1, the rest 1 to 1 - and the zero beats every outside bet. Each spot takes up to{' '}
-              {perks.betCap.toLocaleString('en-US')} coins, the whole board up to{' '}
-              {(perks.betCap * ROULETTE_MAX_FULL_BETS).toLocaleString('en-US')}.
-            </>
-          }
+          info={<>{t('roulette.info', { spot: perks.betCap, table: perks.betCap * ROULETTE_MAX_FULL_BETS })}</>}
         />
       </div>
       <div className="slots-controls roulette-actions">
         <button disabled={spinning || placed.length === 0} onClick={undo}>
-          Undo
+          {t('roulette.undo')}
         </button>
         <button disabled={spinning || total === 0} onClick={clear}>
-          Clear
+          {t('roulette.clear')}
         </button>
         <button
           className="slots-spin"
           disabled={spinning || total === 0 || coins === null || coins < total}
           onClick={() => void spin()}
         >
-          Spin
+          {t('slots.spin')}
         </button>
       </div>
       {error && <p className="editor-error">{error}</p>}
       {coins !== null && coins < 1 && !spinning && (
         <p className="editor-hint">
-          You&apos;re out of coins.{' '}
+          {t('corner.outOfCoins')}{' '}
           <button className="link-button" onClick={onOpenCoinShop}>
-            Buy some at the Coin Shop
+            {t('corner.buyCoins')}
           </button>
         </p>
       )}

@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { SessionInfo } from '../../shared/battle-types'
 import { MAX_USERNAME_LENGTH, normalizeUsername, usernameProblem } from '../../shared/battle-types'
-import { FAN_GAME_NOTICE } from '../../shared/about'
+import LanguagePicker from './LanguagePicker'
+import { useT } from './i18n'
 
 interface Props {
   session: SessionInfo
@@ -9,6 +10,7 @@ interface Props {
 }
 
 function Login({ session, onLoggedIn }: Props): React.JSX.Element {
+  const t = useT()
   const [name, setName] = useState(session.lastUsername ?? '')
   const [remember, setRemember] = useState(session.rememberByDefault)
   const [busy, setBusy] = useState(false)
@@ -32,10 +34,10 @@ function Login({ session, onLoggedIn }: Props): React.JSX.Element {
 
   return (
     <div className="screen login-screen">
-      <h1>Log in</h1>
-      <p className="editor-hint">
-        Enter a username to load its save. A name that doesn&apos;t exist yet starts a new one.
-      </p>
+      {/* Before logging in, so a new player can pick their language first. */}
+      <LanguagePicker className="login-language" />
+      <h1>{t('login.title')}</h1>
+      <p className="editor-hint">{t('login.hint')}</p>
 
       <form
         className="login-form"
@@ -45,36 +47,34 @@ function Login({ session, onLoggedIn }: Props): React.JSX.Element {
         }}
       >
         <label className="editor-field editor-field-full">
-          <span>Username</span>
+          <span>{t('login.username')}</span>
           <input
             type="text"
             autoFocus
             value={name}
             maxLength={MAX_USERNAME_LENGTH}
-            placeholder="Username"
+            placeholder={t('login.username')}
             onChange={(e) => setName(e.target.value)}
           />
         </label>
 
         <label className="editor-field-checkbox login-remember">
           <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-          <span>Remember me on this computer</span>
+          <span>{t('login.remember')}</span>
         </label>
 
         {problem && <p className="editor-error">{problem}</p>}
         {error && <p className="editor-error">{error}</p>}
-        {trimmed && !problem && (
-          <p className="editor-hint">{isExisting ? 'Loads the saved game for this name.' : 'New player - starts a fresh save.'}</p>
-        )}
+        {trimmed && !problem && <p className="editor-hint">{isExisting ? t('login.existing') : t('login.new')}</p>}
 
         <button type="submit" disabled={busy || !trimmed || !!problem}>
-          {isExisting ? 'Log in' : 'Create & log in'}
+          {isExisting ? t('login.logIn') : t('login.create')}
         </button>
       </form>
 
       {session.players.length > 0 && (
         <div className="login-players">
-          <h2 className="options-heading">Players on this computer</h2>
+          <h2 className="options-heading">{t('login.players')}</h2>
           <div className="login-player-list">
             {session.players.map((player) => (
               <button key={player} type="button" className="login-player" onClick={() => setName(player)}>
@@ -85,7 +85,7 @@ function Login({ session, onLoggedIn }: Props): React.JSX.Element {
         </div>
       )}
 
-      <p className="login-notice">{FAN_GAME_NOTICE}</p>
+      <p className="login-notice">{t('about.fanNotice')}</p>
     </div>
   )
 }

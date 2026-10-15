@@ -9,6 +9,7 @@ import { toSpriteId } from '../../shared/battle-types'
 import type { CompanionSize } from '../../shared/battle-types'
 import RarityCard from './RarityCard'
 import { IS_MOBILE_LAYOUT } from './platform'
+import { statusLabel, t, titleName } from './i18n'
 
 interface Props {
   name: string
@@ -39,7 +40,7 @@ const TEAM_SIZE = 6
 function ModifiersTooltipContent({ modifiers }: { modifiers: OpponentModifiersView }): React.JSX.Element {
   return (
     <div className="tooltip-panel rewards-tooltip">
-      <div className="tooltip-title">Chaos modifiers</div>
+      <div className="tooltip-title">{t('hud.chaosModifiers')}</div>
       {modifiers.field.map((line) => (
         <div key={line} className="rewards-row">
           <span className="rewards-name">{line}</span>
@@ -51,7 +52,7 @@ function ModifiersTooltipContent({ modifiers }: { modifiers: OpponentModifiersVi
           <span className="rewards-source">{mon.boosts.join(' · ')}</span>
         </div>
       ))}
-      {modifiers.field.length === 0 && modifiers.mons.length === 0 && <div className="tooltip-row">No modifiers this battle</div>}
+      {modifiers.field.length === 0 && modifiers.mons.length === 0 && <div className="tooltip-row">{t('hud.noModifiers')}</div>}
     </div>
   )
 }
@@ -62,8 +63,8 @@ const BALL_SCALE = { small: 1, large: 1.8 } as const
 // with no Pokemon in it at all.
 function ballTitle(slot: RosterSlotView | undefined): string | undefined {
   if (!slot) return undefined
-  if (slot.fainted) return `${slot.species} (fainted)`
-  if (slot.status) return `${slot.species} (${slot.status})`
+  if (slot.fainted) return t('hud.fainted', { name: slot.species })
+  if (slot.status) return `${slot.species} (${statusLabel(slot.status)})`
   return slot.species
 }
 
@@ -102,14 +103,14 @@ function TrainerHud({ name, title, gold, spriteId, roster, align, size = 'small'
       {name}
       {title && (
         <span className="trainer-hud-title">
-          <span className="trainer-hud-title-the">the</span>
-          {title}
+          <span className="trainer-hud-title-the">{t('hud.the')}</span>
+          {titleName(title)}
         </span>
       )}
     </>
   )
   const nameRow = gold ? (
-    <RarityCard tier="legendary" framed className="trainer-hud-name trainer-hud-name-gold" title="Pokédex complete">
+    <RarityCard tier="legendary" framed className="trainer-hud-name trainer-hud-name-gold" title={t('menu.dexComplete')}>
       {nameText}
     </RarityCard>
   ) : (

@@ -10,7 +10,7 @@ import SpriteImage from './SpriteImage'
 import { formatMoney } from './money'
 import { TmCard, TmQuickCheck } from './TmBits'
 import type { TmInfo } from '../../shared/tms'
-import { CLICK } from './platform'
+import { clickWord, itemName, t } from './i18n'
 
 // The Poke Ball's icon on Showdown's item sheet.
 const POKE_BALL_SPRITENUM = 345
@@ -123,23 +123,24 @@ function BattleResultModal({
   const catchDisabled = runBattle ? busy || caught : busy || caught || pokeballs === null || (!hasPokeballs && !canAfford)
   const catchLabel = caught
     ? runBattle
-      ? 'Added to team!'
+      ? t('result.addedToTeam')
       : freeCatch
-        ? 'Caught! (free)'
-        : 'Caught!'
+        ? t('result.caughtFree')
+        : t('result.caught')
     : runBattle
-      ? 'Add to team'
+      ? t('result.addToTeam')
       : hasPokeballs
-        ? `Catch (${pokeballs} Poke Ball${pokeballs === 1 ? '' : 's'})`
-        : `Buy Poke Ball (${formatMoney(pokeballPrice)})`
+        ? t('result.catch', { count: pokeballs ?? 0 })
+        : t('result.buyBall', { money: formatMoney(pokeballPrice) })
 
   // Only a defeated shiny you could still have caught is worth a warning.
   const leaveNeedsConfirm = canCatch && opponentShiny && !caught
 
-  let heading = 'The battle ended in a tie.'
-  if (winner === 'You') heading = 'You won the battle!'
-  else if (winner) heading = isRaid ? 'You lost the raid!' : isWildBattle ? 'You lost to the wild pokemon!' : `${winner} won the battle!`
-  if (runBattle && winner !== 'You') heading = 'Your run is over!'
+  let heading = t('result.tie')
+  if (winner === 'You') heading = t('result.won')
+  else if (winner)
+    heading = isRaid ? t('result.lostRaid') : isWildBattle ? t('result.lostWild') : t('result.otherWon', { name: winner })
+  if (runBattle && winner !== 'You') heading = t('result.runOver')
 
   // A Classic wild battle splits in two: the result and rewards on the left, and on the
   // right what to do next - search the area, catch, battle again or head back.
@@ -158,10 +159,7 @@ function BattleResultModal({
     <>
       {replacing && (
         <div className="run-replace">
-          <p className="box-empty-hint">
-            Your run team is full - who should make room? The new Pokémon takes over its held item, and any ability or moves it got from New
-            Ability and New Move floors.
-          </p>
+          <p className="box-empty-hint">{t('result.teamFull')}</p>
           <div className="run-replace-grid">
             {replacing.map((mon) => (
               <button
@@ -180,12 +178,12 @@ function BattleResultModal({
                   />
                 </RarityGlow>
                 <span>{mon.species}</span>
-                <span className="box-empty-hint">Lv {mon.level}</span>
+                <span className="box-empty-hint">{t('result.lv', { level: mon.level })}</span>
               </button>
             ))}
           </div>
           <button type="button" disabled={busy} onClick={() => setReplacing(null)}>
-            Keep my team
+            {t('result.keepTeam')}
           </button>
         </div>
       )}
@@ -200,13 +198,12 @@ function BattleResultModal({
           />
           <div className="raid-catch-text">
             <strong>
-              Caught {raidCatch.shiny ? 'a shiny ' : ''}
-              {raidCatch.species}!
+              {t(raidCatch.shiny ? 'result.caughtRaidShiny' : 'result.caughtRaid', { name: raidCatch.species })}
             </strong>
             <span className="merge-stars">{'★'.repeat(raidStars)}</span>
             <span className="box-empty-hint">
-              It joined your box as ★{raidStars} ({2 ** raidStars} copies merged)
-              {raidGigantamax ? ' - and it can Gigantamax' : ''}.
+              {t('result.raidJoined', { stars: raidStars, copies: 2 ** raidStars })}
+              {raidGigantamax ? t('result.raidGmax') : ''}.
             </span>
           </div>
         </div>
@@ -215,17 +212,20 @@ function BattleResultModal({
       {draftResult && (
         <div className="exp-gain-list">
           <div className="exp-gain-row">
-            <span className="exp-gain-species">Draft record</span>
+            <span className="exp-gain-species">{t('result.draftRecord')}</span>
             <span className="exp-gain-detail">
               {draftResult.wins}-{draftResult.losses}
               {draftResult.over &&
-                ` · ${draftResult.wins >= DRAFT_MAX_WINS ? 'perfect run!' : 'draft over'} · +${draftResult.reward} coins`}
+                t('result.draftCoins', {
+                  status: draftResult.wins >= DRAFT_MAX_WINS ? t('result.perfectRun') : t('result.draftOver'),
+                  coins: draftResult.reward
+                })}
             </span>
           </div>
           {draftResult.shinyPatch && (
             <div className="exp-gain-row">
-              <span className="exp-gain-species">Full gauntlet today</span>
-              <span className="exp-gain-detail">+1 Shiny Patch</span>
+              <span className="exp-gain-species">{t('result.fullGauntlet')}</span>
+              <span className="exp-gain-detail">{t('result.shinyPatch')}</span>
             </div>
           )}
         </div>
@@ -233,8 +233,8 @@ function BattleResultModal({
       {runItemReward && (
         <div className="exp-gain-list">
           <div className="exp-gain-row">
-            <span className="exp-gain-species">Reward</span>
-            <span className="exp-gain-detail">Pick your reward back on the run menu</span>
+            <span className="exp-gain-species">{t('result.reward')}</span>
+            <span className="exp-gain-detail">{t('result.pickReward')}</span>
           </div>
         </div>
       )}
@@ -243,7 +243,7 @@ function BattleResultModal({
           {runFainted.map((species, i) => (
             <div key={i} className="exp-gain-row">
               <span className="exp-gain-species">{species}</span>
-              <span className="exp-gain-detail run-fainted-detail">Fainted - left the run</span>
+              <span className="exp-gain-detail run-fainted-detail">{t('result.faintedLeft')}</span>
             </div>
           ))}
         </div>
@@ -251,7 +251,7 @@ function BattleResultModal({
       {moneyGained > 0 && (
         <div className="exp-gain-list">
           <div className="exp-gain-row">
-            <span className="exp-gain-species">Reward</span>
+            <span className="exp-gain-species">{t('result.reward')}</span>
             <span className="exp-gain-detail">+{formatMoney(moneyGained)}</span>
           </div>
         </div>
@@ -262,11 +262,11 @@ function BattleResultModal({
             <div key={i} className="exp-gain-row">
               <span className="exp-gain-species">{g.species}</span>
               {g.cappedOut ? (
-                <span className="exp-gain-detail">At level cap</span>
+                <span className="exp-gain-detail">{t('result.atCap')}</span>
               ) : (
                 <span className="exp-gain-detail">
-                  +{g.gained} exp
-                  {g.levelAfter > g.levelBefore && ` · Lv ${g.levelBefore} → Lv ${g.levelAfter}`}
+                  {t('result.exp', { n: g.gained })}
+                  {g.levelAfter > g.levelBefore && t('result.levelUp', { from: g.levelBefore, to: g.levelAfter })}
                 </span>
               )}
             </div>
@@ -279,9 +279,9 @@ function BattleResultModal({
             <div key={i} className="exp-gain-row">
               <span className="exp-gain-species">
                 <ItemSprite spritenum={d.spritenum} className="item-drop-icon" />
-                {d.itemName}
+                {itemName(d.itemName)}
               </span>
-              <span className="exp-gain-detail">Added to bag</span>
+              <span className="exp-gain-detail">{t('result.addedToBag')}</span>
             </div>
           ))}
         </div>
@@ -290,7 +290,7 @@ function BattleResultModal({
         <div className="tm-reward-row">
           {tmRewards.map((tm) => (
             <TmCard key={tm.moveId} tm={tm} framed className="tm-reward-card">
-              <span className="tm-find-note">New TM!</span>
+              <span className="tm-find-note">{t('result.newTm')}</span>
             </TmCard>
           ))}
         </div>
@@ -314,7 +314,9 @@ function BattleResultModal({
           }}
         >
           <img className="battle-result-icon" src="./icons/tall-grass.png" alt="" />
-          {leaveNeedsConfirm && confirmingLeave === 'rebattle' ? `Leave the shiny uncaught? ${CLICK} again` : 'Find another'}
+          {leaveNeedsConfirm && confirmingLeave === 'rebattle'
+            ? t('result.leaveShiny', { click: clickWord() })
+            : t('result.findAnother')}
         </button>
       )}
       <button
@@ -329,7 +331,7 @@ function BattleResultModal({
           <path d="M2 8 8 2.5 14 8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           <path d="M4 7.2V13.5h3V10h2v3.5h3V7.2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
         </svg>
-        {leaveNeedsConfirm && confirmingLeave === 'menu' ? `Leave the shiny uncaught? ${CLICK} again` : 'Back to menu'}
+        {leaveNeedsConfirm && confirmingLeave === 'menu' ? t('result.leaveShiny', { click: clickWord() }) : t('result.backToMenu')}
       </button>
     </div>
   )

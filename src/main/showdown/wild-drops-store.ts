@@ -2,6 +2,7 @@ import { readText, writeText } from '../platform'
 import { WILD_DROP_MAX_CHANCE, type ItemDropConfig, type WildDropEntry } from '../../shared/battle-types'
 import { toID } from './sim-access'
 import { savePathFor } from './save-paths'
+import { t } from '../i18n'
 
 // Keyed by species id, so "Pikachu" and "pikachu" are the same entry.
 type StoredWildDrops = Record<string, WildDropEntry>
@@ -37,7 +38,7 @@ export function listWildDrops(): WildDropEntry[] {
 // existing entry for that species instead.
 export function setWildDrop(species: string, drop: ItemDropConfig): WildDropEntry[] {
   const key = toID(species)
-  if (!key) throw new Error('Pick a species first')
+  if (!key) throw new Error(t('err.pickASpeciesFirst'))
   if (!drop.itemId || drop.chance <= 0) {
     delete getState()[key]
   } else {

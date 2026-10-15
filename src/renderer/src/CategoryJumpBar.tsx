@@ -5,6 +5,8 @@ interface Props {
   categories: [string, number][]
   /** The list that scrolls; each category's section in it carries `data-category`. */
   scrollRef: React.RefObject<HTMLDivElement | null>
+  /** What each category's button reads (its name in the player's language). */
+  labelOf?: (name: string) => string
 }
 
 // Where a category's section starts inside the scrolling list, or null when it isn't shown.
@@ -18,7 +20,7 @@ function sectionTop(scroll: HTMLElement, category: string): number | null {
  * One button per category above a long item list (the Bag and the Shop), like the Achievements
  * window: a click scrolls down to that category, and the one being read is lit.
  */
-function CategoryJumpBar({ categories, scrollRef }: Props): React.JSX.Element | null {
+function CategoryJumpBar({ categories, scrollRef, labelOf = (name) => name }: Props): React.JSX.Element | null {
   const [current, setCurrent] = useState<string | null>(null)
   const names = categories.map(([name]) => name)
   const key = names.join('|')
@@ -56,7 +58,7 @@ function CategoryJumpBar({ categories, scrollRef }: Props): React.JSX.Element | 
     <span className="tms-filter achievements-categories category-jump-bar">
       {categories.map(([name, count]) => (
         <button key={name} className={current === name ? 'tms-filter-on' : undefined} onClick={() => goTo(name)}>
-          {name}
+          {labelOf(name)}
           <span className="achievements-tab-count">{count}</span>
         </button>
       ))}

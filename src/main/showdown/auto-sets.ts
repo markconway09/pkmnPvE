@@ -1,6 +1,7 @@
 import type { AutoSetOption, AutoSetResult, StatBlock } from '../../shared/battle-types'
 import smogonSets from './data/smogon-sets.json'
 import { learnableMoveIds } from './sim-access'
+import { abilityName, itemName, moveName, t } from '../i18n'
 import { hasItem } from './bag-store'
 import { lockedTmMoves } from './tm-store'
 import { gen9RandomSets, sim } from './ps'
@@ -59,7 +60,7 @@ export function listAutoSets(speciesName: string): AutoSetOption[] {
   for (const [i, set] of (randomSets[species.id]?.sets ?? []).entries()) {
     options.push({ id: `random:${i}`, label: `${set.role} · Random Battle` })
   }
-  options.push({ id: GENERATED_ID, label: 'Auto-generated from its stats' })
+  options.push({ id: GENERATED_ID, label: t('auto.generated') })
   return options
 }
 
@@ -195,7 +196,8 @@ export function buildAutoSet(
   let teraType: string | null = types[0] ?? null
 
   // Why a set's move was left off: its TM isn't owned, or it isn't learnable yet.
-  const whyNot = (name: string): string => (locked.has(toID(name)) ? 'needs its TM' : `isn't learnable at Lv ${level}`)
+  const whyNot = (name: string): string =>
+    locked.has(toID(name)) ? t('auto.needsTm', { move: moveName(name) }) : t('auto.notLearnable', { move: moveName(name), level })
 
   const [kind, indexText] = optionId.split(':')
   const index = Number(indexText)
@@ -221,9 +223,9 @@ export function buildAutoSet(
         bestAttacks(sameType, 1, types, physical, taken)[0] ?? bestAttacks(learnablePool, 1, types, physical, taken)[0]
       if (pick) {
         moves.push(pick)
-        notes.push(`${name} ${whyNot(name)} - used ${Dex.moves.get(pick).name} instead`)
+        notes.push(t('auto.replaced', { why: whyNot(name), move: moveName(Dex.moves.get(pick).name) }))
       } else {
-        notes.push(`${name} ${whyNot(name)}, and there was nothing to replace it with`)
+        notes.push(t('auto.noReplacement', { why: whyNot(name) }))
       }
     }
     abilityChoices = list(smogon.ability)
@@ -259,12 +261,12 @@ export function buildAutoSet(
       if (!moves.includes(id) && !Dex.moves.get(id).isNonstandard) moves.push(id)
     }
     if (moves.length > before && (smogon || random)) {
-      notes.push(`Filled ${moves.length - before} more slot(s) with moves it can learn at Lv ${level}`)
+      notes.push(t('auto.filled', { count: moves.length - before, level }))
     }
   }
 
   const ability = abilityChoices.find((name) => speciesAbilities.includes(name)) ?? null
-  if (!ability && abilityChoices.length > 0) notes.push(`It can't have ${abilityChoices[0]} - kept its current ability`)
+  if (!ability && abilityChoices.length > 0) notes.push(t('auto.noAbility', { ability: abilityName(abilityChoices[0]) }))
 
   // Admin editing can hand out any item; otherwise the set's item only goes on if
   // it's already held or in the bag (any one of its options will do; the held one first).
@@ -276,7 +278,7 @@ export function buildAutoSet(
       : (itemChoices.find((name) => held !== '' && toID(name) === held) ??
         itemChoices.find((name) => hasItem(toID(name))))
     if (owned) item = Dex.items.get(owned).name
-    else notes.push(`The set uses ${itemChoices.join(' or ')} - not in your bag, so its current item stays`)
+    else notes.push(t('auto.noItem', { items: itemChoices.map(itemName).join(t('game.or')) }))
   }
 
   return { moves: moves.slice(0, 4), ability, item, nature, evs, ivs, teraType, notes }

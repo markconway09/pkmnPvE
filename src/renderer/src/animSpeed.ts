@@ -7,12 +7,6 @@ export type AnimSpeed = 'normal' | 'fast' | 'off'
 
 export const ANIM_SPEEDS: AnimSpeed[] = ['normal', 'fast', 'off']
 
-export const ANIM_SPEED_LABELS: Record<AnimSpeed, string> = {
-  normal: 'Normal',
-  fast: 'Fast',
-  off: 'Off'
-}
-
 const KEY = 'pkmnpve.animSpeed'
 // Fast plays every part of an animation in this share of its normal time.
 const FAST_FACTOR = 0.55
