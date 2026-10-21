@@ -30582,3 +30582,27 @@ html[data-layout='mobile'] .options-scale-tabs .tab-strip-tab {
 .horde-log-shrine .horde-log-kind {
   color: #9be6ff;
 }
+
+/* Horde's touch joystick: a ring where the finger came down, its knob following the finger. */
+.horde-stick {
+  position: absolute;
+  z-index: 60;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  background: rgba(0, 0, 0, 0.22);
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.horde-stick-knob {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.7);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}

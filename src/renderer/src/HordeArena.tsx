@@ -926,8 +926,15 @@ const BOOM_MS = 900
 const FLASH_LASTS: Partial<Record<Flash['kind'], number>> = { boom: BOOM_MS, bolt: 320, erupt: 480, crater: 520, vortex: 650, mark: 280, hop: 380 }
 // Kenney's particle images (CC0, public/battle/horde/fx): white shapes each move effect tints
 // with its type's colour, and the exploders' fireballs (one of three, at random), flash and smoke.
+// The touch joystick: how far its knob can go from the centre, and how far it must go before
+// the lead moves at all (both in the stage's pixels).
+const STICK_RADIUS = 56
+const STICK_DEAD_ZONE = 6
 const fxFile = (name: string): string => `./battle/horde/fx/${name}.png`
-const fxUrl = (name: string): string => `url('${fxFile(name)}')`
+// A url() for a CSS variable, made absolute first: a relative one is read against the stylesheet
+// that uses the variable, which in the built game sits in assets/, not beside the page.
+const cssUrl = (path: string): string => `url('${new URL(path, document.baseURI).href}')`
+const fxUrl = (name: string): string => cssUrl(fxFile(name))
 const FX_VARS = {
   '--fx-star': fxUrl('star'),
   '--fx-sparkle': fxUrl('sparkle'),
@@ -1714,7 +1721,19 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
   // arena units across the screen - the field under it changes as the camera moves).
   const keys = useRef(new Set<string>()).current
   const pointer = useRef<{ x: number; y: number } | null>(null)
+  // A finger steers with an on-screen joystick instead: its base where the finger came down and
+  // how far the finger is from it (in the stage's pixels), held by that one finger only.
+  const stick = useRef<{ id: number; ox: number; oy: number; dx: number; dy: number } | null>(null)
   const stageRef = useRef<HTMLDivElement>(null)
+
+  // A pointer's spot on the stage, in its own (unscaled) pixels.
+  function stagePixel(e: React.PointerEvent): { x: number; y: number } | null {
+    const el = stageRef.current
+    const rect = el?.getBoundingClientRect()
+    if (!el || !rect || !rect.width || !el.offsetWidth) return null
+    const scale = rect.width / el.offsetWidth
+    return { x: (e.clientX - rect.left) / scale, y: (e.clientY - rect.top) / scale }
+  }
 
   // A pointer's spot on the screen, in arena units.
   function arenaPoint(e: React.PointerEvent): { x: number; y: number } | null {
@@ -3856,6 +3875,16 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       // Stop on the spot rather than jitter around it.
       reach = Math.min(walkStep, Math.hypot(mx, my))
     }
+    if (!mx && !my && stick.current) {
+      // The joystick: its way, at a pace that grows with how far it's pushed (full from 60% out).
+      const s = stick.current
+      const pushed = Math.hypot(s.dx, s.dy)
+      if (pushed > STICK_DEAD_ZONE) {
+        mx = s.dx
+        my = s.dy
+        reach = walkStep * Math.min(1, pushed / (STICK_RADIUS * 0.6))
+      }
+    }
     const len = Math.hypot(mx, my)
     // Mid-dash or underground, it can't walk; Momentum counts how long it's kept walking.
     if (len > 0.5 && !g.burrow) {
@@ -4512,6 +4541,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
     const letGo = (): void => {
       keys.clear()
       pointer.current = null
+      stick.current = null
     }
     const onHide = (): void => {
       letGo()
@@ -5428,21 +5458,53 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
         style={
           {
             ...FX_VARS,
-            '--horde-ground': `url('${groundTile?.url ?? backdropUrl(LOCATION_BUTTON_BACKDROP[setup.location])}')`
+            '--horde-ground': cssUrl(groundTile?.url ?? backdropUrl(LOCATION_BUTTON_BACKDROP[setup.location]))
           } as React.CSSProperties
         }
-        // Holding the mouse button or a finger on the ground walks the lead toward it.
+        // Holding the mouse button on the ground walks the lead toward it; a finger puts a
+        // joystick down where it lands instead (a second finger meanwhile does nothing).
         onPointerDown={(e) => {
           if (g.outcome) return
-          pointer.current = arenaPoint(e)
+          if (e.pointerType === 'touch') {
+            const at = stick.current ? null : stagePixel(e)
+            if (!at) return
+            stick.current = { id: e.pointerId, ox: at.x, oy: at.y, dx: 0, dy: 0 }
+          } else pointer.current = arenaPoint(e)
           e.currentTarget.setPointerCapture(e.pointerId)
         }}
         onPointerMove={(e) => {
-          if (pointer.current) pointer.current = arenaPoint(e)
+          const s = stick.current
+          if (s && s.id === e.pointerId) {
+            const at = stagePixel(e)
+            if (!at) return
+            let dx = at.x - s.ox
+            let dy = at.y - s.oy
+            const d = Math.hypot(dx, dy)
+            // Pushed past its rim, the base slides along after the finger.
+            if (d > STICK_RADIUS) {
+              s.ox += (dx * (d - STICK_RADIUS)) / d
+              s.oy += (dy * (d - STICK_RADIUS)) / d
+              dx = (dx * STICK_RADIUS) / d
+              dy = (dy * STICK_RADIUS) / d
+            }
+            s.dx = dx
+            s.dy = dy
+          } else if (pointer.current) pointer.current = arenaPoint(e)
         }}
-        onPointerUp={() => (pointer.current = null)}
-        onPointerCancel={() => (pointer.current = null)}
+        onPointerUp={(e) => {
+          if (stick.current?.id === e.pointerId) stick.current = null
+          else pointer.current = null
+        }}
+        onPointerCancel={(e) => {
+          if (stick.current?.id === e.pointerId) stick.current = null
+          else pointer.current = null
+        }}
       >
+        {stick.current && (
+          <div className="horde-stick" style={{ left: stick.current.ox, top: stick.current.oy, width: STICK_RADIUS * 2, height: STICK_RADIUS * 2 }}>
+            <span className="horde-stick-knob" style={{ transform: `translate(${stick.current.dx}px, ${stick.current.dy}px)` }} />
+          </div>
+        )}
         {boss && (
           <div className="horde-boss-bar">
             <span>
