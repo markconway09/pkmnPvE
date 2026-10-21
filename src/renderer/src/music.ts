@@ -11,6 +11,7 @@
 // It keeps playing across every screen; the top bar's player only shows and controls it.
 import freeToUseTracks from './musicTracks.json'
 import { loadBool, loadNumber, loadString, savePref } from './soundPrefs'
+import { IS_MOBILE } from './platform'
 
 export type MusicSource = 'freetouse' | 'links' | 'folder'
 
@@ -71,7 +72,8 @@ const FREE_TO_USE: MusicTrack[] = (freeToUseTracks as { id: string; title: strin
   cover: `${CDN}/${t.id}/cover/webp/sm`
 }))
 
-let on = loadBool(ON_KEY, true)
+// Off to begin with on the phone (it streams over the player's data), on everywhere else.
+let on = loadBool(ON_KEY, !IS_MOBILE)
 let volume = loadNumber(VOLUME_KEY, 0.05)
 let muted = loadBool(MUTED_KEY, false)
 let paused = loadBool(PAUSED_KEY, false)

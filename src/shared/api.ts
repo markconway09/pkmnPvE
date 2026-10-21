@@ -12,6 +12,18 @@ import type { Locale } from './i18n'
 import type { CoinBalance, DailyCoinMon, DailyCoinMonPurchase, DailyCoinOffer, DailyPetalDeals, SlotRules, SlotSpinResult } from './slots'
 import type { BlackjackView } from './blackjack'
 import type { DiceRoll } from './dice'
+import type {
+  HordeHistoryEntry,
+  HordeOffer,
+  HordeRecord,
+  HordeResult,
+  HordeReward,
+  HordeSave,
+  HordeSavedRun,
+  HordeSetup,
+  HordeUpgradeId,
+  HordeUpgrades
+} from './horde'
 import type { AchievementClaimResult, AchievementsState } from './achievements'
 import type { RouletteSpin } from './roulette'
 import type { GameCornerPerks } from './titles'
@@ -155,6 +167,7 @@ export function createApi(transport: ApiTransport) {
     startOnlineBattle: (friend: OnlinePlayer, friendTeam: OnlineTeam, doubles: boolean, stars: boolean): Promise<OnlineViews> =>
       transport.invoke('online:start', friend, friendTeam, doubles, stars),
     chooseOnline: (side: 0 | 1, choice: string): Promise<void> => transport.invoke('online:choose', side, choice),
+    undoOnline: (side: 0 | 1): Promise<void> => transport.invoke('online:undo', side),
     forfeitOnline: (side: 0 | 1): Promise<void> => transport.invoke('online:forfeit', side),
     endOnlineBattle: (): Promise<void> => transport.invoke('online:end'),
     // Online chaos draft: this copy's side of it (the same steps as a solo chaos draft),
@@ -282,6 +295,25 @@ export function createApi(transport: ApiTransport) {
     doubleBlackjack: (): Promise<BlackjackView> => transport.invoke('blackjack:double'),
     // Bets the roll lands over (or under) the divider at target.
     rollDice: (bet: number, target: number, over: boolean): Promise<DiceRoll> => transport.invoke('dice:roll', bet, target, over),
+    // Horde mode: 10 Pokemon to pick from, a run started with one of them, then how it went (to be paid).
+    offerHorde: (): Promise<HordeOffer> => transport.invoke('horde:offer'),
+    // A new lot of Pokemon to pick from, for Poke Dollars.
+    rerollHordeOffer: (): Promise<{ offer: HordeOffer; moneyTotal: number }> => transport.invoke('horde:rerollOffer'),
+    startHorde: (species: string): Promise<HordeSetup> => transport.invoke('horde:start', species),
+    finishHorde: (token: string, result: HordeResult): Promise<HordeReward> => transport.invoke('horde:finish', token, result),
+    // Saving a run to carry on later, the saved run (if any), carrying it on, or ending it.
+    saveHorde: (token: string, save: HordeSave, result: HordeResult): Promise<HordeSavedRun | null> =>
+      transport.invoke('horde:save', token, save, result),
+    getHordeSaved: (): Promise<HordeSavedRun | null> => transport.invoke('horde:saved'),
+    resumeHorde: (): Promise<HordeSave> => transport.invoke('horde:resume'),
+    endSavedHorde: (): Promise<HordeReward> => transport.invoke('horde:endSaved'),
+    getHordeBest: (): Promise<HordeRecord | null> => transport.invoke('horde:best'),
+    getHordeTop: (): Promise<HordeRecord[]> => transport.invoke('horde:top'),
+    // Every finished run, newest first.
+    getHordeHistory: (): Promise<HordeHistoryEntry[]> => transport.invoke('horde:history'),
+    getHordeUpgrades: (): Promise<HordeUpgrades> => transport.invoke('horde:upgrades'),
+    buyHordeUpgrade: (id: HordeUpgradeId): Promise<{ upgrades: HordeUpgrades; moneyTotal: number }> =>
+      transport.invoke('horde:buyUpgrade', id),
     // What the player's titles change in the Game Corner (the bet cap, Plinko's edges).
     getGameCornerPerks: (): Promise<GameCornerPerks> => transport.invoke('gamecorner:perks'),
     getRouletteHistory: (): Promise<number[]> => transport.invoke('roulette:history'),

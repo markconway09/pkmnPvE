@@ -6,11 +6,16 @@ import { DRAFT_ROUNDS, type DraftView } from '../../shared/draft'
 import { toSpriteId } from '../../shared/battle-types'
 import type { MenuPage } from './menuMode'
 import CoinIcon from './CoinIcon'
+import HordeIcon from './HordeIcon'
+import { HORDE_DURATION_MS, formatHordeTime, type HordeRecord } from '../../shared/horde'
 import SpriteImage from './SpriteImage'
 import { trainerSpriteUrl } from './trainerSprite'
 import { missionText, useT, type Translate } from './i18n'
 
 interface Props {
+  // The phone layout's Modes page: only the Battle Tower, Draft and Horde cards (and their
+  // Continue banners), which its bottom bar gathers behind one button.
+  modesOnly?: boolean
   levelCap: number | null
   eligibility: BattleEligibility | null
   // What the Boss Battle button's hint says ("Beat 2 more trainers to challenge Blaine").
@@ -46,6 +51,7 @@ function draftProgress(draft: DraftView, t: Translate): string {
  * and the day's missions. Clicking a card opens that mode's page, like the sidebar does.
  */
 function HomeHub({
+  modesOnly = false,
   levelCap,
   eligibility,
   bossHint,
@@ -69,6 +75,14 @@ function HomeHub({
       .getCoins()
       .then(setCoins)
       .catch(() => setCoins(null))
+  }, [])
+  // The best Horde run, for its card.
+  const [hordeBest, setHordeBest] = useState<HordeRecord | null>(null)
+  useEffect(() => {
+    window.api
+      .getHordeBest()
+      .then(setHordeBest)
+      .catch(() => setHordeBest(null))
   }, [])
   // The DexNav hunt, so the Catch card can show a chain in progress.
   const [dexNav, setDexNav] = useState<DexNavState | null>(null)
@@ -133,7 +147,8 @@ function HomeHub({
         </div>
       )}
 
-      <div className="home-grid">
+      <div className={`home-grid${modesOnly ? ' home-grid-modes' : ''}`}>
+        {!modesOnly && (
         <button className="home-card home-card-classic" onClick={(e) => onGo('classic', e.currentTarget)}>
           <span className="home-card-key">3</span>
           <span className="home-card-head">
@@ -151,6 +166,7 @@ function HomeHub({
           </span>
           <span className="home-card-go">{t('common.open')}</span>
         </button>
+        )}
 
         <button className="home-card home-card-roguelite" onClick={(e) => onGo('roguelite', e.currentTarget)}>
           <span className="home-card-key">4</span>
@@ -184,6 +200,8 @@ function HomeHub({
           <span className="home-card-go">{t('common.open')}</span>
         </button>
 
+        {!modesOnly && (
+        <>
         <button className="home-card home-card-raid" onClick={(e) => onGo('raid', e.currentTarget)}>
           <span className="home-card-key">6</span>
           <span className="home-card-head">
@@ -209,7 +227,31 @@ function HomeHub({
           </span>
           <span className="home-card-go">{t('common.open')}</span>
         </button>
+        </>
+        )}
 
+        <button className="home-card home-card-horde" onClick={(e) => onGo('horde', e.currentTarget)}>
+          <span className="home-card-key">8</span>
+          <span className="home-card-head">
+            <span className="home-card-icon home-card-icon-tile">
+              <HordeIcon className="home-card-icon-horde" />
+            </span>
+            <span className="home-card-title">{t('nav.horde')}</span>
+          </span>
+          <span className="home-card-sub">
+            {hordeBest
+              ? t('home.hordeBest', {
+                  time: hordeBest.won
+                    ? t('horde.clearedPlus', { time: formatHordeTime(hordeBest.survivedMs - HORDE_DURATION_MS) })
+                    : formatHordeTime(hordeBest.survivedMs),
+                  kos: hordeBest.kos
+                })
+              : t('home.hordePitch')}
+          </span>
+          <span className="home-card-go">{t('common.open')}</span>
+        </button>
+
+        {!modesOnly && (
         <div className="home-pair">
           <button className="home-card home-card-catch" onClick={(e) => onGo('catch', e.currentTarget)}>
             <span className="home-card-key">1</span>
@@ -254,8 +296,9 @@ function HomeHub({
             <span className="home-card-go">{t('common.open')}</span>
           </button>
         </div>
+        )}
 
-        {missions && (
+        {!modesOnly && missions && (
           <button className="home-missions" onClick={onOpenMissions}>
             <span className="home-missions-head">
               <img className="home-card-icon" src="./icons/nav/missions.png" alt="" />
@@ -280,6 +323,7 @@ function HomeHub({
         )}
       </div>
 
+      {!modesOnly && (
       <div className="home-tools">
         {tools.map((tool) => (
           <button key={tool.label} className="home-tool" onClick={tool.action}>
@@ -289,6 +333,7 @@ function HomeHub({
           </button>
         ))}
       </div>
+      )}
     </div>
   )
 }

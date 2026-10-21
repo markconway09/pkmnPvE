@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { t } from './i18n'
 import { Peer, type DataConnection } from 'peerjs'
-import type { BattleView, CoopBattleResult, RunDifficulty, RunView } from '../../shared/battle-types'
+import { COMPANION_SIZES, type BattleView, type CoopBattleResult, type RunDifficulty, type RunView } from '../../shared/battle-types'
 import type { DraftView } from '../../shared/draft'
 import {
   ROOM_CODE_ALPHABET,
@@ -138,7 +138,7 @@ function closeBattle(): void {
   for (const listener of battleClosedListeners) listener()
 }
 
-const LOG_ARRAYS = ['log', 'logStates', 'feedback', 'moveEvents', 'gimmickEvents', 'abilityEvents'] as const
+const LOG_ARRAYS = ['log', 'logStates', 'feedback', 'moveEvents', 'gimmickEvents', 'abilityEvents', 'hitEvents'] as const
 
 // Just the log lines after `from` (the rest of the screen whole).
 function sliceView(view: BattleView, from: number): BattleView {
@@ -392,6 +392,21 @@ function friendLeft(): void {
   reset(t('online.lost', { name }))
 }
 
+// The friend's title, gold name and companion, checked over since they came over the
+// network - anything that isn't what it should be is just left off their panel.
+function friendLooks(friend: OnlinePlayer): Pick<OnlinePlayer, 'title' | 'dexComplete' | 'companion'> {
+  const mon = friend.companion
+  const companion =
+    mon && typeof mon === 'object' && typeof mon.species === 'string' && mon.species && COMPANION_SIZES.includes(mon.size)
+      ? { species: mon.species, shiny: mon.shiny === true, gmaxLook: mon.gmaxLook === true, size: mon.size }
+      : null
+  return {
+    title: typeof friend.title === 'string' && friend.title ? friend.title : null,
+    dexComplete: friend.dexComplete === true,
+    companion
+  }
+}
+
 async function receive(message: OnlineMessage): Promise<void> {
   if (!message || typeof message !== 'object') return
   switch (message.type) {
@@ -408,7 +423,7 @@ async function receive(message: OnlineMessage): Promise<void> {
         return
       }
       clearTimeout(connectTimer)
-      setState({ phase: 'lobby', friend, error: null })
+      setState({ phase: 'lobby', friend: { ...friend, ...friendLooks(friend) }, error: null })
       return
     }
     case 'reject':
@@ -504,6 +519,13 @@ async function receive(message: OnlineMessage): Promise<void> {
     case 'choose':
       if (state.role !== 'host') return
       window.api.chooseOnline(1, message.choice).then(
+        () => send({ type: 'chosen', id: message.id }),
+        (e) => send({ type: 'chosen', id: message.id, error: e instanceof Error ? e.message : String(e) })
+      )
+      return
+    case 'undo':
+      if (state.role !== 'host') return
+      window.api.undoOnline(1).then(
         () => send({ type: 'chosen', id: message.id }),
         (e) => send({ type: 'chosen', id: message.id, error: e instanceof Error ? e.message : String(e) })
       )
@@ -637,6 +659,26 @@ export function chooseOnline(choice: string): Promise<void> {
     pendingChoices.set(id, { resolve, reject })
     send({ type: 'choose', id, choice })
   })
+}
+
+/**
+ * Takes back this player's choice for the turn while the friend is still picking. Once
+ * taken back, the screen gets a fresh copy of the turn's request, so every slot is asked again.
+ */
+export async function undoOnlineChoice(): Promise<void> {
+  if (state.role === 'host') await window.api.undoOnline(0)
+  else {
+    await new Promise<void>((resolve, reject) => {
+      const id = nextChoiceId++
+      pendingChoices.set(id, { resolve, reject })
+      send({ type: 'undo', id })
+    })
+  }
+  const view = lastView
+  if (!view?.request) return
+  const reopened = { ...view, request: { ...view.request } as typeof view.request }
+  lastView = reopened
+  for (const listener of viewListeners) listener(reopened, false)
 }
 
 export function forfeitOnline(): void {

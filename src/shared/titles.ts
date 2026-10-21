@@ -39,6 +39,9 @@ export type Title =
   | 'Hex Master'
   | 'Unstoppable'
   | 'AFK'
+  | 'Centurion'
+  | 'Shapeshifter'
+  | 'Schooling'
 
 // What each title does, for the title pickers.
 export const TITLE_PERKS: Record<Title, string> = {
@@ -75,7 +78,10 @@ export const TITLE_PERKS: Record<Title, string> = {
   'Steady Hands': "A TM search's Great slice is 50% wider",
   'Hex Master': 'A TM search needs one less Great to come up a rarity higher',
   Unstoppable: "The Scanner's quick check is twice as likely to turn up a TM",
-  AFK: "A missed check doesn't knock a TM search back a step"
+  AFK: "A missed check doesn't knock a TM search back a step",
+  Centurion: '10% more money from Horde runs',
+  Shapeshifter: 'The Move Deleter can be used twice per Horde run',
+  Schooling: 'Horde runs start with 2 extra rerolls'
 }
 
 /**
@@ -170,6 +176,12 @@ export const SPECIALIST_REFUND_CHANCE = 0.5
 export const STEADY_HANDS_GREAT_MULTIPLIER = 1.5
 export const HEX_MASTER_SPARE_CHECKS = 1
 export const UNSTOPPABLE_QUICK_CHECK_MULTIPLIER = 2
+// Horde perks (see horde-store.ts).
+export const CENTURION_MONEY_MULTIPLIER = 1.1
+// Shapeshifter: how many times a Horde run's Move Deleter can be used (once without it).
+export const SHAPESHIFTER_MOVE_DELETES = 2
+// Schooling: extra level-up rerolls a Horde run starts with.
+export const SCHOOLING_EXTRA_REROLLS = 2
 
 // What the Game Corner's games need to know about the player's title.
 export interface GameCornerPerks {

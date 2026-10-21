@@ -246,7 +246,18 @@ export function prizeMoneyFor(isBoss: boolean, teamSize: number, levelCap: numbe
 // no type filtering at all (the old, pre-location behavior); `eggGroups`
 // works the same way when omitted. Exceptions match on base species name, so
 // every stage of a line is included by naming just one of them.
-export type WildLocationId = 'cave' | 'mountain' | 'forest' | 'city' | 'industry' | 'cemetery' | 'ocean' | 'all' | 'lab'
+export type WildLocationId =
+  | 'cave'
+  | 'mountain'
+  | 'volcano'
+  | 'desert'
+  | 'forest'
+  | 'city'
+  | 'industry'
+  | 'cemetery'
+  | 'ocean'
+  | 'all'
+  | 'lab'
 
 export interface WildLocationConfig {
   id: WildLocationId
@@ -308,6 +319,24 @@ export const WILD_LOCATIONS: WildLocationConfig[] = [
     types: ['Rock', 'Ice', 'Fire', 'Dragon'],
     eggGroups: ['Monster', 'Dragon'],
     exceptionBaseSpecies: ['Sneasel']
+  },
+  {
+    id: 'volcano',
+    get label() {
+      return tr('location.volcano')
+    },
+    icon: '🌋',
+    types: ['Fire', 'Rock', 'Dragon'],
+    exceptionBaseSpecies: []
+  },
+  {
+    id: 'desert',
+    get label() {
+      return tr('location.desert')
+    },
+    icon: '🏜️',
+    types: ['Ground', 'Ghost', 'Dark'],
+    exceptionBaseSpecies: ['Maractus']
   },
   {
     id: 'forest',
@@ -1171,6 +1200,10 @@ export interface RosterSlotView {
   status: string | null
   // Where it is in the roster (see ActivePokemonView.rosterIndex).
   rosterIndex?: number
+  // For its ball's hover tooltip: how much HP it has left, and how its sprite looks.
+  hpPercent?: number
+  shiny?: boolean
+  gmaxLook?: boolean
 }
 
 export interface TrainerBattleInfo {
@@ -1496,6 +1529,9 @@ export interface BattleView {
   // Parallel to log - set on the line where a Pokemon Terastallizes or Mega Evolves.
   gimmickEvents: (GimmickEvent | null)[]
   abilityEvents: (AbilityEvent | null)[]
+  // Parallel to log - a move's hit landing on that line: its type matchup (2 super effective,
+  // 0.5 resisted, 1 otherwise), for the hit sound. Missing from battles saved before it.
+  hitEvents?: (number | null)[]
   request: ChoiceRequest | null
   // Goes up with every new request - an online screen keeps its half-made choices while it stays the same.
   requestSeq?: number

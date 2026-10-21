@@ -16,6 +16,7 @@ import { rewards } from './rewards'
 import { social } from './social'
 import { errors } from './errors'
 import { game } from './game'
+import { horde } from './horde'
 
 export const areas = {
   ...battle,
@@ -34,5 +35,6 @@ export const areas = {
   ...rewards,
   ...social,
   ...errors,
-  ...game
+  ...game,
+  ...horde
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { playHit } from './hitSounds'
 import AchievementToasts from './AchievementToasts'
 import type {
   BattleView,
@@ -36,7 +37,15 @@ import {
 } from './effectiveness'
 import { loadLegacyTrainerSprite } from './trainerSprite'
 import Login from './Login'
-import { chooseOnline, forfeitOnline, leaveOnlineBattle, onOnlineBattleClosed, onOnlineBattleView, useOnlineState } from './online'
+import {
+  chooseOnline,
+  forfeitOnline,
+  leaveOnlineBattle,
+  onOnlineBattleClosed,
+  onOnlineBattleView,
+  undoOnlineChoice,
+  useOnlineState
+} from './online'
 import { formatMoney } from './money'
 import { clickWord, t, tellGame, typeName, useLocale } from './i18n'
 
@@ -250,7 +259,8 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
   // online.ts), and its screens arrive from there rather than as replies.
   const [onlineMode, setOnlineMode] = useState(false)
   // Connected with a friend online: no other battle starts (not even a wild rebattle).
-  const onlineLocked = useOnlineState().friend !== null
+  const onlineFriend = useOnlineState().friend
+  const onlineLocked = onlineFriend !== null
 
   useEffect(
     () =>
@@ -456,6 +466,13 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
   const field = visibleLogCount > 0 ? view!.logStates[visibleLogCount - 1] : EMPTY_FIELD
   const caughtUp = !view || visibleLogCount >= view.log.length
   const isDoubles = !!view?.logStates.some((s) => s.p1[1] || s.p2[1])
+  // Online: this player's part of the turn is picked and sent (not just the partner's or
+  // nobody's slots), and the friend is still picking.
+  const onlineChoiceSent =
+    onlineMode &&
+    pendingChoices.length > 0 &&
+    pendingChoices.every((c) => c !== null) &&
+    pendingChoices.some((c) => c !== 'partner' && c !== 'pass')
   const activeFlags = view?.request?.side.pokemon.map((p) => p.active) ?? []
 
   // Snapshot of both teams once the log is fully played out - the starting point the
@@ -482,7 +499,7 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
   })
   const displayedRoster = (view?.opponentRoster ?? []).map((mon) => {
     const state = rosterStates && lookupState(rosterStates, mon)
-    return state ? { ...mon, fainted: state.fainted, status: state.status } : mon
+    return state ? { ...mon, hpPercent: state.hpPercent ?? mon.hpPercent, fainted: state.fainted, status: state.status } : mon
   })
   // Who's marked as out on the field - from the field itself while the turn plays.
   const displayedActiveFlags = rewinding
@@ -508,6 +525,18 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
     if (visibleLogCount === 0 || !view) return
     const event = view.moveEvents[visibleLogCount - 1]
     if (event) setAnimTrigger(event)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleLogCount])
+
+  // A move's hit just revealed plays the games' hit sound for its matchup - only going
+  // forward, never while the log is wound back.
+  const hitSoundSeenRef = useRef(0)
+  useEffect(() => {
+    const before = hitSoundSeenRef.current
+    hitSoundSeenRef.current = visibleLogCount
+    if (!view || visibleLogCount <= before) return
+    const hit = view.hitEvents?.[visibleLogCount - 1]
+    if (hit != null) playHit(hit, 'battle')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleLogCount])
 
@@ -624,6 +653,21 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
       // The turn wasn't accepted: hand back a fresh copy of the request so every slot
       // is asked again, instead of leaving all of them marked as already chosen.
       setView((v) => (v && v.request ? { ...v, request: { ...v.request } as typeof v.request } : v))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Online: takes this turn's choice back while the friend is still picking - every slot
+  // is asked again.
+  async function undoChoice(): Promise<void> {
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      await undoOnlineChoice()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setBusy(false)
     }
@@ -941,8 +985,14 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
               gold={playerDexComplete}
               spriteId={trainerSprite}
               companion={playerCompanion}
-              hideBalls
-              roster={displayedTeam.map((m) => ({ species: m.species, fainted: m.fainted, status: m.status }))}
+              roster={displayedTeam.map((m) => ({
+                species: m.species,
+                fainted: m.fainted,
+                status: m.status,
+                hpPercent: m.hpPercent,
+                shiny: m.shiny,
+                gmaxLook: m.gmaxLook
+              }))}
               align="left"
               size="large"
             />
@@ -950,6 +1000,11 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
               <TrainerHud
                 name={view.opponentTrainer.name}
                 spriteId={view.opponentTrainer.spriteId}
+                // An online friend shows as they do on their own copy (not in co-op, where
+                // the two of them face a trainer together).
+                {...(onlineMode && !view.coop && onlineFriend
+                  ? { title: onlineFriend.title, gold: onlineFriend.dexComplete, companion: onlineFriend.companion }
+                  : {})}
                 roster={displayedRoster}
                 align="right"
                 size="large"
@@ -1078,7 +1133,8 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
                     tera: teraNow && teraNow !== 'Stellar' ? teraNow : null
                   }
                 : undefined
-              const canGoBack = prevActiveSlot(slotIndex) !== null
+              // Online, once the turn is sent, Cancel under "Waiting for..." takes it back instead.
+              const canGoBack = prevActiveSlot(slotIndex) !== null && !onlineChoiceSent
               // Free from a wild Pokemon, paid from an ordinary trainer, never from a boss.
               const runCost = view?.runCost ?? null
               // A draft match or a Battle Tower fight has Forfeit in Run's place instead.
@@ -1222,16 +1278,20 @@ function Game({ username, isAdmin, initialTrainerSprite, savedTrainerSprite, onL
         )}
 
         {caughtUp && !view?.ended && !view?.request && <p>{t('battle.waiting')}</p>}
-        {/* Online: the friend still has to choose (or this side has nothing to choose). */}
-        {onlineMode &&
-          caughtUp &&
-          !view?.ended &&
-          view?.request &&
-          (view.request.wait || (pendingChoices.length > 0 && pendingChoices.every((c) => c !== null))) && (
+        {/* Online: the friend still has to choose (or this side has nothing to choose). A
+            turn this player picked can be taken back until the friend has picked too. */}
+        {onlineMode && caughtUp && !view?.ended && view?.request && (view.request.wait || onlineChoiceSent) && (
+          <div className="online-waiting-row">
             <p className="online-waiting">
               {t('battle.waitingFor', { name: view.coop?.partnerName ?? view.opponentTrainer?.name ?? t('battle.yourFriend') })}
             </p>
-          )}
+            {!view.request.wait && onlineChoiceSent && (
+              <button className="run-cancel-button run-cancel-back" disabled={busy} onClick={() => void undoChoice()}>
+                {t('common.cancel')}
+              </button>
+            )}
+          </div>
+        )}
         {/* A co-op turn the sim turned down: both pick again. */}
         {view?.coop?.error && !view.ended && (
           <p className="online-waiting coop-turn-error">{t('battle.pickAgain', { error: view.coop.error })}</p>

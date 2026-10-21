@@ -58,6 +58,7 @@ import BossRematchModal from './BossRematchModal'
 import RunMovesChoice from './RunMovesChoice'
 import RoguelitePanel, { RUN_MON_DRAG_PREFIX, RUN_SLOT_DROP_PREFIX, RUN_STARTER_SLOT_ID } from './RoguelitePanel'
 import DraftPanel from './DraftPanel'
+import HordePage from './HordePage'
 import { loadMenuPage, saveMenuPage, type MenuPage } from './menuMode'
 import MenuRail from './MenuRail'
 import HomeHub from './HomeHub'
@@ -197,7 +198,9 @@ const MODE_COLORS: Record<MenuPage, string> = {
   roguelite: '#b48cff',
   draft: '#ffb74d',
   raid: '#e9628c',
-  corner: '#ffd76b'
+  corner: '#ffd76b',
+  horde: '#ff7a59',
+  modes: '#b48cff'
 }
 
 // Each page's name over it, beside its sidebar icon.
@@ -209,7 +212,9 @@ const PAGE_TITLES: Record<MenuPage, MessageKey> = {
   roguelite: 'nav.tower',
   draft: 'nav.draft',
   raid: 'nav.raid',
-  corner: 'nav.corner'
+  corner: 'nav.corner',
+  horde: 'nav.horde',
+  modes: 'nav.modes'
 }
 
 // The number keys open the pages, in the sidebar's order (Home is 0).
@@ -221,7 +226,8 @@ const PAGE_KEYS: Record<string, MenuPage> = {
   '4': 'roguelite',
   '5': 'draft',
   '6': 'raid',
-  '7': 'corner'
+  '7': 'corner',
+  '8': 'horde'
 }
 
 // The dock's small box builds its cards a few rows at a time (see dockBoxBuilt).
@@ -619,7 +625,7 @@ function MainMenu({
       if (!next || e.ctrlKey || e.altKey || e.metaKey || e.repeat) return
       const target = e.target as HTMLElement | null
       if (target?.closest('input, textarea, select, [contenteditable="true"]')) return
-      if (document.querySelector('.modal-overlay, .context-menu-overlay')) return
+      if (document.querySelector('.modal-overlay, .context-menu-overlay, .horde-arena')) return
       goToRef.current(next, document.querySelector<HTMLElement>(`.menu-rail-${next}`))
     }
     window.addEventListener('keydown', onKey)
@@ -1121,10 +1127,10 @@ function MainMenu({
   const tmSearch = useTmSearch((id) => onFight(id))
   if (allBossesDefeated) bossHint = t('menu.bossAgain')
 
-  // The wild level tile fills what's left of the wild grid's last row (four to a row,
+  // The wild level tile fills what's left of the wild grid's last row (five to a row,
   // "Anywhere" taking two) - or a whole row of its own when the tiles fill theirs.
   const wildTileCells = WILD_LOCATIONS.filter((loc) => !loc.requiresAllBosses || allBossesDefeated).length + 1
-  const wildLevelSpan = (4 - (wildTileCells % 4)) % 4 || 4
+  const wildLevelSpan = (5 - (wildTileCells % 5)) % 5 || 5
 
   // The Lab closes again if boss progress is reset - back to All.
   const selectedLocation = WILD_LOCATIONS.find((l) => l.id === wildLocation)
@@ -1351,8 +1357,9 @@ function MainMenu({
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div ref={sectionRef} className={`menu-page menu-page-${mode}`}>
-      {mode === 'home' ? (
+      {mode === 'home' || mode === 'modes' ? (
         <HomeHub
+          modesOnly={mode === 'modes'}
           levelCap={levelCap}
           eligibility={eligibility}
           bossHint={bossHint}
@@ -1384,6 +1391,13 @@ function MainMenu({
             setGameCornerTab('shop')
             goTo('corner', document.querySelector<HTMLElement>('.menu-rail-corner'))
           }}
+        />
+      ) : mode === 'horde' ? (
+        <HordePage
+          busy={battleBusy}
+          money={money}
+          onMoneyChange={setMoney}
+          onBoxChange={refreshBox}
         />
       ) : mode === 'corner' ? (
         <GameCornerModal

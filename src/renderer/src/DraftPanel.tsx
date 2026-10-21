@@ -756,7 +756,7 @@ function DraftPanel({ busy, onBattle, refreshKey, online, battleLocked }: Props)
             title={draft.canReroll ? t('draft.rerollModsTip') : t('draft.rerolledModsTip')}
             onClick={() =>
               void act(async () => {
-                setDraft(await window.api.rerollDraftPack())
+                setDraft(await draftApi.reroll())
               })
             }
           >

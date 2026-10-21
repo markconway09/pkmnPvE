@@ -118,7 +118,14 @@ const es: GameDataText = {
     sell100: ['Comerciante Pokémon', 'Vende 100 Pokémon'],
     earlyloss: ['Inténtalo de nuevo', 'Pierde una partida de la Torre Batalla antes del piso 5'],
     tmambush: ['Mal despertar', 'Despierta a un Pokémon salvaje mientras buscas una MT'],
-    afk: ['Dormido al volante', 'Deja que se agote el tiempo de una prueba de habilidad 10 veces']
+    afk: ['Dormido al volante', 'Deja que se agote el tiempo de una prueba de habilidad 10 veces'],
+    hordewin: ['Rompehordas', 'Sobrevive a una partida de Hordas completa'],
+    hordelevel100: ['Centurión', 'Sube un Pokémon al nivel 100 en una partida de Hordas'],
+    hordeshiny: ['Horda variocolor', 'Sobrevive a una partida de Hordas completa con un Pokémon variocolor'],
+    hordeendless: ['Sin fin', 'Aguanta 20 minutos en una partida de Hordas'],
+    hordemega: ['Megaimpulso', 'Megaevoluciona y aguanta 20 minutos (+10 en modo sin fin) en una partida de Hordas'],
+    hordeditto: ['Cambiaformas', 'Sobrevive a una partida de Hordas completa con Ditto'],
+    hordewishiwashi: ['La unión hace la fuerza', 'Sobrevive a una partida de Hordas completa con Wishiwashi']
   },
   categories: {
     Battle: 'Combate',
@@ -128,6 +135,7 @@ const es: GameDataText = {
     Draft: 'Draft',
     TMs: 'MT',
     'Game Corner': 'Casino',
+    Horde: 'Hordas',
     Secret: 'Secreto'
   },
   titles: {
@@ -164,7 +172,10 @@ const es: GameDataText = {
     'Steady Hands': 'Pulso firme',
     'Hex Master': 'Maestro maldito',
     Unstoppable: 'Imparable',
-    AFK: 'AFK'
+    AFK: 'AFK',
+    Centurion: 'Centurión',
+    Shapeshifter: 'Cambiaformas',
+    Schooling: 'Banco de peces'
   },
   perks: {
     Veteran: 'Doble de experiencia en los combates',
@@ -203,7 +214,10 @@ const es: GameDataText = {
     'Steady Hands': 'La franja Genial de una búsqueda de MT es un 50 % más ancha',
     'Hex Master': 'Una búsqueda de MT necesita un Genial menos para subir de rareza',
     Unstoppable: 'La comprobación rápida del Escáner tiene el doble de probabilidad de encontrar una MT',
-    AFK: 'Una prueba fallada no hace retroceder un paso la búsqueda de MT'
+    AFK: 'Una prueba fallada no hace retroceder un paso la búsqueda de MT',
+    Centurion: '10 % más de dinero en las partidas de Hordas',
+    Shapeshifter: 'El Quitamovimientos se puede usar dos veces por partida de Hordas',
+    Schooling: 'Las partidas de Hordas empiezan con 2 tiradas extra'
   },
   missions: {
     wild5: 'Gana 5 combates contra Pokémon salvajes',
@@ -224,7 +238,9 @@ const es: GameDataText = {
     raid1: 'Gana una Incursión Dinamax',
     trainers10: 'Vence a 10 entrenadores',
     draft1: 'Gana un combate en el modo Draft',
-    runfloors15: 'Supera 15 pisos de la Torre Batalla'
+    runfloors15: 'Supera 15 pisos de la Torre Batalla',
+    hordekos100: 'Derrota a 100 Pokémon en una sola partida de Hordas',
+    hordewin1: 'Resiste una partida de Hordas completa (10 minutos)'
   }
 }
 

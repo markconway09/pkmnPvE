@@ -112,7 +112,14 @@ function currentStats(): Record<AchievementStat, number> {
     flawlessSearches: counters.flawlessSearches ?? 0,
     flawlessLegendarySearches: counters.flawlessLegendarySearches ?? 0,
     bestGreatStreak: counters.bestGreatStreak ?? 0,
-    skillTimeouts: counters.skillTimeouts ?? 0
+    skillTimeouts: counters.skillTimeouts ?? 0,
+    hordeRunsWon: counters.hordeRunsWon ?? 0,
+    hordeBestLevel: counters.hordeBestLevel ?? 0,
+    hordeShinyWins: counters.hordeShinyWins ?? 0,
+    hordeBestMinutes: counters.hordeBestMinutes ?? 0,
+    hordeMegaRuns: counters.hordeMegaRuns ?? 0,
+    hordeDittoWins: counters.hordeDittoWins ?? 0,
+    hordeWishiwashiWins: counters.hordeWishiwashiWins ?? 0
   }
 }
 

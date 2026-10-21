@@ -42,7 +42,7 @@ export const dex: Record<keyof typeof en, Message> = {
   'tm.searchTip':
     'Busca una MT en {area}: te quedan {left} hoy · {pity} más sin una morada y la siguiente lo será seguro',
   'tm.noneLeft': 'No quedan búsquedas aquí hoy: vuelve mañana',
-  'tm.search': 'Buscar MT',
+  'tm.search': 'Buscar',
   'tm.searchingAnywhere': 'Buscando en cualquier sitio',
   'tm.searchingIn': 'Buscando en {area}',
   'tm.lookingAround': 'Echando un vistazo...',

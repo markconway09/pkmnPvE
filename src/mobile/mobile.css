@@ -165,6 +165,11 @@ html:is([data-platform='mobile'], [data-layout='mobile']) {
     grid-column: 1 / -1;
     grid-row: auto;
   }
+  /* Modes: Battle Tower, Draft and Horde, one card per row. */
+  & .home-grid-modes > .home-card {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
   & .home-card {
     padding: 12px;
     gap: 6px;
@@ -204,6 +209,204 @@ html:is([data-platform='mobile'], [data-layout='mobile']) {
   }
   & .home-pair {
     gap: 10px;
+  }
+  & .home-card-horde {
+    grid-column: 1 / -1;
+  }
+  & .home-grid:has(.home-card-horde) .home-card-classic {
+    grid-row: auto;
+  }
+  /* Horde: its page in one column, and the arena's bars a little tighter. */
+  & .horde-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  & .horde-pick-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  & .horde-area {
+    min-height: 100px;
+  }
+  & .horde-area-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  /* The arena's top bar on one line: the lead's name, HP and EXP taking what's left beside
+     the clock and the Stats and Pause buttons, which never shrink. The stats themselves
+     open in a window from the Stats button. */
+  & .horde-hud {
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding: 6px var(--m-gutter);
+  }
+  & .horde-hud-lead {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: none;
+    gap: 3px;
+  }
+  & .horde-hud-name {
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  & .horde-hud-stats {
+    display: none;
+  }
+  & .horde-hp {
+    height: 13px;
+  }
+  & .horde-hp-text {
+    line-height: 13px;
+    white-space: nowrap;
+  }
+  & .horde-hud-clock {
+    flex: 0 0 auto;
+    min-width: 48px;
+  }
+  & .horde-clock {
+    font-size: 20px;
+    line-height: 1.1;
+  }
+  & .horde-hud-sub {
+    font-size: 10px;
+    white-space: nowrap;
+  }
+  & .horde-hud-actions {
+    flex: 0 0 auto;
+    gap: 6px;
+  }
+  & .horde-hud-actions .horde-btn {
+    padding: 6px 9px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  & .horde-stats-btn {
+    display: inline-block;
+  }
+  & .horde-stats-panel {
+    width: calc(100vw - 2 * var(--m-gutter));
+    padding: 16px;
+  }
+  /* The effects row: items show just their icon and time left, and the row scrolls sideways
+     when it holds more than fits. */
+  & .horde-hud-effects {
+    padding: 0 var(--m-gutter);
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    touch-action: pan-x;
+  }
+  & .horde-hud-item-name {
+    display: none;
+  }
+  & .horde-hud-item {
+    gap: 2px;
+  }
+  /* The moves two to a row, each its name on top and everything else in small tags under it. */
+  & .horde-moves {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px;
+    padding: 6px var(--m-gutter);
+  }
+  & .horde-move {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: 2px;
+    min-width: 0;
+    max-width: none;
+    padding: 4px 6px;
+    border-radius: 8px;
+  }
+  & .horde-move-name {
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  & .horde-move-rank {
+    font-size: 9px;
+  }
+  & .horde-move-meta {
+    flex-wrap: wrap;
+    gap: 2px 3px;
+    font-size: 9px;
+    line-height: 1.3;
+    white-space: nowrap;
+  }
+  & .horde-move-tag {
+    padding: 0 4px;
+    border-radius: 4px;
+  }
+  /* A level-up's cards stacked one above another, small enough that all three fit on the
+     screen; the window scrolls if they still don't. */
+  & .horde-overlay:has(.horde-choices) {
+    align-items: flex-start;
+    overflow-y: auto;
+  }
+  & .horde-choices {
+    width: 100%;
+    margin-block: auto;
+    gap: 8px;
+    padding: 10px var(--m-gutter);
+  }
+  & .horde-choices h2 {
+    font-size: 18px;
+  }
+  & .horde-choices-note {
+    margin: -4px 0 0;
+    font-size: 12px;
+    text-align: center;
+  }
+  & .horde-choice-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    width: 100%;
+  }
+  & .horde-choice {
+    width: auto;
+    min-width: 0;
+    gap: 3px;
+    padding: 9px 10px;
+  }
+  & .horde-choice-rarity {
+    font-size: 10px;
+  }
+  & .horde-choice-kind {
+    font-size: 9px;
+  }
+  & .horde-choice-title {
+    font-size: 14px;
+    overflow-wrap: anywhere;
+  }
+  & .horde-choice-icon {
+    height: 14px;
+  }
+  & .horde-choice-badge {
+    padding: 1px 6px;
+    font-size: 9px;
+  }
+  & .horde-choice-change {
+    column-gap: 4px;
+    font-size: 11px;
+  }
+  & .horde-choice-values {
+    gap: 4px;
+  }
+  & .horde-choice-text {
+    font-size: 10px;
+    line-height: 1.3;
+  }
+  & .horde-choice-actions .horde-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+  & .horde-odds {
+    gap: 2px 8px;
+    font-size: 10px;
   }
   & .home-grid .home-mission {
     grid-template-columns: minmax(0, 1fr) 60px 40px;
@@ -282,7 +485,7 @@ html:is([data-platform='mobile'], [data-layout='mobile']) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   & .classic-level-tile {
-    /* Over its inline span, worked out for the desktop's four columns. */
+    /* Over its inline span, worked out for the desktop's five columns. */
     grid-column: 1 / -1 !important;
     min-height: 0;
   }
@@ -359,17 +562,35 @@ html:is([data-platform='mobile'], [data-layout='mobile']) {
   & .battle-huds-large .trainer-hud-stacked > .trainer-hud-name {
     text-align: left;
   }
+  /* Lying down, an XL companion stays in the row and pushes the name over. */
+  & .battle-huds-large .trainer-hud-stacked .trainer-hud-companion-xl {
+    position: relative;
+    left: auto;
+    margin-left: -54px;
+  }
   & .battle-huds-large .trainer-hud-right {
     padding-left: 8px;
   }
-  /* The team's Poke Balls in one small row (their size comes from the sprite sheet, inline). */
-  & .battle-huds-large .trainer-hud-balls {
-    flex-wrap: nowrap;
-    gap: 2px;
-    margin-top: 4px;
+  /* The opponent's panel mirrors the player's: sprite on the outside, name inward, and
+     both teams' ball columns left room on the inner edge. */
+  & .battle-huds-large .trainer-hud-right.trainer-hud-stacked {
+    flex-direction: row-reverse;
   }
-  & .battle-huds-large .pokeball-icon {
-    zoom: 0.3;
+  & .battle-huds-large .trainer-hud-right.trainer-hud-stacked > .trainer-hud-name {
+    text-align: right;
+  }
+  & .battle-huds-large .trainer-hud-left.trainer-hud-stacked {
+    padding-right: 18px;
+  }
+  & .battle-huds-large .trainer-hud-right.trainer-hud-stacked {
+    padding-left: 18px;
+  }
+  & .battle-huds-large .trainer-hud-ball-column {
+    gap: 2px;
+  }
+  & .battle-huds-large .trainer-hud-ball {
+    width: 6px;
+    height: 6px;
   }
   & .battle-huds-large .trainer-hud-right .trainer-hud-sprite {
     width: 36px;
@@ -744,23 +965,80 @@ html:is([data-platform='mobile'], [data-layout='mobile']) {
     padding-left: 2px;
     padding-right: 2px;
   }
-  & .run-difficulty-details {
+  /* The last run: its result and summary on one line, every reward on the lines below
+     (the desktop's single pill ran off the side). */
+  & .run-setup .run-result {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px 8px;
+    width: 100%;
+    padding: 6px 10px;
+    border-radius: 14px;
+  }
+  & .run-setup .run-reward-list {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  /* The rules and rewards grow to fit rather than scrolling in a fixed box. */
+  & .run-setup .run-difficulty-details {
+    height: auto;
     max-height: none;
+    overflow: visible;
   }
-  & .run-reward-group {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-  & .run-reward-group-chips {
-    flex-wrap: wrap;
-    min-width: 0;
-  }
-  & .run-generation-row {
-    flex-wrap: wrap;
+  /* Each group of rewards is its own tile: who gives it as a small header, the rewards
+     in a grid of chips under it, so nothing runs past the screen's edge. */
+  & .run-reward-groups {
     gap: 6px;
   }
-  & .run-generation-chips {
-    flex-wrap: wrap;
+  & .run-setup .run-reward-group {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
+    padding: 6px 8px 8px;
+    border-radius: 10px;
+    border-left: 3px solid var(--run-accent);
+    background: color-mix(in srgb, var(--run-accent) 7%, rgba(255, 255, 255, 0.03));
+  }
+  & .run-reward-group-label {
+    font-size: 10px;
+    font-weight: bold;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--run-accent) 55%, #d5dbe6);
+  }
+  & .run-reward-group-chips {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
+    gap: 4px;
     min-width: 0;
+  }
+  & .run-setup .run-reward-chip {
+    min-width: 0;
+    padding: 3px 8px 3px 4px;
+    border-radius: 8px;
+    border-color: color-mix(in srgb, var(--run-accent) 30%, #3a4150);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--run-accent) 14%, #161b23), #11151b);
+    color: #e6e6e6;
+    white-space: normal;
+    line-height: 1.2;
+  }
+  /* Generations: the label above, then Any and 1-9 across the full width. */
+  & .run-setup .run-generation-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+  & .run-generation-chips {
+    flex-wrap: nowrap;
+    min-width: 0;
+    gap: 2px;
+  }
+  & .run-generation-chip {
+    font-size: 11px;
+  }
+  & .run-generation-chip.run-generation-any {
+    flex: none;
+    padding: 4px 8px;
   }
   & .run-moves-columns {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1006,6 +1284,29 @@ html:is([data-platform='mobile'], [data-layout='mobile']) {
   & .coin-shop-section-head {
     flex-wrap: wrap;
     row-gap: 2px;
+  }
+  /* Room above the banner for today's Pokemon's bubble, so the coins' row doesn't cover it. */
+  & .coin-shop-banner {
+    margin-top: 18px;
+  }
+  /* A prize's price right against its coin. */
+  & .coin-prize .buy-button {
+    gap: 0;
+  }
+  /* The Pokemon of the day stands up: sprite, then its name and note, then the price. */
+  & .coin-daily-mon {
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 16px;
+    text-align: center;
+  }
+  & .coin-daily-mon-text {
+    align-items: center;
+    width: 100%;
+  }
+  & .coin-daily-mon-buy {
+    width: 100%;
+    max-width: 220px;
   }
 
   /* ---- Items, Key Items, TMs and the Shop ---- */
@@ -1486,17 +1787,6 @@ html:is([data-platform='mobile'], [data-layout='mobile']) {
     width: 100%;
   }
 
-  /* ---- Battle: the opponent's team as one ball and a count ---- */
-  & .battle-huds-large .trainer-hud-balls-count {
-    align-items: center;
-    gap: 4px;
-  }
-  & .trainer-hud-ball-count {
-    font-size: 13px;
-    font-weight: bold;
-    color: #d5dbe6;
-  }
-
   /* ---- Items: the picked item's pane, with a × back to the bag in its corner ---- */
   & .items-detail {
     position: relative;
@@ -1665,5 +1955,151 @@ html:is([data-platform='mobile'], [data-layout='mobile']) {
   }
   & .draft-modifier-card-group {
     font-size: 9px;
+  }
+}
+
+/* Horde mode on a phone: a smaller minimap, tomes and held items in tight rows, and the chest's items stacked smaller. */
+html:is([data-platform='mobile'], [data-layout='mobile']) {
+  & .horde-minimap {
+    top: 8px;
+    right: 8px;
+    width: 110px;
+  }
+  & .horde-loadout {
+    gap: 4px;
+    padding: 0 var(--m-gutter) 6px;
+  }
+  & .horde-tomes {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: 100%;
+    gap: 4px;
+  }
+  & .horde-tome {
+    min-width: 0;
+    gap: 2px;
+    padding: 2px 4px;
+    font-size: 10px;
+  }
+  & .horde-tome-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  & .horde-held-item {
+    width: 28px;
+    height: 28px;
+  }
+  & .horde-chest-open-btn {
+    bottom: 10px;
+  }
+  & .horde-chest-key {
+    display: none;
+  }
+  & .horde-chest-big {
+    margin: 50px 0 36px;
+  }
+  & .horde-chest-beams {
+    top: 70px;
+    width: 420px;
+    height: 420px;
+  }
+  & .horde-chest-coins {
+    bottom: 44px;
+  }
+  & .horde-chest-big-sprite {
+    scale: 3.2;
+  }
+  & .horde-chest-items {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    min-height: 0;
+    padding: 0 var(--m-gutter);
+  }
+  & .horde-chest-item {
+    width: calc((100vw - 2 * var(--m-gutter) - 16px) / 3);
+    min-height: 140px;
+    padding: 8px 4px;
+  }
+  & .horde-chest-item-name {
+    font-size: 12px;
+  }
+  & .horde-chest-item-buff {
+    font-size: 11px;
+  }
+}
+
+/* Horde pause menu on a phone: the lists' windows across the screen. */
+html:is([data-platform='mobile'], [data-layout='mobile']) {
+  & .horde-pause-list-modal .horde-panel {
+    width: calc(100vw - 2 * var(--m-gutter));
+    padding: 16px;
+  }
+}
+
+/* Horde on a phone: type effects and held items live in the pause menu's window instead of the bar under the moves. */
+html:is([data-platform='mobile'], [data-layout='mobile']) {
+  & .horde-loadout .horde-effects,
+  & .horde-tip {
+    display: none;
+  }
+}
+
+/* Horde level-up cards on a phone: smaller stat tiles and buttons, and badge tooltips kept on screen. */
+html:is([data-platform='mobile'], [data-layout='mobile']) {
+  & .horde-choice-stat {
+    padding: 4px 6px;
+  }
+  & .horde-choice-stat .horde-choice-after {
+    font-size: 14px;
+  }
+  & .horde-choice-twist {
+    padding: 4px 7px;
+    font-size: 11px;
+  }
+  & .horde-card-tip {
+    left: 0;
+    width: min(240px, 70vw);
+    translate: 0 0;
+  }
+  & .horde-choice-take {
+    margin-top: 4px;
+    padding: 6px 12px;
+  }
+  & .horde-action {
+    padding: 5px 10px 5px 6px;
+    font-size: 12px;
+  }
+  & .horde-action-icon {
+    width: 18px;
+    height: 18px;
+    font-size: 11px;
+  }
+}
+
+/* Horde level-up cards on a phone: Banish sits under the Take button, in the flow of the card. */
+html:is([data-platform='mobile'], [data-layout='mobile']) {
+  & .horde-choice.horde-choice-banishable {
+    padding-bottom: 9px;
+  }
+  & .horde-choice .horde-banish {
+    position: static;
+    align-self: flex-end;
+    margin-top: 4px;
+  }
+  & .horde-choice-stat .horde-choice-after {
+    font-size: 12px;
+  }
+}
+
+/* Horde on a phone: a tapped move's tooltip shows (the others live in the pause menu), and the loadout band is centred. */
+html:is([data-platform='mobile'], [data-layout='mobile']) {
+  & .horde-tip.horde-tip-move {
+    display: block;
+    width: min(300px, calc(100vw - 16px));
+  }
+  & .horde-loadout {
+    padding: 6px var(--m-gutter);
   }
 }

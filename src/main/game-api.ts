@@ -201,6 +201,22 @@ import {
   standBlackjack
 } from './showdown/blackjack-store'
 import { rollDice } from './showdown/dice-store'
+import {
+  buyHordeUpgrade,
+  endSavedHorde,
+  finishHorde,
+  getHordeBest,
+  getHordeHistory,
+  getHordeSaved,
+  getHordeTop,
+  getHordeUpgrades,
+  offerHorde,
+  rerollHordeOffer,
+  resumeHorde,
+  saveHorde,
+  startHorde
+} from './showdown/horde-store'
+import type { HordeResult, HordeSave, HordeUpgradeId } from '../shared/horde'
 import { resetStatsCounters } from './showdown/stats-store'
 import { getRouletteHistory, spinRoulette } from './showdown/roulette-store'
 import { dropPlinko } from './showdown/plinko-store'
@@ -514,8 +530,20 @@ handle('battle:catch', (_event, replaceRunMonId?: string) => {
 handle('online:self', (): OnlineSelf => {
   const session = getSessionInfo()
   if (!session.username) throw new Error(t('err.logInFirst'))
+  const achievements = getAchievements()
+  const box = getBoxState()
+  const companion = box.companion
+    ? { species: box.companion.species, shiny: box.companion.shiny, gmaxLook: box.companion.gmaxLook, size: box.companionSize ?? 'S' }
+    : null
   return {
-    player: { name: session.username, spriteId: session.trainerSprite ?? 'red', version: appVersion() },
+    player: {
+      name: session.username,
+      spriteId: session.trainerSprite ?? 'red',
+      version: appVersion(),
+      title: achievements.title,
+      dexComplete: achievements.dexComplete,
+      companion
+    },
     team: { team: getTeamPokemonSets(), mergeStars: getTeamMergeStars(), everstone: getTeamEverstones() }
   }
 })
@@ -623,7 +651,8 @@ handle('online:draftBattle', async (event, friend: OnlinePlayer, hostOrder: numb
   const friendName = String(friend?.name ?? 'Friend').slice(0, 24) || 'Friend'
   const guestName = friendName === session.username ? `${friendName} (2)` : friendName
   onlineBattle?.forfeitSide(0)
-  const battle = new WildBattle(match.p1team, 'gen9customgame', 'gen9randombattle', {
+  // No Terastallizing in a chaos draft.
+  const battle = new WildBattle(match.p1team, 'gen9customgame@@@Terastal Clause', 'gen9randombattle', {
     team: match.p2team,
     name: guestName,
     difficulty: 'easy',
@@ -643,6 +672,12 @@ handle('online:draftBattle', async (event, friend: OnlinePlayer, hostOrder: numb
 handle('online:choose', async (_event, side: 0 | 1, choice: string) => {
   if (!onlineBattle) throw new Error(t('err.noOnlineBattle'))
   await onlineBattle.chooseFor(side === 1 ? 1 : 0, String(choice))
+})
+
+// Either player taking back their choice while the other is still picking.
+handle('online:undo', async (_event, side: 0 | 1) => {
+  if (!onlineBattle) throw new Error(t('err.noOnlineBattle'))
+  await onlineBattle.undoFor(side === 1 ? 1 : 0)
 })
 
 // Either player giving up - or the friend's connection dropping, which counts the same.
@@ -923,7 +958,9 @@ handle('draft:chaosModifier', (_event, index: number, target?: ChaosModifierTarg
 // The gauntlet's next battle, in the draft's format, with the picks brought (in lead order).
 handle('draft:battle', async (_event, bring: number[]) => {
   const { format, p1team, opponent, chaos } = beginDraftBattle(bring)
-  const formatId = format === 'doubles' ? 'gen9doublescustomgame' : 'gen9customgame'
+  // No Terastallizing in a chaos draft.
+  const formatId =
+    (format === 'doubles' ? 'gen9doublescustomgame' : 'gen9customgame') + (format === 'chaos' ? '@@@Terastal Clause' : '')
   activeBattle = new WildBattle(p1team, formatId, 'gen9randombattle', {
     team: opponent.team,
     name: opponent.name,
@@ -1045,6 +1082,19 @@ handle('blackjack:hit', () => hitBlackjack())
 handle('blackjack:stand', () => standBlackjack())
 handle('blackjack:double', () => doubleBlackjack())
 handle('dice:roll', (_event, bet: number, target: number, over: boolean) => rollDice(bet, target, over))
+handle('horde:offer', () => offerHorde())
+handle('horde:rerollOffer', () => rerollHordeOffer())
+handle('horde:start', (_event, species: string) => startHorde(species))
+handle('horde:finish', (_event, token: string, result: HordeResult) => finishHorde(token, result))
+handle('horde:save', (_event, token: string, save: HordeSave, result: HordeResult) => saveHorde(token, save, result))
+handle('horde:saved', () => getHordeSaved())
+handle('horde:resume', () => resumeHorde())
+handle('horde:endSaved', () => endSavedHorde())
+handle('horde:best', () => getHordeBest())
+handle('horde:top', () => getHordeTop())
+handle('horde:history', () => getHordeHistory())
+handle('horde:upgrades', () => getHordeUpgrades())
+handle('horde:buyUpgrade', (_event, id: HordeUpgradeId) => buyHordeUpgrade(id))
 handle('debug:setWallet', (_event, money: number, coins: number) => {
   requireAdmin()
   return { money: setMoney(money), coins: setCoins(coins) }

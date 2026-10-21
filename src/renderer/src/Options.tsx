@@ -10,6 +10,7 @@ import LanguagePicker from './LanguagePicker'
 import { BUG_REPORT_URL } from '../../shared/about'
 import { playSfx, setSfxOn, setSfxVolume, sfxLevel, sfxOn } from './sfx'
 import { cryOn, cryVolume, playCry, setCryOn, setCryVolume } from './cries'
+import { hitSoundsOn, playHit, setHitSoundsOn } from './hitSounds'
 import {
   chooseMusicFolder,
   musicState,
@@ -22,9 +23,10 @@ import {
   type MusicSource
 } from './music'
 import TabStrip from './TabStrip'
+import MusicPlayer from './MusicPlayer'
 import { cornerSoundsOn, setCornerSoundsOn } from './ticks'
 import { ANIM_SPEEDS, animSpeed, setAnimSpeed, type AnimSpeed } from './animSpeed'
-import { IS_MOBILE } from './platform'
+import { IS_MOBILE, IS_MOBILE_LAYOUT } from './platform'
 import { UI_SCALE_CHOICES, type UiScaleChoice, type UiScaleState } from '../../shared/ui-scale'
 import { useT, type Translate } from './i18n'
 
@@ -295,6 +297,7 @@ function Options({
   const [music, setMusic] = useState(() => Math.round(musicState().volume * 100))
   const [musicOn, setMusicOnState] = useState(() => musicState().on)
   const [cornerOn, setCornerOn] = useState(cornerSoundsOn)
+  const [battleHitsOn, setBattleHitsOn] = useState(() => hitSoundsOn('battle'))
   const [moveAnims, setMoveAnims] = useState<AnimSpeed>(animSpeed)
 
   // Esc closes it, like clicking outside.
@@ -380,7 +383,20 @@ function Options({
                   setCornerSoundsOn(next)
                 }}
               />
+              {/* The games' hit sounds in the normal battles (Horde's are switched in its pause menu). */}
+              <SwitchRow
+                label={t('sound.hitBattle')}
+                on={battleHitsOn}
+                onToggle={(next) => {
+                  setBattleHitsOn(next)
+                  setHitSoundsOn('battle', next)
+                  // Switched on: a hit, to hear it.
+                  if (next) playHit(1, 'battle')
+                }}
+              />
             </div>
+            {/* The phone layout's top bar has no music player, so it's here instead. */}
+            {musicOn && IS_MOBILE_LAYOUT && <MusicPlayer compact />}
             {musicOn && <MusicSourceSettings />}
           </section>
 

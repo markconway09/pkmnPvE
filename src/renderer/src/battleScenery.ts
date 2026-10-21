@@ -30,7 +30,9 @@ const BACKDROP_IDS = [
   'orasdesert',
   'orassea',
   'skypillar',
-  'terrace'
+  'terrace',
+  'volcano',
+  'dunes'
 ]
 
 // Every boss fights in the gym (Classic and Battle Tower alike), and every Max Raid in the
@@ -46,6 +48,8 @@ const RAID_BACKDROP = 'frostcavern'
 const LOCATION_BACKDROP_IDS: Record<WildLocationId, string[]> = {
   cave: ['dampcave', 'earthycave', 'icecave', 'frostcavern'],
   mountain: ['skypillar', 'orasdesert', 'desert'],
+  volcano: ['volcano'],
+  desert: ['dunes'],
   forest: ['forest', 'darkmeadow', 'meadow', 'terrace'],
   city: ['city', 'darkcity', 'terrace', 'battlemaison'],
   industry: ['aquacordetown', 'darkcity'],
@@ -59,6 +63,8 @@ const LOCATION_BACKDROP_IDS: Record<WildLocationId, string[]> = {
 export const LOCATION_BUTTON_BACKDROP: Record<WildLocationId, string> = {
   cave: 'earthycave',
   mountain: 'skypillar',
+  volcano: 'volcano',
+  desert: 'dunes',
   forest: 'forest',
   city: 'city',
   industry: 'darkcity',
@@ -69,7 +75,8 @@ export const LOCATION_BUTTON_BACKDROP: Record<WildLocationId, string> = {
 }
 
 // Each wild location's icon (overworld sprites from Bulbapedia's archives, in
-// public/icons/locations) - "All" and anything without one of its own get wild grass.
+// public/icons/locations; the Volcano's is a Ruby/Sapphire lava tile cut round like the
+// Grotto ones, the Desert's Pokemon-Amie's Mysterious Cactus) - "All" gets wild grass.
 export function locationIconUrl(location: WildLocationId | undefined): string {
   return location && location !== 'all' ? `./icons/locations/${location}.png` : './icons/tall-grass.png'
 }
@@ -88,8 +95,52 @@ export function battleBackdropId(view: BattleView, location?: WildLocationId): s
   return randomBackdropId(location)
 }
 
+// The backdrops that aren't .jpg: the Volcano (from ORAS).
+const PNG_BACKDROPS = new Set(['volcano'])
+
 export function backdropUrl(id: string): string {
-  return `./battle/bg/bg-${id}.jpg`
+  return `./battle/bg/bg-${id}.${PNG_BACKDROPS.has(id) ? 'png' : 'jpg'}`
+}
+
+// Horde mode's ground: small tiling floor textures from Black/White (public/battle/horde,
+// with each one's width in pixels), a main and a backup per location - runs at a location
+// take turns between them. A location with none keeps its blurred backdrop instead.
+const HORDE_GROUND_TILES: Partial<Record<WildLocationId, [string, number][]>> = {
+  cave: [['cave-1', 64], ['cave-2', 64]],
+  mountain: [['mountain-1', 64], ['mountain-2', 16]],
+  volcano: [['volcano-1', 64], ['volcano-2', 16]],
+  desert: [['desert-1', 32], ['desert-2', 16]],
+  city: [['city-1', 64], ['city-2', 32]],
+  industry: [['industry-1', 32]],
+  cemetery: [['cemetery-1', 64], ['cemetery-2', 64]],
+  forest: [['forest-1', 64]],
+  ocean: [['ocean-1', 64], ['ocean-2', 32]]
+}
+
+export interface HordeGroundTile {
+  url: string
+  px: number
+}
+
+/** This run's ground tile at a location - the one after last run's - or null if it has none. */
+export function nextHordeGroundTile(location: WildLocationId): HordeGroundTile | null {
+  const tiles = HORDE_GROUND_TILES[location]
+  if (!tiles?.length) return null
+  const key = `horde-ground-${location}`
+  let last = -1
+  try {
+    last = Number(localStorage.getItem(key) ?? -1)
+  } catch {
+    // localStorage unavailable - every run starts on the main tile
+  }
+  const next = Number.isInteger(last) ? (last + 1) % tiles.length : 0
+  try {
+    localStorage.setItem(key, String(next))
+  } catch {
+    // not remembered - fine
+  }
+  const [file, px] = tiles[next]
+  return { url: `./battle/horde/${file}.png`, px }
 }
 
 interface OverlayStyle {

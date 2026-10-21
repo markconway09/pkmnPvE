@@ -3,6 +3,8 @@
 export const data = {
   'location.cave': 'Cave',
   'location.mountain': 'Mountain',
+  'location.volcano': 'Volcano',
+  'location.desert': 'Desert',
   'location.forest': 'Forest',
   'location.city': 'City',
   'location.industry': 'Industry',

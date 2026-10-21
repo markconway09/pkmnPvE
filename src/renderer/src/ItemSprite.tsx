@@ -43,7 +43,22 @@ const SYNTHETIC_SPRITES: Record<number, string> = {
   '-28': './sprites/misc/fashioncase.png', // Fashion Case (Serebii)
   '-29': './sprites/misc/scanner.png', // Scanner
   '-30': './sprites/misc/dexnav.png', // DexNav (Bulbagarden Archives)
-  '-31': './sprites/misc/friendshippetal.png' // Friendship Petal (Serebii's Pink Petal)
+  '-31': './sprites/misc/friendshippetal.png', // Friendship Petal (Serebii's Pink Petal)
+  '-32': './sprites/misc/maxmushrooms.png', // Max Mushrooms (Serebii)
+  // Horde mode's held items with no Showdown sprite, its gold and its chests (all Serebii).
+  '-33': './sprites/misc/hpup.png', // HP Up
+  '-34': './sprites/misc/protein.png', // Protein
+  '-35': './sprites/misc/iron.png', // Iron
+  '-36': './sprites/misc/carbos.png', // Carbos
+  '-37': './sprites/misc/luckyegg.png', // Lucky Egg
+  '-38': './sprites/misc/amuletcoin.png', // Amulet Coin
+  '-39': './sprites/misc/relicgold.png', // Relic Gold - Horde mode's gold
+  '-40': './sprites/misc/machinepart.png', // Machine Part - Horde mode's chests
+  '-41': './sprites/misc/expshare.png', // Exp. Share
+  '-42': './sprites/misc/reliccrown.png', // Relic Crown
+  '-43': './sprites/misc/luckincense.png', // Luck Incense
+  '-44': './sprites/misc/cardkey.png', // Card Key
+  '-45': './sprites/misc/pearlstring.png' // Pearl String
 }
 
 function ItemSprite({ spritenum, className }: Props): React.JSX.Element {

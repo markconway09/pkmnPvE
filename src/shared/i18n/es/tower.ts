@@ -70,7 +70,7 @@ export const tower: Record<keyof typeof en, Message> = {
   'tower.floors': '{n} pisos',
   'tower.rewardsEachBoss': 'Recompensas por cada jefe vencido',
   'tower.generation': 'Generación:',
-  'tower.any': 'Cualquiera',
+  'tower.any': 'Todas',
   'tower.genOnly': 'Solo jefes de la generación {n}',
   'tower.genSoon': 'Generación {n}: próximamente',
   'tower.leaveRoom': 'Sal primero de la sala online',

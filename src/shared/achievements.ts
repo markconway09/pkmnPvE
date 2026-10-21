@@ -111,14 +111,25 @@ export type AchievementStat =
   | 'flawlessLegendarySearches'
   | 'bestGreatStreak'
   | 'skillTimeouts'
+  // Horde: runs survived to the end (the full 10 minutes), the highest level a lead reached,
+  // runs won with a shiny lead, the most whole minutes one run lasted (endless mode too),
+  // runs where the lead Mega Evolved, and runs won with Ditto and with Wishiwashi.
+  | 'hordeRunsWon'
+  | 'hordeBestLevel'
+  | 'hordeShinyWins'
+  | 'hordeBestMinutes'
+  | 'hordeMegaRuns'
+  | 'hordeDittoWins'
+  | 'hordeWishiwashiWins'
 
-export type AchievementCategory = 'Battle' | 'Collection' | 'Merges & Raids' | 'Battle Tower' | 'Draft' | 'TMs' | 'Game Corner' | 'Secret'
+export type AchievementCategory = 'Battle' | 'Collection' | 'Merges & Raids' | 'Battle Tower' | 'Draft' | 'TMs' | 'Game Corner' | 'Horde' | 'Secret'
 export const ACHIEVEMENT_CATEGORIES: AchievementCategory[] = [
   'Battle',
   'Collection',
   'Merges & Raids',
   'Battle Tower',
   'Draft',
+  'Horde',
   'TMs',
   'Game Corner',
   'Secret'
@@ -1015,6 +1026,62 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     reward: { title: 'Unstoppable' }
   },
 
+  // Horde
+  {
+    id: 'hordewin',
+    name: 'Horde Breaker',
+    description: 'Survive a full Horde run',
+    category: 'Horde',
+    stat: 'hordeRunsWon',
+    goal: 1,
+    reward: { money: 10000 }
+  },
+  {
+    id: 'hordelevel100',
+    name: 'Centurion',
+    description: 'Level a Pokémon up to level 100 in a Horde run',
+    category: 'Horde',
+    stat: 'hordeBestLevel',
+    goal: 100,
+    reward: { title: 'Centurion' }
+  },
+  {
+    id: 'hordemega',
+    name: 'Mega Rush',
+    description: 'Mega Evolve and last 20 minutes (+10 in endless mode) in a Horde run',
+    category: 'Horde',
+    stat: 'hordeMegaRuns',
+    goal: 1,
+    reward: { pokemon: [mon('Rayquaza', undefined, true)] }
+  },
+  {
+    id: 'hordeendless',
+    name: 'Endless',
+    description: 'Last 20 minutes in a Horde run',
+    category: 'Horde',
+    stat: 'hordeBestMinutes',
+    goal: 20,
+    reward: { items: [item('randomlegendary')] }
+  },
+  {
+    id: 'hordeditto',
+    name: 'Shapeshifter',
+    description: 'Survive a full Horde run with Ditto',
+    category: 'Horde',
+    stat: 'hordeDittoWins',
+    goal: 1,
+    reward: { title: 'Shapeshifter' }
+  },
+  {
+    id: 'hordewishiwashi',
+    name: 'Strength in Numbers',
+    description: 'Survive a full Horde run with Wishiwashi',
+    category: 'Horde',
+    stat: 'hordeWishiwashiWins',
+    goal: 1,
+    reward: { title: 'Schooling' }
+  },
+
   // Secret: shown as ??? until unlocked.
   {
     id: 'mergeshiny',
@@ -1087,6 +1154,15 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     stat: 'skillTimeouts',
     goal: 10,
     reward: { title: 'AFK' }
+  },
+  {
+    id: 'hordeshiny',
+    name: 'Shiny Horde',
+    description: 'Survive a full Horde run with a shiny Pokémon',
+    category: 'Secret',
+    stat: 'hordeShinyWins',
+    goal: 1,
+    reward: { items: [item('shinypatch')] }
   }
 ]
 

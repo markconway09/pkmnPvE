@@ -4,6 +4,8 @@ import type { Message } from '../en'
 export const data: Record<keyof typeof en, Message> = {
   'location.cave': 'Cueva',
   'location.mountain': 'Montaña',
+  'location.volcano': 'Volcán',
+  'location.desert': 'Desierto',
   'location.forest': 'Bosque',
   'location.city': 'Ciudad',
   'location.industry': 'Industria',

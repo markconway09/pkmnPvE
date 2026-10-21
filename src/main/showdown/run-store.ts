@@ -556,10 +556,13 @@ function takeoverTileCost(current: StoredRun): number {
 }
 
 function rollRegularChoices(current: StoredRun, rng: () => number): RunChoice[] {
-  // No Pokémon Center floors at all on a no-healing difficulty. A co-op floor can always
-  // roll one - the two teams' health is never the same, and the floor has to be.
+  // No Pokémon Center floors at all on a no-healing difficulty. A co-op floor can roll one
+  // - the two teams' health is never the same, and the floor has to be - except the first
+  // floor and the one right after a boss, when both teams are at full health.
+  const freshCoopFloor = current.floor === 1 || isBossFloor(current.floor - 1)
   const hurt =
-    !runDifficultyInfo(current.difficulty).noHealing && (!!current.coop || current.team.some((m) => m.hp < 1 || m.status))
+    !runDifficultyInfo(current.difficulty).noHealing &&
+    (current.coop ? !freshCoopFloor : current.team.some((m) => m.hp < 1 || m.status))
   const choices: RunChoice[] = []
   for (let tries = 0; choices.length < FLOOR_OPTIONS && tries < 200; tries++) {
     const choice = rollChoice(hurt, rng)

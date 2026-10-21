@@ -5,6 +5,11 @@
 export const CUSTOM_ITEM_NAMES_ES: Record<string, string> = {
   linkcable: 'Cable Conexión',
   rarecandy: 'Caramelo Raro',
+  // Horde mode's held items with no Showdown entry.
+  reliccrown: 'Corona Antigua',
+  luckincense: 'Incienso Duplo',
+  cardkey: 'Llave Magnética',
+  pearlstring: 'Ristra de Perlas',
   blackaugurite: 'Mineral Negro',
   peatblock: 'Bloque de Turba',
   randompokemon: 'Pokémon al azar',

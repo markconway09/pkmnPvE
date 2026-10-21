@@ -1,4 +1,4 @@
-import type { BattleView, CoopBattleResult, RunDifficulty, RunMonView } from './battle-types'
+import type { BattleView, CompanionSize, CoopBattleResult, RunDifficulty, RunMonView } from './battle-types'
 import type { ChaosField } from './draft'
 
 // Online battles with a friend: two copies of the game connect straight to each other
@@ -16,6 +16,18 @@ export interface OnlinePlayer {
   spriteId: string
   // Both copies must be the same version, or the battle could play out differently.
   version: string
+  // How they look on the friend's battle panel, as on their own: their title, a gold name
+  // for a full Pokedex, and their companion. Missing from older copies.
+  title?: string | null
+  dexComplete?: boolean
+  companion?: OnlineCompanion | null
+}
+
+export interface OnlineCompanion {
+  species: string
+  shiny: boolean
+  gmaxLook?: boolean
+  size: CompanionSize
 }
 
 // A player's team as their copy sends it: the sets as saved, with each one's merge stars
@@ -103,6 +115,8 @@ export type OnlineMessage =
   // Friend -> host: their choice for the turn; the host answers with whether it stood.
   | { type: 'choose'; id: number; choice: string }
   | { type: 'chosen'; id: number; error?: string }
+  // Friend -> host: taking back their choice while the host still picks (answered with 'chosen').
+  | { type: 'undo'; id: number }
   // Friend -> host: giving up the battle.
   | { type: 'forfeit' }
   // Host -> friend: an online chaos draft is starting, from these Smogon tiers.

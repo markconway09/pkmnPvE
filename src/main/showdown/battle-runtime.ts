@@ -433,6 +433,7 @@ interface MirroredLog {
   moveEvents: (MoveEvent | null)[]
   gimmickEvents: (GimmickEvent | null)[]
   abilityEvents: (AbilityEvent | null)[]
+  hitEvents: (number | null)[]
 }
 
 // The same slot seen from the other side: p1a <-> p2a, p1b <-> p2b.
@@ -527,6 +528,10 @@ export class WildBattle {
   private readonly moveEvents: (MoveEvent | null)[] = []
   private readonly gimmickEvents: (GimmickEvent | null)[] = []
   private readonly abilityEvents: (AbilityEvent | null)[] = []
+  // Parallel to displayLog/logStates - see readHit.
+  private readonly hitEvents: (number | null)[] = []
+  // The slots whose hit sound has already played for the hit landing on them right now (see readHit).
+  private readonly hitSounded = new Set<SlotKey>()
   private readonly textParser = new BattleTextParser('p1')
   private readonly p1team: PokemonSet[]
   private readonly p2team: PokemonSet[]
@@ -607,7 +612,8 @@ export class WildBattle {
         feedback: [],
         moveEvents: [],
         gimmickEvents: [],
-        abilityEvents: []
+        abilityEvents: [],
+        hitEvents: []
       }
     } else {
       this.remote = null
@@ -1065,6 +1071,7 @@ export class WildBattle {
           p2b: this.active.p2b?.hpPercent ?? null
         }
         this.applyStateLine(line)
+        const hit = this.readHit(line, lines.slice(index + 1))
         // A co-op fight: the Z-Move used is its user's player's own (see installCoopGimmicks).
         if (this.opponent?.coop && line.startsWith('|-zpower|')) {
           const slot = slotKeyFromIdent(line.split('|')[2])
@@ -1115,21 +1122,23 @@ export class WildBattle {
           this.moveEvents.push(eventUsed ? null : moveEvent)
           this.gimmickEvents.push(eventUsed ? null : gimmickEvent)
           this.abilityEvents.push(eventUsed ? null : abilityEvent)
+          this.hitEvents.push(eventUsed ? null : hit)
           eventUsed = true
         }
         // The friend's copy: parsed afresh (the parser tidies the args it's given in place).
+        let guestEventUsed = false
         if (this.guestLog) {
           const guest = BattleTextParser.parseBattleLine(line)
           if (args[0] === '-weather' && kwArgs.from) guest.kwArgs.from = kwArgs.from
-          let guestEventUsed = false
           for (const textLine of (this.guestLog.parser.parseArgs(guest.args, guest.kwArgs) || '').split('\n')) {
             if (!textLine.trim()) continue
-            this.pushGuestLine(textLine, guestEventUsed ? {} : { event, moveEvent, gimmickEvent, abilityEvent })
+            this.pushGuestLine(textLine, guestEventUsed ? {} : { event, moveEvent, gimmickEvent, abilityEvent, hit })
             guestEventUsed = true
           }
         }
 
-        this.pushHpDeltaLine(line, hpBefore)
+        // A hit whose line showed no text sounds on its HP line instead.
+        this.pushHpDeltaLine(line, hpBefore, eventUsed ? null : hit, guestEventUsed ? null : hit)
 
         if (line.startsWith('|win|')) {
           this.ended = true
@@ -1200,11 +1209,17 @@ export class WildBattle {
   // One line of the friend's log, with its moment's field and events flipped to their side.
   private pushGuestLine(
     text: string,
-    events: { event?: FeedbackEvent | null; moveEvent?: MoveEvent | null; gimmickEvent?: GimmickEvent | null; abilityEvent?: AbilityEvent | null }
+    events: {
+      event?: FeedbackEvent | null
+      moveEvent?: MoveEvent | null
+      gimmickEvent?: GimmickEvent | null
+      abilityEvent?: AbilityEvent | null
+      hit?: number | null
+    }
   ): void {
     const guest = this.guestLog
     if (!guest) return
-    const { event, moveEvent, gimmickEvent, abilityEvent } = events
+    const { event, moveEvent, gimmickEvent, abilityEvent, hit } = events
     guest.log.push(text)
     guest.logStates.push(flipSnapshot(this.snapshotField()))
     guest.feedback.push(event ? { ...event, slot: flipSlot(event.slot) } : null)
@@ -1220,6 +1235,38 @@ export class WildBattle {
     )
     guest.gimmickEvents.push(gimmickEvent ? { ...gimmickEvent, slot: flipSlot(gimmickEvent.slot) } : null)
     guest.abilityEvents.push(abilityEvent ? { ...abilityEvent, slot: flipSlot(abilityEvent.slot) } : null)
+    guest.hitEvents.push(hit ?? null)
+  }
+
+  // A move's hit starting to land on this line, for the hit sound: its matchup against the
+  // Pokemon hit. A hit's first line is "A critical hit!", "It's super effective!" / "It's not very
+  // effective...", or else its damage (from the move itself - not recoil, weather or a burn), so
+  // the sound plays with the crit flash rather than a line or two later on the HP line. The
+  // lines after it are read ahead for the matchup. Each hit of a multi-hit move sounds again.
+  private readHit(line: string, rest: string[]): number | null {
+    const parts = line.slice(1).split('|')
+    const cmd = parts[0]
+    if (cmd === 'move') this.hitSounded.clear()
+    const slot = slotKeyFromIdent(parts[1])
+    if (!slot) return null
+    const damage = cmd === '-damage' && !line.includes('[from]')
+    if (!damage && cmd !== '-crit' && cmd !== '-supereffective' && cmd !== '-resisted') return null
+    if (this.hitSounded.has(slot)) {
+      // Its damage at last: the next hit on it is a new one.
+      if (damage) this.hitSounded.delete(slot)
+      return null
+    }
+    if (!damage) this.hitSounded.add(slot)
+    let matchup = 1
+    for (const next of [line, ...rest]) {
+      const p = next.slice(1).split('|')
+      if (p[0] === 'move') break
+      if (slotKeyFromIdent(p[1]) !== slot) continue
+      if (p[0] === '-supereffective') matchup = 2
+      else if (p[0] === '-resisted') matchup = 0.5
+      else if (p[0] === '-damage' && !next.includes('[from]')) break
+    }
+    return matchup
   }
 
   // The sim's own record of every field effect that has a countdown - the
@@ -1363,7 +1410,12 @@ export class WildBattle {
     })
   }
 
-  private pushHpDeltaLine(line: string, hpBefore: Record<SlotKey, number | null>): void {
+  private pushHpDeltaLine(
+    line: string,
+    hpBefore: Record<SlotKey, number | null>,
+    hit: number | null,
+    guestHit: number | null
+  ): void {
     // -sethp: HP set outright (Pain Split, for both Pokemon).
     if (!line.startsWith('|-damage|') && !line.startsWith('|-heal|') && !line.startsWith('|-sethp|')) return
     const parts = line.slice(1).split('|')
@@ -1382,7 +1434,9 @@ export class WildBattle {
     this.moveEvents.push(null)
     this.gimmickEvents.push(null)
     this.abilityEvents.push(null)
-    if (this.guestLog) this.pushGuestLine(say(this.guestLog.parser.pokemon(parts[1])), {})
+    // Only a hit that took HP away makes a sound.
+    this.hitEvents.push(delta < 0 ? hit : null)
+    if (this.guestLog) this.pushGuestLine(say(this.guestLog.parser.pokemon(parts[1])), { hit: delta < 0 ? guestHit : null })
   }
 
   private snapshotField(): FieldSnapshot {
@@ -1513,12 +1567,14 @@ export class WildBattle {
   private opponentRoster(foeSide: 0 | 1 = 1): RosterSlotView[] {
     const side = this.battleStream.battle?.sides[foeSide]
     const team = foeSide === 0 ? this.p1team : this.p2team
-    if (!side) return team.map((mon) => ({ species: mon.species, fainted: false, status: null }))
+    if (!side) return team.map((mon) => ({ species: mon.species, fainted: false, status: null, hpPercent: 100, shiny: !!mon.shiny }))
     return side.pokemon.filter((mon) => !(this.opponent?.raid && mon.name === RAID_PLACEHOLDER_NAME)).map((mon) => ({
       species: mon.species?.name ?? mon.name,
       fainted: mon.fainted,
       status: mon.status || null,
-      rosterIndex: side.team.indexOf(mon.set)
+      rosterIndex: side.team.indexOf(mon.set),
+      hpPercent: mon.maxhp ? Math.round((mon.hp / mon.maxhp) * 100) : 0,
+      shiny: !!mon.set.shiny
     }))
   }
 
@@ -1691,6 +1747,25 @@ export class WildBattle {
     const player = this.playerOn(side)
     if (!player || this.ended) return
     await this.sendChoice(player, choice)
+  }
+
+  /**
+   * Online: one player takes back their choice while the other is still picking (the
+   * Cancel under "Waiting for..."). Once both have picked the turn has run, and this does nothing.
+   */
+  async undoFor(side: 0 | 1): Promise<void> {
+    if (this.ended) return
+    if (this.opponent?.coop) {
+      // A co-op turn waits here until both have picked: only this player's slots are cleared.
+      if (this.coopPending.seq !== this.human.requestSeq) return
+      const who: CoopRole = side === 0 ? 'host' : 'guest'
+      const controllers = this.coopControllers()
+      this.coopPending.parts = this.coopPending.parts.map((part, i) => (controllers[i] === who ? null : part))
+      this.changed()
+      return
+    }
+    const player = this.playerOn(side)
+    if (player) await this.sendChoice(player, 'undo')
   }
 
   // Hands a choice to the sim and waits a moment for it to be turned down.
@@ -2324,6 +2399,7 @@ export class WildBattle {
       moveEvents: [...this.moveEvents],
       gimmickEvents: [...this.gimmickEvents],
       abilityEvents: [...this.abilityEvents],
+      hitEvents: [...this.hitEvents],
       request: this.ended ? null : this.requestWithTraps(),
       requestSeq: this.human.requestSeq,
       ended: this.ended,
@@ -2382,6 +2458,7 @@ export class WildBattle {
       moveEvents: [...guest.moveEvents],
       gimmickEvents: [...guest.gimmickEvents],
       abilityEvents: [...guest.abilityEvents],
+      hitEvents: [...guest.hitEvents],
       request: this.ended ? null : this.requestWithTraps(1),
       requestSeq: this.remote?.requestSeq,
       ended: this.ended,

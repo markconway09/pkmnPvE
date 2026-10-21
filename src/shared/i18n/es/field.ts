@@ -26,6 +26,7 @@ export const field: Record<keyof typeof en, Message> = {
   'hud.chaosModifiers': 'Modificadores del Caos',
   'hud.noModifiers': 'Sin modificadores en este combate',
   'hud.fainted': '{name} (debilitado)',
+  'hud.faintedTag': 'Debilitado',
   'hud.the': 'el',
 
   'sprite.leechSeed': 'Drenadoras',

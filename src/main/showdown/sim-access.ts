@@ -119,6 +119,24 @@ const { BattlePlayer } = battleStream
   }
 }
 
+// Rayquaza Mega Evolves the way it does in the games: knowing Dragon Ascent is enough, no
+// Mega Stone needed (Gen 9 Showdown only allows it in old-gen formats). Still not while it
+// holds a Z-Crystal. Patched on the sim's shared battle actions, read when each Pokemon is
+// set up, so the Mega button and the AI both see it.
+{
+  type Actions = { dex: typeof Dex; canMegaEvo(pokemon: Pokemon): string | null | undefined }
+  const actions = Object.getPrototypeOf(new sim.Battle({ formatid: toID('gen9customgame') }).actions) as Actions
+  const canMegaEvo = actions.canMegaEvo
+  actions.canMegaEvo = function (this: Actions, pokemon: Pokemon) {
+    const species = pokemon.baseSpecies
+    const mega = species.otherFormes && this.dex.species.get(species.otherFormes[0])
+    if (mega?.isMega && mega.requiredMove && pokemon.baseMoves.includes(toID(mega.requiredMove)) && !pokemon.getItem().zMove) {
+      return mega.name
+    }
+    return canMegaEvo.call(this, pokemon)
+  }
+}
+
 // Teams/Dex aren't re-exported directly: their method signatures reference
 // pokemon-showdown internal types (e.g. Teams' ExportOptions) that aren't
 // themselves exported, which TS refuses to name in an exported const's
@@ -1893,6 +1911,11 @@ function isLegendaryClass(species: ReturnType<typeof Dex.species.get>): boolean 
   return species.tags.some((tag) => RANDOM_LEGENDARY_TAGS.has(tag))
 }
 
+/** Whether a species is legendary-class (legendary, mythical, ultra beast or paradox). */
+export function isLegendarySpecies(name: string): boolean {
+  return isLegendaryClass(Dex.species.get(name))
+}
+
 function pickFrom(species: ReturnType<typeof Dex.species.get>[]): string {
   return species[Math.floor(Math.random() * species.length)].name
 }
@@ -1927,9 +1950,9 @@ export function speciesRarityTier(speciesName: string): RarityTier {
   return 'common'
 }
 
-export function pickRandomUnevolvedAnySpecies(): string {
+export function pickRandomUnevolvedAnySpecies(legendaryChance = RANDOM_POKEMON_LEGENDARY_CHANCE): string {
   const all = unevolvedSpecies()
-  const wantLegendary = Math.random() < RANDOM_POKEMON_LEGENDARY_CHANCE
+  const wantLegendary = Math.random() < legendaryChance
   return pickFrom(all.filter((s) => isLegendaryClass(s) === wantLegendary))
 }
 

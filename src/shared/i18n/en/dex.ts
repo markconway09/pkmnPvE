@@ -40,7 +40,7 @@ export const dex = {
   'tm.searchTip':
     'Search {area} for a TM - {left} left today · {pity} more without a purple and the next is sure to be one',
   'tm.noneLeft': 'No searches left here today - back tomorrow',
-  'tm.search': 'TM search',
+  'tm.search': 'Search',
   'tm.searchingAnywhere': 'Searching anywhere',
   'tm.searchingIn': 'Searching the {area}',
   'tm.lookingAround': 'Looking around...',

@@ -1,6 +1,5 @@
 import type { BattleRewardsView, OpponentModifiersView, RosterSlotView } from '../../shared/battle-types'
 import { trainerSpriteUrl } from './trainerSprite'
-import { ballStateFor, pokeballStyle } from './pokeballIcon'
 import RewardsTooltipContent from './RewardsTooltipContent'
 import Tooltip from './Tooltip'
 import SpriteImage from './SpriteImage'
@@ -8,7 +7,6 @@ import { loadSpriteStyle } from './spriteStyle'
 import { toSpriteId } from '../../shared/battle-types'
 import type { CompanionSize } from '../../shared/battle-types'
 import RarityCard from './RarityCard'
-import { IS_MOBILE_LAYOUT } from './platform'
 import { statusLabel, t, titleName } from './i18n'
 
 interface Props {
@@ -30,8 +28,6 @@ interface Props {
   modifiers?: OpponentModifiersView | null
   // The player's companion, standing beside their sprite, at the size they picked.
   companion?: { species: string; shiny: boolean; gmaxLook?: boolean; size: CompanionSize } | null
-  // No Poke Balls - the player's own team is on show beside the battle anyway.
-  hideBalls?: boolean
 }
 
 const TEAM_SIZE = 6
@@ -56,21 +52,48 @@ function ModifiersTooltipContent({ modifiers }: { modifiers: OpponentModifiersVi
     </div>
   )
 }
-const BALL_SCALE = { small: 1, large: 1.8 } as const
 
-// What a pokeball's tooltip says on hover - the Pokemon it stands for, plus
-// whether it's currently down or affected by a status. Nothing for a slot
-// with no Pokemon in it at all.
-function ballTitle(slot: RosterSlotView | undefined): string | undefined {
-  if (!slot) return undefined
-  if (slot.fainted) return t('hud.fainted', { name: slot.species })
-  if (slot.status) return `${slot.species} (${statusLabel(slot.status)})`
-  return slot.species
+// A team member's ball on hover: its sprite, its name, and its HP bar with any status.
+function BallTooltipContent({ slot }: { slot: RosterSlotView }): React.JSX.Element {
+  const hp = slot.fainted ? 0 : Math.max(0, Math.min(100, slot.hpPercent ?? 100))
+  const hpClass = hp > 50 ? 'hp-high' : hp > 20 ? 'hp-mid' : 'hp-low'
+  return (
+    <div className="tooltip-panel trainer-hud-ball-tip">
+      <SpriteImage
+        style={loadSpriteStyle()}
+        className={`trainer-hud-ball-tip-sprite${slot.fainted ? ' trainer-hud-ball-tip-fainted' : ''}`}
+        spriteId={toSpriteId(slot.species)}
+        shiny={slot.shiny}
+        gmax={slot.gmaxLook}
+        alt={slot.species}
+      />
+      <div className="trainer-hud-ball-tip-info">
+        <div className="trainer-hud-ball-tip-name">
+          {slot.species}
+          {slot.fainted ? (
+            <span className="trainer-hud-ball-tip-down">{t('hud.faintedTag')}</span>
+          ) : (
+            slot.status && <span className={`status-badge status-${slot.status}`}>{statusLabel(slot.status)}</span>
+          )}
+        </div>
+        <div className="hp-bar-track">
+          <div className={`hp-bar-fill ${hpClass}`} style={{ width: `${hp}%` }} />
+          <span className="hp-bar-text">{hp}%</span>
+        </div>
+      </div>
+    </div>
+  )
 }
 
-function TrainerHud({ name, title, gold, spriteId, roster, align, size = 'small', rewards, modifiers, companion, hideBalls }: Props): React.JSX.Element {
+function ballClass(slot: RosterSlotView | undefined): string {
+  if (!slot) return 'trainer-hud-ball trainer-hud-ball-empty'
+  if (slot.fainted) return 'trainer-hud-ball trainer-hud-ball-fainted'
+  if (slot.status) return `trainer-hud-ball trainer-hud-ball-statused trainer-hud-ball-${slot.status}`
+  return 'trainer-hud-ball'
+}
+
+function TrainerHud({ name, title, gold, spriteId, roster, align, size = 'small', rewards, modifiers, companion }: Props): React.JSX.Element {
   const slots = Array.from({ length: TEAM_SIZE }, (_, i) => roster[i])
-  const alive = slots.filter((slot) => slot && !slot.fainted).length
   const sprite =
     modifiers || rewards !== undefined ? (
       <Tooltip
@@ -96,7 +119,8 @@ function TrainerHud({ name, title, gold, spriteId, roster, align, size = 'small'
       />
     </div>
   ) : (
-    sprite
+    // Wrapped like the companion's figure, so both trainers stand the same way.
+    <div className="trainer-hud-figure">{sprite}</div>
   )
   const nameText = (
     <>
@@ -116,37 +140,21 @@ function TrainerHud({ name, title, gold, spriteId, roster, align, size = 'small'
   ) : (
     <div className="trainer-hud-name">{nameText}</div>
   )
-  // The player (no Poke Balls): the name along the top, the sprites centred under it.
-  if (hideBalls) {
-    return (
-      <div className={`trainer-hud trainer-hud-${align} trainer-hud-${size} trainer-hud-stacked`}>
-        {nameRow}
-        {figure}
-      </div>
-    )
-  }
+  // Both trainers alike: the name along the top, the sprite centred under it, and the
+  // team as a column of small balls down the side facing the other trainer.
   return (
-    <div className={`trainer-hud trainer-hud-${align} trainer-hud-${size}`}>
+    <div className={`trainer-hud trainer-hud-${align} trainer-hud-${size} trainer-hud-stacked`}>
+      {nameRow}
       {figure}
-      <div className="trainer-hud-info">
-        {nameRow}
-        {IS_MOBILE_LAYOUT ? (
-          // On the phone, one ball and how many Pokemon are still standing (the six don't fit).
-          <div className="trainer-hud-balls trainer-hud-balls-count" title={slots.filter(Boolean).map(ballTitle).join(', ')}>
-            <span className="pokeball-icon" style={pokeballStyle(alive > 0 ? 'healthy' : 'fainted', BALL_SCALE[size])} />
-            <span className="trainer-hud-ball-count">×{alive}</span>
-          </div>
-        ) : (
-        <div className="trainer-hud-balls">
-          {slots.map((slot, i) => (
-            <span
-              key={i}
-              className="pokeball-icon"
-              style={pokeballStyle(ballStateFor(slot), BALL_SCALE[size])}
-              title={ballTitle(slot)}
-            />
-          ))}
-        </div>
+      <div className="trainer-hud-ball-column">
+        {slots.map((slot, i) =>
+          slot ? (
+            <Tooltip key={i} placement={align === 'left' ? 'right' : 'below'} content={<BallTooltipContent slot={slot} />}>
+              <span className={ballClass(slot)} />
+            </Tooltip>
+          ) : (
+            <span key={i} className={ballClass(slot)} />
+          )
         )}
       </div>
     </div>

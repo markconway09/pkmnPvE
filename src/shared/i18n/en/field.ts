@@ -25,6 +25,7 @@ export const field = {
   'hud.chaosModifiers': 'Chaos modifiers',
   'hud.noModifiers': 'No modifiers this battle',
   'hud.fainted': '{name} (fainted)',
+  'hud.faintedTag': 'Fainted',
   'hud.the': 'the',
 
   'sprite.leechSeed': 'Leech Seed',

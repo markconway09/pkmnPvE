@@ -1162,27 +1162,6 @@ textarea,
   text-overflow: ellipsis;
 }
 
-.trainer-hud-balls {
-  display: flex;
-  gap: 4px;
-}
-
-.pokeball-icon {
-  /* A flex row this cramped (six of these, at either size) would otherwise
-     squash them thinner than the sprite sheet crop expects. */
-  flex-shrink: 0;
-}
-
-/* Deliberately NOT flex-direction: row-reverse here (it used to be) - that
-   only reordered the balls visually, while each ball's hover title and
-   healthy/statused/fainted look stayed tied to its team-order index. The two
-   fell out of sync, so hovering the leftmost ball could name a Pokemon from
-   the other end of the roster. Left-to-right now always matches team order
-   on both sides. */
-.trainer-hud-right .trainer-hud-balls {
-  justify-content: flex-end;
-}
-
 /* The bigger panel under the move buttons - sprite on one side, name and ball
    grid on the other, same arrangement as the compact bar above (just scaled
    up - see pokeballStyle's own scale argument for how the pokeballs stay
@@ -1210,12 +1189,6 @@ textarea,
 .trainer-hud-large .trainer-hud-name {
   font-size: 16px;
   white-space: normal;
-}
-
-.trainer-hud-large .trainer-hud-balls {
-  gap: 6px;
-  margin-top: 8px;
-  flex-wrap: wrap;
 }
 
 .battle-huds-large {
@@ -11358,11 +11331,15 @@ button.trainer-danger {
 }
 
 /* XL in battle stands behind the trainer, who overlaps it a little - as if it's further back.
-   (The panel's backdrop blur makes it its own layer, so -1 still stays inside the panel.) */
+   (The panel's backdrop blur makes it its own layer, so -1 still stays inside the panel.)
+   It hangs off the trainer's side rather than widening the figure, so the trainer stays
+   centred in the panel however big the companion is. */
 .trainer-hud-stacked .trainer-hud-companion-xl {
-  position: relative;
+  position: absolute;
+  bottom: 0;
+  left: calc(100% - 54px);
   z-index: -1;
-  margin-left: -54px;
+  margin-left: 0;
 }
 
 
@@ -16349,7 +16326,7 @@ img.sprite-smooth {
   margin: 0 0 10px;
 }
 
-.options-modal-body button:not(.sprite-style-option):not(.options-sound-toggle):not([class^="tab-strip"]) {
+.options-modal-body button:not(.sprite-style-option):not(.options-sound-toggle):not([class^="tab-strip"]):not(.music-player-button) {
   height: 32px;
   padding: 0 16px;
   border: 1px solid #2f3746;
@@ -16358,7 +16335,7 @@ img.sprite-smooth {
   font-size: 13px;
 }
 
-.options-modal-body button:not(.sprite-style-option):not(.options-sound-toggle):not([class^="tab-strip"]):hover:not(:disabled) {
+.options-modal-body button:not(.sprite-style-option):not(.options-sound-toggle):not([class^="tab-strip"]):not(.music-player-button):hover:not(:disabled) {
   border-color: #4a5468;
   background: #222935;
 }
@@ -18118,10 +18095,10 @@ img.sprite-smooth {
   color: #7d8799;
 }
 
-/* Four to a row; "Anywhere" twice as wide. */
+/* Five to a row; "Anywhere" twice as wide. */
 .classic-wild-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
   width: 100%;
 }
@@ -22472,6 +22449,14 @@ img.sprite-smooth {
   font-style: italic;
 }
 
+/* "Waiting for..." with the Cancel that takes the turn's choice back beside it. */
+.online-waiting-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 
 /* A Classic wild win's result in two columns: the result and its rewards on the left,
    and on the right Search the area at the top, then Catch, Battle again and Back to menu. */
@@ -24711,4 +24696,5889 @@ html[data-layout='mobile'] .options-scale-tabs .tab-strip-tab {
 .tab-strip-close.editor-close {
   width: 34px;
   height: 34px;
+}
+
+/* Each trainer's team in battle: a column of small Poke Balls down the inner side of their
+   panel (the side facing the other trainer), in team order top to bottom. Hovering one shows
+   that Pokemon. */
+.trainer-hud-ball-column {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.trainer-hud-left .trainer-hud-ball-column {
+  right: 6px;
+}
+
+.trainer-hud-right .trainer-hud-ball-column {
+  left: 6px;
+}
+
+.trainer-hud-ball-column > div {
+  display: flex;
+}
+
+/* A tiny Poke Ball: red top, white bottom, a dark band and button across the middle. */
+.trainer-hud-ball {
+  position: relative;
+  display: block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid #10141a;
+  background: linear-gradient(to bottom, #e0453b 0 42%, #10141a 42% 58%, #f0f2f5 58%);
+  cursor: default;
+}
+
+.trainer-hud-ball::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: #f0f2f5;
+  border: 1px solid #10141a;
+  box-sizing: border-box;
+}
+
+/* Statused: a ring in the status's colour. Fainted: greyed out. No Pokemon: a faint empty dot. */
+.trainer-hud-ball-statused {
+  box-shadow: 0 0 0 2px #e0a92e;
+}
+
+.trainer-hud-ball-par {
+  box-shadow: 0 0 0 2px #e0c22e;
+}
+
+.trainer-hud-ball-brn {
+  box-shadow: 0 0 0 2px #e0682e;
+}
+
+.trainer-hud-ball-psn,
+.trainer-hud-ball-tox {
+  box-shadow: 0 0 0 2px #a25fd1;
+}
+
+.trainer-hud-ball-slp {
+  box-shadow: 0 0 0 2px #9aa3b0;
+}
+
+.trainer-hud-ball-frz {
+  box-shadow: 0 0 0 2px #7fd1e0;
+}
+
+.trainer-hud-ball-fainted {
+  filter: grayscale(1) brightness(0.55);
+}
+
+.trainer-hud-ball-empty {
+  background: none;
+  border: 1px dashed #3a4150;
+}
+
+.trainer-hud-ball-empty::after {
+  content: none;
+}
+
+/* The ball's hover tooltip: the sprite beside its name, status and HP bar. */
+.tooltip-panel.trainer-hud-ball-tip {
+  width: 200px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.trainer-hud-ball-tip-sprite {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  flex-shrink: 0;
+}
+
+.trainer-hud-ball-tip-fainted {
+  filter: grayscale(1) brightness(0.6);
+}
+
+.trainer-hud-ball-tip-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.trainer-hud-ball-tip-name {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-weight: bold;
+}
+
+.trainer-hud-ball-tip-down {
+  font-size: 10px;
+  color: #e0453b;
+}
+
+/* Room on the inner side for the ball column, so it never sits on the trainer. */
+.trainer-hud-large.trainer-hud-left {
+  padding-right: 30px;
+}
+
+.trainer-hud-large.trainer-hud-right {
+  padding-left: 30px;
+}
+
+/* The compact music player in Options (the phone layout's top bar has none): full width,
+   cover, title and artist, and previous / play / next. */
+.music-player.music-player-compact {
+  max-width: none;
+  flex: none;
+  margin: 10px 0 0;
+}
+.music-player-compact .music-player-button {
+  width: 34px;
+  height: 34px;
+}
+.music-player-compact .music-player-play {
+  width: 38px;
+  height: 38px;
+}
+.music-player-compact .music-player-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ---- Horde mode: its menu page, and the arena a run plays out in ---- */
+
+.menu-rail-horde,
+.menu-page-title-horde {
+  --page-color: 255, 122, 89;
+}
+
+.mode-pulse-horde {
+  --mode-color: 255, 122, 89;
+}
+
+.menu-rail-icon-horde {
+  width: 36px;
+  height: 36px;
+  padding: 5px;
+  box-sizing: content-box;
+}
+
+.home-card-horde {
+  --card-color: 255, 122, 89;
+  grid-column: 2 / -1;
+}
+
+/* With Horde's card across the third row, Battles reaches down beside it. */
+.home-grid:has(.home-card-horde) .home-card-classic {
+  grid-row: span 3;
+}
+
+.home-card-horde .home-card-icon-tile {
+  width: 32px;
+  height: 32px;
+  color: rgb(var(--card-color));
+}
+
+.home-card-icon-horde {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.horde-page {
+  display: grid;
+  grid-template-columns: minmax(0, 560px) minmax(0, 320px);
+  justify-content: center;
+  align-items: start;
+  gap: 14px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px;
+}
+
+.horde-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  border: 2px solid rgba(255, 122, 89, 0.5);
+  border-radius: 14px;
+  background:
+    radial-gradient(ellipse at 0% 0%, rgba(255, 122, 89, 0.18), transparent 60%),
+    linear-gradient(180deg, #1c222c, #14181f);
+}
+
+.horde-title {
+  margin: 0;
+  color: #ffb39f;
+}
+
+.horde-pitch {
+  margin: 0;
+  color: #d6dde6;
+}
+
+.horde-rules {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #aab6c4;
+  font-size: 13px;
+}
+
+.horde-card-label {
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #ffb39f;
+}
+
+.horde-muted {
+  margin: 0;
+  color: #8995a3;
+}
+
+.horde-last {
+  margin: 0;
+  color: #9fdf9f;
+  font-size: 13px;
+}
+
+.horde-error {
+  margin: 0;
+  color: #ff6b6b;
+}
+
+.horde-btn {
+  padding: 8px 16px;
+  border: 2px solid #4a5568;
+  border-radius: 10px;
+  background: #222a35;
+  color: #e6edf5;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.horde-btn:hover:not(:disabled) {
+  border-color: #8a9bb0;
+}
+
+.horde-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.horde-btn-primary {
+  border-color: #ff7a59;
+  background: linear-gradient(180deg, #ff8f6e, #e0603f);
+  color: #fff;
+}
+
+.horde-btn-primary:hover:not(:disabled) {
+  border-color: #ffc2b0;
+}
+
+.horde-start {
+  width: 100%;
+  font-size: 16px;
+  padding: 10px 16px;
+}
+
+.horde-results {
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: space-between;
+  gap: 6px 24px;
+  font-size: 14px;
+}
+
+.horde-results span {
+  color: #aab6c4;
+}
+
+.horde-results b {
+  text-align: right;
+}
+
+/* The arena: over the whole window, a HUD on top, the lane, the moves along the bottom. */
+.horde-arena {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  flex-direction: column;
+  background: #10141a;
+  color: #e6edf5;
+  user-select: none;
+}
+
+.horde-hud {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  background: linear-gradient(180deg, #1c222c, #151a22);
+  border-bottom: 2px solid #2a3340;
+}
+
+.horde-hud-lead {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 360px;
+}
+
+.horde-hud-name {
+  font-weight: bold;
+}
+
+.horde-hud-level {
+  color: #9fb3c8;
+  font-size: 0.85em;
+}
+
+.horde-hp {
+  position: relative;
+  height: 14px;
+  border-radius: 7px;
+  background: #2b333f;
+  overflow: hidden;
+}
+
+.horde-hp-fill {
+  height: 100%;
+  background: linear-gradient(180deg, #6ee87a, #3fbf55);
+  transition: width 0.15s linear;
+}
+
+.horde-hp-yellow {
+  background: linear-gradient(180deg, #ffe066, #e6b800);
+}
+
+.horde-hp-red {
+  background: linear-gradient(180deg, #ff7b7b, #e04545);
+}
+
+.horde-hp-text {
+  position: absolute;
+  inset: 0;
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+  text-shadow: 0 1px 2px #000;
+}
+
+.horde-exp {
+  height: 5px;
+  border-radius: 3px;
+  background: #2b333f;
+  overflow: hidden;
+}
+
+.horde-exp-fill {
+  height: 100%;
+  background: #5fb6ff;
+  transition: width 0.2s ease-out;
+}
+
+.horde-hud-clock {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.horde-clock {
+  font-size: 30px;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+}
+
+.horde-hud-sub {
+  color: #9fb3c8;
+  font-size: 13px;
+}
+
+.horde-hud-actions {
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.horde-stage {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  /* The backdrop itself is set by HordeArena (an image from public/, not bundled). */
+  background-color: #3f6b3a;
+  background-position: center;
+  background-size: cover;
+}
+
+.horde-boss-bar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(520px, 80%);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: bold;
+  text-align: center;
+  text-shadow: 0 1px 3px #000;
+}
+
+.horde-boss-hp {
+  height: 12px;
+  border: 2px solid #1b1f26;
+  border-radius: 7px;
+  background: #2b333f;
+  overflow: hidden;
+}
+
+.horde-boss-hp div {
+  height: 100%;
+  background: linear-gradient(180deg, #ff6d6d, #c62828);
+  transition: width 0.15s linear;
+}
+
+/* Each Pokemon stands with its feet on its spot. */
+.horde-unit {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translate(-50%, -100%);
+}
+
+.horde-sprite {
+  height: clamp(56px, 12vh, 112px);
+  width: auto;
+  max-width: 160px;
+  object-fit: contain;
+  pointer-events: none;
+  /* No drop shadow: the soft shadow underfoot does that, and a filter on dozens of
+     animated sprites is costly to redraw. */
+  transition: transform 0.12s ease-out;
+}
+
+/* The lead faces the crowd. */
+.horde-player .horde-sprite {
+  transform: scaleX(-1);
+}
+
+.horde-player.horde-lunge .horde-sprite {
+  transform: scaleX(-1) translateX(-14px);
+}
+
+.horde-player.horde-hurt .horde-sprite {
+  filter: drop-shadow(0 0 6px #ff4040) brightness(1.4);
+}
+
+.horde-foe {
+  cursor: crosshair;
+}
+
+.horde-foe-elite .horde-sprite {
+  height: clamp(72px, 16vh, 150px);
+  filter: drop-shadow(0 0 8px rgba(190, 120, 255, 0.9));
+}
+
+.horde-foe-boss .horde-sprite {
+  height: clamp(110px, 26vh, 240px);
+  max-width: 260px;
+  filter: drop-shadow(0 0 10px rgba(255, 70, 70, 0.9));
+}
+
+.horde-flash .horde-sprite {
+  filter: brightness(2.4);
+}
+
+.horde-fainted {
+  pointer-events: none;
+  animation: horde-faint 0.42s ease-in forwards;
+}
+
+@keyframes horde-faint {
+  to {
+    opacity: 0;
+    transform: translate(-50%, -80%);
+  }
+}
+
+/* The wild Pokemon picked as the target: a gold ring at its feet. */
+.horde-focused::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  width: 70%;
+  height: 12px;
+  border: 2px solid #ffd76b;
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(255, 215, 107, 0.8);
+  z-index: -1;
+}
+
+.horde-foe-hp {
+  width: 52px;
+  height: 5px;
+  margin-top: 2px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+.horde-foe-hp div {
+  height: 100%;
+  background: #6ee87a;
+}
+
+.horde-foe-elite .horde-foe-hp,
+.horde-foe-boss .horde-foe-hp {
+  width: 80px;
+}
+
+.horde-foe-level {
+  font-size: 11px;
+  font-weight: bold;
+  text-shadow: 0 1px 2px #000;
+}
+
+.horde-move-call {
+  position: absolute;
+  bottom: 100%;
+  padding: 2px 10px;
+  border-radius: 10px;
+  background: var(--move-color);
+  color: #fff;
+  font-size: 12px;
+  font-weight: bold;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  animation: horde-move-call 0.7s ease-out forwards;
+}
+
+@keyframes horde-move-call {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  15% {
+    opacity: 1;
+    transform: none;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.horde-burst {
+  position: absolute;
+  width: 70px;
+  height: 70px;
+  margin-top: -50px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, var(--burst-color) 35%, transparent 70%);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 30;
+  animation: horde-burst 0.38s ease-out forwards;
+}
+
+.horde-burst-spread {
+  width: 120px;
+  height: 60px;
+  margin-top: -20px;
+}
+
+@keyframes horde-burst {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.5);
+  }
+}
+
+.horde-popup {
+  position: absolute;
+  margin-top: -90px;
+  font-weight: bold;
+  font-size: 16px;
+  color: #fff;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 35;
+  text-shadow:
+    0 0 3px #000,
+    0 1px 2px #000;
+  animation: horde-popup 0.8s ease-out forwards;
+}
+
+.horde-popup-crit {
+  font-size: 20px;
+  color: #ffd76b;
+}
+
+.horde-popup-super {
+  color: #ff9a6b;
+}
+
+.horde-popup-weak {
+  color: #b9c3cf;
+  font-size: 14px;
+}
+
+.horde-popup-miss {
+  color: #c9d1db;
+  font-size: 13px;
+}
+
+.horde-popup-heal {
+  color: #7dff8c;
+}
+
+.horde-popup-hurt {
+  color: #ff6b6b;
+}
+
+.horde-popup-level {
+  color: #5fd0ff;
+  font-size: 18px;
+}
+
+@keyframes horde-popup {
+  from {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -36px);
+  }
+}
+
+.horde-moves {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 16px;
+  background: linear-gradient(0deg, #1c222c, #151a22);
+  border-top: 2px solid #2a3340;
+}
+
+.horde-move {
+  position: relative;
+  flex: 1 1 150px;
+  max-width: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 2px solid var(--move-color, #4a5568);
+  border-radius: 10px;
+  background: #1a2029;
+  overflow: hidden;
+}
+
+.horde-move-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--move-color);
+  opacity: 0.35;
+}
+
+.horde-move-name,
+.horde-move-meta {
+  position: relative;
+  font-weight: bold;
+  font-size: 13px;
+}
+
+.horde-move-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #c9d1db;
+  font-size: 11px;
+}
+
+.horde-move-tag {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.horde-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 10, 14, 0.7);
+}
+
+.horde-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: min(320px, 90vw);
+  padding: 20px 24px;
+  border: 2px solid #ff7a59;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #1f2631, #161b23);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+}
+
+.horde-panel h2 {
+  margin: 0;
+  text-align: center;
+}
+
+.horde-new-best {
+  text-align: center;
+  font-weight: bold;
+  color: #ffd76b;
+}
+
+/* Horde: the window Start opens - the area the run is in (with the title over it), then
+   the 10 Pokemon to pick from, then Cancel. */
+.modal-panel.horde-pick-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(960px, 94vw);
+  max-width: none;
+  padding: 14px;
+}
+
+.horde-area {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 130px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  overflow: hidden;
+  background-position: center;
+  background-size: cover;
+  box-shadow:
+    inset 0 -70px 50px -20px rgba(0, 0, 0, 0.8),
+    inset 0 40px 40px -20px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.horde-area-title {
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #ffd76b;
+  text-shadow: 0 1px 3px #000;
+}
+
+.horde-area-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.horde-area-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 26px;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 2px 6px #000;
+}
+
+.horde-area-icon {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.7));
+}
+
+.horde-area-types {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.horde-pick-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+/* A pick is a bare button holding a RarityCard in the Pokemon's rarity colour. */
+.horde-pick {
+  display: flex;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: #e6edf5;
+  cursor: pointer;
+}
+
+.horde-pick:focus-visible {
+  outline: 2px solid #ffd76b;
+  outline-offset: 2px;
+}
+
+.horde-pick-card {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 8px 10px;
+  overflow: hidden;
+}
+
+.horde-pick:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Where the Pokemon stands - the shiny halo and sparkles sit behind and around it. */
+.horde-pick-stage {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.horde-pick-sprite {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.45));
+  transition: transform 0.15s ease;
+}
+
+.horde-pick:hover:not(:disabled) .horde-pick-sprite {
+  transform: scale(1.08);
+}
+
+.horde-pick-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: bold;
+}
+
+.horde-pick-name .shiny-icon,
+.horde-top-name .shiny-icon {
+  margin-left: 4px;
+}
+
+.horde-pick-types {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 3px;
+}
+
+.horde-pick-types .type-badge {
+  padding: 0 5px;
+  font-size: 9px;
+  line-height: 15px;
+}
+
+/* Its base stats: a short label, a bar and the number. */
+.horde-pick-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  margin-top: 2px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.horde-pick-stat {
+  display: grid;
+  grid-template-columns: 24px 1fr 24px;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+}
+
+.horde-pick-stat-label {
+  color: #8995a3;
+  font-weight: bold;
+}
+
+.horde-pick-stat-bar {
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+.horde-pick-stat-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+}
+
+.horde-pick-stat-value {
+  color: #c9d4e0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The Mega tag, in the card's top corner. */
+.horde-pick-mega-corner {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+}
+
+.horde-pick-mega-tag {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #ff5ec4, #6ad0ff);
+  color: #fff;
+  font-size: 8px;
+  font-weight: bold;
+  letter-spacing: 0.06em;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.horde-pick-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.horde-hud-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  font-size: 11px;
+  color: #9fb3c8;
+}
+
+.horde-hud-stats b {
+  color: #e6edf5;
+}
+
+.horde-move-rank {
+  color: #ffd76b;
+  font-size: 11px;
+}
+
+/* A level-up: three cards to pick from while the clock is stopped. */
+.horde-choices {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+}
+
+.horde-choices h2 {
+  margin: 0;
+  color: #5fd0ff;
+  text-shadow: 0 2px 6px #000;
+}
+
+.horde-choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+}
+
+.horde-choice {
+  --move-color: #5fd0ff;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 220px;
+  padding: 16px;
+  color: #e6edf5;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+  animation: horde-choice-in 0.25s ease-out backwards;
+}
+
+.horde-choice-rarity {
+  font-size: 12px;
+  font-weight: bold;
+  color: var(--tier);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--tier) 60%, transparent);
+}
+
+.horde-choice-kind {
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--move-color);
+}
+
+.horde-choice-title {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.horde-choice-text {
+  font-size: 12px;
+  color: #aab6c4;
+}
+
+@keyframes horde-choice-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+}
+
+.horde-choices-note {
+  margin: -6px 0 0;
+  color: #ffd23f;
+  font-weight: bold;
+}
+
+/* Under the cards: each rarity's chance with the Luck held. */
+.horde-odds {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: #aab6c4;
+  text-shadow: 0 1px 2px #000;
+}
+
+.horde-odds-tier {
+  color: var(--tier);
+  font-weight: bold;
+}
+
+/* Just evolved: a white flash as the new form appears. */
+.horde-sprite.horde-evolved {
+  animation: horde-evolve 0.8s ease-out;
+}
+
+@keyframes horde-evolve {
+  from {
+    filter: brightness(6) drop-shadow(0 0 16px #fff);
+  }
+}
+
+/* The Horde page sits in the middle of the window, top to bottom. */
+.menu-page-horde {
+  overflow-y: auto;
+}
+
+.menu-page-horde > .horde-page {
+  margin-block: auto;
+}
+
+/* A Horde upgrade card's change: the value now, an arrow, the value after. */
+.horde-choice-change {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0 6px;
+  font-size: 13px;
+  color: #aab6c4;
+}
+
+/* A long label wraps on its own; the values stay together and drop to the next line,
+   right-aligned, when the card is too narrow for both. */
+.horde-choice-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.horde-choice-values {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.horde-choice-before {
+  color: #8995a3;
+}
+
+.horde-choice-arrow {
+  color: var(--tier);
+}
+
+.horde-choice-after {
+  color: #7dff8c;
+}
+
+/* ---- Horde mode: type effects (status dots, held/frozen/fleeing foes, rocks, shield, buffs) ---- */
+.horde-foe-effects {
+  display: flex;
+  gap: 3px;
+  justify-content: center;
+  margin-top: 2px;
+  pointer-events: none;
+}
+
+.horde-foe-effects span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.6),
+    0 0 4px rgba(255, 255, 255, 0.35);
+}
+
+.horde-frozen .horde-sprite {
+  filter: hue-rotate(160deg) saturate(0.5) brightness(1.35) drop-shadow(0 0 6px #9be7ff);
+}
+
+.horde-stopped .horde-sprite {
+  filter: drop-shadow(0 0 6px #ffe14d) brightness(1.15);
+  animation: horde-jolt 0.12s linear infinite;
+}
+
+@keyframes horde-jolt {
+  50% {
+    translate: 2px 0;
+  }
+}
+
+.horde-fleeing .horde-sprite {
+  transform: scaleX(-1);
+  opacity: 0.8;
+}
+
+.horde-confused .horde-sprite {
+  animation: horde-wobble 0.5s ease-in-out infinite;
+}
+
+@keyframes horde-wobble {
+  25% {
+    rotate: -8deg;
+  }
+  75% {
+    rotate: 8deg;
+  }
+}
+
+.horde-rock {
+  position: absolute;
+  width: 46px;
+  height: 14px;
+  margin-top: 26px;
+  transform: translate(-50%, 0);
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 40%, var(--move-color) 0 22%, transparent 24%),
+    radial-gradient(circle at 65% 55%, var(--move-color) 0 20%, transparent 22%),
+    radial-gradient(ellipse, rgba(0, 0, 0, 0.35), transparent 70%);
+  pointer-events: none;
+  z-index: 5;
+}
+
+.horde-hp-shield {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: linear-gradient(180deg, rgba(160, 225, 255, 0.75), rgba(90, 170, 230, 0.75));
+  border-right: 1px solid #fff;
+}
+
+.horde-hud-buff {
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--move-color);
+  color: #fff;
+  font-weight: bold;
+  text-shadow: 0 1px 2px #000;
+}
+
+.horde-move-effect {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.horde-popup-effect {
+  font-size: 14px;
+  margin-top: -112px;
+}
+
+.horde-popup-dot {
+  font-size: 12px;
+  color: #d9a6ff;
+}
+
+/* ---- Horde mode: the arena seen from above ---- */
+/* The location's backdrop, blurred and darkened into ground.
+   Its own stacking context, so the depth-sorted Pokemon never rise over the overlays. */
+.horde-stage {
+  isolation: isolate;
+  touch-action: none;
+  user-select: none;
+  background-image: none;
+}
+
+.horde-stage::before {
+  content: '';
+  position: absolute;
+  inset: -24px;
+  background:
+    linear-gradient(rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0.42)),
+    var(--horde-ground) center / cover;
+  filter: blur(7px) saturate(0.85);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* How far spread moves reach: a dashed ring around the lead. */
+.horde-spread-ring {
+  position: absolute;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  background: radial-gradient(circle, transparent 62%, rgba(255, 255, 255, 0.05));
+  pointer-events: none;
+  z-index: 2;
+}
+
+.horde-boss-bar {
+  z-index: 300;
+}
+
+/* Smaller sprites for the wider view; each faces the way --face says (sprites face left). */
+.horde-sprite {
+  height: clamp(32px, 6.5vh, 60px);
+  max-width: 90px;
+  transform: scaleX(var(--face, 1));
+}
+
+.horde-player .horde-sprite,
+.horde-fleeing .horde-sprite {
+  transform: scaleX(var(--face, 1));
+}
+
+.horde-player.horde-lunge .horde-sprite {
+  transform: scaleX(var(--face, 1));
+  translate: var(--lunge-x, 0) var(--lunge-y, 0);
+}
+
+.horde-foe-elite .horde-sprite {
+  height: clamp(42px, 8.5vh, 80px);
+}
+
+.horde-foe-boss .horde-sprite {
+  height: clamp(66px, 14vh, 136px);
+  max-width: 170px;
+}
+
+/* A wild Pokemon's bars sit over its head, so its feet stay on its spot. */
+.horde-foe {
+  flex-direction: column-reverse;
+}
+
+.horde-foe .horde-foe-hp {
+  margin: 0 0 2px;
+}
+
+.horde-foe .horde-foe-effects {
+  margin: 0 0 2px;
+}
+
+/* A soft shadow underfoot. */
+.horde-unit::before {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  width: 56%;
+  height: 10px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.45), transparent 70%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.horde-burst {
+  margin-top: -32px;
+  z-index: 200;
+}
+
+.horde-burst-spread {
+  margin-top: -16px;
+}
+
+.horde-popup {
+  margin-top: -72px;
+  z-index: 210;
+}
+
+.horde-popup-effect {
+  margin-top: -92px;
+}
+
+.horde-rock {
+  width: 60px;
+  height: 18px;
+  margin-top: -9px;
+  z-index: 3;
+}
+
+/* Hitboxes: a circle at each Pokemon's feet (red for wild ones, blue for the lead), brighter
+   while a wild Pokemon's touches the lead's - that's when it can hit. */
+.horde-hitbox {
+  position: absolute;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border: 1.5px solid rgba(255, 90, 90, 0.4);
+  border-radius: 50%;
+  background: rgba(255, 70, 70, 0.08);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.horde-hitbox-lead {
+  border-color: rgba(120, 200, 255, 0.6);
+  background: rgba(120, 200, 255, 0.1);
+}
+
+.horde-hitbox-hot {
+  border-color: rgba(255, 80, 80, 0.85);
+  background: rgba(255, 60, 60, 0.2);
+}
+
+/* A wild Pokemon close enough to attack: a red glow underfoot. */
+.horde-in-reach::before {
+  background: radial-gradient(ellipse, rgba(255, 50, 50, 0.75), transparent 70%);
+}
+
+/* The lead's HP just under its feet. */
+.horde-lead-hp {
+  position: absolute;
+  top: calc(100% + 6px);
+  width: 58px;
+  height: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.7);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.horde-lead-hp-fill {
+  height: 100%;
+  background: linear-gradient(180deg, #6ee87a, #3fbf55);
+  transition: width 0.15s linear;
+}
+
+.horde-lead-hp-fill.horde-hp-yellow {
+  background: linear-gradient(180deg, #ffe066, #e6b800);
+}
+
+.horde-lead-hp-fill.horde-hp-red {
+  background: linear-gradient(180deg, #ff7b7b, #e04545);
+}
+
+.horde-lead-hp-shield {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: rgba(140, 215, 255, 0.8);
+}
+
+/* ---- Horde mode: smaller Pokemon, moves in flight, drops ---- */
+.horde-foe-hp {
+  width: 40px;
+}
+
+.horde-foe-elite .horde-foe-hp,
+.horde-foe-boss .horde-foe-hp {
+  width: 64px;
+}
+
+.horde-burst {
+  width: 52px;
+  height: 52px;
+  margin-top: -22px;
+}
+
+.horde-burst-spread {
+  width: 90px;
+  height: 46px;
+  margin-top: -10px;
+}
+
+.horde-popup {
+  margin-top: -56px;
+}
+
+.horde-popup-effect {
+  margin-top: -74px;
+}
+
+.horde-popup-item {
+  color: #ffd76b;
+  font-size: 15px;
+  margin-top: -76px;
+}
+
+/* A single-target move flying to its target: a glowing orb in its type's colour with a trail;
+   the stronger the move, the bigger. */
+.horde-shot {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, #fff 0 25%, var(--move-color) 55%, transparent 75%);
+  box-shadow:
+    0 0 10px 3px var(--move-color),
+    0 0 18px 6px color-mix(in srgb, var(--move-color) 40%, transparent);
+  pointer-events: none;
+  z-index: 190;
+}
+
+.horde-shot-medium {
+  width: 18px;
+  height: 18px;
+}
+
+.horde-shot-strong {
+  width: 24px;
+  height: 24px;
+}
+
+/* A spread move's wave rolling out round the lead to the edge of the ring. */
+.horde-wave {
+  position: absolute;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 3px solid var(--move-color);
+  background: radial-gradient(circle, transparent 55%, color-mix(in srgb, var(--move-color) 35%, transparent));
+  pointer-events: none;
+  z-index: 4;
+  animation: horde-wave var(--wave-ms, 260ms) ease-out forwards;
+}
+
+/* Grown from the lead outward: the centring translate stays in the same transform as the
+   scale, so the wave stays centred on the lead as it grows. */
+@keyframes horde-wave {
+  from {
+    transform: translate(-50%, -50%) scale(0.1);
+    opacity: 0.9;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.55;
+  }
+}
+
+/* Experience on the ground: a small glowing gem, bigger for an elite's or a boss's. */
+.horde-drop {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 4;
+}
+
+.horde-gem {
+  width: 9px;
+  height: 9px;
+  rotate: 45deg;
+  background: linear-gradient(135deg, #b9f3ff, #3fb8ff);
+  box-shadow: 0 0 6px rgba(80, 190, 255, 0.9);
+}
+
+.horde-gem-elite {
+  width: 13px;
+  height: 13px;
+  background: linear-gradient(135deg, #f0c8ff, #a24bff);
+  box-shadow: 0 0 8px rgba(190, 120, 255, 0.95);
+}
+
+.horde-gem-boss {
+  width: 17px;
+  height: 17px;
+  background: linear-gradient(135deg, #ffe9a8, #ff9d1c);
+  box-shadow: 0 0 10px rgba(255, 190, 60, 1);
+}
+
+/* An item on the ground: its icon on a bobbing gold glow. */
+.horde-drop-item {
+  display: flex;
+  padding: 3px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 215, 107, 0.55), transparent 70%);
+  animation: horde-item-bob 1.2s ease-in-out infinite;
+  z-index: 5;
+}
+
+.horde-drop-pulled {
+  animation: none;
+}
+
+@keyframes horde-item-bob {
+  50% {
+    translate: 0 -4px;
+  }
+}
+
+.horde-hud-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  --move-color: #6b5320;
+}
+
+/* ---- Horde mode: the effects row, endless mode, a boss's speed ---- */
+/* The effects on the lead (items, Tailwind, Rage) get a row of their own, one line high even
+   when empty, so they come and go without shifting the arena. */
+.horde-hud-effects {
+  display: flex;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 16px;
+  overflow: hidden;
+  font-size: 11px;
+  background: #151a22;
+  border-bottom: 2px solid #2a3340;
+}
+
+.horde-hud-effects .horde-hud-buff {
+  white-space: nowrap;
+}
+
+.horde-clock-endless {
+  color: #ffd76b;
+}
+
+.horde-endless-label {
+  color: #ffd76b;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.horde-boss-speed {
+  color: #ff9a6b;
+  font-size: 0.85em;
+}
+
+/* How far off experience and items are picked up: barely there. */
+.horde-pickup-ring {
+  position: absolute;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border: 1px dashed rgba(140, 220, 255, 0.18);
+  border-radius: 50%;
+  background: rgba(140, 220, 255, 0.03);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Electric's chain: a bolt from one foe to the next, fading fast. */
+.horde-arc {
+  position: absolute;
+  height: 3px;
+  transform-origin: 0 50%;
+  translate: 0 -50%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #fff, var(--move-color), #fff);
+  box-shadow: 0 0 8px 2px var(--move-color);
+  pointer-events: none;
+  z-index: 195;
+  animation: horde-arc 0.22s linear forwards;
+}
+
+@keyframes horde-arc {
+  to {
+    opacity: 0;
+  }
+}
+
+/* Washed back by Water: a splash of spray at its feet as it slides. */
+.horde-sliding::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  width: 90%;
+  height: 16px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(170, 225, 255, 0.85), rgba(80, 160, 255, 0.4) 50%, transparent 72%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.horde-sliding .horde-sprite {
+  rotate: -6deg;
+}
+
+/* ---- Horde page: the title with its info icon, and the best runs ---- */
+.horde-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tooltip-panel.horde-info-panel {
+  width: 380px;
+  max-width: calc(100vw - 32px);
+}
+
+.horde-top {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.horde-top-run {
+  display: grid;
+  grid-template-columns: 22px 56px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* The run just played, if it made the list. */
+.horde-top-new {
+  border-color: rgba(255, 215, 107, 0.7);
+  box-shadow: 0 0 10px rgba(255, 215, 107, 0.25);
+}
+
+.horde-top-place {
+  font-size: 18px;
+  font-weight: bold;
+  color: #ffd76b;
+  text-align: center;
+}
+
+.horde-top-sprite {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+}
+
+.horde-top-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 13px;
+  color: #aab6c4;
+}
+
+.horde-top-name {
+  color: #e6edf5;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.horde-top-time {
+  color: #ffd76b;
+  font-weight: bold;
+}
+
+/* ---- Horde mode: Mega Evolution, Gigantamax bosses, items running out ---- */
+/* The Mega bar: rainbow, charging as Mega Energy comes in, draining while Mega Evolved. */
+.horde-mega-bar {
+  position: relative;
+  height: 7px;
+  border-radius: 4px;
+  background: #2b333f;
+  overflow: hidden;
+}
+
+.horde-mega-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff5f6d, #ffc371, #7dff8c, #4fc3ff, #b57bff);
+  transition: width 0.15s linear;
+}
+
+.horde-mega-active .horde-mega-fill {
+  animation: horde-rainbow 1.2s linear infinite;
+}
+
+@keyframes horde-rainbow {
+  to {
+    filter: hue-rotate(360deg);
+  }
+}
+
+/* Mega Evolved: a rainbow glow round the lead. */
+.horde-mega-sprite {
+  filter: drop-shadow(0 0 6px #ff7bf2) drop-shadow(0 0 10px rgba(123, 200, 255, 0.8));
+}
+
+/* Mega Energy on the ground: a rainbow gem. */
+.horde-gem-mega {
+  width: 11px;
+  height: 11px;
+  background: linear-gradient(135deg, #ff5f6d, #ffc371, #7dff8c, #4fc3ff, #b57bff);
+  box-shadow: 0 0 8px rgba(255, 140, 255, 0.95);
+  animation: horde-rainbow 1.5s linear infinite;
+}
+
+/* A Gigantamax boss: bigger, with a red Dynamax glow. */
+.horde-foe-gmax .horde-sprite {
+  height: clamp(96px, 20vh, 190px);
+  max-width: 240px;
+  filter: drop-shadow(0 0 14px rgba(255, 40, 80, 0.95)) drop-shadow(0 0 4px #ff9ab0);
+}
+
+/* An item about to vanish: flashing through its last 10 seconds. */
+.horde-drop-expiring {
+  animation: horde-item-expiring 0.35s steps(2, jump-none) infinite;
+}
+
+@keyframes horde-item-expiring {
+  to {
+    opacity: 0.15;
+  }
+}
+
+/* Under a level-up's cards: roll them again (a few times a run) or skip the level-up. */
+.horde-choice-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+/* Horde move shapes. A stream: a glowing band from the lead toward its aim, flickering as it pours. */
+.horde-beam {
+  position: absolute;
+  transform-origin: 0 50%;
+  translate: 0 -50%;
+  border-radius: 0 999px 999px 0;
+  background: linear-gradient(90deg, #fff 0%, var(--move-color) 25%, color-mix(in srgb, var(--move-color) 60%, transparent) 80%, transparent);
+  box-shadow: 0 0 14px 4px color-mix(in srgb, var(--move-color) 55%, transparent);
+  mask-image: linear-gradient(0deg, transparent, #000 30%, #000 70%, transparent);
+  pointer-events: none;
+  z-index: 192;
+  animation: horde-beam var(--beam-ms, 1350ms) linear forwards;
+}
+
+@keyframes horde-beam {
+  0% {
+    opacity: 0;
+    scale: 0.2 0.6;
+  }
+  15% {
+    opacity: 1;
+    scale: 1 1;
+  }
+  50% {
+    opacity: 0.8;
+    scale: 1 0.8;
+  }
+  80% {
+    opacity: 1;
+    scale: 1 1;
+  }
+  100% {
+    opacity: 0;
+    scale: 1 0.6;
+  }
+}
+
+/* A cone: a wedge of the move's colour bursting out in front of the lead. */
+.horde-cone {
+  position: absolute;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: conic-gradient(
+    from var(--cone-from),
+    color-mix(in srgb, var(--move-color) 55%, transparent) 0 var(--cone-angle),
+    transparent var(--cone-angle)
+  );
+  mask-image: radial-gradient(circle, transparent 8%, #000 30%, #000 60%, transparent 71%);
+  pointer-events: none;
+  z-index: 5;
+  animation: horde-cone 0.3s ease-out forwards;
+}
+
+@keyframes horde-cone {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* A strike coming down: a streak dropping from above onto a mark at the foe's feet. */
+.horde-strike {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 196;
+}
+
+.horde-strike::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  bottom: 20px;
+  width: 10px;
+  height: 90px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, transparent, var(--move-color) 60%, #fff);
+  box-shadow: 0 0 12px 3px var(--move-color);
+  animation: horde-strike-fall var(--strike-ms, 250ms) ease-in forwards;
+}
+
+.horde-strike::after {
+  content: '';
+  position: absolute;
+  left: -22px;
+  top: -8px;
+  width: 44px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--move-color);
+  opacity: 0.8;
+}
+
+@keyframes horde-strike-fall {
+  from {
+    translate: 0 -320px;
+    opacity: 0.4;
+  }
+  to {
+    translate: 0 0;
+    opacity: 1;
+  }
+}
+
+/* Where a strike lands, and a blast's explosion: a flash of the move's colour on the ground. */
+.horde-strike-hit,
+.horde-blast {
+  position: absolute;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 12%, var(--move-color) 35%, color-mix(in srgb, var(--move-color) 30%, transparent) 60%, transparent 71%);
+  pointer-events: none;
+  z-index: 6;
+  animation: horde-cone 0.3s ease-out forwards;
+}
+
+.horde-blast {
+  border: 3px solid var(--move-color);
+}
+
+/* Scatter's smaller shots, a blast's heavier one, and a piercing shot's long streak. */
+.horde-shot.horde-shot-small {
+  width: 10px;
+  height: 10px;
+}
+
+.horde-shot.horde-shot-blast {
+  width: 22px;
+  height: 22px;
+}
+
+.horde-shot.horde-shot-pierce {
+  width: 30px;
+  height: 10px;
+  border-radius: 999px;
+}
+
+/* A move upgrade card's shape badge (Stream, Strike...), in the move's type colour. */
+.horde-choice-badge {
+  align-self: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--move-color, rgba(255, 255, 255, 0.4));
+  background: color-mix(in srgb, var(--move-color, #fff) 25%, transparent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Horde: each Pokemon drawn bigger or smaller by its real height (the companion's sizes) -
+   tiny ones like Wishiwashi and Beldum small, Wailord-sized ones big. Feet stay on the spot.
+   Same steps as the companion in battle (S 48%, M 66%, L 108% of the trainer), M being 1;
+   XL a bit under the companion's double, so a Wailord doesn't fill the field. */
+.horde-size-s .horde-sprite {
+  zoom: 0.73;
+}
+
+.horde-size-l .horde-sprite {
+  zoom: 1.64;
+}
+
+.horde-size-xl .horde-sprite {
+  zoom: 2.2;
+}
+
+
+/* Horde: the pause menu's list of level-up choices taken, newest first. */
+.horde-log {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(420px, 86vw);
+}
+
+.horde-log-title {
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #9aa6b8;
+}
+
+.horde-log-empty {
+  font-size: 13px;
+  color: #8a95a6;
+}
+
+.horde-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: min(320px, 45vh);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.horde-log-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
+.horde-log-level {
+  min-width: 44px;
+  color: #9aa6b8;
+}
+
+.horde-log-kind {
+  color: #c4ccd8;
+}
+
+.horde-log-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.horde-log-detail {
+  font-weight: bold;
+  color: #8fe388;
+}
+
+/* Horde upgrade shop: under the intro and best runs, across the page's full width. */
+.horde-shop {
+  grid-column: 1 / -1;
+}
+
+.horde-shop-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.horde-shop-money {
+  font-weight: bold;
+  color: #ffd166;
+}
+
+.horde-shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px;
+}
+
+.horde-upgrade {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 122, 89, 0.3);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(255, 122, 89, 0.08), rgba(0, 0, 0, 0.25));
+}
+
+.horde-upgrade-maxed {
+  border-color: rgba(255, 209, 102, 0.6);
+  background: linear-gradient(180deg, rgba(255, 209, 102, 0.12), rgba(0, 0, 0, 0.25));
+}
+
+.horde-upgrade-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.horde-upgrade-name {
+  font-weight: bold;
+  color: #ffb39f;
+}
+
+.horde-upgrade-rank {
+  font-size: 12px;
+  font-weight: bold;
+  color: #aab6c4;
+  font-variant-numeric: tabular-nums;
+}
+
+.horde-upgrade-maxed .horde-upgrade-rank {
+  color: #ffd166;
+}
+
+/* What the upgrade gives right now - the card's headline - with the next rank's beside it. */
+.horde-upgrade-values {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+}
+
+.horde-upgrade-now {
+  font-size: 16px;
+  font-weight: bold;
+  line-height: 1.15;
+  color: #fff;
+  text-shadow: 0 0 10px rgba(255, 122, 89, 0.45);
+}
+
+.horde-upgrade-maxed .horde-upgrade-now {
+  color: #ffd166;
+  text-shadow: 0 0 10px rgba(255, 209, 102, 0.45);
+}
+
+.horde-upgrade-now-none {
+  font-size: 13px;
+  font-weight: normal;
+  color: #7f8b99;
+  text-shadow: none;
+}
+
+.horde-upgrade-next {
+  font-size: 11px;
+  color: #8fe388;
+}
+
+/* One pip per rank, bought ones lit and the next one outlined. */
+.horde-upgrade-pips {
+  display: flex;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.horde-upgrade-pip {
+  flex: 1;
+  height: 7px;
+  min-width: 0;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.horde-upgrade-pip-on {
+  background: linear-gradient(180deg, #ffb39f, #ff7a59);
+  box-shadow: 0 0 4px rgba(255, 122, 89, 0.6);
+}
+
+.horde-upgrade-maxed .horde-upgrade-pip-on {
+  background: linear-gradient(180deg, #ffe39a, #ffc23d);
+  box-shadow: 0 0 4px rgba(255, 209, 102, 0.6);
+}
+
+.horde-upgrade-pip-next {
+  box-shadow: inset 0 0 0 1px rgba(255, 179, 159, 0.7);
+}
+
+.horde-upgrade-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.horde-upgrade-max {
+  margin-left: auto;
+  padding: 2px 6px;
+  font-weight: bold;
+  color: #ffd166;
+}
+
+/* The Horde intro box stretches to the best runs box's height, Start at its foot. */
+.horde-intro {
+  align-self: stretch;
+}
+
+.horde-intro .horde-start {
+  margin-top: auto;
+}
+
+/* Horde choice cards: the title with its move category icon (physical, special or status)
+   beside it, and the badges row ("New" for a new move, then its shape). */
+.horde-choice-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.horde-choice-icon {
+  flex-shrink: 0;
+  height: 18px;
+  image-rendering: pixelated;
+}
+
+.horde-choice-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.horde-choice-badges .horde-choice-badge {
+  align-self: auto;
+}
+
+.horde-choice-badge-new {
+  border-color: #ffd54a;
+  background: color-mix(in srgb, #ffd54a 30%, transparent);
+  color: #fff3c4;
+  text-shadow: 0 0 6px rgba(255, 213, 74, 0.7);
+}
+
+/* ---- Modes: the phone layout's page for Battle Tower, Draft and Horde ---- */
+
+.menu-rail-modes,
+.menu-page-title-modes {
+  --page-color: 180, 140, 255;
+}
+
+.mode-pulse-modes {
+  --mode-color: 180, 140, 255;
+}
+
+/* Horde page: the saved run, with Continue and New game beside it. */
+
+.horde-saved {
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.horde-saved-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.horde-saved-actions .horde-btn {
+  flex: 1;
+}
+
+.horde-saved-actions .horde-muted {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+/* Horde pause menu: the card a taken upgrade was, beside its hovered row. */
+.horde-log-tip {
+  position: fixed;
+  z-index: 50;
+  pointer-events: none;
+  cursor: default;
+  animation: horde-choice-in 0.12s ease-out;
+}
+
+/* Horde run's end: the damage each move dealt, with a bar against the top one. */
+.horde-damage {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 13px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.horde-damage-title {
+  grid-column: 1 / -1;
+  color: #aab6c4;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.horde-damage-row {
+  display: contents;
+}
+
+.horde-damage-name {
+  white-space: nowrap;
+}
+
+.horde-damage-bar {
+  height: 6px;
+  min-width: 40px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.horde-damage-bar span {
+  display: block;
+  height: 100%;
+  background: #e8c547;
+}
+
+.horde-damage-row b {
+  text-align: right;
+}
+
+.horde-damage-share {
+  color: #aab6c4;
+  text-align: right;
+  min-width: 3ch;
+}
+
+/* Home: the mode cards (Battle Tower, Draft, Max Raids, Game Corner, Horde) sit about
+   30% shorter; Catch and Box below keep their full height. */
+.home-grid {
+  grid-auto-rows: minmax(105px, auto);
+}
+
+.home-card-roguelite,
+.home-card-draft,
+.home-card-raid,
+.home-card-corner,
+.home-card-horde {
+  min-height: 105px;
+}
+
+.home-pair .home-card {
+  min-height: 150px;
+}
+
+/* Horde pause menu: the display switches - one row each in a dark well, a knob sliding across
+   a track that lights up in the panel's orange while on. */
+.horde-pause-toggles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.horde-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #c9d1dc;
+  font: inherit;
+  font-size: 0.85rem;
+  line-height: 1.2;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.horde-switch:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.horde-switch:focus-visible {
+  outline: 2px solid #ff7a59;
+  outline-offset: -2px;
+}
+
+.horde-switch-on {
+  color: #fff;
+}
+
+.horde-switch-track {
+  position: relative;
+  flex: none;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  background: #3a4350;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+  transition: background 0.2s;
+}
+
+.horde-switch-on .horde-switch-track {
+  background: linear-gradient(180deg, #ff9677, #ff6a45);
+}
+
+.horde-switch-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #e8ecf1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  transition: translate 0.2s ease;
+}
+
+.horde-switch-on .horde-switch-knob {
+  translate: 18px 0;
+  background: #fff;
+}
+
+/* How far melee moves reach: a faint ring around the lead, shown only with a melee move known. */
+.horde-melee-ring {
+  position: absolute;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border: 2px dotted rgba(255, 150, 90, 0.45);
+  border-radius: 50%;
+  background: rgba(255, 150, 90, 0.03);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Horde page: the run history and move list buttons, between the top cards and the shop. */
+.horde-info-buttons {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.modal-panel.horde-info-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(820px, 94vw);
+  max-width: none;
+  max-height: 86vh;
+}
+
+.horde-info-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.horde-info-modal-title {
+  margin: 0;
+  color: #ffb39f;
+}
+
+.horde-info-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* The move list: a type filter, then one row per move. */
+.horde-moves-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.horde-moves-filter button {
+  cursor: pointer;
+  border: 2px solid transparent;
+  opacity: 0.55;
+}
+
+.horde-moves-filter button.active,
+.horde-moves-filter button:hover {
+  opacity: 1;
+}
+
+.horde-moves-filter button.active {
+  border-color: #fff;
+}
+
+.horde-moves-filter-all {
+  padding: 2px 10px;
+  border-radius: 6px;
+  background: #222a35;
+  color: #e6edf5;
+  font-weight: bold;
+}
+
+.horde-moves-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.horde-moves-row {
+  display: grid;
+  grid-template-columns: minmax(170px, 1.2fr) minmax(120px, 1fr) minmax(150px, 1.3fr);
+  align-items: center;
+  gap: 4px 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 13px;
+}
+
+.horde-moves-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #e6edf5;
+}
+
+.horde-moves-shape,
+.horde-moves-stats {
+  color: #aab6c4;
+}
+
+.horde-moves-boosts {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.horde-moves-boost {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(255, 209, 102, 0.12);
+  border: 1px solid rgba(255, 209, 102, 0.35);
+  color: #ffd166;
+  font-size: 12px;
+}
+
+/* The run history: one row per run, opening up to show how it went. */
+.horde-history {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.horde-history-run {
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.horde-history-run.won {
+  border-color: rgba(159, 223, 159, 0.35);
+}
+
+.horde-history-run.open {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.horde-history-head {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.horde-history-sum {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 13px;
+  color: #aab6c4;
+}
+
+.horde-history-money {
+  color: #ffd166;
+  font-weight: bold;
+}
+
+.horde-history-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.horde-history-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.horde-history-facts span {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #d6dee8;
+}
+
+.horde-history-moves {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.horde-history-move {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+@media (max-width: 640px) {
+  .horde-moves-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* The run history and move list buttons, styled like the Horde page's cards. */
+.horde-info-button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 2px solid rgba(255, 122, 89, 0.5);
+  border-radius: 14px;
+  background:
+    radial-gradient(ellipse at 0% 0%, rgba(255, 122, 89, 0.18), transparent 60%),
+    linear-gradient(180deg, #1c222c, #14181f);
+  color: #e6edf5;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+
+.horde-info-button:hover {
+  border-color: #ff7a59;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(255, 122, 89, 0.18);
+}
+
+.horde-info-button-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 122, 89, 0.45);
+  background: rgba(255, 122, 89, 0.14);
+  color: #ffb39f;
+}
+
+.horde-info-button-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.horde-info-button-label {
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #ffb39f;
+}
+
+.horde-info-button-sub {
+  font-size: 13px;
+  color: #aab6c4;
+}
+
+.horde-info-button-arrow {
+  flex: none;
+  font-size: 24px;
+  line-height: 1;
+  color: #ffb39f;
+  transition: transform 0.15s;
+}
+
+.horde-info-button:hover .horde-info-button-arrow {
+  transform: translateX(3px);
+}
+
+@media (max-width: 640px) {
+  .horde-info-buttons {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* A run's damage stats in the run history. */
+.horde-history-damage-toggle {
+  align-self: flex-start;
+  padding: 5px 12px;
+  font-size: 13px;
+}
+
+.horde-damage.horde-history-damage {
+  max-height: none;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 122, 89, 0.3);
+}
+
+/* ---- Horde mode: the stats window (a phone's top bar has no room for the stats) ---- */
+.horde-stats-btn {
+  display: none;
+}
+
+.horde-stats-panel h2 .horde-hud-level {
+  font-size: 0.6em;
+}
+
+.horde-stats-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 14px;
+  font-size: 14px;
+  color: #9fb3c8;
+}
+
+.horde-stats-list span {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.horde-stats-list b {
+  color: #e6edf5;
+}
+
+/* Horde range rings: fade out when not needed, and light up for a moment when a pick grows one. */
+.horde-spread-ring,
+.horde-melee-ring,
+.horde-pickup-ring,
+.horde-hitbox-lead {
+  transition: opacity 0.3s ease;
+}
+
+.horde-spread-ring {
+  --ring-glow: rgba(255, 255, 255, 0.9);
+}
+
+.horde-melee-ring {
+  --ring-glow: rgba(255, 150, 90, 0.95);
+}
+
+.horde-pickup-ring {
+  --ring-glow: rgba(140, 220, 255, 0.95);
+}
+
+.horde-ring-hidden {
+  opacity: 0;
+}
+
+.horde-ring-flash {
+  animation: horde-ring-flash 1.5s ease-out;
+}
+
+@keyframes horde-ring-flash {
+  0%,
+  25% {
+    border-color: var(--ring-glow);
+    box-shadow: 0 0 14px var(--ring-glow), inset 0 0 14px var(--ring-glow);
+  }
+}
+
+/* Pause menu: the range rings choice, across both columns - its label and three options. */
+.horde-ring-mode {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 10px;
+  color: #c9d1dc;
+  font-size: 0.85rem;
+  line-height: 1.2;
+}
+
+.horde-ring-mode-options {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 999px;
+  background: #3a4350;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.horde-ring-mode-option {
+  padding: 3px 10px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #c9d1dc;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.horde-ring-mode-option:hover {
+  color: #fff;
+}
+
+.horde-ring-mode-option:focus-visible {
+  outline: 2px solid #ff7a59;
+  outline-offset: -2px;
+}
+
+.horde-ring-mode-on {
+  background: linear-gradient(180deg, #ff9677, #ff6a45);
+  color: #fff;
+}
+
+/* Horde picker: a shiny Pokemon's card - a golden rim that breathes, a halo turning slowly
+   behind the Pokemon, and sparkles twinkling around it. */
+.horde-pick-shiny .horde-pick-card {
+  border-color: #ffd76b;
+  box-shadow:
+    0 0 0 1px rgba(255, 215, 107, 0.35),
+    0 0 14px rgba(255, 215, 107, 0.35);
+  animation: horde-shiny-rim 2.4s ease-in-out infinite;
+}
+
+.horde-pick-shiny .horde-pick-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(115deg, transparent 35%, rgba(255, 240, 190, 0.18) 50%, transparent 65%);
+  background-size: 250% 100%;
+  animation: horde-shiny-sweep 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.horde-pick-shiny .horde-pick-sprite {
+  filter:
+    drop-shadow(0 0 6px rgba(255, 225, 130, 0.85))
+    drop-shadow(0 3px 3px rgba(0, 0, 0, 0.45));
+}
+
+.horde-pick-shine {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 110px;
+  height: 110px;
+  margin: -55px 0 0 -55px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(255, 230, 140, 0.55), rgba(255, 215, 107, 0.15) 45%, transparent 70%),
+    repeating-conic-gradient(rgba(255, 236, 170, 0.22) 0 10deg, transparent 10deg 30deg);
+  -webkit-mask: radial-gradient(circle, #000 35%, transparent 70%);
+  mask: radial-gradient(circle, #000 35%, transparent 70%);
+  animation: horde-shiny-spin 12s linear infinite;
+  pointer-events: none;
+}
+
+.horde-pick-sparkles {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.horde-pick-sparkles i {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #fff6cf;
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  filter: drop-shadow(0 0 3px #ffd76b);
+  opacity: 0;
+  animation: horde-shiny-twinkle 1.8s ease-in-out infinite;
+}
+
+.horde-pick-sparkles i:nth-child(1) { top: 8%; left: 10%; }
+.horde-pick-sparkles i:nth-child(2) { top: 18%; right: 6%; width: 7px; height: 7px; animation-delay: 0.45s; }
+.horde-pick-sparkles i:nth-child(3) { bottom: 18%; left: 2%; width: 7px; height: 7px; animation-delay: 0.9s; }
+.horde-pick-sparkles i:nth-child(4) { bottom: 6%; right: 14%; animation-delay: 1.35s; }
+
+@keyframes horde-shiny-rim {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(255, 215, 107, 0.3),
+      0 0 10px rgba(255, 215, 107, 0.25);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(255, 215, 107, 0.6),
+      0 0 22px rgba(255, 215, 107, 0.55);
+  }
+}
+
+@keyframes horde-shiny-sweep {
+  0% { background-position: 150% 0; }
+  60%, 100% { background-position: -100% 0; }
+}
+
+@keyframes horde-shiny-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes horde-shiny-twinkle {
+  0%, 100% { opacity: 0; transform: scale(0.3) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1) rotate(45deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .horde-pick-shiny .horde-pick-card,
+  .horde-pick-shiny .horde-pick-card::after,
+  .horde-pick-shine,
+  .horde-pick-sparkles i {
+    animation: none;
+  }
+  .horde-pick-sparkles i {
+    opacity: 0.8;
+  }
+}
+
+/* ---- Horde mode: the field, chests, minimap, tomes and held items ---- */
+
+/* The ground is drawn on the field layer (below), tiled across it, not on the screen. */
+.horde-stage::before {
+  display: none;
+}
+
+/* Everything on the field, sized to the whole field and slid under the screen by the camera. */
+.horde-world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 0;
+  will-change: transform;
+}
+
+.horde-world::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0.42)),
+    var(--horde-ground) 0 0 / var(--horde-tile-w) var(--horde-tile-h) repeat;
+  filter: blur(6px) saturate(0.85);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* The field's edge: a dark band just inside it. */
+.horde-world::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 0 6px rgba(0, 0, 0, 0.45), inset 0 0 60px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* A wild Pokemon rising out of the ground: the sprite slides up, cut off at its feet. */
+.horde-rising .horde-sprite {
+  translate: 0 calc((1 - var(--rise, 1)) * 100%);
+  clip-path: inset(0 0 calc((1 - var(--rise, 1)) * 100%) 0);
+}
+
+.horde-rising .horde-foe-hp,
+.horde-rising .horde-foe-level,
+.horde-rising .horde-foe-effects {
+  visibility: hidden;
+}
+
+.horde-rising {
+  pointer-events: none;
+}
+
+.horde-rise-dirt {
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 56px;
+  height: 16px;
+  translate: -50% 0;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(70, 45, 20, 0.9), rgba(70, 45, 20, 0.5) 60%, transparent);
+  scale: calc(0.5 + var(--rise, 1) * 0.7);
+  opacity: calc(1.2 - var(--rise, 1));
+  pointer-events: none;
+}
+
+.horde-rise-dirt::before,
+.horde-rise-dirt::after {
+  content: '';
+  position: absolute;
+  bottom: 6px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(190, 160, 120, 0.7);
+  animation: horde-rise-dust 0.5s ease-out infinite;
+}
+
+.horde-rise-dirt::before {
+  left: 4px;
+}
+
+.horde-rise-dirt::after {
+  right: 4px;
+  animation-delay: 0.25s;
+}
+
+@keyframes horde-rise-dust {
+  from {
+    transform: translate(0, 0) scale(0.6);
+    opacity: 0.9;
+  }
+  to {
+    transform: translate(0, -18px) scale(1.4);
+    opacity: 0;
+  }
+}
+
+/* A chest on the field, its price under it. */
+.horde-chest {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  transform: translate(-50%, -100%);
+  pointer-events: auto;
+}
+
+.horde-chest-sprite {
+  scale: 1.9;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.5));
+}
+
+.horde-chest-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 7px 1px 3px;
+  border-radius: 999px;
+  background: rgba(10, 12, 16, 0.75);
+  color: #c9ced8;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.horde-chest-affordable .horde-chest-price {
+  color: #ffd23f;
+}
+
+.horde-chest-near .horde-chest-sprite {
+  animation: horde-chest-ready 0.9s ease-in-out infinite;
+}
+
+.horde-chest-near {
+  cursor: pointer;
+}
+
+@keyframes horde-chest-ready {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 4px rgba(255, 210, 63, 0.6));
+  }
+  50% {
+    filter: drop-shadow(0 0 10px rgba(255, 210, 63, 1));
+  }
+}
+
+.horde-gold-icon {
+  image-rendering: pixelated;
+}
+
+.horde-hud-gold {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: #ffd23f;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+/* Standing by a chest: the open button, low in the middle of the screen. */
+.horde-chest-open-btn {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  translate: -50% 0;
+  z-index: 320;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.horde-chest-key {
+  margin-left: 6px;
+  padding: 0 6px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+/* The arrow at the screen's edge pointing to the nearest chest off screen. */
+.horde-chest-arrow {
+  position: absolute;
+  z-index: 315;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: rgba(10, 12, 16, 0.6);
+  pointer-events: none;
+}
+
+.horde-chest-arrow-head {
+  position: absolute;
+  inset: -9px;
+  pointer-events: none;
+}
+
+.horde-chest-arrow-head::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  translate: 0 -50%;
+  border: 7px solid transparent;
+  border-left: 9px solid #ffd23f;
+  border-right: 0;
+}
+
+/* The minimap, top right. */
+.horde-minimap {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 320;
+  width: 200px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  background: rgba(10, 14, 20, 0.6);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.horde-minimap-view {
+  position: absolute;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 2px;
+}
+
+.horde-minimap-dot {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  translate: -50% -50%;
+  border-radius: 50%;
+}
+
+.horde-minimap-chest {
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  background: #ffd23f;
+}
+
+.horde-minimap-elite {
+  background: #c27bff;
+}
+
+.horde-minimap-boss {
+  width: 9px;
+  height: 9px;
+  background: #ff4a4a;
+}
+
+.horde-minimap-lead {
+  width: 8px;
+  height: 8px;
+  background: #fff;
+  box-shadow: 0 0 0 2px #2f8cff;
+}
+
+/* An empty move or tome slot. */
+.horde-slot-empty {
+  border-style: dashed;
+  border-color: #3a4352;
+  opacity: 0.55;
+}
+
+.horde-slot-empty .horde-move-name,
+.horde-slot-empty .horde-tome-name {
+  font-weight: normal;
+  color: #8a93a3;
+}
+
+/* The tomes and held items, under the moves. */
+.horde-loadout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 0 16px 10px;
+  background: #151a22;
+}
+
+.horde-tomes {
+  display: flex;
+  gap: 6px;
+}
+
+.horde-tome {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 110px;
+  padding: 4px 10px;
+  border: 2px solid #8a6cff;
+  border-radius: 8px;
+  background: #1c1a2c;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.horde-tome-rank {
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #8a6cff;
+  color: #fff;
+  font-size: 11px;
+}
+
+.horde-held {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.horde-held-item {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+}
+
+.horde-held-count {
+  position: absolute;
+  right: 1px;
+  bottom: 0;
+  font-size: 10px;
+  font-weight: bold;
+  text-shadow: 0 1px 2px #000;
+}
+
+/* Opening a chest: the screen dims, the chest drops in and shakes, bursts open, the items rise out. */
+.horde-chest-overlay {
+  z-index: 150;
+  flex-direction: column;
+  gap: 18px;
+  background: rgba(4, 6, 10, 0.82);
+  cursor: pointer;
+  animation: horde-chest-dim 0.3s ease-out;
+}
+
+@keyframes horde-chest-dim {
+  from {
+    background: rgba(4, 6, 10, 0);
+  }
+}
+
+/* The items' row on top, the chest under it - the light fanning out behind the items. */
+.horde-chest-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.horde-chest-big {
+  position: relative;
+  z-index: 1;
+  margin: 70px 0 50px;
+  animation:
+    horde-chest-drop 0.35s cubic-bezier(0.3, 1.4, 0.6, 1),
+    horde-chest-shake 0.11s 0.35s linear 5;
+}
+
+.horde-chest-big-sprite {
+  scale: 4.5;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 6px 4px rgba(0, 0, 0, 0.6));
+}
+
+.horde-chest-big-open {
+  animation: horde-chest-pop 0.45s ease-out forwards;
+}
+
+@keyframes horde-chest-drop {
+  from {
+    transform: translateY(-260px);
+    opacity: 0;
+  }
+}
+
+@keyframes horde-chest-shake {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  25% {
+    transform: rotate(-9deg) translateX(-3px);
+  }
+  75% {
+    transform: rotate(9deg) translateX(3px);
+  }
+}
+
+@keyframes horde-chest-pop {
+  0% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.35);
+    filter: brightness(2.2);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1.15);
+  }
+}
+
+/* Light fanning out behind the items in the best item's colour, slowly turning. */
+.horde-chest-beams {
+  position: absolute;
+  z-index: 0;
+  left: 50%;
+  top: 95px;
+  translate: -50% -50%;
+  width: 620px;
+  height: 620px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, var(--tier) 0deg 9deg, transparent 9deg 24deg);
+  mask: radial-gradient(closest-side, #000 15%, transparent 100%);
+  opacity: 0.55;
+  animation:
+    horde-chest-beams-in 0.45s ease-out,
+    horde-chest-beams-turn 9s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes horde-chest-beams-in {
+  from {
+    scale: 0.1;
+    opacity: 0;
+  }
+}
+
+@keyframes horde-chest-beams-turn {
+  to {
+    rotate: 360deg;
+  }
+}
+
+/* A shower of coins bursting up out of the chest. */
+.horde-chest-coins {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: 62px;
+  pointer-events: none;
+}
+
+.horde-chest-coins span {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fff6b0, #ffd23f 45%, #b8860b);
+  --angle: calc(var(--coin) * 12deg - 168deg);
+  animation: horde-chest-coin 0.9s cubic-bezier(0.2, 0.7, 0.4, 1) forwards;
+  animation-delay: calc(var(--coin) * 0.02s);
+  opacity: 0;
+}
+
+@keyframes horde-chest-coin {
+  0% {
+    transform: rotate(var(--angle)) translateX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: rotate(var(--angle)) translateX(240px) translateY(40px);
+    opacity: 0;
+  }
+}
+
+.horde-chest-items {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  gap: 14px;
+  min-height: 190px;
+  cursor: default;
+}
+
+.horde-chest-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 170px;
+  min-height: 190px;
+  padding: 12px;
+  text-align: center;
+}
+
+.horde-chest-item-waiting {
+  visibility: hidden;
+}
+
+/* Each item flies up out of the chest, spinning through the others as it goes. */
+.horde-chest-item-spinning {
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  background: rgba(20, 24, 32, 0.8);
+  overflow: hidden;
+  animation: horde-chest-item-rise 0.32s cubic-bezier(0.2, 0.8, 0.4, 1);
+}
+
+@keyframes horde-chest-item-rise {
+  from {
+    transform: translateY(240px) scale(0.15);
+    opacity: 0;
+  }
+}
+
+.horde-chest-reel {
+  animation: horde-chest-reel 0.07s linear infinite;
+  filter: blur(1.5px);
+}
+
+@keyframes horde-chest-reel {
+  from {
+    transform: translateY(-22px);
+  }
+  to {
+    transform: translateY(22px);
+  }
+}
+
+.horde-chest-item-sprite {
+  scale: 2.2;
+  image-rendering: pixelated;
+}
+
+.horde-chest-item-shown {
+  animation: horde-chest-item-land 0.35s cubic-bezier(0.3, 1.5, 0.6, 1);
+}
+
+@keyframes horde-chest-item-land {
+  from {
+    transform: scale(1.12);
+    filter: brightness(1.8);
+  }
+}
+
+.horde-chest-item-rarity {
+  color: var(--tier);
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.horde-chest-item-name {
+  font-size: 15px;
+}
+
+.horde-chest-item-buff {
+  color: #9fe3a8;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.horde-chest-item-count {
+  color: #aab2bf;
+  font-size: 11px;
+}
+
+.horde-chest-take {
+  min-width: 160px;
+}
+
+.horde-chest-take-hidden {
+  visibility: hidden;
+}
+
+/* Horde pause menu: the switches and Resume / Save & quit, with buttons opening the
+   level-up choices taken and the held items each in a window of its own. */
+.horde-pause-list-btns {
+  display: flex;
+  gap: 8px;
+}
+
+.horde-pause-list-btns .horde-btn {
+  flex: 1;
+}
+
+.horde-pause-list-modal {
+  z-index: 110;
+}
+
+.horde-pause-list-modal .horde-panel {
+  width: min(440px, 92vw);
+  max-height: 85vh;
+}
+
+.horde-pause-list-modal .horde-log {
+  width: 100%;
+}
+
+.horde-pause-list-modal .horde-log-list {
+  max-height: calc(85vh - 120px);
+}
+
+/* A horde field with a floor tile (instead of a backdrop): the pixels stay crisp and
+   unblurred, only shaded a little so the Pokemon stand out. */
+.horde-world-tiled::before {
+  background:
+    linear-gradient(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.3)),
+    var(--horde-ground) 0 0 / var(--horde-tile-w) var(--horde-tile-h) repeat;
+  image-rendering: pixelated;
+  filter: saturate(0.9);
+}
+
+/* Horde level-up: a card's Banish button, in its top corner, and the banishes left. */
+.horde-choice {
+  position: relative;
+}
+
+.horde-banish {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 7px;
+  border: 1px solid rgba(255, 107, 107, 0.55);
+  border-radius: 6px;
+  background: rgba(20, 8, 8, 0.75);
+  color: #ff9b9b;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.horde-banish:hover {
+  background: rgba(120, 24, 24, 0.85);
+  color: #fff;
+}
+
+.horde-banish-count {
+  align-self: center;
+  font-size: 12px;
+  font-weight: bold;
+  color: #ff9b9b;
+}
+
+/* Horde page: tighter cards and info buttons, so the page needs less height. */
+.horde-page {
+  gap: 10px;
+}
+
+.horde-page .horde-card {
+  gap: 8px;
+  padding: 12px 14px;
+}
+
+.horde-page .horde-info-button {
+  padding: 8px 12px;
+}
+
+.horde-page .horde-info-button-icon {
+  width: 32px;
+  height: 32px;
+}
+
+/* Horde exploders: a dark red outline round the sprite (kept through a hit's flash, freezing
+   and being held), pulsing brighter while the fuse burns, the blast's reach filling in under
+   it, and the blast itself. */
+.horde-foe-exploder .horde-sprite {
+  filter: drop-shadow(1.5px 0 0 #7a0a0a) drop-shadow(-1.5px 0 0 #7a0a0a) drop-shadow(0 1.5px 0 #7a0a0a) drop-shadow(0 -1.5px 0 #7a0a0a);
+}
+
+.horde-foe-exploder.horde-flash .horde-sprite {
+  filter: drop-shadow(1.5px 0 0 #7a0a0a) drop-shadow(-1.5px 0 0 #7a0a0a) drop-shadow(0 1.5px 0 #7a0a0a) drop-shadow(0 -1.5px 0 #7a0a0a) brightness(2.4);
+}
+
+.horde-foe-exploder.horde-frozen .horde-sprite {
+  filter: drop-shadow(1.5px 0 0 #7a0a0a) drop-shadow(-1.5px 0 0 #7a0a0a) drop-shadow(0 1.5px 0 #7a0a0a) drop-shadow(0 -1.5px 0 #7a0a0a) hue-rotate(160deg) saturate(0.5) brightness(1.35);
+}
+
+.horde-foe-exploder.horde-stopped .horde-sprite {
+  filter: drop-shadow(1.5px 0 0 #7a0a0a) drop-shadow(-1.5px 0 0 #7a0a0a) drop-shadow(0 1.5px 0 #7a0a0a) drop-shadow(0 -1.5px 0 #7a0a0a) brightness(1.15);
+}
+
+.horde-foe-exploder.horde-fusing .horde-sprite {
+  animation: horde-fuse 0.28s ease-in-out infinite alternate;
+}
+
+@keyframes horde-fuse {
+  from {
+    filter: drop-shadow(1.5px 0 0 #7a0a0a) drop-shadow(-1.5px 0 0 #7a0a0a) drop-shadow(0 1.5px 0 #7a0a0a) drop-shadow(0 -1.5px 0 #7a0a0a);
+  }
+  to {
+    filter: drop-shadow(1.5px 0 0 #7a0a0a) drop-shadow(-1.5px 0 0 #7a0a0a) drop-shadow(0 1.5px 0 #7a0a0a) drop-shadow(0 -1.5px 0 #7a0a0a) brightness(1.6) drop-shadow(0 0 8px #ff3b1f);
+  }
+}
+
+.horde-fuse-ring {
+  position: absolute;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border: 2px dashed rgba(200, 30, 20, 0.85);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 60, 30, 0.32) 0 calc(var(--fuse, 0) * 70.7%),
+    rgba(160, 20, 10, 0.12) calc(var(--fuse, 0) * 70.7%)
+  );
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* An exploder's blast: a flash, then one of Kenney's fireballs swelling out over its reach and
+   turning as it goes, then black smoke drifting up. The box itself only holds the centring;
+   each layer grows from its own middle, so it all comes out of the exploder. */
+.horde-boom {
+  position: absolute;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 7;
+}
+
+.horde-boom::before,
+.horde-boom::after,
+.horde-boom-flash {
+  content: '';
+  position: absolute;
+  inset: -12%;
+  background: center / contain no-repeat;
+}
+
+.horde-boom::before {
+  background-image: var(--boom-img);
+  animation: horde-boom-fire 0.6s ease-out forwards;
+}
+
+.horde-boom::after {
+  background-image: var(--fx-smoke);
+  opacity: 0;
+  animation: horde-boom-smoke 0.9s ease-out forwards;
+}
+
+.horde-boom-flash {
+  inset: 10%;
+  background-image: var(--fx-flash);
+  z-index: 1;
+  animation: horde-boom-flash 0.25s ease-out forwards;
+}
+
+@keyframes horde-boom-fire {
+  0% {
+    opacity: 1;
+    transform: rotate(var(--boom-turn, 0deg)) scale(0.25);
+  }
+  35% {
+    opacity: 1;
+    transform: rotate(calc(var(--boom-turn, 0deg) + 20deg)) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(calc(var(--boom-turn, 0deg) + 40deg)) scale(1.1);
+  }
+}
+
+@keyframes horde-boom-smoke {
+  0%,
+  30% {
+    opacity: 0;
+    transform: translateY(0) scale(0.6);
+  }
+  50% {
+    opacity: 0.75;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-18%) scale(1.05);
+  }
+}
+
+@keyframes horde-boom-flash {
+  from {
+    opacity: 1;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.2);
+  }
+}
+
+/* Horde Move Deleter: the known moves to pick one to forget */
+.horde-move-deleter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* Horde move effects drawn with Kenney's particle images (white shapes, used as masks over the
+   move's type colour; the image paths are set on .horde-stage). */
+
+/* A shot: its orb with a sparkle spinning round it. */
+.horde-shot::after {
+  content: '';
+  position: absolute;
+  inset: -90%;
+  background: color-mix(in srgb, var(--move-color) 60%, #fff);
+  mask: var(--fx-star) center / contain no-repeat;
+  animation: horde-fx-spin 0.6s linear infinite;
+}
+
+/* A piercing shot: a sharp-edged bolt, pointed in front and tapering behind, with a bright
+   core - drawn rather than a glow image, so it stays crisp however big its upgrades make it.
+   A touch of blur softens its edges (on the shot itself, so the bolt's clipped edge blurs too). */
+.horde-shot.horde-shot-pierce {
+  background: none;
+  box-shadow: none;
+  filter: blur(0.6px);
+  /* See-through, so a big one doesn't hide the foes it passes over. */
+  opacity: 0.6;
+}
+
+.horde-shot.horde-shot-pierce::after {
+  inset: -20% -60%;
+  background: linear-gradient(
+    to bottom,
+    var(--move-color) 0 28%,
+    color-mix(in srgb, var(--move-color) 25%, #fff) 28% 72%,
+    var(--move-color) 72% 100%
+  );
+  mask: none;
+  clip-path: polygon(0 40%, 62% 0, 100% 50%, 62% 100%, 0 60%);
+  animation: none;
+}
+
+@keyframes horde-fx-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+/* Electric's chain: a jagged bolt from one foe to the next. */
+.horde-arc {
+  height: 30px;
+  border-radius: 0;
+  box-shadow: none;
+  background: color-mix(in srgb, var(--move-color) 65%, #fff);
+  mask: var(--fx-bolt-side) center / 100% 100% no-repeat;
+}
+
+/* A spread move's wave: a glowing ring rolling out round the lead. */
+.horde-wave {
+  border: none;
+  border-radius: 0;
+  background: var(--move-color);
+  mask: var(--fx-ring) center / 100% 100% no-repeat;
+}
+
+/* A stream: a bright streak of light down the middle of its band. */
+.horde-beam::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0.85;
+  mask: var(--fx-streak) center / 100% 260% no-repeat;
+}
+
+/* A strike coming down: a bolt of lightning in the move's colour. */
+.horde-strike::before {
+  left: -18px;
+  width: 36px;
+  height: 110px;
+  border-radius: 0;
+  box-shadow: none;
+  background: color-mix(in srgb, var(--move-color) 60%, #fff);
+  mask: var(--fx-bolt) center / 100% 100% no-repeat;
+}
+
+/* Where a strike lands, and a blast's explosion: a starburst of the move's colour. */
+.horde-strike-hit,
+.horde-blast {
+  border: none;
+  border-radius: 0;
+  background: radial-gradient(circle, #fff 0 14%, var(--move-color) 40%);
+  mask: var(--fx-burst) center / contain no-repeat;
+}
+
+/* A hit: a twinkling sparkle in its type's colour. */
+.horde-burst {
+  border-radius: 0;
+  background: radial-gradient(circle, #fff 0 18%, var(--burst-color) 45%);
+  mask: var(--fx-sparkle) center / contain no-repeat;
+}
+
+.horde-burst-spread {
+  mask-size: 100% 100%;
+}
+
+/* Horde run: the location and next chest's price in the top bar (PC only). */
+.horde-hud-place {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.horde-hud-place-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: bold;
+}
+
+.horde-hud-place-icon {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+.horde-hud-chest {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.horde-hud-chest-affordable {
+  color: #ffd75e;
+}
+
+/* Horde level-up cards: each sort has its own colour, mark and stripe, so moves, upgrades,
+   tomes and effects tell apart at a glance. */
+.horde-choice.horde-choice-move { --kind-color: var(--move-color); --kind-mark: "\2726"; }
+.horde-choice.horde-choice-upgrade { --kind-color: #5fe08a; --kind-mark: "\25B2"; }
+.horde-choice.horde-choice-tome { --kind-color: #a98bff; --kind-mark: "\2261"; }
+.horde-choice.horde-choice-effect { --kind-color: var(--move-color); --kind-mark: "\2739"; }
+
+.horde-choice[class*="horde-choice-"] .horde-choice-kind {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px 2px 7px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--kind-color, #5fd0ff) 70%, transparent);
+  background: color-mix(in srgb, var(--kind-color, #5fd0ff) 22%, rgba(0, 0, 0, 0.35));
+  color: color-mix(in srgb, var(--kind-color, #5fd0ff) 45%, #fff);
+}
+
+.horde-choice-move .horde-choice-kind::before,
+.horde-choice-upgrade .horde-choice-kind::before,
+.horde-choice-tome .horde-choice-kind::before,
+.horde-choice-effect .horde-choice-kind::before {
+  content: var(--kind-mark);
+  font-size: 12px;
+  color: var(--kind-color);
+}
+
+/* A stripe down the left edge in the sort's colour. */
+.horde-choice-move::after,
+.horde-choice-upgrade::after,
+.horde-choice-tome::after,
+.horde-choice-effect::after {
+  content: "";
+  position: absolute;
+  left: -2px;
+  top: 14px;
+  bottom: 14px;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
+  background: var(--kind-color);
+  box-shadow: 0 0 8px var(--kind-color);
+  pointer-events: none;
+}
+
+/* Upgrades: a dashed stripe - it builds on a move already held. */
+.horde-choice-upgrade::after {
+  background: repeating-linear-gradient(180deg, var(--kind-color) 0 8px, transparent 8px 12px);
+  box-shadow: none;
+}
+
+/* Tomes: a faint page-lined wash in purple. */
+.horde-choice.rarity-card-framed.horde-choice-tome {
+  background:
+    repeating-linear-gradient(180deg, transparent 0 17px, rgba(169, 139, 255, 0.07) 17px 18px),
+    radial-gradient(ellipse at 15% 50%, color-mix(in srgb, var(--tier) 22%, transparent), transparent 60%),
+    linear-gradient(180deg, #241c34, #16131f);
+}
+
+/* The move's type, under its kind. */
+.horde-choice .horde-choice-type {
+  align-self: flex-start;
+  margin-top: -2px;
+}
+
+/* New moves and tomes glow gold, softly pulsing. */
+.horde-choice.horde-choice-fresh {
+  animation:
+    horde-choice-in 0.25s ease-out backwards,
+    horde-choice-fresh-glow 1.8s ease-in-out 0.25s infinite;
+}
+
+.horde-log-tip.horde-choice-fresh {
+  animation: horde-choice-fresh-glow 1.8s ease-in-out infinite;
+}
+
+@keyframes horde-choice-fresh-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 10px 1px rgba(255, 213, 74, 0.35),
+      inset 0 0 16px rgba(255, 213, 74, 0.12),
+      0 8px 20px rgba(0, 0, 0, 0.5);
+  }
+  50% {
+    box-shadow:
+      0 0 22px 5px rgba(255, 213, 74, 0.65),
+      inset 0 0 24px rgba(255, 213, 74, 0.22),
+      0 8px 20px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* Horde range rings, stronger: brighter, thicker lines with a dark edge so they read on light
+   backgrounds (dunes, snow) as well as dark ones. */
+.horde-spread-ring {
+  border: 3px dashed rgba(255, 255, 255, 0.75);
+  background: radial-gradient(circle, transparent 60%, rgba(255, 255, 255, 0.1));
+  filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.95)) drop-shadow(0 0 1px rgba(0, 0, 0, 0.8));
+}
+
+.horde-melee-ring {
+  border: 3px dotted rgba(255, 150, 90, 0.9);
+  background: rgba(255, 150, 90, 0.07);
+  filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.95)) drop-shadow(0 0 1px rgba(0, 0, 0, 0.8));
+}
+
+.horde-pickup-ring {
+  border: 2px dashed rgba(140, 220, 255, 0.6);
+  background: rgba(140, 220, 255, 0.05);
+  filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.9));
+}
+
+.horde-hitbox-lead {
+  border-width: 2px;
+  border-color: rgba(120, 200, 255, 0.9);
+  filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.9));
+}
+
+.horde-hitbox-hot {
+  border-color: rgba(255, 80, 80, 1);
+}
+
+/* A spread move's wave, thicker: a solid glowing band of the move's colour rolling out. */
+.horde-wave {
+  mask: none;
+  border-radius: 50%;
+  border: 7px solid color-mix(in srgb, var(--move-color) 75%, #fff);
+  background: radial-gradient(circle, transparent 45%, color-mix(in srgb, var(--move-color) 45%, transparent) 70%);
+  box-shadow:
+    0 0 18px 5px var(--move-color),
+    inset 0 0 18px 5px var(--move-color),
+    0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+
+/* A cone, bolder: a stronger wedge that stays full before it fades. */
+.horde-cone {
+  background: conic-gradient(
+    from var(--cone-from),
+    color-mix(in srgb, var(--move-color) 85%, #fff) 0 var(--cone-angle),
+    transparent var(--cone-angle)
+  );
+  mask-image: radial-gradient(circle, transparent 5%, #000 18%, #000 66%, transparent 71%);
+  filter: drop-shadow(0 0 6px var(--move-color));
+  animation-name: horde-cone-strong;
+}
+
+@keyframes horde-cone-strong {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+  60% {
+    opacity: 0.95;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* A strike or a barrage's strikes, bigger: a wider bolt with a glow and dark edge (on the
+   holder, so the bolt's mask doesn't cut them off), and a bolder mark where it lands. */
+.horde-strike {
+  filter: drop-shadow(0 0 6px var(--move-color)) drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.9));
+}
+
+.horde-strike::before {
+  left: -30px;
+  width: 60px;
+  height: 140px;
+  background: color-mix(in srgb, var(--move-color) 70%, #fff);
+}
+
+.horde-strike::after {
+  left: -28px;
+  top: -10px;
+  width: 56px;
+  height: 20px;
+  border: 3px solid var(--move-color);
+  background: color-mix(in srgb, var(--move-color) 30%, transparent);
+  opacity: 1;
+}
+
+/* Horde moves' own looks (hordeMoveFx.tsx). */
+
+/* A meteor landing shakes the field. */
+.horde-shake .horde-world {
+  animation: horde-fx-shake 0.18s linear;
+}
+
+@keyframes horde-fx-shake {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  25% {
+    translate: -5px 3px;
+  }
+  50% {
+    translate: 4px -4px;
+  }
+  75% {
+    translate: -3px -2px;
+  }
+}
+
+/* The lead dashing (a blur of its colour), vanished (just a mound of earth), charging up (a
+   pulsing ring at its feet) or rampaging (glowing red). */
+.horde-player.horde-dashing .horde-sprite {
+  filter: drop-shadow(-10px 0 6px color-mix(in srgb, var(--move-color) 70%, transparent)) brightness(1.3);
+}
+
+.horde-player.horde-burrowed .horde-sprite,
+.horde-player.horde-burrowed .horde-lead-hp {
+  opacity: 0;
+}
+
+.horde-player.horde-burrowed::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  width: 46px;
+  height: 18px;
+  translate: -50% 0;
+  border-radius: 50% 50% 40% 40%;
+  background: radial-gradient(ellipse at 50% 30%, #8a6a44, #4a3420 75%);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--move-color) 60%, transparent);
+  animation: horde-fx-mound 0.3s ease-in-out infinite alternate;
+}
+
+@keyframes horde-fx-mound {
+  to {
+    scale: 1.12 0.9;
+  }
+}
+
+.horde-player.horde-charging::after {
+  content: '';
+  position: absolute;
+  bottom: -14px;
+  left: 50%;
+  width: 70px;
+  height: 26px;
+  translate: -50% 0;
+  border-radius: 50%;
+  border: 3px solid color-mix(in srgb, var(--move-color) 70%, #fff);
+  box-shadow:
+    0 0 14px 4px var(--move-color),
+    inset 0 0 10px 2px var(--move-color);
+  animation: horde-fx-charge-ring 0.35s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+.horde-player.horde-charging .horde-sprite {
+  filter: drop-shadow(0 0 8px var(--move-color)) brightness(1.2);
+}
+
+@keyframes horde-fx-charge-ring {
+  from {
+    scale: 0.75;
+    opacity: 0.6;
+  }
+  to {
+    scale: 1.05;
+    opacity: 1;
+  }
+}
+
+.horde-player.horde-raging .horde-sprite {
+  filter: drop-shadow(0 0 6px #ff3b2f) drop-shadow(0 0 12px #ff3b2f) saturate(1.4);
+}
+
+/* Shots with a look of their own, in place of the glowing orb. */
+.horde-shot[class*='horde-fx-shot-']::after {
+  display: none;
+}
+
+.horde-shot.horde-fx-shot-orb {
+  width: 26px;
+  height: 26px;
+  background: radial-gradient(
+    circle at 40% 35%,
+    color-mix(in srgb, var(--move-color) 30%, #fff) 0 12%,
+    var(--move-color) 45%,
+    color-mix(in srgb, var(--move-color) 60%, #000) 75%
+  );
+  box-shadow: 0 0 14px 5px color-mix(in srgb, var(--move-color) 70%, transparent);
+  animation: horde-fx-orb-pulse 0.3s ease-in-out infinite alternate;
+}
+
+@keyframes horde-fx-orb-pulse {
+  to {
+    scale: 1.12;
+  }
+}
+
+.horde-shot.horde-fx-shot-star {
+  width: 32px;
+  height: 32px;
+  border-radius: 0;
+  box-shadow: none;
+  background: color-mix(in srgb, var(--move-color) 35%, #fff6b0);
+  /* A five-point star, drawn here rather than the particle image's four points. */
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='50,2 61,37 98,37 68,59 79,95 50,73 21,95 32,59 2,37 39,37'/%3E%3C/svg%3E") center / contain no-repeat;
+  filter: drop-shadow(0 0 4px #fff6b0);
+  animation: horde-fx-spin 0.5s linear infinite;
+}
+
+.horde-shot.horde-fx-shot-leaf {
+  width: 22px;
+  height: 11px;
+  border-radius: 100% 0;
+  box-shadow: none;
+  background: linear-gradient(135deg, #a6f07a, var(--move-color) 60%, #2f6b25);
+  animation: horde-fx-spin 0.35s linear infinite;
+}
+
+.horde-shot.horde-fx-shot-coin {
+  width: 16px;
+  height: 16px;
+  box-shadow: 0 0 8px 2px rgba(255, 210, 63, 0.7);
+  background: radial-gradient(circle at 40% 35%, #fff6c4 0 15%, #ffd23f 40%, #b8860b 80%);
+  border: 2px solid #8a6508;
+  animation: horde-fx-coin-flip 0.3s linear infinite;
+}
+
+@keyframes horde-fx-coin-flip {
+  50% {
+    scale: 0.25 1;
+  }
+}
+
+.horde-shot.horde-fx-shot-needle {
+  width: 8px;
+  height: 20px;
+  border-radius: 50% 50% 50% 50% / 90% 90% 10% 10%;
+  box-shadow: 0 0 6px 2px color-mix(in srgb, var(--move-color) 60%, transparent);
+  background: linear-gradient(180deg, #fff, var(--move-color) 50%, color-mix(in srgb, var(--move-color) 50%, #000));
+  animation: horde-fx-spin 0.25s linear infinite;
+}
+
+.horde-shot.horde-fx-shot-bubble {
+  width: 20px;
+  height: 20px;
+  box-shadow: none;
+  background:
+    radial-gradient(circle at 35% 30%, #fff 0 12%, transparent 22%),
+    radial-gradient(circle, transparent 55%, color-mix(in srgb, var(--move-color) 80%, #fff) 70%, transparent 74%);
+  animation: horde-fx-bubble 0.4s ease-in-out infinite alternate;
+}
+
+@keyframes horde-fx-bubble {
+  to {
+    scale: 1.15 0.9;
+  }
+}
+
+.horde-shot.horde-fx-shot-rock {
+  width: 20px;
+  height: 17px;
+  border-radius: 45% 55% 40% 60% / 55% 45% 55% 45%;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
+  background: radial-gradient(circle at 35% 30%, #d8c8a8, #8f7a58 55%, #5a4a32);
+  animation: horde-fx-spin 0.45s linear infinite;
+}
+
+/* An orbiting ball: a blazing orb in its type's colour. */
+.horde-fx-orb {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    #fff 0 18%,
+    color-mix(in srgb, var(--move-color) 60%, #ffd23f) 45%,
+    var(--move-color) 65%,
+    transparent 72%
+  );
+  box-shadow: 0 0 16px 6px color-mix(in srgb, var(--move-color) 70%, transparent);
+  pointer-events: none;
+  z-index: 190;
+}
+
+/* Ground a move left behind: a pool of its colour, fading as its time runs out. */
+.horde-fx-zone {
+  position: absolute;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--move-color) 65%, transparent) 0 40%,
+    color-mix(in srgb, var(--move-color) 35%, transparent) 65%,
+    transparent 72%
+  );
+  opacity: calc(0.25 + 0.6 * var(--zone-left, 1));
+  pointer-events: none;
+  z-index: 4;
+  animation: horde-fx-zone 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes horde-fx-zone {
+  to {
+    scale: 1.06;
+  }
+}
+
+.horde-fx-zone-fire {
+  background: radial-gradient(
+    circle,
+    rgba(255, 220, 120, 0.8) 0 15%,
+    rgba(255, 110, 30, 0.6) 40%,
+    rgba(200, 40, 10, 0.3) 62%,
+    transparent 72%
+  );
+  animation-duration: 0.25s;
+}
+
+.horde-fx-zone-poison {
+  background: radial-gradient(
+    circle at 40% 40%,
+    rgba(220, 150, 255, 0.6) 0 8%,
+    rgba(150, 60, 190, 0.65) 30%,
+    rgba(90, 30, 120, 0.45) 60%,
+    transparent 72%
+  );
+}
+
+.horde-fx-zone-slow {
+  box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--move-color) 50%, #fff);
+}
+
+/* A wandering whirlwind: a swirl of its colour spinning on the spot. */
+.horde-fx-zone.horde-fx-zone-whirl {
+  background: conic-gradient(
+    from 0deg,
+    transparent,
+    color-mix(in srgb, var(--move-color) 80%, #fff) 25%,
+    transparent 40%,
+    color-mix(in srgb, var(--move-color) 80%, #fff) 65%,
+    transparent 80%
+  );
+  mask-image: radial-gradient(circle, transparent 12%, #000 25%, #000 60%, transparent 71%);
+  animation: horde-fx-spin 0.45s linear infinite;
+}
+
+/* An aftershock: a second, fainter ring rolling further out. */
+.horde-wave.horde-fx-aftershock {
+  opacity: 0.75;
+  border-style: dashed;
+}
+
+/* A strike falling at an angle from far off: a meteor trailing fire, a block of ice or a plain
+   rock, its shadow growing at the foe's feet as it comes. */
+.horde-fx-fall {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 196;
+}
+
+.horde-fx-fall-rock {
+  position: absolute;
+  left: -26px;
+  top: -52px;
+  width: 52px;
+  height: 52px;
+  border-radius: 46% 54% 50% 50%;
+  background: radial-gradient(circle at 60% 65%, #fff1a8 0 10%, #ff9b3a 25%, #8b3a1a 55%, #3d1c10 80%);
+  box-shadow: 0 0 22px 8px rgba(255, 120, 40, 0.75);
+  animation: horde-fx-meteor-fall var(--strike-ms, 550ms) cubic-bezier(0.5, 0, 0.9, 0.6) var(--fall-delay, 0ms) both;
+}
+
+/* Its fiery tail, streaming back the way it came. */
+.horde-fx-fall-rock::before {
+  content: '';
+  position: absolute;
+  left: -90px;
+  top: -150px;
+  width: 70px;
+  height: 200px;
+  rotate: -27deg;
+  transform-origin: 100% 100%;
+  border-radius: 50%;
+  background: linear-gradient(
+    0deg,
+    rgba(255, 210, 120, 0.95),
+    rgba(255, 110, 30, 0.7) 35%,
+    color-mix(in srgb, var(--move-color) 50%, transparent) 70%,
+    transparent
+  );
+  filter: blur(3px);
+  z-index: -1;
+}
+
+.horde-fx-fall-iceMeteor .horde-fx-fall-rock {
+  border-radius: 12%;
+  rotate: 20deg;
+  background: linear-gradient(135deg, #ffffff, #bdefff 35%, #6cc8ec 70%, #3d8fb8);
+  box-shadow: 0 0 18px 6px rgba(150, 230, 255, 0.8);
+}
+
+.horde-fx-fall-iceMeteor .horde-fx-fall-rock::before {
+  background: linear-gradient(0deg, rgba(220, 250, 255, 0.9), rgba(150, 220, 255, 0.5) 50%, transparent);
+}
+
+.horde-fx-fall-rockfall .horde-fx-fall-rock {
+  left: -18px;
+  top: -36px;
+  width: 36px;
+  height: 32px;
+  background: radial-gradient(circle at 35% 30%, #d8c8a8, #8f7a58 55%, #4a3c28);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45);
+}
+
+.horde-fx-fall-rockfall .horde-fx-fall-rock::before {
+  left: -40px;
+  width: 30px;
+  background: linear-gradient(0deg, rgba(200, 180, 140, 0.6), transparent);
+}
+
+@keyframes horde-fx-meteor-fall {
+  from {
+    translate: -340px -620px;
+    scale: 0.7;
+  }
+  to {
+    translate: 0 0;
+    scale: 1;
+  }
+}
+
+.horde-fx-fall-shadow {
+  position: absolute;
+  left: -30px;
+  top: -9px;
+  width: 60px;
+  height: 18px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.55), transparent 70%);
+  animation: horde-fx-fall-shadow var(--strike-ms, 550ms) ease-in var(--fall-delay, 0ms) both;
+}
+
+@keyframes horde-fx-fall-shadow {
+  from {
+    scale: 0.2;
+    opacity: 0.2;
+  }
+  to {
+    scale: 1;
+    opacity: 1;
+  }
+}
+
+/* Where a meteor comes down: a glowing crater, a shockwave ring, and debris thrown out. */
+.horde-fx-crater {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.horde-fx-crater::before {
+  content: '';
+  position: absolute;
+  left: -50px;
+  top: -20px;
+  width: 100px;
+  height: 40px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, #fff3b0 0 10%, rgba(255, 130, 40, 0.85) 30%, rgba(60, 30, 15, 0.7) 55%, transparent 72%);
+  animation: horde-fx-crater 0.52s ease-out forwards;
+}
+
+.horde-fx-crater::after {
+  content: '';
+  position: absolute;
+  left: -60px;
+  top: -24px;
+  width: 120px;
+  height: 48px;
+  border-radius: 50%;
+  border: 4px solid color-mix(in srgb, var(--move-color) 60%, #fff);
+  animation: horde-fx-crater-ring 0.45s ease-out forwards;
+}
+
+.horde-fx-crater-iceMeteor::before {
+  background: radial-gradient(ellipse, #fff 0 12%, rgba(170, 235, 255, 0.85) 35%, rgba(80, 160, 200, 0.5) 58%, transparent 72%);
+}
+
+.horde-fx-crater-rockfall::before {
+  background: radial-gradient(ellipse, rgba(210, 190, 150, 0.9) 0 20%, rgba(110, 90, 60, 0.6) 50%, transparent 72%);
+}
+
+@keyframes horde-fx-crater {
+  0% {
+    scale: 0.3;
+    opacity: 1;
+  }
+  40% {
+    scale: 1.1;
+    opacity: 1;
+  }
+  100% {
+    scale: 1.2;
+    opacity: 0;
+  }
+}
+
+@keyframes horde-fx-crater-ring {
+  from {
+    scale: 0.2;
+    opacity: 1;
+  }
+  to {
+    scale: 1.5;
+    opacity: 0;
+  }
+}
+
+.horde-fx-debris {
+  position: absolute;
+  left: -5px;
+  top: -5px;
+  width: 10px;
+  height: 9px;
+  border-radius: 40%;
+  background: #6b5638;
+  rotate: calc(var(--i) * 60deg + 15deg);
+  animation: horde-fx-debris 0.5s cubic-bezier(0.2, 0.8, 0.4, 1) forwards;
+}
+
+.horde-fx-crater-iceMeteor .horde-fx-debris {
+  background: #d4f5ff;
+}
+
+@keyframes horde-fx-debris {
+  from {
+    transform: translate(0, 0);
+    opacity: 1;
+  }
+  to {
+    transform: translate(60px, -14px);
+    opacity: 0;
+  }
+}
+
+/* A strike from below on its way: a crack spreading at the foe's feet. */
+.horde-fx-crack {
+  position: absolute;
+  width: 70px;
+  height: 18px;
+  translate: -50% -50%;
+  pointer-events: none;
+  z-index: 5;
+  border-radius: 50%;
+  background:
+    linear-gradient(17deg, transparent 46%, rgba(30, 18, 8, 0.9) 47% 53%, transparent 54%),
+    linear-gradient(-23deg, transparent 46%, rgba(30, 18, 8, 0.9) 47% 52%, transparent 53%),
+    radial-gradient(ellipse, color-mix(in srgb, var(--move-color) 55%, transparent), transparent 70%);
+  animation: horde-fx-crack var(--strike-ms, 250ms) ease-out var(--fall-delay, 0ms) both;
+}
+
+.horde-fx-crack-shadow {
+  background: radial-gradient(ellipse, rgba(40, 10, 60, 0.85), rgba(90, 50, 140, 0.4) 50%, transparent 70%);
+}
+
+@keyframes horde-fx-crack {
+  from {
+    scale: 0.2 0.5;
+    opacity: 0.3;
+  }
+  to {
+    scale: 1;
+    opacity: 1;
+  }
+}
+
+/* A burst up out of the ground: spikes (earth, stone, or a reaching shadow) and dust. */
+.horde-fx-erupt {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 197;
+}
+
+.horde-fx-erupt-spike {
+  position: absolute;
+  bottom: 0;
+  left: calc((var(--i) - 2) * 15px - 8px);
+  width: 16px;
+  height: calc(70px - (var(--i) - 2) * (var(--i) - 2) * 10px);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  background: linear-gradient(0deg, color-mix(in srgb, var(--move-color) 70%, #3a2614), color-mix(in srgb, var(--move-color) 50%, #fff));
+  rotate: calc((var(--i) - 2) * 14deg);
+  transform-origin: 50% 100%;
+  animation: horde-fx-erupt 0.48s cubic-bezier(0.2, 1.4, 0.4, 1) calc(var(--i) * 25ms) both;
+}
+
+.horde-fx-erupt-spikes .horde-fx-erupt-spike {
+  width: 18px;
+  height: calc(90px - (var(--i) - 2) * (var(--i) - 2) * 14px);
+  background: linear-gradient(0deg, #5b5246, #b9ad98 60%, #ece3cf);
+}
+
+.horde-fx-erupt-shadow .horde-fx-erupt-spike {
+  clip-path: none;
+  width: 12px;
+  border-radius: 50% 50% 20% 20%;
+  background: linear-gradient(0deg, rgba(30, 10, 50, 0.95), rgba(110, 60, 170, 0.85));
+  box-shadow: 0 0 8px rgba(140, 80, 220, 0.8);
+}
+
+@keyframes horde-fx-erupt {
+  0% {
+    scale: 1 0;
+    opacity: 1;
+  }
+  45% {
+    scale: 1 1;
+    opacity: 1;
+  }
+  100% {
+    scale: 1 0.85;
+    opacity: 0;
+  }
+}
+
+.horde-fx-erupt-dust {
+  position: absolute;
+  left: -50px;
+  top: -14px;
+  width: 100px;
+  height: 28px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(150, 120, 80, 0.7), transparent 70%);
+  animation: horde-fx-crater-ring 0.48s ease-out forwards;
+}
+
+.horde-fx-erupt-shadow .horde-fx-erupt-dust {
+  background: radial-gradient(ellipse, rgba(80, 40, 120, 0.7), transparent 70%);
+}
+
+/* Before a bolt: a crackle of its colour round the foe's feet. */
+.horde-fx-charge {
+  position: absolute;
+  width: 54px;
+  height: 18px;
+  translate: -50% -50%;
+  border-radius: 50%;
+  border: 2px dashed color-mix(in srgb, var(--move-color) 70%, #fff);
+  box-shadow: 0 0 10px 2px var(--move-color);
+  pointer-events: none;
+  z-index: 5;
+  animation: horde-fx-spin 0.3s linear infinite;
+}
+
+/* A lightning bolt from the top of the screen down to the foe, with a flash where it strikes. */
+.horde-fx-bolt {
+  position: absolute;
+  width: 70px;
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+  z-index: 198;
+  animation: horde-fx-bolt 0.32s linear forwards;
+}
+
+.horde-fx-bolt svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.horde-fx-bolt-glow,
+.horde-fx-bolt-core {
+  fill: none;
+  stroke-linejoin: miter;
+  vector-effect: non-scaling-stroke;
+}
+
+.horde-fx-bolt-glow {
+  stroke: color-mix(in srgb, var(--move-color) 85%, #fff);
+  stroke-width: 11;
+  opacity: 0.55;
+  filter: drop-shadow(0 0 6px var(--move-color));
+}
+
+.horde-fx-bolt-core {
+  stroke: #fff;
+  stroke-width: 3.5;
+}
+
+.horde-fx-bolt-flash {
+  position: absolute;
+  left: 50%;
+  bottom: -30px;
+  width: 110px;
+  height: 60px;
+  translate: -50% 0;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, #fff 0 18%, color-mix(in srgb, var(--move-color) 70%, transparent) 45%, transparent 70%);
+  animation: horde-fx-crater 0.32s ease-out forwards;
+}
+
+@keyframes horde-fx-bolt {
+  0% {
+    opacity: 1;
+  }
+  30% {
+    opacity: 0.35;
+  }
+  45% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* A swirl round the foe: a spinning spiral of its colour. */
+.horde-fx-vortex {
+  position: absolute;
+  width: 110px;
+  height: 110px;
+  translate: -50% -70%;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent,
+    color-mix(in srgb, var(--move-color) 85%, #fff) 20%,
+    transparent 35%,
+    color-mix(in srgb, var(--move-color) 85%, #fff) 55%,
+    transparent 70%,
+    color-mix(in srgb, var(--move-color) 85%, #fff) 88%,
+    transparent
+  );
+  mask-image: radial-gradient(circle, transparent 15%, #000 30%, #000 55%, transparent 70%);
+  pointer-events: none;
+  z-index: 197;
+  animation:
+    horde-fx-spin 0.3s linear infinite,
+    horde-fx-vortex 0.65s ease-out forwards;
+}
+
+@keyframes horde-fx-vortex {
+  0% {
+    scale: 0.3 0.25;
+    opacity: 1;
+  }
+  40% {
+    scale: 1 0.85;
+    opacity: 1;
+  }
+  100% {
+    scale: 1.2 1;
+    opacity: 0;
+  }
+}
+
+/* A melee hit's mark on the foe: claws, a fist, a boot, fangs, a horn, a cross-slash or an impact ring. */
+.horde-fx-mark {
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  translate: -50% -110%;
+  rotate: var(--turn, 0deg);
+  color: color-mix(in srgb, var(--move-color) 45%, #fff);
+  filter: drop-shadow(0 0 4px var(--move-color)) drop-shadow(0 0 1px rgba(0, 0, 0, 0.9));
+  pointer-events: none;
+  z-index: 198;
+  animation: horde-fx-mark 0.28s ease-out forwards;
+}
+
+.horde-fx-mark svg {
+  width: 100%;
+  height: 100%;
+}
+
+.horde-fx-mark-cross {
+  position: absolute;
+  inset: 0;
+  scale: -1 1;
+}
+
+.horde-fx-mark-ring {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  border: 5px solid currentColor;
+  background: radial-gradient(circle, #fff 0 15%, transparent 45%);
+}
+
+@keyframes horde-fx-mark {
+  0% {
+    scale: 0.5;
+    opacity: 1;
+  }
+  45% {
+    scale: 1.15;
+    opacity: 1;
+  }
+  100% {
+    scale: 1.25;
+    opacity: 0;
+  }
+}
+
+/* The moves list: each move's twist under its name, and its rarity in that rarity's colour. */
+.horde-moves-trait {
+  grid-column: 1 / -1;
+  order: 1;
+  color: #ffd166;
+  font-size: 12px;
+}
+
+.horde-moves-boosts {
+  order: 2;
+}
+
+.horde-moves-rarity-common {
+  color: #b0c3d9;
+}
+
+.horde-moves-rarity-uncommon {
+  color: #4b8bff;
+}
+
+.horde-moves-rarity-rare {
+  color: #a77bff;
+}
+
+.horde-moves-rarity-epic {
+  color: #eb4b9b;
+}
+
+.horde-moves-rarity-legendary {
+  color: #ffd23f;
+}
+
+/* The loadout bar on one line: tomes, then type effects, then the held items taking the rest
+   of the room and scrolling sideways once there are too many. */
+.horde-loadout {
+  flex-wrap: nowrap;
+}
+
+.horde-tomes,
+.horde-effects {
+  flex: none;
+}
+
+.horde-held {
+  flex: 1;
+  min-width: 0;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+
+.horde-held-item {
+  flex: none;
+}
+
+/* A type effect: its name in its type's colour, with a pip for each move of the type (all
+   lit up, and glowing, once its bonus is in). */
+.horde-effects {
+  display: flex;
+  gap: 6px;
+}
+
+.horde-effect {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 2px solid var(--move-color);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--move-color) 18%, #151a22);
+  font-size: 12px;
+  font-weight: bold;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.horde-effect-bonus {
+  box-shadow: 0 0 8px color-mix(in srgb, var(--move-color) 70%, transparent);
+}
+
+.horde-effect-pips {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.horde-effect-pips > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.horde-effect-pips > span.on {
+  background: var(--move-color);
+  box-shadow: 0 0 3px var(--move-color);
+}
+
+/* The tooltip over a type effect or held item, above where it's hovered. */
+.horde-tip {
+  position: fixed;
+  z-index: 300;
+  width: max-content;
+  max-width: 320px;
+  translate: -50% 0;
+  padding: 10px 12px;
+  border: 1px solid #3a4352;
+  border-radius: 10px;
+  background: #10141b;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+.horde-tip-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  text-align: left;
+  color: #d5dde8;
+}
+
+.horde-tip-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #fff;
+}
+
+.horde-tip-levels {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: #8a93a3;
+}
+
+.horde-tip-levels .horde-tip-on {
+  color: #fff;
+  font-weight: bold;
+}
+
+.horde-tip-levels .horde-tip-on::before {
+  content: '▶ ';
+  color: var(--move-color, #ffd166);
+}
+
+.horde-tip-note {
+  color: #8a93a3;
+  font-size: 11px;
+}
+
+/* The pause menu's window of type effects and held items: each effect a row that opens up to its tooltip. */
+.horde-pause-effects-items {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-height: calc(85vh - 90px);
+  overflow-y: auto;
+}
+
+.horde-pause-effects-items .horde-log-list {
+  max-height: none;
+}
+
+.horde-effect-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 2px solid var(--move-color);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--move-color) 14%, #151a22);
+  color: #fff;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.horde-effect-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Horde level-up cards, reorganised: the kind and rarity on top, the title with its New or rank
+   badge, the shape and effect badges (each with a tooltip), stat tiles, then the move's twist. */
+.horde-choice-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.horde-choice-head {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.horde-choice-head .horde-choice-icon {
+  margin-left: auto;
+}
+
+.horde-choice-head .horde-choice-badge {
+  align-self: center;
+}
+
+.horde-choice-badges {
+  justify-content: flex-start;
+}
+
+.horde-choice-badge-rank {
+  border-color: #a98bff;
+  background: color-mix(in srgb, #a98bff 28%, transparent);
+  color: #e6dcff;
+}
+
+/* A shape or effect badge: hovering it (tapping it, on a phone) shows what it means. */
+.horde-card-tag {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: help;
+}
+
+.horde-card-tip {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  z-index: 60;
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  width: 230px;
+  translate: -50% 0;
+  padding: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--move-color, #5fd0ff) 55%, #3a4352);
+  border-radius: 9px;
+  background: #10141b;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.65);
+  color: #d5dde8;
+  font-size: 12px;
+  font-weight: normal;
+  letter-spacing: 0;
+  line-height: 1.35;
+  text-align: left;
+  text-transform: none;
+  pointer-events: none;
+}
+
+.horde-card-tip > span:first-child {
+  color: #fff;
+}
+
+.horde-card-tag:hover .horde-card-tip,
+.horde-card-tag-open .horde-card-tip {
+  display: flex;
+}
+
+/* The stats as tiles: a small label, the value before (faded), an arrow, and the value after (bright),
+   with any head start in a green chip. A lone stat (a tome's) takes the whole row. */
+.horde-choice-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.horde-choice-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.horde-choice-stat:only-child {
+  grid-column: 1 / -1;
+  align-items: center;
+}
+
+.horde-choice-stat .horde-choice-label {
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a93a3;
+}
+
+.horde-choice-stat .horde-choice-values {
+  margin-left: 0;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.horde-choice-stat .horde-choice-before {
+  font-size: 13px;
+}
+
+.horde-choice-stat .horde-choice-after {
+  font-size: 17px;
+  color: #fff;
+  text-shadow: 0 0 8px rgba(125, 255, 140, 0.35);
+}
+
+.horde-choice-stat .horde-choice-before + .horde-choice-arrow + .horde-choice-after {
+  color: #7dff8c;
+}
+
+.horde-choice-bump {
+  align-self: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(125, 255, 140, 0.15);
+  color: #7dff8c;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+/* The move's own twist: a gold-edged note under its stats. */
+.horde-choice-twist {
+  padding: 6px 9px;
+  border-left: 3px solid var(--move-color, #ffd166);
+  border-radius: 0 8px 8px 0;
+  background: color-mix(in srgb, var(--move-color, #ffd166) 12%, rgba(0, 0, 0, 0.3));
+  color: #ffe9a8;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.horde-choice-twist::before {
+  content: '\2726  ';
+  color: var(--move-color, #ffd166);
+}
+
+/* A tome's note: centred under its stat, softly lit in purple. */
+.horde-choice-tome .horde-choice-title {
+  color: #e6dcff;
+  text-shadow: 0 0 10px rgba(169, 139, 255, 0.45);
+}
+
+.horde-choice-tome .horde-choice-text {
+  padding-top: 6px;
+  border-top: 1px dashed rgba(169, 139, 255, 0.3);
+  color: #c9bdf0;
+  text-align: center;
+  line-height: 1.35;
+}
+
+/* A phone's Take button, at the foot of each card. */
+.horde-choice-take {
+  margin-top: auto;
+  width: 100%;
+}
+
+/* The buttons under the cards: rounded, each with its icon in a coloured dot and what's left in a chip. */
+.horde-choice-actions {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.horde-action {
+  --action-color: #c9d3df;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px 7px 8px;
+  border: 1px solid color-mix(in srgb, var(--action-color) 40%, rgba(255, 255, 255, 0.1));
+  border-radius: 999px;
+  background: linear-gradient(180deg, #2a3342, #1a212b);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45);
+  color: #e6edf5;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  transition:
+    translate 0.12s,
+    border-color 0.12s,
+    box-shadow 0.12s;
+}
+
+.horde-action:hover:not(:disabled) {
+  translate: 0 -1px;
+  border-color: var(--action-color);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.5),
+    0 0 10px color-mix(in srgb, var(--action-color) 35%, transparent);
+}
+
+.horde-action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.horde-action-skip {
+  padding: 7px 8px 7px 14px;
+}
+
+.horde-action-icon {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--action-color) 25%, transparent);
+  color: var(--action-color);
+  font-size: 13px;
+}
+
+.horde-action-count {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 11px;
+  text-align: center;
+}
+
+.horde-action-reroll {
+  --action-color: #5fd0ff;
+}
+
+.horde-action-delete {
+  --action-color: #ff8a8a;
+}
+
+.horde-action-on {
+  border-color: var(--action-color);
+}
+
+.horde-choice-actions .horde-banish-count {
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 107, 107, 0.4);
+  border-radius: 999px;
+  background: rgba(40, 10, 10, 0.6);
+}
+
+/* Horde level-up cards, tidied: no stripe down the left, the New badge beside the kind at the top
+   (the rarity pushed to the right), smaller stat tiles, and room at the foot for Banish. */
+.horde-choice-move::after,
+.horde-choice-upgrade::after,
+.horde-choice-tome::after,
+.horde-choice-effect::after {
+  content: none;
+}
+
+.horde-choice-top {
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+.horde-choice-top .horde-choice-rarity {
+  margin-left: auto;
+}
+
+.horde-choice-top .horde-choice-badge {
+  align-self: center;
+  padding: 1px 8px;
+  font-size: 10px;
+}
+
+.horde-choice-stat {
+  padding: 4px 7px;
+}
+
+.horde-choice-stat .horde-choice-label {
+  font-size: 9px;
+}
+
+.horde-choice-stat .horde-choice-before {
+  font-size: 11px;
+}
+
+.horde-choice-stat .horde-choice-after {
+  font-size: 14px;
+}
+
+.horde-choice-bump {
+  padding: 0 5px;
+  font-size: 9px;
+}
+
+.horde-choice.horde-choice-banishable {
+  padding-bottom: 36px;
+}
+
+.horde-choice .horde-banish {
+  top: auto;
+  bottom: 8px;
+  right: 8px;
+}
+
+.horde-action-icon svg {
+  display: block;
+  width: 13px;
+  height: 13px;
+}
+
+/* Horde level-up cards: wide enough for the kind, New badge and "Legendary" on one line. */
+.horde-choice {
+  width: 250px;
+}
+
+/* A move upgrade's changes stacked one above another, each across the whole card: the label
+   on the left, before and after on the right. */
+.horde-choice-upgrade .horde-choice-stats {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.horde-choice-upgrade .horde-choice-stat {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.horde-choice-upgrade .horde-choice-stat .horde-choice-values {
+  flex-wrap: nowrap;
+}
+
+/* The moves bar: the moves stretched across the whole width. */
+.horde-move {
+  flex: 1 1 0;
+  max-width: none;
+  cursor: help;
+}
+
+/* The tomes, type effects and held items sit in the middle of their band, top to bottom. */
+.horde-loadout {
+  align-items: center;
+  padding: 8px 16px;
+}
+
+.horde-tip-move {
+  width: 300px;
+}
+
+.horde-tome {
+  cursor: help;
+}
+
+/* A stream, redrawn: it shoots out to its full reach, pours for a while, then thins away. A faint
+   dashed outline shows the whole area it covers, a soft glow fills it, a bright core flows along
+   it, a flare sits at the lead, and a pulsing ring marks where its reach ends. */
+.horde-beam {
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  mask-image: none;
+  animation: horde-beam-life var(--beam-ms, 1350ms) ease-out forwards;
+}
+
+.horde-beam::after {
+  content: none;
+}
+
+@keyframes horde-beam-life {
+  0% {
+    opacity: 0;
+    scale: 0 0.5;
+  }
+  12% {
+    opacity: 1;
+    scale: 1 1;
+  }
+  82% {
+    opacity: 1;
+    scale: 1 1;
+  }
+  100% {
+    opacity: 0;
+    scale: 1 0.25;
+  }
+}
+
+.horde-beam > span {
+  position: absolute;
+  pointer-events: none;
+}
+
+.horde-beam-edge {
+  inset: 0;
+  border: 2px dashed color-mix(in srgb, var(--move-color) 55%, transparent);
+  border-left: none;
+  border-radius: 0 999px 999px 0;
+  opacity: 0.6;
+}
+
+.horde-beam-glow {
+  inset: 8% 0;
+  border-radius: 0 999px 999px 0;
+  background: linear-gradient(
+    0deg,
+    transparent,
+    color-mix(in srgb, var(--move-color) 40%, transparent) 30%,
+    color-mix(in srgb, var(--move-color) 55%, transparent) 50%,
+    color-mix(in srgb, var(--move-color) 40%, transparent) 70%,
+    transparent
+  );
+  filter: blur(3px);
+}
+
+.horde-beam-flow {
+  inset: 28% 0;
+  border-radius: 999px;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 22px, rgba(255, 255, 255, 0.55) 22px 34px, transparent 34px 48px),
+    linear-gradient(
+      0deg,
+      transparent,
+      color-mix(in srgb, var(--move-color) 85%, #fff) 25%,
+      #fff 50%,
+      color-mix(in srgb, var(--move-color) 85%, #fff) 75%,
+      transparent
+    );
+  mask-image: linear-gradient(90deg, #000 85%, transparent);
+  filter: drop-shadow(0 0 6px var(--move-color));
+  animation: horde-beam-flow 0.3s linear infinite;
+}
+
+@keyframes horde-beam-flow {
+  from {
+    background-position:
+      0 0,
+      0 0;
+  }
+  to {
+    background-position:
+      48px 0,
+      0 0;
+  }
+}
+
+.horde-beam-mouth {
+  left: 0;
+  top: 50%;
+  width: 34px;
+  height: 34px;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 25%, color-mix(in srgb, var(--move-color) 80%, #fff) 45%, transparent 70%);
+  animation: horde-beam-pulse 0.18s ease-in-out infinite alternate;
+}
+
+/* The end of its reach: an upright ring with a splash of light inside. */
+.horde-beam-end {
+  right: 0;
+  top: 50%;
+  height: 100%;
+  aspect-ratio: 0.45;
+  translate: 50% -50%;
+  border-radius: 50%;
+  border: 3px solid color-mix(in srgb, var(--move-color) 55%, #fff);
+  background: radial-gradient(ellipse, color-mix(in srgb, #fff 70%, var(--move-color)) 0 15%, color-mix(in srgb, var(--move-color) 45%, transparent) 50%, transparent 72%);
+  box-shadow:
+    0 0 10px 2px var(--move-color),
+    inset 0 0 8px 1px var(--move-color);
+  animation: horde-beam-pulse 0.25s ease-in-out infinite alternate;
+}
+
+@keyframes horde-beam-pulse {
+  from {
+    scale: 0.88;
+  }
+  to {
+    scale: 1.08;
+  }
+}
+
+/* The Horde move list as a 3-wide grid of small cards: name, shape, power and cooldown, then its twist. */
+.horde-moves-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.horde-moves-list .horde-moves-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.horde-moves-list .horde-moves-trait {
+  order: 0;
+}
+
+@media (max-width: 720px) {
+  .horde-moves-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Horde held items: a small panel in the scene's top-left corner, wrapping onto more rows as it fills. */
+.horde-stage .horde-held {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 320;
+  flex: none;
+  flex-wrap: wrap;
+  max-width: 300px;
+  padding: 6px;
+  overflow: visible;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  background: rgba(10, 14, 20, 0.6);
+}
+
+/* Stealth Rock in Horde mode: the battle screen's rock pieces scattered round the spot, in
+   place of the drawn dots. */
+.horde-rock {
+  width: 0;
+  height: 0;
+  margin-top: 0;
+  background: none;
+  border-radius: 0;
+  overflow: visible;
+}
+
+.horde-rock img {
+  position: absolute;
+  height: auto;
+  transform: translate(-50%, -50%);
+  opacity: 0.9;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.45));
+  pointer-events: none;
+}
+
+/* A type effect with all 4 moves of its type (its mastery): a stronger, pulsing glow. */
+.horde-effect-mastery {
+  box-shadow: 0 0 12px color-mix(in srgb, var(--move-color) 90%, transparent),
+    inset 0 0 6px color-mix(in srgb, var(--move-color) 60%, transparent);
+  animation: horde-mastery-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes horde-mastery-pulse {
+  50% {
+    box-shadow: 0 0 18px color-mix(in srgb, var(--move-color) 100%, transparent),
+      inset 0 0 8px color-mix(in srgb, var(--move-color) 70%, transparent);
+  }
+}
+
+/* ---- Horde mode: an item in the effects row shows what it does on hover (a tap on a phone) ---- */
+.horde-hud-item {
+  pointer-events: auto;
+  cursor: help;
+}
+
+/* Horde mode: a stat lowered by the lead's own move (Overheat, Close Combat...) in the effects row - red-edged. */
+.horde-hud-debuff {
+  box-shadow: inset 0 0 0 2px #ff4d4d;
+}
+
+/* Horde picker: clearing the run keeps the pick, and when the lot changes - under the area. */
+.horde-pick-reward {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin: 8px 0 4px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(255, 215, 107, 0.08);
+  border: 1px solid rgba(255, 215, 107, 0.35);
+  text-align: center;
+  font-size: 13px;
+}
+.horde-pick-reward b {
+  color: #ffd76b;
+}
+.horde-pick-reward span {
+  opacity: 0.7;
+  font-size: 12px;
+}
+
+/* Horde results: a cleared run's lead joining the Box. */
+.horde-caught {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: bold;
+  color: #ffd76b;
+}
+.horde-caught-sprite {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+/* A shot bouncing on to the next foe: a ring popping off the one it left, and the hopping
+   shot itself bigger and brighter, with a white glow, so each bounce is easy to follow. */
+.horde-hop {
+  position: absolute;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 3px solid color-mix(in srgb, var(--move-color) 50%, #fff);
+  box-shadow:
+    0 0 10px 2px var(--move-color),
+    inset 0 0 10px 2px color-mix(in srgb, var(--move-color) 60%, transparent);
+  pointer-events: none;
+  z-index: 189;
+  animation: horde-hop-ring 0.38s ease-out forwards;
+}
+
+@keyframes horde-hop-ring {
+  from {
+    scale: 0.2;
+    opacity: 1;
+  }
+  to {
+    scale: 1.3;
+    opacity: 0;
+  }
+}
+
+.horde-shot.horde-shot-hop {
+  scale: 1.35;
+  filter: drop-shadow(0 0 4px #fff) drop-shadow(0 0 10px var(--move-color));
+}
+
+/* Horde level-up: raising every card's rarity for gold - its price in gold, red when short. */
+.horde-action-rarity {
+  --action-color: #ffc94d;
+}
+
+.horde-action-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #ffd76a;
+}
+
+.horde-action-price .horde-gold-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.horde-action-price-short {
+  color: #ff7b7b;
+}
+
+/* Horde's pick window: dealing new picks for Poke Dollars, at the left of its buttons. */
+.horde-pick-reroll {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+/* Horde shrines: a Totem Trial or Tapu Ruin standing on the field (the achievements icon), its name or progress under it. */
+.horde-shrine {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  transform: translate(-50%, -100%);
+  pointer-events: auto;
+}
+
+.horde-shrine-icon {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 3px rgba(0, 0, 0, 0.55));
+}
+
+.horde-shrine-totem .horde-shrine-icon {
+  filter: drop-shadow(0 4px 3px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 6px rgba(255, 140, 60, 0.7));
+}
+
+.horde-shrine-tapu .horde-shrine-icon {
+  filter: drop-shadow(0 4px 3px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 6px rgba(110, 220, 255, 0.7));
+}
+
+.horde-shrine-label {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(10, 12, 16, 0.75);
+  color: #e8ecf2;
+  font-size: 12px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.horde-shrine-totem .horde-shrine-label {
+  color: #ffb07a;
+}
+
+.horde-shrine-tapu .horde-shrine-label {
+  color: #9be6ff;
+}
+
+.horde-shrine-near {
+  cursor: pointer;
+}
+
+.horde-shrine-near .horde-shrine-icon,
+.horde-shrine-active .horde-shrine-icon {
+  animation: horde-shrine-ready 0.9s ease-in-out infinite;
+}
+
+@keyframes horde-shrine-ready {
+  0%,
+  100% {
+    scale: 1;
+  }
+  50% {
+    scale: 1.08;
+  }
+}
+
+/* A Tapu Ruin's circle: a pie filling round it as the lead stands inside. */
+.horde-tapu-ring {
+  position: absolute;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border: 2px dashed rgba(110, 220, 255, 0.45);
+  border-radius: 50%;
+  background: conic-gradient(rgba(110, 220, 255, 0.28) calc(var(--tapu-fill, 0) * 360deg), rgba(110, 220, 255, 0.06) 0);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.horde-tapu-ring-in {
+  border-style: solid;
+  border-color: rgba(110, 220, 255, 0.85);
+}
+
+/* A totem: an elite with an orange glow. */
+.horde-foe-totem .horde-sprite {
+  filter: drop-shadow(0 0 6px rgba(255, 140, 60, 0.95)) drop-shadow(0 0 14px rgba(255, 140, 60, 0.6));
+}
+
+.horde-shrine-arrow .horde-chest-arrow-head::after {
+  border-left-color: #9be6ff;
+}
+
+.horde-shrine-arrow-icon {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+.horde-minimap-shrine {
+  width: 7px;
+  height: 7px;
+  border-radius: 1px;
+  rotate: 45deg;
+}
+
+.horde-minimap-shrine-totem {
+  background: #ff8c3c;
+}
+
+.horde-minimap-shrine-tapu {
+  background: #6edcff;
+}
+
+/* The shrines' stack floating at the top middle of the scene, under the top bar: Totem Trials
+   under way, then a shrine's reward. */
+.horde-shrine-top {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  translate: -50% 0;
+  z-index: 330;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 32px);
+  pointer-events: none;
+}
+
+.horde-shrine-tracker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 14px 4px 6px;
+  border: 1px solid rgba(255, 140, 60, 0.7);
+  border-radius: 999px;
+  background: rgba(10, 14, 20, 0.82);
+  color: #f1f4f8;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.horde-shrine-tracker b {
+  color: #ff8c3c;
+}
+
+.horde-shrine-tracker-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+/* A shrine's reward: a banner in that stack, up for a few seconds. */
+.horde-shrine-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 560px;
+  padding: 12px 22px 12px 14px;
+  border: 2px solid var(--shrine-color);
+  border-radius: 12px;
+  background: rgba(10, 14, 20, 0.88);
+  box-shadow: 0 0 22px color-mix(in srgb, var(--shrine-color) 45%, transparent);
+  pointer-events: none;
+  animation:
+    horde-shrine-banner-in 0.35s ease-out,
+    horde-shrine-banner-out 0.5s ease-in 5.5s forwards;
+}
+
+.horde-shrine-banner-totem {
+  --shrine-color: #ff8c3c;
+}
+
+.horde-shrine-banner-tapu {
+  --shrine-color: #6edcff;
+}
+
+.horde-shrine-banner-icon {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.horde-shrine-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.horde-shrine-banner-title {
+  color: var(--shrine-color);
+  font-size: 20px;
+}
+
+.horde-shrine-banner-line {
+  color: #f1f4f8;
+  font-size: 15px;
+  font-weight: bold;
+}
+
+@keyframes horde-shrine-banner-in {
+  from {
+    opacity: 0;
+    translate: 0 -16px;
+  }
+}
+
+@keyframes horde-shrine-banner-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* A Tapu blessing in the upgrades taken list: marked out in the ruins' blue. */
+.horde-log-row.horde-log-shrine {
+  border-color: #6edcff;
+  box-shadow: inset 3px 0 0 #6edcff;
+}
+
+.horde-log-shrine .horde-log-kind {
+  color: #9be6ff;
 }

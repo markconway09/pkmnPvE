@@ -24,6 +24,9 @@ export type MissionStat =
   | 'runTrainerWins'
   | 'runBossWins'
   | 'draftWins'
+  // Horde runs that lasted the full 10 minutes / that reached 100 KOs (each counts the run once).
+  | 'hordeRunsWon'
+  | 'horde100KoRuns'
 
 export interface MissionReward {
   money?: number
@@ -62,13 +65,15 @@ export const MISSION_TEMPLATES: MissionTemplate[] = [
   { id: 'wild15', tier: 'medium', text: 'Win 15 wild battles', stat: 'wildWins', goal: 15, reward: { items: [item('expcandym', 2)] } },
   { id: 'greats3', tier: 'medium', text: 'Hit 3 Great skill checks (in a search or a quick check)', stat: 'skillGreats', goal: 3, reward: { coins: 500 } },
   { id: 'runtrainers3', tier: 'medium', text: 'Beat 3 trainers in Battle Tower runs', stat: 'runTrainerWins', goal: 3, reward: { coins: 500 } },
+  { id: 'hordekos100', tier: 'medium', text: 'Get 100 KOs in a single Horde run', stat: 'horde100KoRuns', goal: 1, reward: { items: [item('expcandym', 2)] } },
 
   // Hard
   { id: 'boss1', tier: 'hard', text: 'Beat a Battle Tower boss', stat: 'runBossWins', goal: 1, reward: { items: [item('randompokemon')] } },
   { id: 'raid1', tier: 'hard', text: 'Win a Max Raid', stat: 'raidsWon', goal: 1, reward: { items: [item('randompokemon')] }, needsRaids: true },
   { id: 'trainers10', tier: 'hard', text: 'Beat 10 trainers', stat: 'trainerWins', goal: 10, reward: { items: [item('lockcapsule', 2)] } },
   { id: 'draft1', tier: 'hard', text: 'Win a match in Draft mode', stat: 'draftWins', goal: 1, reward: { items: [item('randompokemon')] } },
-  { id: 'runfloors15', tier: 'hard', text: 'Clear 15 Battle Tower floors', stat: 'runFloors', goal: 15, reward: { items: [item('expcandyl')] } }
+  { id: 'runfloors15', tier: 'hard', text: 'Clear 15 Battle Tower floors', stat: 'runFloors', goal: 15, reward: { items: [item('expcandyl')] } },
+  { id: 'hordewin1', tier: 'hard', text: 'Survive a full Horde run (10 minutes)', stat: 'hordeRunsWon', goal: 1, reward: { items: [item('randompokemon')] } }
 ]
 
 // Finishing all three of the day's missions.
