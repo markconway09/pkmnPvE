@@ -1,0 +1,5 @@
+Horde fixes
+
+- Horde: steer with an on-screen joystick on phones and touchscreens
+- Horde: each area's ground tiles show again instead of a plain green field
+- Horde: move effects (stars, bursts, fireballs, smoke) show again
