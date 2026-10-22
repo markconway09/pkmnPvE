@@ -581,8 +581,15 @@ export interface BoxPokemonView extends PokemonSummary {
   // Friendship not maxed yet, and this many Friendship Petals in the bag to max it.
   friendshipPetals?: number
   // Every Pokemon it can evolve into, ready or not, with what it takes and whether it's
-  // already in the Pokedex (the edit window lists them all).
-  evolutionPaths?: { species: string; method: string; ready: boolean; registered: boolean }[]
+  // already in the Pokedex (the edit window lists them all). `boost`: not ready, but it would
+  // be with this many Friendship Petals / Rare Candies from the bag - evolving spends them.
+  evolutionPaths?: {
+    species: string
+    method: string
+    ready: boolean
+    registered: boolean
+    boost?: { petals: number; candies: number }
+  }[]
   // A Pokemon with a form-change item for it in the bag (the Rotom Catalog, Prison Bottle,
   // Reveal Glass...): the forms it can change into, and the item.
   formChanges?: { forms: string[]; itemName: string; spritenum: number; ready: boolean }

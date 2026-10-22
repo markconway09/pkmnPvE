@@ -122,10 +122,11 @@ const es: GameDataText = {
     hordewin: ['Rompehordas', 'Sobrevive a una partida de Hordas completa'],
     hordelevel100: ['Centurión', 'Sube un Pokémon al nivel 100 en una partida de Hordas'],
     hordeshiny: ['Horda variocolor', 'Sobrevive a una partida de Hordas completa con un Pokémon variocolor'],
-    hordeendless: ['Sin fin', 'Aguanta 20 minutos en una partida de Hordas'],
-    hordemega: ['Megaimpulso', 'Megaevoluciona y aguanta 20 minutos (+10 en modo sin fin) en una partida de Hordas'],
+    hordeendless: ['Infinito', 'Aguanta 20 minutos en una partida de Hordas'],
+    hordemega: ['Megaimpulso', 'Megaevoluciona y aguanta 20 minutos (+10 en modo infinito) en una partida de Hordas'],
     hordeditto: ['Cambiaformas', 'Sobrevive a una partida de Hordas completa con Ditto'],
-    hordewishiwashi: ['La unión hace la fuerza', 'Sobrevive a una partida de Hordas completa con Wishiwashi']
+    hordewishiwashi: ['La unión hace la fuerza', 'Sobrevive a una partida de Hordas completa con Wishiwashi'],
+    hordeduos: ['Maestro de los elementos', 'Usa todos los dúos de tipos al menos una vez']
   },
   categories: {
     Battle: 'Combate',
@@ -175,7 +176,8 @@ const es: GameDataText = {
     AFK: 'AFK',
     Centurion: 'Centurión',
     Shapeshifter: 'Cambiaformas',
-    Schooling: 'Banco de peces'
+    Schooling: 'Banco de peces',
+    'Master of Elements': 'Maestro de los elementos'
   },
   perks: {
     Veteran: 'Doble de experiencia en los combates',
@@ -217,7 +219,8 @@ const es: GameDataText = {
     AFK: 'Una prueba fallada no hace retroceder un paso la búsqueda de MT',
     Centurion: '10 % más de dinero en las partidas de Hordas',
     Shapeshifter: 'El Quitamovimientos se puede usar dos veces por partida de Hordas',
-    Schooling: 'Las partidas de Hordas empiezan con 2 tiradas extra'
+    Schooling: 'Las partidas de Hordas empiezan con 2 tiradas extra',
+    'Master of Elements': 'En las partidas de Hordas, los movimientos de otros tipos activan el efecto de un tipo un 70 % de las veces (en vez del 50 %)'
   },
   missions: {
     wild5: 'Gana 5 combates contra Pokémon salvajes',

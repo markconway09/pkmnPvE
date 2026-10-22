@@ -210,6 +210,7 @@ import {
   getHordeSaved,
   getHordeTop,
   getHordeUpgrades,
+  getHordeDuos,
   offerHorde,
   rerollHordeOffer,
   resumeHorde,
@@ -1094,6 +1095,7 @@ handle('horde:best', () => getHordeBest())
 handle('horde:top', () => getHordeTop())
 handle('horde:history', () => getHordeHistory())
 handle('horde:upgrades', () => getHordeUpgrades())
+handle('horde:duos', () => getHordeDuos())
 handle('horde:buyUpgrade', (_event, id: HordeUpgradeId) => buyHordeUpgrade(id))
 handle('debug:setWallet', (_event, money: number, coins: number) => {
   requireAdmin()

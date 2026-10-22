@@ -37,6 +37,8 @@ export type HordeLeadStat = 'atk' | 'def' | 'spe'
 //  rockfall  - the same, as plain rocks.
 //  vortex    - a swirl round the foe.
 //  orb, star, leaf, coin, needle, bubble, rock - what its shots look like.
+//  stealthRock, caltrop - orbiting balls drawn as the battle screen's Stealth Rock pieces or Spikes' caltrops.
+//  steam     - orbiting balls drawn as puffs of pink steam.
 //  slash, fist, kick, bite, horn, cross, slam - the mark a melee hit leaves on the foe.
 export type HordeMoveAnim =
   | 'sky'
@@ -54,6 +56,9 @@ export type HordeMoveAnim =
   | 'needle'
   | 'bubble'
   | 'rock'
+  | 'stealthRock'
+  | 'caltrop'
+  | 'steam'
   | 'slash'
   | 'fist'
   | 'kick'
@@ -170,6 +175,11 @@ export type HordeTrait =
   | { kind: 'freeze'; chance: number; ms: number }
   // A chance to confuse the foe (only one at full HP, if fullHp).
   | { kind: 'confuse'; chance: number; ms: number; fullHp?: boolean }
+  // Its hits are this many times as likely to set off this type's effect.
+  | { kind: 'effectBoost'; type: string; times: number }
+  // A chance a hit leaves an entry hazard where the foe stood: Spikes (hurting foes on them every second,
+  // as Stealth Rock's rocks do) or Toxic Spikes (a little hurt, and poisoning a foe stepping on them).
+  | { kind: 'hazard'; hazard: 'spikes' | 'toxicSpikes'; chance: number }
   // A chance to set off this type's effect (even without a move of the type).
   | { kind: 'inflict'; type: string; chance: number }
   // The hit always jumps on to this many more foes nearby, each for this share.
@@ -339,11 +349,13 @@ const BY_TYPE: Record<string, Def[]> = {
     m('Poison Jab', 'melee', 'medium', 70, 4800, 'uncommon', { kind: 'critUp', chance: 15 }, { anim: 'fist' }),
     m('Venoshock', 'shot', 'medium', 60, 5100, 'uncommon', { kind: 'vsStatus', bonus: 100, type: 'Poison' }),
     m('Sludge Bomb', 'blast', 'medium', 55, 6300, 'uncommon', { kind: 'inflict', type: 'Poison', chance: 25 }),
+    m('Mortal Spin', 'orbit', 'weak', 25, 6600, 'uncommon', { kind: 'hazard', hazard: 'toxicSpikes', chance: 50 }),
     m('Sludge Wave', 'nova', 'medium', 50, 7800, 'uncommon', { kind: 'inflict', type: 'Poison', chance: 25 }),
     m('Gunk Shot', 'pierce', 'strong', 75, 9300, 'rare', { kind: 'zone', ms: 3000, reach: 45, share: 0.12 })
   ],
   Ground: [
     m('Mud-Slap', 'cone', 'weak', 25, 4200, 'common', { kind: 'foeDrop', stat: 'atk', percent: 20, ms: 4000 }, { starter: true }),
+    m('Spikes', 'orbit', 'medium', 25, 7200, 'uncommon', { kind: 'hazard', hazard: 'spikes', chance: 50 }, { anim: 'caltrop' }),
     m('Mud Shot', 'shot', 'weak', 45, 3300, 'common', { kind: 'foeDrop', stat: 'spe', percent: 30, ms: 3000 }),
     m('Bulldoze', 'nova', 'weak', 30, 5400, 'common', { kind: 'foeDrop', stat: 'spe', percent: 40, ms: 2500 }),
     m('High Horsepower', 'melee', 'medium', 80, 6300, 'uncommon', { kind: 'knockback', distance: 90 }, { anim: 'kick' }),
@@ -358,14 +370,14 @@ const BY_TYPE: Record<string, Def[]> = {
     m('Air Cutter', 'cone', 'medium', 45, 5700, 'uncommon', { kind: 'reach', bonus: 40 }),
     m('Air Slash', 'pierce', 'medium', 55, 6000, 'uncommon', { kind: 'flinch', chance: 25 }),
     m('Brave Bird', 'melee', 'strong', 120, 9000, 'rare', { kind: 'recoil', share: 0.3 }, { anim: 'slam' }),
-    m('Hurricane', 'strike', 'strong', 90, 10500, 'epic', { kind: 'zone', ms: 3500, reach: 80, share: 0.2, pull: 120, drift: true }, { anim: 'vortex' })
+    m('Hurricane', 'strike', 'strong', 90, 10500, 'epic', { kind: 'zone', ms: 3500, reach: 80, share: 0.2, slow: 0.3, drift: true }, { anim: 'vortex' })
   ],
   Psychic: [
     m('Confusion', 'strike', 'weak', 40, 3000, 'common', { kind: 'confuse', chance: 20, ms: 1500 }, { starter: true }),
     m('Psybeam', 'beam', 'medium', 45, 6000, 'uncommon', { kind: 'confuse', chance: 30, ms: 2000 }),
     m('Zen Headbutt', 'melee', 'medium', 80, 5700, 'uncommon', { kind: 'flinch', chance: 25 }, { anim: 'slam' }),
     m('Psyshock', 'shot', 'medium', 70, 5400, 'uncommon', { kind: 'confuse', chance: 100, ms: 2000, fullHp: true }, { anim: 'orb' }),
-    m('Stored Power', 'shot', 'medium', 40, 4800, 'rare', { kind: 'scaleWith', source: 'tomes', amount: 15 }, { anim: 'orb' }),
+    m('Stored Power', 'shot', 'medium', 40, 4800, 'rare', { kind: 'scaleWith', source: 'tomes', amount: 10 }, { anim: 'orb' }),
     m('Expanding Force', 'nova', 'medium', 45, 7800, 'uncommon', { kind: 'echo', type: 'Psychic', max: 3 }),
     m('Psychic', 'strike', 'strong', 90, 8700, 'rare', { kind: 'hurl', distance: 120, share: 0.4, reach: 70 }),
     m('Future Sight', 'strike', 'strong', 140, 10500, 'epic', { kind: 'delayed', ms: 1800 })
@@ -386,6 +398,7 @@ const BY_TYPE: Record<string, Def[]> = {
     m('Rock Slide', 'rain', 'medium', 40, 6300, 'uncommon', { kind: 'flinch', chance: 20 }, { anim: 'rockfall' }),
     m('Ancient Power', 'scatter', 'medium', 30, 5400, 'uncommon', { kind: 'selfBoost', stats: ['atk', 'def', 'spe'], percent: 15, ms: 5000, chance: 20 }, { anim: 'rock', shots: 5 }),
     m('Power Gem', 'pierce', 'medium', 55, 6000, 'uncommon', { kind: 'pierceGrow', per: 15 }),
+    m('Stealth Rock', 'orbit', 'medium', 25, 7200, 'uncommon', { kind: 'effectBoost', type: 'Rock', times: 2 }, { anim: 'stealthRock' }),
     m('Stone Edge', 'strike', 'strong', 100, 8700, 'rare', { kind: 'critUp', chance: 25 }, { anim: 'spikes', critBoost: true }),
     m('Head Smash', 'melee', 'strong', 150, 10500, 'epic', { kind: 'recoil', share: 0.4 }, { anim: 'slam' })
   ],
@@ -410,6 +423,7 @@ const BY_TYPE: Record<string, Def[]> = {
   ],
   Dark: [
     m('Bite', 'melee', 'weak', 45, 2700, 'common', { kind: 'flinch', chance: 20 }, { starter: true, anim: 'bite' }),
+    m('Ceaseless Edge', 'melee', 'medium', 60, 4800, 'rare', { kind: 'hazard', hazard: 'spikes', chance: 60 }, { anim: 'slash' }),
     m('Sucker Punch', 'melee', 'weak', 50, 3000, 'common', { kind: 'flinch', chance: 100, slowed: true }, { anim: 'fist' }),
     m('Snarl', 'cone', 'weak', 30, 4800, 'common', { kind: 'foeDrop', stat: 'atk', percent: 25, ms: 3000 }),
     m('Pursuit', 'shot', 'weak', 40, 3000, 'common', { kind: 'far', bonus: 60 }),
@@ -434,7 +448,9 @@ const BY_TYPE: Record<string, Def[]> = {
     m('Draining Kiss', 'melee', 'medium', 60, 4500, 'uncommon', { kind: 'drain', share: 0.5 }, { anim: 'slam' }),
     m('Play Rough', 'melee', 'medium', 85, 5700, 'uncommon', { kind: 'foeDrop', stat: 'atk', percent: 25, ms: 4000 }, { anim: 'slam' }),
     m('Dazzling Gleam', 'nova', 'medium', 50, 7500, 'uncommon', { kind: 'wideRing', bonus: 20 }),
-    m('Moonblast', 'blast', 'strong', 75, 9000, 'rare', { kind: 'foeDrop', stat: 'atk', percent: 30, ms: 5000 })
+    m('Moonblast', 'blast', 'strong', 75, 9000, 'rare', { kind: 'foeDrop', stat: 'atk', percent: 30, ms: 5000 }),
+    m('Strange Steam', 'orbit', 'medium', 30, 7200, 'rare', { kind: 'confuse', chance: 20, ms: 2000 }, { anim: 'steam' }),
+    m('Light of Ruin', 'beam', 'strong', 120, 18000, 'epic', { kind: 'recoil', share: 0.15 })
   ]
 }
 

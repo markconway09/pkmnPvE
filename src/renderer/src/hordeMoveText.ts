@@ -1,11 +1,58 @@
 // A Horde move's twist (see HordeTrait in shared/horde-moves.ts), in words.
-import { HORDE_HURT_RECENT_MS, hordeMoveDef, type HordeLeadStat, type HordeMove } from '../../shared/horde'
+import {
+  HORDE_EFFECT,
+  HORDE_HURT_RECENT_MS,
+  HORDE_REACH_SHAPES,
+  hordeCountKind,
+  hordeMoveDef,
+  hordeMoveShape,
+  type HordeLeadStat,
+  type HordeMove,
+  type HordeMoveBoost,
+  type HordeMoveShape
+} from '../../shared/horde'
 import type { MessageKey } from '../../shared/i18n'
 import { typeName, type Translate } from './i18n'
 
 const STAT_KEYS: Record<HordeLeadStat, MessageKey> = { atk: 'horde.stat.atk', def: 'horde.stat.def', spe: 'horde.stat.spe' }
 
 const pct = (share: number): number => Math.round(share * 100)
+
+// What a reach upgrade grows, by the move's shape: a melee move's reach, a stream's or cone's
+// size, a blast's or wave's radius, a piercing shot's size.
+const REACH_LABEL_KEYS: Partial<Record<HordeMoveShape, MessageKey>> = {
+  melee: 'horde.upLabel.reach',
+  beam: 'horde.upLabel.stream',
+  cone: 'horde.upLabel.cone',
+  blast: 'horde.upLabel.blast',
+  nova: 'horde.upLabel.wave',
+  pierce: 'horde.change.size'
+}
+// What a count upgrade adds, by the move's shape: more projectiles, more strikes one after
+// another, more strikes in a barrage, more orbs.
+const COUNT_LABEL_KEYS: Partial<Record<HordeMoveShape, MessageKey>> = {
+  shot: 'horde.change.count',
+  strike: 'horde.upLabel.strikesInARow',
+  rain: 'horde.upLabel.strikes',
+  orbit: 'horde.upLabel.orbs'
+}
+
+/** What an upgrade card raises on this move, named for what it really grows there. */
+export function hordeBoostLabel(t: Translate, move: HordeMove, boost: HordeMoveBoost): string {
+  const shape = hordeMoveShape(move)
+  if (boost === 'power') return t('horde.change.power')
+  if (boost === 'cooldown') return t('horde.change.cooldown')
+  if (boost === 'crit') return t('horde.change.crit')
+  if (boost === 'range') {
+    // A move with no reach of its own grows the ground it leaves (Whirlpool's zone and the like).
+    if (!HORDE_REACH_SHAPES.includes(shape)) return t('horde.upLabel.zone')
+    return t(REACH_LABEL_KEYS[shape] ?? 'horde.change.range')
+  }
+  const kind = hordeCountKind(move)
+  if (kind === 'bounces') return t('horde.change.bounces')
+  if (kind === 'hits') return t('horde.upLabel.hitsInARow')
+  return t(COUNT_LABEL_KEYS[shape] ?? 'horde.change.count')
+}
 const secs = (ms: number): string => String(Math.round(ms / 100) / 10)
 
 /** What a move does that no other does, in a sentence. */
@@ -118,6 +165,10 @@ export function hordeTraitText(t: Translate, move: HordeMove): string {
       return t('horde.trait.paralyze', { chance: tr.chance })
     case 'confuse':
       return t(tr.fullHp ? 'horde.trait.confuseFull' : 'horde.trait.confuse', { chance: tr.chance })
+    case 'effectBoost':
+      return t('horde.trait.effectBoost', { n: tr.times, effect: effect(tr.type) })
+    case 'hazard':
+      return t(tr.hazard === 'toxicSpikes' ? 'horde.trait.toxicSpikes' : 'horde.trait.spikes', { chance: tr.chance, s: secs(HORDE_EFFECT.rockMs) })
     case 'inflict':
       return tr.chance >= 100
         ? t('horde.trait.inflictSure', { effect: effect(tr.type) })

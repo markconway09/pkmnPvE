@@ -20,10 +20,11 @@ import {
 import SpriteImage from "./SpriteImage";
 import RarityCard, { RarityGlow } from "./RarityCard";
 import ShinyIcon from "./ShinyIcon";
+import ItemSprite from "./ItemSprite";
 import Tooltip from "./Tooltip";
 import BuyButton from "./BuyButton";
 import HordeArena from "./HordeArena";
-import { HordeHistoryModal, HordeMovesModal } from "./HordeInfoModals";
+import { HordeHistoryModal, HordeGuideModal } from "./HordeInfoModals";
 import {
   LOCATION_BUTTON_BACKDROP,
   backdropUrl,
@@ -40,6 +41,9 @@ interface Props {
   // A cleared run's lead went into the box.
   onBoxChange: () => void;
 }
+
+// The Poke Ball shown by a Pokemon's name when it's in the Pokedex.
+const POKE_BALL_SPRITENUM = 345;
 
 // A base stat bar's colour: red when low, through yellow and green, to teal when high.
 function statColor(value: number): string {
@@ -351,7 +355,7 @@ function HordePage({ busy, money, onMoneyChange, onBoxChange }: Props): React.JS
         <HordeHistoryModal onClose={() => setInfoModal(null)} />
       )}
       {infoModal === "moves" && (
-        <HordeMovesModal onClose={() => setInfoModal(null)} />
+        <HordeGuideModal onClose={() => setInfoModal(null)} />
       )}
 
       {/* The upgrade shop: each upgrade's ranks, what they add so far, and the next one's price. */}
@@ -553,6 +557,14 @@ function HordePage({ busy, money, onMoneyChange, onBoxChange }: Props): React.JS
                         <span className="horde-pick-name">
                           {top.species}
                           {s.shiny && <ShinyIcon />}
+                          {s.registered && (
+                            <span
+                              className="context-menu-caught horde-pick-caught"
+                              title={t("pm.inDex")}
+                            >
+                              <ItemSprite spritenum={POKE_BALL_SPRITENUM} />
+                            </span>
+                          )}
                         </span>
                         <span className="horde-pick-types">
                           {(s.finalForm?.types ?? s.types).map((type) => (

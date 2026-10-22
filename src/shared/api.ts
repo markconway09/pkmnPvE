@@ -13,6 +13,7 @@ import type { CoinBalance, DailyCoinMon, DailyCoinMonPurchase, DailyCoinOffer, D
 import type { BlackjackView } from './blackjack'
 import type { DiceRoll } from './dice'
 import type {
+  HordeDuoId,
   HordeHistoryEntry,
   HordeOffer,
   HordeRecord,
@@ -312,6 +313,7 @@ export function createApi(transport: ApiTransport) {
     // Every finished run, newest first.
     getHordeHistory: (): Promise<HordeHistoryEntry[]> => transport.invoke('horde:history'),
     getHordeUpgrades: (): Promise<HordeUpgrades> => transport.invoke('horde:upgrades'),
+    getHordeDuos: (): Promise<HordeDuoId[]> => transport.invoke('horde:duos'),
     buyHordeUpgrade: (id: HordeUpgradeId): Promise<{ upgrades: HordeUpgrades; moneyTotal: number }> =>
       transport.invoke('horde:buyUpgrade', id),
     // What the player's titles change in the Game Corner (the bet cap, Plinko's edges).

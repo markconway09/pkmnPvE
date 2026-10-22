@@ -25197,13 +25197,11 @@ html[data-layout='mobile'] .options-scale-tabs .tab-strip-tab {
 
 .horde-foe-elite .horde-sprite {
   height: clamp(72px, 16vh, 150px);
-  filter: drop-shadow(0 0 8px rgba(190, 120, 255, 0.9));
 }
 
 .horde-foe-boss .horde-sprite {
   height: clamp(110px, 26vh, 240px);
   max-width: 260px;
-  filter: drop-shadow(0 0 10px rgba(255, 70, 70, 0.9));
 }
 
 .horde-flash .horde-sprite {
@@ -25872,11 +25870,11 @@ html[data-layout='mobile'] .options-scale-tabs .tab-strip-tab {
 }
 
 .horde-frozen .horde-sprite {
-  filter: hue-rotate(160deg) saturate(0.5) brightness(1.35) drop-shadow(0 0 6px #9be7ff);
+  filter: hue-rotate(160deg) saturate(0.5) brightness(1.35);
 }
 
 .horde-stopped .horde-sprite {
-  filter: drop-shadow(0 0 6px #ffe14d) brightness(1.15);
+  filter: brightness(1.15);
   animation: horde-jolt 0.12s linear infinite;
 }
 
@@ -26262,7 +26260,7 @@ html[data-layout='mobile'] .options-scale-tabs .tab-strip-tab {
 
 @keyframes horde-item-bob {
   50% {
-    translate: 0 -4px;
+    transform: translate(-50%, calc(-50% - 4px));
   }
 }
 
@@ -26475,7 +26473,6 @@ html[data-layout='mobile'] .options-scale-tabs .tab-strip-tab {
 .horde-foe-gmax .horde-sprite {
   height: clamp(96px, 20vh, 190px);
   max-width: 240px;
-  filter: drop-shadow(0 0 14px rgba(255, 40, 80, 0.95)) drop-shadow(0 0 4px #ff9ab0);
 }
 
 /* An item about to vanish: flashing through its last 10 seconds. */
@@ -28311,34 +28308,46 @@ html[data-layout='mobile'] .options-scale-tabs .tab-strip-tab {
 }
 
 /* Horde exploders: a dark red outline round the sprite (kept through a hit's flash, freezing
-   and being held), pulsing brighter while the fuse burns, the blast's reach filling in under
-   it, and the blast itself. */
+   and being held), a red glow pulsing behind it while the fuse burns, the blast's reach filling
+   in under it, and the blast itself. The outline is one soft shadow, not four hard ones, and the
+   fuse pulses the glow's opacity rather than the sprite's filter - filters on animated sprites
+   are redrawn every frame. */
 .horde-foe-exploder .horde-sprite {
-  filter: drop-shadow(1.5px 0 0 #7a0a0a) drop-shadow(-1.5px 0 0 #7a0a0a) drop-shadow(0 1.5px 0 #7a0a0a) drop-shadow(0 -1.5px 0 #7a0a0a);
+  filter: drop-shadow(0 0 1.5px #7a0a0a);
 }
 
 .horde-foe-exploder.horde-flash .horde-sprite {
-  filter: drop-shadow(1.5px 0 0 #7a0a0a) drop-shadow(-1.5px 0 0 #7a0a0a) drop-shadow(0 1.5px 0 #7a0a0a) drop-shadow(0 -1.5px 0 #7a0a0a) brightness(2.4);
+  filter: drop-shadow(0 0 1.5px #7a0a0a) brightness(2.4);
 }
 
 .horde-foe-exploder.horde-frozen .horde-sprite {
-  filter: drop-shadow(1.5px 0 0 #7a0a0a) drop-shadow(-1.5px 0 0 #7a0a0a) drop-shadow(0 1.5px 0 #7a0a0a) drop-shadow(0 -1.5px 0 #7a0a0a) hue-rotate(160deg) saturate(0.5) brightness(1.35);
+  filter: drop-shadow(0 0 1.5px #7a0a0a) hue-rotate(160deg) saturate(0.5) brightness(1.35);
 }
 
 .horde-foe-exploder.horde-stopped .horde-sprite {
-  filter: drop-shadow(1.5px 0 0 #7a0a0a) drop-shadow(-1.5px 0 0 #7a0a0a) drop-shadow(0 1.5px 0 #7a0a0a) drop-shadow(0 -1.5px 0 #7a0a0a) brightness(1.15);
+  filter: drop-shadow(0 0 1.5px #7a0a0a) brightness(1.15);
 }
 
-.horde-foe-exploder.horde-fusing .horde-sprite {
+.horde-fuse-glow {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  width: 115%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 90, 40, 0.75), rgba(255, 59, 31, 0.35) 40%, transparent 68%);
+  pointer-events: none;
+  z-index: -1;
   animation: horde-fuse 0.28s ease-in-out infinite alternate;
 }
 
 @keyframes horde-fuse {
   from {
-    filter: drop-shadow(1.5px 0 0 #7a0a0a) drop-shadow(-1.5px 0 0 #7a0a0a) drop-shadow(0 1.5px 0 #7a0a0a) drop-shadow(0 -1.5px 0 #7a0a0a);
+    opacity: 0.15;
   }
   to {
-    filter: drop-shadow(1.5px 0 0 #7a0a0a) drop-shadow(-1.5px 0 0 #7a0a0a) drop-shadow(0 1.5px 0 #7a0a0a) drop-shadow(0 -1.5px 0 #7a0a0a) brightness(1.6) drop-shadow(0 0 8px #ff3b1f);
+    opacity: 1;
   }
 }
 
@@ -30605,4 +30614,599 @@ html[data-layout='mobile'] .options-scale-tabs .tab-strip-tab {
   background: rgba(255, 255, 255, 0.7);
   border: 2px solid rgba(255, 255, 255, 0.9);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* Horde top bar: Speed's buffs in green and Curse's debuff in red, beside the Speed stat. */
+.horde-stat-buff {
+  color: #6ee08a;
+  font-weight: bold;
+}
+
+.horde-stat-debuff {
+  color: #ff6b6b;
+  font-weight: bold;
+}
+
+/* The effects row slides along when it holds more than fits - dragged with the mouse or the wheel. */
+.horde-hud-effects {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  cursor: grab;
+}
+
+.horde-hud-effects:active {
+  cursor: grabbing;
+}
+
+/* Nothing on the field (chests, shrines, item icons) can be picked up and dragged as an image. */
+.horde-arena img {
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+/* Horde ranged foes: a blue outline round the sprite (kept through a hit's flash, freezing and
+   being held), and their shots - a dark core ringed in the move's type colour with a red glow, so
+   they stand apart from the lead's own. */
+.horde-foe-ranged .horde-sprite {
+  filter: drop-shadow(0 0 1.5px #1a5fd0);
+}
+
+.horde-foe-ranged.horde-flash .horde-sprite {
+  filter: drop-shadow(0 0 1.5px #1a5fd0) brightness(2.4);
+}
+
+.horde-foe-ranged.horde-frozen .horde-sprite {
+  filter: drop-shadow(0 0 1.5px #1a5fd0) hue-rotate(160deg) saturate(0.5) brightness(1.35);
+}
+
+.horde-foe-ranged.horde-stopped .horde-sprite {
+  filter: drop-shadow(0 0 1.5px #1a5fd0) brightness(1.15);
+}
+
+.horde-shot.horde-shot-foe {
+  background: radial-gradient(circle, #1b0505 0 30%, var(--move-color) 45% 60%, transparent 75%);
+  box-shadow:
+    0 0 8px 3px #ff2a2a,
+    0 0 16px 5px color-mix(in srgb, var(--move-color) 45%, transparent);
+  /* Over every sprite (their depth goes up to about 310) - they have to be seen to be dodged. */
+  z-index: 320;
+}
+
+.horde-shot.horde-shot-foe::after {
+  display: none;
+}
+
+/* Several chests opened at once: the items wrap into rows that scroll, leaving the chest and
+   the Take button on screen. */
+.horde-chest-items.horde-chest-items-many {
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: flex-start;
+  max-width: min(92vw, 960px);
+  max-height: max(220px, calc(100vh - 380px));
+  padding: 10px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+}
+
+/* The Horde guide: tabs over the moves, abilities, upgrades and items lists. */
+.horde-guide-tabs {
+  flex: none;
+}
+
+/* A value for each rarity, common to legendary, side by side. */
+.horde-guide-rarities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 13px;
+}
+
+/* The upgrade cards' table: one row per rarity, one column per stat raised. */
+.horde-guide-table {
+  display: grid;
+  grid-template-columns: repeat(7, auto);
+  gap: 6px 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 13px;
+  color: #aab6c4;
+  overflow-x: auto;
+}
+
+.horde-guide-th {
+  color: #e6edf5;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+/* A held item: a small card in its rarity's colours, laid out like a move's. */
+.horde-guide-held {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+/* The Codex move filters: a row of type chips and a row of shape chips, each with its label. */
+.horde-guide-filters {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.horde-guide-filter-label {
+  color: #8d9aab;
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.horde-guide-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.horde-guide-filter button {
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+
+/* Type chips keep their type colours; once one is picked the rest fade back. */
+.horde-guide-type {
+  border: none;
+  min-width: 64px;
+  text-align: center;
+}
+
+.horde-guide-type:hover {
+  transform: translateY(-1px);
+}
+
+.horde-guide-type.faded {
+  opacity: 0.35;
+}
+
+.horde-guide-type.faded:hover {
+  opacity: 0.8;
+}
+
+.horde-guide-type.active {
+  box-shadow: 0 0 0 2px #fff, 0 0 10px rgba(255, 255, 255, 0.35);
+}
+
+/* "All" and the shape chips: plain pills, gold when picked. */
+.horde-guide-chip {
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #222a35;
+  color: #c9d3df;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.horde-guide-chip:hover {
+  border-color: rgba(255, 209, 102, 0.6);
+  color: #fff;
+}
+
+.horde-guide-chip.active {
+  background: rgba(255, 209, 102, 0.18);
+  border-color: #ffd166;
+  color: #ffd166;
+}
+
+/* A move's shape, as a badge beside its type. */
+.horde-shape-badge {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #2b3442;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #dbe3ec;
+  font-size: 11px;
+  font-weight: bold;
+  cursor: help;
+}
+
+.horde-moves-title {
+  color: #e6edf5;
+}
+
+/* What its upgrades raise, as small gold chips under the move. */
+.horde-moves-list .horde-moves-boosts {
+  order: 3;
+  align-items: center;
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  .horde-guide-filters {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* The Codex type synergies: the chance and strength by moves held, then a card per type. */
+.horde-guide-levels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* A synergy card's parts - effect, bonus, mastery - each in its own box with a small tag. */
+.horde-guide-synergy-part {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-self: stretch;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.22);
+  color: #c9d3df;
+  font-size: 12px;
+}
+
+.horde-guide-synergy-tag {
+  color: #8d9aab;
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.horde-guide-mastery {
+  border: 1px solid rgba(255, 209, 102, 0.3);
+  color: #ffe3a3;
+}
+
+.horde-guide-mastery .horde-guide-synergy-tag {
+  color: #ffd166;
+}
+
+/* In the scrolling Codex body, nothing shrinks - the upgrade table would squash to nothing. */
+.horde-info-modal-body > * {
+  flex-shrink: 0;
+}
+
+/* The Codex tabs stick to the top of the scrolling body, over a strip of the panel's colour. */
+.horde-guide-tabbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding-bottom: 6px;
+  background: #1e2430;
+  box-shadow: 0 6px 8px -6px rgba(0, 0, 0, 0.6);
+}
+
+/* Horde mode: a duo synergy (2 moves each of two types) - its chip, card badge and pause row edged
+   in both its types' colours. */
+.horde-effect-duo,
+.horde-card-tag-duo,
+.horde-effect-row-duo {
+  border: 2px solid transparent;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--duo-a) 22%, #151a22), color-mix(in srgb, var(--duo-b) 22%, #151a22)) padding-box,
+    linear-gradient(90deg, var(--duo-a), var(--duo-b)) border-box;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--duo-a) 50%, transparent), 0 0 10px color-mix(in srgb, var(--duo-b) 50%, transparent);
+}
+
+.horde-effect-row-duo .horde-effect-row-head .horde-muted {
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+/* Horde pause menu: a duo synergy within reach - its two types and name, then a pair of pips for
+   each type (lit for every move of it held) and how many of the 4 moves are in place. */
+.horde-duo-row:not(.horde-effect-row-duo) {
+  border-color: color-mix(in srgb, var(--duo-a) 60%, #3a4352);
+  background: color-mix(in srgb, var(--duo-a) 8%, #151a22);
+}
+
+.horde-duo-row-name {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+
+.horde-duo-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  font-size: 12px;
+}
+
+.horde-duo-on {
+  color: #ffd166;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+/* Horde mode: the type effects and duo synergies beside the abilities take the rest of the bar and
+   slide sideways when dragged (or with the wheel) once there are more than fit - no scrollbar. */
+.horde-effects.horde-effects-slide {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  cursor: grab;
+  user-select: none;
+}
+
+.horde-effects.horde-effects-slide::-webkit-scrollbar {
+  display: none;
+}
+
+.horde-effects.horde-effects-slide:active {
+  cursor: grabbing;
+}
+
+.horde-effects-slide > .horde-effect {
+  flex: none;
+}
+
+/* Horde mode: a green tick beside a duo synergy that's been on in a run (the Codex and the pause menu). */
+.horde-duo-tick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #3ecf72;
+  color: #0d1a12;
+  font-size: 11px;
+  font-weight: bold;
+  line-height: 1;
+  flex: none;
+}
+
+/* Stealth Rock's orbit in Horde mode: the battle screen's rock pieces circling the lead, tumbling. */
+.horde-fx-orb-rock {
+  position: absolute;
+  width: 30px;
+  height: auto;
+  transform: translate(-50%, -50%) rotate(var(--spin, 0deg));
+  image-rendering: pixelated;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+  pointer-events: none;
+  z-index: 6;
+}
+
+/* Spikes and Toxic Spikes in Horde mode: caltrops on the spot, a touch smaller than the rocks. */
+.horde-spikes img {
+  opacity: 0.95;
+}
+
+/* The edit window's evolution that spends a Friendship Petal / Rare Candies to evolve now:
+   its line names the items, with their icons, in place of the method. */
+.editor-evolution-boost {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: #f4c96b;
+}
+
+/* Flamethrower's and Fire Blast's streams: a rush of fire instead of a band of light. Puffs of
+   Kenney's fire images pour from the lead to the end of the reach - small and yellow-white at the
+   lead, swelling and turning deep orange-red as they go, then fading - each one tumbling a little,
+   with a flickering tongue of flame at the lead's end. */
+.horde-beam-fire > .horde-fire-puff {
+  left: 0;
+  top: 50%;
+  height: 130%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  background: radial-gradient(circle, #fffbe0 0 12%, #ffd23a 30%, #ff7a12 55%, #e8320a 80%);
+  mask: var(--fx-fire-0) center / contain no-repeat;
+  mix-blend-mode: screen;
+  opacity: 0;
+  animation: horde-fire-puff 0.5s linear infinite;
+  animation-delay: calc(var(--puff) * -0.5s / 12);
+}
+
+.horde-beam-fire > .horde-fire-puff-1 {
+  mask-image: var(--fx-fire-1);
+}
+
+@keyframes horde-fire-puff {
+  0% {
+    left: 0%;
+    opacity: 0;
+    scale: 0.3;
+    rotate: var(--puff-spin);
+    filter: hue-rotate(18deg) brightness(1.4);
+  }
+  12% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 0.95;
+  }
+  100% {
+    left: 100%;
+    opacity: 0;
+    scale: 1.15;
+    rotate: calc(var(--puff-spin) + 120deg);
+    filter: hue-rotate(-14deg) brightness(0.85);
+  }
+}
+
+/* The tongue of flame at the lead's end, laid on its side to point down the stream. */
+.horde-beam-fire > .horde-fire-mouth {
+  left: 0;
+  top: 50%;
+  height: 110%;
+  aspect-ratio: 1;
+  translate: -30% -50%;
+  rotate: 90deg;
+  background: radial-gradient(circle, #fff 0 18%, #ffe066 38%, #ff8c1a 70%);
+  mask: var(--fx-flame-0) center / contain no-repeat;
+  mix-blend-mode: screen;
+  animation: horde-fire-flicker 0.16s steps(1) infinite;
+}
+
+@keyframes horde-fire-flicker {
+  0% {
+    mask-image: var(--fx-flame-0);
+    scale: 1 1;
+  }
+  50% {
+    mask-image: var(--fx-flame-1);
+    scale: 1.1 0.92;
+  }
+}
+
+/* Fire moves' shots (and fire-type foes' shots): a ball of flame with Kenney's flame trailing out
+   behind it, pointed back along its flight and flickering. A foe's keeps its dark, red-ringed core
+   so it still reads as something to dodge. */
+.horde-shot.horde-shot-fire:not(.horde-shot-foe) {
+  background: radial-gradient(circle, #fff 0 25%, #ffe066 45%, #ff8c1a 65%, transparent 78%);
+  box-shadow: 0 0 10px 3px rgba(255, 120, 20, 0.7);
+}
+
+.horde-shot.horde-shot-fire::after {
+  content: '';
+  display: block;
+  position: absolute;
+  inset: auto;
+  left: -100%;
+  top: -166%;
+  width: 300%;
+  height: 300%;
+  z-index: -1;
+  transform-origin: 50% 72%;
+  rotate: calc(var(--shot-turn, 0rad) - 90deg);
+  background: linear-gradient(0deg, #fff6c0 15%, #ffd23a 35%, #ff7a12 60%, #e8320a 85%);
+  mask: var(--fx-flame-0) center / contain no-repeat;
+  animation: horde-shot-fire-flicker 0.14s steps(1) infinite;
+}
+
+@keyframes horde-shot-fire-flicker {
+  0% {
+    mask-image: var(--fx-flame-0);
+    scale: 1 1;
+  }
+  50% {
+    mask-image: var(--fx-flame-1);
+    scale: 0.92 1.08;
+  }
+}
+
+/* No icon, sprite or link anywhere in the UI can be picked up and dragged as a ghost image.
+   Moving Pokemon around the box uses pointer drags, which this doesn't affect. */
+img,
+svg,
+a {
+  -webkit-user-drag: none;
+}
+
+/* Horde picker: the Poke Ball by a Pokemon's name when it's in the Pokedex. */
+.horde-pick-name .horde-pick-caught {
+  margin-left: 2px;
+  vertical-align: middle;
+}
+
+/* Horde arena drawing. Things on the field are placed with translate (see place in HordeArena),
+   and what moves every frame - Pokemon, shots, and the rings round the lead - gets a layer of
+   its own, so moving it is a slide on the GPU: no repaint, and a ring's shadow is drawn once. */
+.horde-unit,
+.horde-shot,
+.horde-spread-ring,
+.horde-melee-ring,
+.horde-pickup-ring,
+.horde-hitbox-lead {
+  will-change: translate;
+}
+
+/* Elites, bosses and frozen or held foes: a soft glow behind the sprite, in place of a blurred
+   shadow on it - a filter on an animated sprite is redrawn every frame, this never is. */
+.horde-aura {
+  position: absolute;
+  top: 45%;
+  left: 50%;
+  width: 110%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--aura, transparent) 0, transparent 66%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.horde-foe-elite .horde-aura {
+  --aura: rgba(190, 120, 255, 0.55);
+}
+
+.horde-foe-boss .horde-aura {
+  --aura: rgba(255, 70, 70, 0.55);
+}
+
+.horde-foe-gmax .horde-aura {
+  --aura: rgba(255, 40, 80, 0.7);
+}
+
+.horde-frozen .horde-aura {
+  --aura: rgba(155, 231, 255, 0.6);
+}
+
+.horde-stopped .horde-aura {
+  --aura: rgba(255, 225, 77, 0.6);
+}
+
+/* Odd Keystone's ghosts: see-through, bobbing by the lead while they fire. */
+.horde-ghost {
+  pointer-events: none;
+  opacity: 0.8;
+  animation: horde-ghost-bob 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes horde-ghost-bob {
+  from {
+    margin-top: -6px;
+  }
+  to {
+    margin-top: 6px;
+  }
+}
+
+/* Strange Steam in Horde mode: its orbiting balls are soft puffs of pink steam, swelling and fading. */
+.horde-fx-orb-steam {
+  width: 38px;
+  height: 38px;
+  background:
+    radial-gradient(circle at 35% 40%, rgba(255, 230, 245, 0.9) 0 16%, transparent 34%),
+    radial-gradient(circle at 65% 55%, rgba(255, 170, 220, 0.85) 0 20%, transparent 40%),
+    radial-gradient(circle, rgba(255, 140, 205, 0.75) 0 35%, transparent 68%);
+  box-shadow: 0 0 18px 8px rgba(255, 150, 210, 0.45);
+  filter: blur(1.5px);
+  animation: horde-steam-puff 900ms ease-in-out infinite alternate;
+}
+
+@keyframes horde-steam-puff {
+  from {
+    transform: translate(-50%, -50%) scale(0.85);
+    opacity: 0.75;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1.15);
+    opacity: 1;
+  }
 }

@@ -119,7 +119,8 @@ function currentStats(): Record<AchievementStat, number> {
     hordeBestMinutes: counters.hordeBestMinutes ?? 0,
     hordeMegaRuns: counters.hordeMegaRuns ?? 0,
     hordeDittoWins: counters.hordeDittoWins ?? 0,
-    hordeWishiwashiWins: counters.hordeWishiwashiWins ?? 0
+    hordeWishiwashiWins: counters.hordeWishiwashiWins ?? 0,
+    hordeDuosUsed: counters.hordeDuosUsed ?? 0
   }
 }
 

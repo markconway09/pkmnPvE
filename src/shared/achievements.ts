@@ -113,7 +113,8 @@ export type AchievementStat =
   | 'skillTimeouts'
   // Horde: runs survived to the end (the full 10 minutes), the highest level a lead reached,
   // runs won with a shiny lead, the most whole minutes one run lasted (endless mode too),
-  // runs where the lead Mega Evolved, and runs won with Ditto and with Wishiwashi.
+  // runs where the lead Mega Evolved, runs won with Ditto and with Wishiwashi, and how many
+  // different duo synergies have been on in a run.
   | 'hordeRunsWon'
   | 'hordeBestLevel'
   | 'hordeShinyWins'
@@ -121,6 +122,7 @@ export type AchievementStat =
   | 'hordeMegaRuns'
   | 'hordeDittoWins'
   | 'hordeWishiwashiWins'
+  | 'hordeDuosUsed'
 
 export type AchievementCategory = 'Battle' | 'Collection' | 'Merges & Raids' | 'Battle Tower' | 'Draft' | 'TMs' | 'Game Corner' | 'Horde' | 'Secret'
 export const ACHIEVEMENT_CATEGORIES: AchievementCategory[] = [
@@ -1080,6 +1082,15 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     stat: 'hordeWishiwashiWins',
     goal: 1,
     reward: { title: 'Schooling' }
+  },
+  {
+    id: 'hordeduos',
+    name: 'Master of Elements',
+    description: 'Use all type duos at least once',
+    category: 'Horde',
+    stat: 'hordeDuosUsed',
+    goal: 24,
+    reward: { title: 'Master of Elements' }
   },
 
   // Secret: shown as ??? until unlocked.

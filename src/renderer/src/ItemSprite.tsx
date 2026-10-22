@@ -58,7 +58,8 @@ const SYNTHETIC_SPRITES: Record<number, string> = {
   '-42': './sprites/misc/reliccrown.png', // Relic Crown
   '-43': './sprites/misc/luckincense.png', // Luck Incense
   '-44': './sprites/misc/cardkey.png', // Card Key
-  '-45': './sprites/misc/pearlstring.png' // Pearl String
+  '-45': './sprites/misc/pearlstring.png', // Pearl String
+  '-46': './sprites/misc/oddkeystone.png' // Odd Keystone
 }
 
 function ItemSprite({ spritenum, className }: Props): React.JSX.Element {

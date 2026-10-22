@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  HORDE_BERRY_CHANCE,
-  HORDE_BERRY_HEAL,
   HORDE_BOSS_HP,
   HORDE_BOSS_TIMES_MS,
   HORDE_DURATION_MS,
@@ -16,6 +14,13 @@ import {
   HORDE_EXPLODER_POWER,
   HORDE_EXPLODER_REACH,
   HORDE_EXPLODER_WILD_CHANCE,
+  HORDE_RANGED_CHANCE,
+  HORDE_RANGED_KEEP_AWAY,
+  HORDE_RANGED_BACK_OFF,
+  HORDE_RANGED_STRAFE,
+  HORDE_FOE_SHOT_SPEED,
+  HORDE_FOE_SHOT_HITBOX,
+  HORDE_FOE_SHOT_MS,
   HORDE_KO_EXP,
   HORDE_LEVEL_HEAL,
   HORDE_BASE_STATS,
@@ -39,7 +44,6 @@ import {
   HORDE_CRIT_CHANCE,
   hordeSoftCap,
   HORDE_GMAX_CHANCE,
-  HORDE_GMAX_HP,
   HORDE_GMAX_WALK,
   HORDE_ITEM_FLASH_MS,
   HORDE_ITEM_LIFESPAN_MS,
@@ -82,9 +86,10 @@ import {
   HORDE_LEAD_HITBOX,
   HORDE_PICKUP_PULL,
   HORDE_PICKUP_RANGE,
+  HORDE_LAUNCHER_SHARE,
+  HORDE_REACH_PICKUP_SHARE,
   HORDE_PROJECTILE_SPEED,
   HORDE_SCARF_WALK,
-  HORDE_SPREAD_FOCUS_BONUS,
   HORDE_SPREAD_WAVE_MS,
   HORDE_FOE_SPACING,
   HORDE_PLAYER_WALK,
@@ -98,6 +103,7 @@ import {
   HORDE_RISE_NEAR,
   HORDE_RISE_FAR,
   HORDE_RISE_MS,
+  HORDE_ENDLESS_RISE_FAST,
   HORDE_GOLD_PER_EXP,
   HORDE_GOLD_CARD,
   HORDE_CHEST_NEAR,
@@ -122,7 +128,6 @@ import {
   HORDE_TAPU_RADIUS,
   HORDE_TAPU_HOLD_MS,
   HORDE_TAPU_BOOST,
-  HORDE_TAPU_DRAIN,
   HORDE_TAPU_DEFENDERS,
   HORDE_TAPU_DEFENDER_LEVELS,
   HORDE_SHRINE_GOLD,
@@ -141,7 +146,11 @@ import {
   HORDE_EJECT_REACH,
   HORDE_EJECT_PUSH,
   HORDE_EJECT_SAFE_MS,
+  HORDE_LEVEL_PUSH_REACH,
+  HORDE_LEVEL_PUSH,
+  HORDE_LEVEL_SAFE_MS,
   HORDE_METRONOME_STACKS,
+  HORDE_CURSE_MAX_SLOW,
   HORDE_SASH_SAFE_MS,
   HORDE_SASH_COOLDOWN_MS,
   HORDE_SHELL_BELL_CAP,
@@ -154,7 +163,10 @@ import {
   HORDE_BATTERY_SHARE,
   HORDE_CHARCOAL_REACH,
   HORDE_CHARCOAL_SHARE,
-  HORDE_ICE_FREEZE_MS,
+  HORDE_ICE_SLOW_MAX,
+  HORDE_ICE_SLOW_MS,
+  HORDE_GHOST_REACH,
+  HORDE_GHOST_SHOT_MS,
   HORDE_RUSH_MS,
   HORDE_SPELL_TAG_KOS,
   hordeStackedChance,
@@ -213,6 +225,7 @@ import {
   hordeRollItem,
   hordeFoeCooldownScale,
   hordeFoeHpScale,
+  hordeFoeDefScale,
   hordeFoeLevel,
   hordeFoeWalk,
   hordeFoeWalkScale,
@@ -234,6 +247,7 @@ import {
   hordeRarityOdds,
   hordeSpeedFactor,
   hordeLeadWalk,
+  hordeNetSpeed,
   hordeStats,
   hordeWave,
   type HordeBaseStat,
@@ -247,6 +261,12 @@ import {
   type HordeChoice,
   type HordeMove,
   type HordeTypeEffect,
+  type HordeDuoId,
+  HORDE_DUO,
+  HORDE_DUOS,
+  hordeActiveDuos,
+  hordeActiveDuoIds,
+  hordeDuoProgress,
   type HordeLeadStat,
   type HordeMoveAnim,
   type HordeTrait,
@@ -261,7 +281,7 @@ import {
 import SpriteImage from './SpriteImage'
 import ShinyIcon from './ShinyIcon'
 import RarityCard from './RarityCard'
-import HordeChestOpen, { heldBuffText } from './HordeChestOpen'
+import HordeChestOpen, { heldBuffText, hordeItemDesc } from './HordeChestOpen'
 import ItemSprite from './ItemSprite'
 import { gmaxSpriteCandidates, loadSpriteStyle, spriteCandidates } from './spriteStyle'
 import { TYPE_COLORS } from './moveAnimations'
@@ -271,7 +291,7 @@ import { formatMoney } from './money'
 import { loadBool, savePref } from './soundPrefs'
 import { hitSoundsOn, playHit, preloadHitSounds, setHitSoundsOn } from './hitSounds'
 import { itemName, moveName, typeName, useT } from './i18n'
-import { hordeTraitText } from './hordeMoveText'
+import { hordeBoostLabel, hordeTraitText } from './hordeMoveText'
 import { HordeFlashFx, HordeStrikeFx, hordeLandingKind, hordeShotClass, ERUPT_ANIMS, MARK_ANIMS, METEOR_ANIMS } from './hordeMoveFx'
 import type { MessageKey } from '../../shared/i18n'
 import type { RarityTier } from '../../shared/battle-types'
@@ -291,7 +311,7 @@ interface Foe {
   kind: FoeKind
   // The final boss: beating it wins the run.
   final: boolean
-  // A Gigantamax boss: twice the HP, half the pace, and a Max Mushroom when beaten.
+  // A Gigantamax boss: half the pace, and a Max Mushroom when beaten.
   gmax: boolean
   // An elite that came with a wave (endless mode): its items and Mega Energy drop as a wild one's do.
   swarm: boolean
@@ -316,8 +336,9 @@ interface Foe {
   risingUntil: number
   // How long its rise takes, if not HORDE_RISE_MS (a Totem Trial's callers rise slower).
   riseMs?: number
-  // Being washed (or knocked) back: which way, and how much further it has to slide.
-  slide: { dx: number; dy: number; left: number } | null
+  // Being washed (or knocked) back: which way, how much further it has to slide, and whether it
+  // freezes what it slams into (Flash Freeze).
+  slide: { dx: number; dy: number; left: number; freeze?: boolean } | null
   // When it fainted - it fades out, then goes.
   faintedAt: number | null
   // The type effects on it (see HORDE_EFFECT), each lasting until a time on the run's clock.
@@ -327,6 +348,11 @@ interface Foe {
   exploder?: boolean
   fuseAt?: number
   byLead?: boolean
+  // A ranged one (see HORDE_RANGED_CHANCE), which way it edges round the lead (1 or -1), and
+  // whether it's close enough to fire.
+  ranged?: boolean
+  strafe?: 1 | -1
+  aiming?: boolean
   // Called up by a Totem Trial (that shrine's id) - and whether it's the totem itself.
   shrine?: number
   totem?: boolean
@@ -343,6 +369,20 @@ interface Bomb {
   attack: number
   fuseAt: number
   byLead: boolean
+}
+
+// A ranged foe's shot, flying straight on (dx, dy a unit heading) until it hits the lead or fades:
+// its move (for its look), the damage it deals, who fired it and when it fades (on the run's clock).
+interface FoeShot {
+  id: number
+  x: number
+  y: number
+  dx: number
+  dy: number
+  move: HordeMove
+  dmg: number
+  fromId: number
+  until: number
 }
 
 // What a blast comes from: where, how strong, and whether the lead set it off.
@@ -378,7 +418,8 @@ interface CardFace {
   lines: string[]
   // The badges under the title - a move's shape and its type's effect - each with what it means,
   // shown when hovered (tapped on a phone). Cards saved before them have the one badge instead.
-  tags?: { label: string; tip: string[]; color?: string; pips?: number }[]
+  // A duo synergy the move would complete has both its types' colours.
+  tags?: { label: string; tip: string[]; color?: string; pips?: number; duo?: [string, string] }[]
   // A move's own twist, under its stats.
   twist?: string
   // A tome's rank once taken (none for a new one).
@@ -414,6 +455,11 @@ interface FoeEffects {
   charm: { cut: number; until: number } | null
   // Stats lowered by moves (see foeDrop), each by a share until a time - none in runs saved before them.
   drop?: Partial<Record<HordeLeadStat, { amount: number; until: number }>>
+  // Duo synergies (see HORDE_DUO): soaked by Wash Away (Conductor), when a fleeing foe last passed
+  // it poison (Infestation), and fighting for the lead (Possession).
+  soakedUntil?: number
+  infestAt?: number
+  possessedUntil?: number
 }
 
 function noEffects(): FoeEffects {
@@ -442,6 +488,20 @@ interface Rock {
   until: number
   // The foes that have stepped on it (Avalanche's burst hits each once).
   hit?: number[]
+}
+
+// Spikes or Toxic Spikes left on the ground by a move: hurting foes on them every second (dps),
+// and Toxic Spikes poisoning each foe the first time it steps on them (poison a second, for poisonMs).
+interface Spike {
+  id: number
+  x: number
+  y: number
+  toxic: boolean
+  dps: number
+  poison: number
+  until: number
+  move: string
+  hit: number[]
 }
 
 interface Popup {
@@ -483,7 +543,19 @@ interface KnownMove {
   koPower?: number
   chargeUntil?: number
   rampUntil?: number
+  // Reaper (Ghost + Dark) finished a foe with it: it comes round again at once.
+  reapReady?: boolean
 }
+
+// What an orbit move's balls are drawn as, for those with a look of their own (one piece after another).
+const ORBIT_PIECES: Partial<Record<HordeMoveAnim, string[]>> = { stealthRock: ['rock1', 'rock2'], caltrop: ['caltrop'] }
+
+// Where the caltrops sit on a Spikes spot (and the poison ones on Toxic Spikes).
+const SPIKE_PIECES = [
+  { dx: -16, dy: -2 },
+  { dx: 8, dy: -8 },
+  { dx: 14, dy: 6 }
+]
 
 // Where the Stealth Rock pieces sit on a rock spot, round its middle.
 const ROCK_PIECES = [
@@ -498,19 +570,35 @@ function traitOf(known: KnownMove): HordeTrait {
   return hordeMoveDef(known.move).trait
 }
 
+// The Shadow Ball an Odd Keystone's ghosts fire - with no upgrades, and the lead's Attack behind it.
+const GHOST_BALL: KnownMove = {
+  move: hordeMoveOf(hordeMoveDef({ id: 'shadowball', name: 'Shadow Ball', type: 'Ghost' })),
+  power: 0,
+  cut: 0,
+  range: 0,
+  count: 0,
+  crit: 0,
+  upgrades: 0
+}
+
 /** A known move's own look, if it has one. */
 function animOf(known: KnownMove): HordeMoveAnim | undefined {
   return hordeMoveDef(known.move).anim
 }
 
-// How much further a move reaches with its reach upgrades.
-function reachScale(known: KnownMove): number {
-  return 1 + known.range / 100
+// How much further a move reaches with its reach upgrades and Mega Launcher.
+function reachScale(g: Game, known: KnownMove): number {
+  return 1 + launchRange(g, known) / 100
 }
 
-/** How many times its width a stream is: its reach upgrades widen it by more than they lengthen it. */
-function beamWidthScale(known: KnownMove): number {
-  return 1 + (known.range / 100) * HORDE_SHAPES.beamWidthGrowth
+/** How many times its width a stream is: its reach upgrades (and Mega Launcher) widen it by more than they lengthen it. */
+function beamWidthScale(g: Game, known: KnownMove): number {
+  return 1 + (launchRange(g, known) / 100) * HORDE_SHAPES.beamWidthGrowth
+}
+
+/** A move's reach upgrades plus Mega Launcher's share (cones, blasts, streams and piercing shots grow by half of it). */
+function launchRange(g: Game, known: KnownMove): number {
+  return known.range + bonusOf(g, 'area') * HORDE_LAUNCHER_SHARE
 }
 
 // Electric's chain jumping from one foe to the next: a bolt between them for a moment.
@@ -548,6 +636,17 @@ interface Shot {
   hitIds?: number[]
   outLeft?: number
   returning?: boolean
+}
+
+// An Odd Keystone's ghost, floating this far off the lead: it fires its Shadow Balls one at a
+// time at foes close by, then fades (on the run's clock).
+interface Ghost {
+  id: number
+  ox: number
+  oy: number
+  shotsLeft: number
+  nextShotAt: number
+  born: number
 }
 
 // A strike called down on a foe: it lands (on the run's clock) a moment later, wherever the
@@ -637,6 +736,8 @@ interface Zone {
   dy: number
   born: number
   until: number
+  // Mudslide's mud: Wash Away pushes foes on it further.
+  mud?: boolean
 }
 
 // Balls circling the lead (the orbit shape), each foe hit at most once every so often.
@@ -673,6 +774,8 @@ interface Drop {
   shrine?: boolean
   // Picked up and flying to the lead.
   pulled: boolean
+  // A chest already opened along with another that reached the lead first - gone from the field.
+  taken?: boolean
 }
 
 // How a run ends: fainted, or given up / ended by the player.
@@ -694,6 +797,8 @@ interface Shrine {
   y: number
   started: boolean
   heldMs: number
+  // A Tapu Ruin's second wave of defenders, risen when it first reaches half full.
+  secondWave?: boolean
 }
 
 interface Game {
@@ -722,8 +827,9 @@ interface Game {
   level: number
   levelsGained: number
   exp: number
-  // Levels gained whose choice hasn't been made yet - true for the one it evolved at (all legendary).
-  pendingChoices: boolean[]
+  // Levels gained whose choice hasn't been made yet: the level each was reached at (past 100 it
+  // stays 100), and whether it evolved there (all legendary).
+  pendingChoices: { level: number; evolves: boolean }[]
   // What it is now, and how far along its evolution line (setup.evolutions) it's got.
   form: HordeSpecies
   evolved: number
@@ -732,6 +838,8 @@ interface Game {
   statBonus: Record<HordeBaseStat, number>
   bonus: Record<HordeBonusStat, number>
   luck: number
+  // Curse's Speed debuff (percent slower), kept apart from the Speed buffs above - never past HORDE_CURSE_MAX_SLOW.
+  curseSlow: number
   // Multi-target picks taken (each lets single-target moves hit one more foe in the spread ring), level-up rerolls
   // and banishes left, and the new moves and tomes banished (see hordeChoiceKey) - never offered again this run.
   multi: number
@@ -773,9 +881,13 @@ interface Game {
   bursts: Burst[]
   arcs: Arc[]
   shots: Shot[]
+  // Odd Keystones' ghosts about the lead.
+  ghosts: Ghost[]
+  // Ranged foes' shots on their way.
+  foeShots: FoeShot[]
   waves: Wave[]
   strikes: Strike[]
-  // Melee and piercing moves' repeats from Multi-shot, each going off again at its time.
+  // Melee and piercing moves' repeats from Multi-Attack, each going off again at its time.
   repeats: { known: KnownMove; at: number }[]
   beams: Beam[]
   flashes: Flash[]
@@ -808,6 +920,8 @@ interface Game {
   // Every chest opened this run, paid for or not (Relic Crown, Luck Incense), the Reaper Cloth's
   // executes, when the Eject Pack's rush ends, and whether the level-up on screen is a Rare Candy's.
   chestsGot: number
+  // Chests opened by the time the Luck Incense turned up (null without one).
+  incenseFrom: number | null
   reaped: number
   rushUntil: number
   candyScreen: boolean
@@ -828,11 +942,17 @@ interface Game {
   nextTideAt: number
   nextGaleAt: number
   darkHits: number
+  // When Thunderstorm's lightning next strikes (none in runs saved before it).
+  nextStormAt?: number
+  // Every duo synergy that's been on this run (none in runs saved before them).
+  duosSeen?: HordeDuoId[]
   // Iron Guard's and Leech's shield, soaking up damage before HP.
   shield: number
   tailwind: { speed: number; until: number } | null
   rage: { stacks: number; per: number; until: number } | null
   rocks: Rock[]
+  // Spikes and Toxic Spikes (none in runs saved before them).
+  spikes?: Spike[]
   // The items' effects: until when the Choice Scarf, Booster Energy and Flame Orb last (on
   // the run's clock), and the Big Nuggets picked up.
   scarfUntil: number
@@ -880,6 +1000,8 @@ const SPAWN_CORNER_SHARE = 0.35
 const PLAYER_MARGIN = 30
 // How wide an angle (radians) a wave rises across, on its side of the lead.
 const WAVE_SPREAD = 0.9
+// How far past the screen's edge things are still drawn (a big sprite stands well above its feet).
+const DRAW_MARGIN = 300
 // Water's bonus drags foes within this of the push's path.
 const DRAG_WIDTH = 40
 // Rage's bonus hits a foe behind the target - no more than this angle off the line through it.
@@ -944,12 +1066,21 @@ const FX_VARS = {
   '--fx-bolt-side': fxUrl('bolt-side'),
   '--fx-streak': fxUrl('streak'),
   '--fx-flash': fxUrl('flash'),
-  '--fx-smoke': fxUrl('smoke')
+  '--fx-smoke': fxUrl('smoke'),
+  '--fx-fire-0': fxUrl('fire-0'),
+  '--fx-fire-1': fxUrl('fire-1'),
+  '--fx-flame-0': fxUrl('flame-0'),
+  '--fx-flame-1': fxUrl('flame-1')
 } as React.CSSProperties
 const BOOM_FIREBALLS = 3
+// The moves whose stream is drawn as a rush of fire (puffs of flame pouring out) instead of a band of light.
+const FIRE_STREAMS = new Set(['flamethrower', 'fireblast'])
+// How many flame puffs are in flight along a fire stream at once.
+const FIRE_PUFFS = 12
 // Every effect picture, so the run can load them all before the first move goes off.
 const FX_FILES = [
   ...['star', 'sparkle', 'burst', 'ring', 'bolt', 'bolt-side', 'streak', 'flash', 'smoke'],
+  ...['fire-0', 'fire-1', 'flame-0', 'flame-1'],
   ...Array.from({ length: BOOM_FIREBALLS }, (_, i) => `explosion-${i}`)
 ].map(fxFile)
 // How fast a washed-back foe slides, in arena units a second.
@@ -974,6 +1105,7 @@ const STAT_KEYS = {
   def: 'horde.stat.def',
   spe: 'horde.stat.spe',
   area: 'horde.stat.area',
+  reach: 'horde.stat.reach',
   haste: 'horde.stat.haste',
   pickup: 'horde.stat.pickup',
   critChance: 'horde.stat.critChance',
@@ -992,6 +1124,7 @@ const ABILITY_KEYS: Record<HordeStat, MessageKey> = {
   def: 'horde.ability.def',
   spe: 'horde.ability.spe',
   area: 'horde.ability.area',
+  reach: 'horde.ability.reach',
   haste: 'horde.ability.haste',
   pickup: 'horde.ability.pickup',
   critChance: 'horde.ability.critChance',
@@ -1054,19 +1187,37 @@ const CORNERS: [number, number][] = [
 function leadStats(form: HordeSpecies, level: number, bonus: Record<HordeBaseStat, number>): HordeStats {
   const base = hordeStats(form.baseStats, level)
   const out = {} as HordeStats
-  for (const stat of HORDE_BASE_STATS) out[stat] = stat === 'spe' ? base.spe : Math.round(base[stat] * (1 + bonus[stat] / 100))
+  for (const stat of HORDE_BASE_STATS) out[stat] = stat === 'spe' ? base.spe + Math.round(bonus.spe) : Math.round(base[stat] * (1 + bonus[stat] / 100))
   return out
 }
 
-/** How fast the lead walks for its Speed, with its Speed picks, items and upgrades (more for a slow lead - see hordeLeadWalk). */
-function leadWalk(g: Game, bonusPercent = statPercents(g).spe): number {
-  return hordeLeadWalk(g.stats.spe, g.level, bonusPercent)
+/** How fast the lead walks for its Speed (picks, items and upgrades already in it) less Curse's debuff (see hordeLeadWalk). */
+function leadWalk(g: Game): number {
+  return hordeLeadWalk(g.stats.spe, g.level, g.curseSlow)
+}
+
+/** A percent with at most one decimal. */
+function tenth(n: number): number {
+  return Math.round(n * 10) / 10
+}
+
+/** A whole number with its sign: +12, 0, -20. */
+function signed(n: number): string {
+  const v = Number.isFinite(n) ? Math.round(n) : 0
+  return v > 0 ? `+${v}` : v < 0 ? String(v) : '0'
+}
+
+/**
+ * The net Speed points beside the Speed stat: buff colour when up, debuff colour when down, a
+ * plain 0 otherwise (tiny leftovers and broken numbers count as 0).
+ */
+function speedLabel(net: number): React.JSX.Element {
+  const shown = signed(net)
+  const className = shown.startsWith('+') ? 'horde-stat-buff' : shown.startsWith('-') ? 'horde-stat-debuff' : undefined
+  return <span className={className}> ({shown})</span>
 }
 
 /** What the held items add, by what they raise (nothing for what none raise). */
-/** The label of what a move's count upgrades add (see hordeCountKind). */
-const COUNT_LABEL_KEYS = { bounces: 'horde.change.bounces', hits: 'horde.change.hits', shots: 'horde.change.count' } as const
-
 function heldOf(g: Game, stat: HordeHeldStat): number {
   return hordeHeldTotals(g.held)[stat] ?? 0
 }
@@ -1082,6 +1233,29 @@ function statPercents(g: Game): Record<HordeBaseStat, number> {
   for (const stat of HORDE_BASE_STATS) out[stat] += heldOf(g, stat)
   out.atk += reaperAttack(g) + spellTagAttack(g)
   return out
+}
+
+// The effects row can hold more than fits: dragging it with the mouse (or the wheel) slides it
+// along. It only takes the pointer once it's moved, so a plain click still reaches an effect.
+let effectsDrag: { x: number; left: number; moved: boolean } | null = null
+const effectsDragHandlers: React.HTMLAttributes<HTMLDivElement> = {
+  onPointerDown: (e) => {
+    if (e.pointerType === 'mouse' && e.button === 0) effectsDrag = { x: e.clientX, left: e.currentTarget.scrollLeft, moved: false }
+  },
+  onPointerMove: (e) => {
+    if (!effectsDrag) return
+    const dx = e.clientX - effectsDrag.x
+    if (!effectsDrag.moved && Math.abs(dx) > 4) {
+      effectsDrag.moved = true
+      e.currentTarget.setPointerCapture(e.pointerId)
+    }
+    if (effectsDrag.moved) e.currentTarget.scrollLeft = effectsDrag.left - dx
+  },
+  onPointerUp: () => (effectsDrag = null),
+  onPointerCancel: () => (effectsDrag = null),
+  onWheel: (e) => {
+    e.currentTarget.scrollLeft += e.deltaY + e.deltaX
+  }
 }
 
 /** The Attack (percent) from the Reaper Cloth's executes this run. */
@@ -1103,9 +1277,9 @@ function growingDamage(g: Game): { crown: number; pearl: number; powder: number 
   }
 }
 
-/** The Luck from Luck Incenses, for every chest opened this run. */
+/** The Luck from the Luck Incense, for every chest opened since it turned up. */
 function incenseLuck(g: Game): number {
-  return heldOf(g, 'chestLuck') * g.chestsGot
+  return g.incenseFrom === null ? 0 : heldOf(g, 'chestLuck') * (g.chestsGot - g.incenseFrom)
 }
 
 /** A chance (0-1) from the held copies of an item whose chances don't simply add up (Card Key, Bright Powder). */
@@ -1221,8 +1395,10 @@ function newGame(setup: HordeSetup): Game {
     // It starts knowing just the setup's first move.
     known: [{ move: setup.moves[0], power: 0, cut: 0, range: 0, count: 0, crit: 0, upgrades: 0 }],
     statBonus,
+    curseSlow: 0,
     bonus: {
       area: 0,
+      reach: 0,
       haste: hordeUpgradeTotal('haste', up.haste),
       pickup: hordeUpgradeTotal('pickup', up.pickup),
       critChance: 0,
@@ -1257,6 +1433,8 @@ function newGame(setup: HordeSetup): Game {
     bursts: [],
     arcs: [],
     shots: [],
+    ghosts: [],
+    foeShots: [],
     waves: [],
     strikes: [],
     repeats: [],
@@ -1278,6 +1456,7 @@ function newGame(setup: HordeSetup): Game {
     bell: { second: 0, healed: 0, carry: 0 },
     rarityUps: 0,
     chestsGot: 0,
+    incenseFrom: null,
     reaped: 0,
     rushUntil: 0,
     candyScreen: false,
@@ -1296,6 +1475,7 @@ function newGame(setup: HordeSetup): Game {
     tailwind: null,
     rage: null,
     rocks: [],
+    spikes: [],
     scarfUntil: 0,
     boosterUntil: 0,
     flameUntil: 0,
@@ -1337,6 +1517,8 @@ function saveGame(g: Game): unknown {
     bursts: [],
     arcs: [],
     shots: [],
+    ghosts: [],
+    foeShots: [],
     waves: [],
     strikes: [],
     repeats: [],
@@ -1372,7 +1554,7 @@ function loadGame(saved: unknown): Game {
     g.py += dy
     g.aimX += dx
     g.aimY += dy
-    for (const list of [g.foes, g.drops, g.rocks]) {
+    for (const list of [g.foes, g.drops, g.rocks, g.spikes ?? []]) {
       for (const at of list) {
         at.x += dx
         at.y += dy
@@ -1389,6 +1571,8 @@ function loadGame(saved: unknown): Game {
   // A run saved before exploders.
   g.bombs ??= []
   g.leadBlastAt = -Infinity
+  // Shots in flight aren't saved (and a run saved before ranged foes has none).
+  g.foeShots = []
   // A run saved before banishes: none to use.
   g.banishes ??= 0
   g.banished ??= []
@@ -1408,9 +1592,17 @@ function loadGame(saved: unknown): Game {
   g.sashReadyAt ??= 0
   g.ejectReadyAt ??= 0
   g.metronome ??= 0
+  // A run from before Curse's slow was its own debuff: take it back out of the Speed buffs.
+  if (g.curseSlow === undefined) {
+    g.curseSlow = Math.min(HORDE_CURSE_MAX_SLOW, Math.max(0, -g.statBonus.spe))
+    g.statBonus.spe = Math.max(0, g.statBonus.spe)
+  }
   g.bell ??= { second: 0, healed: 0, carry: 0 }
   g.rarityUps ??= 0
   g.chestsGot ??= g.chestsOpened ?? 0
+  // A run from before the Luck Incense counted only chests after it: every chest counts.
+  g.incenseFrom ??= g.held.luckIncense ? 0 : null
+  g.ghosts ??= []
   g.reaped ??= 0
   g.rushUntil ??= 0
   g.candyScreen ??= false
@@ -1450,7 +1642,8 @@ function runResult(g: Game): HordeResult {
     damage: g.damage,
     tomes: g.tomes,
     held: g.held,
-    chests: g.chestsOpened
+    chests: g.chestsOpened,
+    duos: g.duosSeen ?? []
   }
 }
 
@@ -1481,7 +1674,7 @@ function ownRing(known: KnownMove): number {
 /** Where an orbit move's balls are right now, going round the lead. */
 function orbSpots(g: Game, orb: Orb): { x: number; y: number }[] {
   const turn = (HORDE_ORBIT.turns * (g.clock - orb.born)) / 1000
-  const radius = HORDE_ORBIT.radius * (1 + bonusOf(g, 'area') / 100)
+  const radius = HORDE_ORBIT.radius * (1 + (bonusOf(g, 'area') * HORDE_LAUNCHER_SHARE) / 100)
   return Array.from({ length: orb.balls }, (_, i) => {
     const angle = (turn + i / orb.balls) * Math.PI * 2
     return { x: g.px + Math.cos(angle) * radius, y: g.py - BODY_HEIGHT + Math.sin(angle) * radius * 0.8 }
@@ -1493,25 +1686,25 @@ function critChance(g: Game): number {
   return HORDE_CRIT_CHANCE + bonusOf(g, 'critChance') + (effectRank(g, 'Dark').bonus ? HORDE_EFFECT.ambushCritChance : 0)
 }
 
-/** How far spread moves reach, with Range tomes and items. */
+/** How far spread moves reach, with Mega Launcher tomes and items. */
 function spreadRadius(g: Game): number {
-  // Range widens it, and so do wave moves' reach upgrades.
+  // Mega Launcher widens it, and so do wave moves' reach upgrades.
   const waves = g.known.reduce((sum, k) => sum + (hordeMoveShape(k.move) === 'nova' ? k.range : 0), 0)
   return HORDE_SPREAD_RADIUS * (1 + (bonusOf(g, 'area') + waves) / 100)
 }
 
 /**
  * How far melee moves reach (between feet): one reach for them all, stretched by every melee
- * move's reach upgrades and by Range.
+ * move's reach upgrades and by Long Reach.
  */
 function meleeRadius(g: Game): number {
   const melee = g.known.reduce((sum, k) => sum + (hordeMoveShape(k.move) === 'melee' ? k.range : 0), 0)
-  return HORDE_SHAPES.meleeReach * (1 + (melee + bonusOf(g, 'area')) / 100)
+  return HORDE_SHAPES.meleeReach * (1 + (melee + bonusOf(g, 'reach')) / 100)
 }
 
-/** How far off experience and items are picked up, with Pickup tomes and items. */
-function pickupRange(g: Game): number {
-  return HORDE_PICKUP_RANGE * (1 + bonusOf(g, 'pickup') / 100)
+/** How far off experience and items are picked up, with Pickup tomes and items, and a little from Long Reach. */
+function pickupRange(g: Game, extraReach = 0): number {
+  return HORDE_PICKUP_RANGE * (1 + (bonusOf(g, 'pickup') + bonusOf(g, 'reach', extraReach) * HORDE_REACH_PICKUP_SHARE) / 100)
 }
 
 /** A known move's cooldown, with its own upgrades, Haste tomes and items, and the moves it knows (Solar Beam). */
@@ -1544,6 +1737,11 @@ function effectRank(g: Game, type: string): HordeTypeEffect {
   return hordeTypeEffect(knownMoves(g), type)
 }
 
+/** Whether the lead's moves make this duo synergy (see HORDE_DUOS). */
+function duoOn(g: Game, id: HordeDuoId): boolean {
+  return hordeActiveDuoIds(knownMoves(g)).has(id)
+}
+
 /** How many type effects are on a foe right now (for Hex). */
 function effectCount(fx: FoeEffects, clock: number): number {
   return [
@@ -1564,6 +1762,7 @@ function effectTypesOn(fx: FoeEffects, clock: number): string[] {
   const on: string[] = []
   if (fx.vulnerableUntil > clock) on.push('Normal')
   if (fx.burn && fx.burn.until > clock) on.push('Fire')
+  if ((fx.soakedUntil ?? 0) > clock) on.push('Water')
   if (fx.stopUntil > clock || (fx.slow && fx.slow.until > clock)) on.push('Ground')
   if (fx.frozenUntil > clock || (fx.chill && fx.chill.until > clock)) on.push('Ice')
   if (fx.guard && fx.guard.until > clock) on.push('Fighting')
@@ -1579,8 +1778,12 @@ function CardTag({ tag }: { tag: NonNullable<CardFace['tags']>[number] }): React
   const [open, setOpen] = useState(false)
   return (
     <span
-      className={`horde-choice-badge horde-card-tag${open ? ' horde-card-tag-open' : ''}`}
-      style={tag.color ? ({ '--move-color': tag.color } as React.CSSProperties) : undefined}
+      className={`horde-choice-badge horde-card-tag${tag.duo ? ' horde-card-tag-duo' : ''}${open ? ' horde-card-tag-open' : ''}`}
+      style={
+        tag.color
+          ? ({ '--move-color': tag.color, '--duo-a': tag.duo?.[0], '--duo-b': tag.duo?.[1] } as React.CSSProperties)
+          : undefined
+      }
       onClick={
         IS_MOBILE_LAYOUT
           ? (ev) => {
@@ -1628,6 +1831,8 @@ interface Props {
 function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element {
   const t = useT()
   const fighter = setup.fighter
+  // The share of a type effect's chance moves of other types get (more with the Master of Elements title).
+  const otherShare = setup.otherTypeShare ?? HORDE_EFFECT_OTHER_TYPE_SHARE
   // The moves a run can learn (and the wild Pokemon use) - the list as it is now for a run saved
   // before it changed. Worked out once, not on every frame.
   const [catalog] = useState(() => (setup.moves.every((m) => hordeFindMoveDef(m.id)) ? setup.moves : hordeMoveCatalog()))
@@ -1842,13 +2047,17 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
     }
     const lift = (kind === 'boss' ? 6 : kind === 'elite' ? 3 : 0) + extraLevels
     const level = Math.min(100, hordeFoeLevel(g.elapsed) + lift)
-    const stats = hordeStats(sp.baseStats, level, 15)
+    // In endless mode its Defense grows as its HP does (see hordeFoeDefScale).
+    const own = hordeStats(sp.baseStats, level, 15)
+    const stats = { ...own, def: Math.round(own.def * hordeFoeDefScale(g.elapsed)) }
     const hpMult =
       hordeFoeHpScale(g.elapsed) *
       (kind === 'boss' ? HORDE_BOSS_HP[big ? HORDE_BOSS_HP.length - 1 : 0] : kind === 'elite' ? HORDE_ELITE_HP : 1)
     // Exploders (a horde of them, or a wild Pokemon that rolls as one) are a bit tougher.
     const explodes = !!exploder || (kind === 'wild' && !!sp.explodes && Math.random() < HORDE_EXPLODER_WILD_CHANCE)
-    const maxHp = Math.max(1, Math.round(stats.hp * hpMult * (gmax ? HORDE_GMAX_HP : 1) * (explodes ? HORDE_EXPLODER_HP : 1)))
+    // A wild Pokemon better at Sp. Atk than Attack sometimes keeps its distance and fires its moves instead.
+    const ranged = kind === 'wild' && !explodes && !!sp.special && Math.random() < HORDE_RANGED_CHANCE
+    const maxHp = Math.max(1, Math.round(stats.hp * hpMult * (explodes ? HORDE_EXPLODER_HP : 1)))
     // Its Speed sets its pace; a boss lumbers in at half that, and wild ones and elites get quicker as the run goes on.
     const walk =
       hordeFoeWalk(stats.spe, level) *
@@ -1875,23 +2084,32 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       cooldowns: moves.map((m, i) => (i === 0 ? 0 : hordeMoveCooldown(m) * 0.5)),
       flashUntil: 0,
       bornAt: g.clock,
-      risingUntil: g.clock + HORDE_RISE_MS,
+      risingUntil: g.clock + riseMs(g),
+      riseMs: riseMs(g),
       slide: null,
       faintedAt: null,
       fx: noEffects(),
       // One of an exploder horde always is; a wild Pokemon that can learn Explosion only sometimes,
       // and an elite or a boss never - they attack like any other.
-      exploder: explodes ? true : undefined
+      exploder: explodes ? true : undefined,
+      ranged: ranged ? true : undefined,
+      strafe: ranged ? (Math.random() < 0.5 ? 1 : -1) : undefined
     })
   }
 
-  // A small horde of this third of the run's exploders (as many as there's room for), rising up together on one side of the lead.
-  function spawnExploders(g: Game, room: number): void {
+  // How long rising out of the ground takes: half as long in endless mode.
+  function riseMs(g: Game): number {
+    return HORDE_RISE_MS / (g.endless ? HORDE_ENDLESS_RISE_FAST : 1)
+  }
+
+  // A small horde of this third of the run's exploders, rising up together on one side of the lead
+  // (they don't wait for room, however full the arena).
+  function spawnExploders(g: Game): void {
     const list = setup.exploders
     if (!list?.length) return
     const sp = list[hordePoolIndex(g.elapsed, list.length)]
     const [least, most] = HORDE_EXPLODER_COUNT
-    const count = Math.min(room, least + Math.floor(Math.random() * (most - least + 1)))
+    const count = least + Math.floor(Math.random() * (most - least + 1))
     const side = Math.random() * Math.PI * 2
     for (let i = 0; i < count; i++) spawnFoe(g, 'wild', false, risePoint(g, side + (Math.random() - 0.5) * WAVE_SPREAD), false, false, sp)
   }
@@ -1910,6 +2128,11 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
     blowUp(g, blastFrom(foe), foe)
   }
 
+  // Ranged foes' shots caught in a blast (its reach round a spot on the ground) are wiped out.
+  function clearFoeShots(g: Game, x: number, y: number, reach: number): void {
+    if (g.foeShots.length) g.foeShots = g.foeShots.filter((s) => dist(s.x, s.y + BODY_HEIGHT, x, y) > reach)
+  }
+
   function blastFrom(foe: Foe): BlastSource {
     return { x: foe.x, y: foe.y, level: foe.level, attack: foe.stats.atk, byLead: !!foe.byLead }
   }
@@ -1918,6 +2141,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
   // exploders caught in it - standing or knocked out - go off a moment later, counted as the lead's if this one was.
   function blowUp(g: Game, src: BlastSource, self?: Foe): void {
     g.flashes.push({ id: g.seq++, kind: 'boom', x: src.x, y: src.y, dx: 0, dy: 0, type: 'Fire', born: g.now, reach: HORDE_EXPLODER_REACH })
+    clearFoeShots(g, src.x, src.y, HORDE_EXPLODER_REACH)
     const blast = (defense: number): number =>
       hordeDamage({
         level: src.level,
@@ -1977,12 +2201,19 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       leadPopup(g, t('horde.levelUp', { level: g.level }), 'level')
     }
     refreshStats(g, HORDE_LEVEL_HEAL + (evolves ? HORDE_EVOLVE_HEAL : 0))
-    g.pendingChoices.push(evolves)
+    // Foes nearby are knocked back (an elite less, a boss not at all), and nothing lands for a moment.
+    g.safeUntil = Math.max(g.safeUntil, g.clock + HORDE_LEVEL_SAFE_MS)
+    g.flashes.push({ id: g.seq++, kind: 'blast', x: g.px, y: g.py, dx: 0, dy: 0, type: 'Normal', born: g.now, reach: HORDE_LEVEL_PUSH_REACH })
+    clearFoeShots(g, g.px, g.py, HORDE_LEVEL_PUSH_REACH)
+    for (const foe of standingFoes(g))
+      if (foe.kind !== 'boss' && awayOf(g, foe) <= HORDE_LEVEL_PUSH_REACH + HORDE_FOE_HITBOX[foe.kind])
+        push(g, foe, HORDE_LEVEL_PUSH * (foe.kind === 'elite' ? HORDE_ELITE_HOLD_SHARE : 1), false)
+    g.pendingChoices.push({ level: g.level, evolves })
   }
 
   // What a level-up choice was, in words, for the pause menu's list.
   function describeChoice(g: Game, choice: HordeChoice): TakenChoice {
-    const level = g.level - g.pendingChoices.length + 1
+    const level = g.pendingChoices[0]?.level ?? g.level
     const entry = { level, rarity: choice.rarity }
     if (choice.kind === 'learn') return { ...entry, kind: t('horde.choice.learn'), title: moveName(choice.move.name) }
     if (choice.kind === 'upgrade')
@@ -1990,7 +2221,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
     if (choice.kind === 'multi') return { ...entry, kind: t('horde.choice.multi'), title: t('horde.multi'), detail: `+${HORDE_MULTI_TARGETS}` }
     if (choice.kind === 'gold') return { ...entry, kind: t('horde.choice.gold'), title: t('horde.gold'), detail: `+${HORDE_GOLD_CARD[choice.rarity]}` }
     const rank = (g.tomes.find((tm) => tm.stat === choice.stat)?.ranks ?? 0) + 1
-    const curse = hordeCurseGain(choice.rarity, rank - 1)
+    const curse = hordeCurseGain(choice.rarity, rank - 1, g.curseSlow)
     const detail =
       choice.stat === 'luck'
         ? `+${HORDE_LUCK_POINTS[choice.rarity]}`
@@ -2043,11 +2274,11 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       if (stat === 'luck') g.luck += HORDE_LUCK_POINTS[choice.rarity]
       else if (isBonusStat(stat)) g.bonus[stat] += hordeBonusPercent(stat, choice.rarity, ranksHeld)
       else if (stat === 'curse') {
-        // Curse: sturdier (HP and Defense) but slower.
-        const { up, down } = hordeCurseGain(choice.rarity, ranksHeld)
+        // Curse: sturdier (HP and Defense) but slower - a Speed debuff of its own, up to the most.
+        const { up, down } = hordeCurseGain(choice.rarity, ranksHeld, g.curseSlow)
         g.statBonus.hp += up
         g.statBonus.def += up
-        g.statBonus.spe -= down
+        g.curseSlow += down
         refreshStats(g, 0)
       }
       else {
@@ -2056,8 +2287,8 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       }
     }
     // A pick that grows a ring lights it up for a moment: wave moves' reach the spread ring,
-    // melee moves' reach (or a first melee move) the melee ring, Pickup the pickup ring - and
-    // Range both the spread and the melee ring.
+    // melee moves' reach (or a first melee move) the melee ring, Pickup the pickup ring, Mega
+    // Launcher the spread ring - and Long Reach both the melee and the pickup ring.
     const grown = (move: HordeMove): RingKind | null =>
       hordeMoveShape(move) === 'nova' ? 'spread' : hordeMoveShape(move) === 'melee' ? 'melee' : null
     let ring: RingKind | null = null
@@ -2065,8 +2296,9 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       ring = choice.boosts.includes('range') || hordeMoveShape(choice.move) === 'melee' ? grown(choice.move) : null
     else if (choice.kind === 'upgrade' && choice.boosts.includes('range')) ring = g.known[choice.slot] ? grown(g.known[choice.slot].move) : null
     else if (choice.kind === 'stat' && choice.stat === 'pickup') ring = 'pickup'
+    else if (choice.kind === 'stat' && choice.stat === 'area') ring = 'spread'
     if (ring) ringFlash[ring] = performance.now()
-    if (choice.kind === 'stat' && choice.stat === 'area') for (const r of ['spread', 'melee'] as RingKind[]) ringFlash[r] = performance.now()
+    if (choice.kind === 'stat' && choice.stat === 'reach') for (const r of ['melee', 'pickup'] as RingKind[]) ringFlash[r] = performance.now()
     g.pendingChoices.shift()
     setChoices(null)
   }
@@ -2083,7 +2315,9 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
 
   // A level-up's choices, rolled with the lead's Luck and moves.
   function rollChoices(g: Game, evolution: boolean): HordeChoice[] {
-    const list = dealChoices(g, evolution)
+    let list = dealChoices(g, evolution)
+    // Loaded Dice: each deals the cards again for free while none of them is legendary.
+    for (let i = 0; i < (g.held.loadedDice ?? 0) && !list.some((c) => c.rarity === 'legendary'); i++) list = dealChoices(g, evolution)
     // A Rare Candy's level-up: every card one rarity higher, rerolls too.
     if (!g.candyScreen) return list
     const known = knownMoves(g)
@@ -2102,7 +2336,9 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       futureTypes(g),
       g.tomes.map((tm) => tm.stat),
       g.banished,
-      setup.learnTypes
+      setup.learnTypes,
+      // Curse at its most slow isn't offered again.
+      g.curseSlow >= HORDE_CURSE_MAX_SLOW ? ['curse'] : []
     )
   }
 
@@ -2125,17 +2361,42 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       g.chestsOpened++
     }
     g.chests = g.chests.filter((c) => c !== chest)
+    summonGhosts(g)
     giveChest(g)
   }
 
-  // A chest's items held, and the chest shown opening (after any still opening).
-  function giveChest(g: Game): void {
-    g.chestsGot++
-    const items = hordeRollChest(luckOf(g), g.held)
-    for (const id of items) g.held[id] = (g.held[id] ?? 0) + 1
+  // A chest's items held (or several chests' all together), and the chest shown opening (along with any still opening).
+  function giveChest(g: Game, count = 1): void {
+    const items: HordeHeldId[] = []
+    for (let i = 0; i < count; i++) {
+      g.chestsGot++
+      const rolled = hordeRollChest(luckOf(g), g.held)
+      for (const id of rolled) g.held[id] = (g.held[id] ?? 0) + 1
+      // The Luck Incense counts the chests opened from here on; Loaded Dice each bring a reroll.
+      if (rolled.includes('luckIncense') && g.incenseFrom === null) g.incenseFrom = g.chestsGot
+      g.rerolls += rolled.filter((id) => id === 'loadedDice').length
+      items.push(...rolled)
+    }
     refreshStats(g, 0)
     stopped.current = true
     setChestItems((open) => [...(open ?? []), ...items])
+  }
+
+  // Odd Keystones: a ghost for each one by the lead, firing its Shadow Balls at the foes close by.
+  function summonGhosts(g: Game): void {
+    const copies = g.held.oddKeystone ?? 0
+    const turn = Math.random() * Math.PI * 2
+    for (let i = 0; i < copies; i++) {
+      const angle = turn + (i / copies) * Math.PI * 2
+      g.ghosts.push({
+        id: g.seq++,
+        ox: Math.cos(angle) * 70,
+        oy: Math.sin(angle) * 45 - 20,
+        shotsLeft: HORDE_HELD_ITEMS.oddKeystone.amount,
+        nextShotAt: g.clock + 400 + i * 100,
+        born: g.clock
+      })
+    }
   }
 
   // The Totem Trial the lead stands by that hasn't started yet, if any.
@@ -2156,6 +2417,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
   // Pokemon round it - the trial is done once every one of them is down.
   function startTotem(g: Game, shrine: Shrine): void {
     shrine.started = true
+    summonGhosts(g)
     const [least, most] = HORDE_TOTEM_FOES
     const count = least + Math.floor(Math.random() * (most - least + 1))
     // Each rises slowly, so the lead can get out of the ring before it closes.
@@ -2180,15 +2442,17 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
   }
 
   // A Tapu Ruin stepped into for the first time: high-level elites rise round it to defend it.
-  function wakeTapu(g: Game, shrine: Shrine): void {
-    shrine.started = true
+  // The first time it's half full, a second wave rises the same way.
+  function wakeTapu(g: Game, shrine: Shrine, again = false): void {
+    if (again) shrine.secondWave = true
+    else shrine.started = true
     const turn = Math.random() * Math.PI * 2
     for (let i = 0; i < HORDE_TAPU_DEFENDERS; i++) {
       const angle = turn + (i / HORDE_TAPU_DEFENDERS) * Math.PI * 2
       const at = clampToWorld(g, shrine.x + Math.cos(angle) * HORDE_TAPU_RADIUS, shrine.y + Math.sin(angle) * HORDE_TAPU_RADIUS, PLAYER_MARGIN)
       spawnFoe(g, 'elite', false, at, false, false, undefined, HORDE_TAPU_DEFENDER_LEVELS)
     }
-    addPopup(g, shrine.x, shrine.y - 60, t('horde.shrine.tapuWake'), 'level')
+    addPopup(g, shrine.x, shrine.y - 60, t(again ? 'horde.shrine.tapuWave' : 'horde.shrine.tapuWake'), 'level')
   }
 
   // The gold a shrine done adds: a set amount plus a share of what a chest costs now.
@@ -2231,14 +2495,15 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       amount = Math.round(hordeBonusPercent(stat, 'legendary') * HORDE_TAPU_BOOST * 10) / 10
       g.bonus[stat] += amount
     } else {
-      amount = Math.round(hordeBaseStatPercent(stat, 'legendary') * HORDE_TAPU_BOOST * 10) / 10
+      const raw = hordeBaseStatPercent(stat, 'legendary') * HORDE_TAPU_BOOST
+      amount = stat === 'spe' ? Math.round(raw) : Math.round(raw * 10) / 10
       g.statBonus[stat] += amount
       refreshStats(g, 0)
     }
     const gold = shrineGold(g)
     g.gold += gold
     const statName = t(STAT_KEYS[stat])
-    const shown = stat === 'luck' ? `+${amount}` : `+${amount}%`
+    const shown = stat === 'luck' || stat === 'spe' ? `+${amount}` : `+${amount}%`
     g.shrineBanner = {
       kind: 'tapu',
       title: t('horde.shrine.tapuDone'),
@@ -2247,6 +2512,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
     }
     // In the pause menu's list of upgrades taken, beside the level-up picks.
     g.log.push({ level: g.level, rarity: 'legendary', kind: t('horde.shrine.tapu'), title: statName, detail: shown, shrine: true })
+    summonGhosts(g)
     endShrine(g, shrine)
   }
 
@@ -2378,14 +2644,16 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
     }
   }
 
-  // Pushed away from the lead; with Wash Away's bonus it takes the foes in its path along too.
-  function push(g: Game, foe: Foe, distance: number, drag: boolean): void {
+  // Pushed away from the lead; with Wash Away's bonus it takes the foes in its path along too
+  // (how many it dragged along comes back). With Flash Freeze it freezes what it slams into.
+  function push(g: Game, foe: Foe, distance: number, drag: boolean, freeze = false): number {
     const { dx, dy } = awayFromLead(g, foe.x, foe.y)
     const fromX = foe.x
     const fromY = foe.y
-    foe.slide = { dx, dy, left: distance }
+    foe.slide = { dx, dy, left: distance, freeze: freeze || undefined }
     foe.stopped = false
-    if (!drag) return
+    if (!drag) return 0
+    let dragged = 0
     for (const other of standingFoes(g)) {
       if (other === foe || other.kind === 'boss') continue
       // How far along the push's path it stands, and how far to the side of it.
@@ -2394,8 +2662,33 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       if (along > 0 && along < distance && side <= DRAG_WIDTH) {
         other.slide = { dx, dy, left: distance / 2 }
         other.stopped = false
+        dragged++
       }
     }
+    return dragged
+  }
+
+  // A duo synergy going off, its name popping up in its first type's colour.
+  function duoPopup(g: Game, x: number, y: number, id: HordeDuoId, type: string): void {
+    twistPopup(g, x, y, t(`horde.duo.${id}` as MessageKey), type)
+  }
+
+  // One more chill on a foe at this potency - enough of them freeze it solid (an elite for half
+  // as long, a boss a quarter).
+  function chillFoe(g: Game, foe: Foe, potency: number): void {
+    const fx = foe.fx
+    const E = HORDE_EFFECT
+    const stacks = (fx.chill && fx.chill.until > g.clock ? fx.chill.stacks : 0) + 1
+    const per = Math.max(fx.chill?.per ?? 0, E.chillSlow * potency)
+    if (stacks >= E.chillStacks) {
+      fx.frozenUntil = Math.max(fx.frozenUntil, g.clock + E.freezeMs * potency * HORDE_FREEZE_SHARE[foe.kind])
+      fx.chill = null
+    } else fx.chill = { stacks, per, until: g.clock + E.chillMs }
+  }
+
+  // A foe standing in Mudslide's mud.
+  function inMud(g: Game, foe: Foe): boolean {
+    return g.zones.some((z) => z.mud && z.until > g.clock && dist(z.x, z.y, foe.x, foe.y) <= z.reach + HORDE_FOE_HITBOX[foe.kind])
   }
 
   // A shield on the lead, never past this share of its max HP.
@@ -2498,7 +2791,8 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
   function useItem(g: Game, item: HordeItemId): void {
     switch (item) {
       case 'magnet':
-        for (const d of g.drops) if (!d.item) d.pulled = true
+        // Every gem on the field comes in, and every chest lying about too.
+        for (const d of g.drops) if (!d.item || d.item === 'chest') d.pulled = true
         break
       case 'choiceScarf':
         g.scarfUntil = g.clock + HORDE_ITEM_BUFF_MS
@@ -2521,10 +2815,14 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       case 'bigNugget':
         g.bigNuggets++
         break
-      case 'chest':
-        // Opened for free, with no effect on what the field's chests cost.
-        giveChest(g)
+      case 'chest': {
+        // Opened for free, with no effect on what the field's chests cost - and every other chest
+        // already on its way in (a magnet's) comes with it, all opened as one.
+        const coming = g.drops.filter((d) => d.item === 'chest' && d.pulled && !d.taken)
+        for (const d of coming) d.taken = true
+        giveChest(g, Math.max(1, coming.length))
         break
+      }
       case 'maxMushroom':
         // Its max HP grows for good, the HP it gains with it.
         g.hpMult *= 1 + HORDE_MAX_MUSHROOM_HP / 100
@@ -2569,11 +2867,6 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
     if (Math.random() < HORDE_CHEST_DROP_CHANCE[loot]) dropItem(g, fellX - 18, fellY - 6, 'chest')
     // A Gigantamax boss leaves a Max Mushroom.
     if (foe.gmax) dropItem(g, fellX, fellY, 'maxMushroom')
-    if (Math.random() < HORDE_BERRY_CHANCE && g.hp < g.maxHp) {
-      const heal = Math.round(g.maxHp * HORDE_BERRY_HEAL)
-      g.hp = Math.min(g.maxHp, g.hp + heal)
-      leadPopup(g, t('horde.berry', { hp: heal }), 'heal')
-    }
 
     // What the effects on it do as it faints.
     const fx = foe.fx
@@ -2682,7 +2975,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
     reach: number,
     dps: number,
     ms: number,
-    opts: { slow?: number; pull?: number; drift?: boolean } = {}
+    opts: { slow?: number; pull?: number; drift?: boolean; mud?: boolean } = {}
   ): void {
     const angle = Math.random() * Math.PI * 2
     g.zones.push({
@@ -2698,7 +2991,8 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       dx: Math.cos(angle),
       dy: Math.sin(angle),
       born: g.clock,
-      until: g.clock + ms
+      until: g.clock + ms,
+      mud: opts.mud || undefined
     })
     if (g.zones.length > HORDE_MAX_ZONES) g.zones.splice(0, g.zones.length - HORDE_MAX_ZONES)
   }
@@ -2808,6 +3102,35 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
           twistPopup(g, foe.x, foe.y, t('horde.proc.confuse'), type)
         }
         break
+      case 'hazard': {
+        // Mortal Spin, Spikes, Ceaseless Edge: hazards where the foe stood, as many lying about as rocks
+        // would with the lead's rank in Ground (Spikes) or Poison (Toxic Spikes).
+        if (roll(tr.chance)) {
+          const toxic = tr.hazard === 'toxicSpikes'
+          const rank = effectRank(g, toxic ? 'Poison' : 'Ground')
+          const E = HORDE_EFFECT
+          const spots = rank.mastery ? E.avalancheSpots : rank.bonus ? E.rockBonusSpots : E.rockSpots
+          const mine = (g.spikes ?? []).filter((s) => s.until > g.clock && s.toxic === toxic)
+          g.spikes = [
+            ...(g.spikes ?? []).filter((s) => s.until > g.clock && s.toxic !== toxic),
+            ...[
+              ...mine,
+              {
+                id: g.seq++,
+                x: foe.x,
+                y: foe.y,
+                toxic,
+                dps: dmg * (toxic ? E.toxicSpikeShare : E.rockShare) * rank.potency,
+                poison: toxic ? dmg * E.poisonShare * rank.potency : 0,
+                until: g.clock + E.rockMs,
+                move: known.move.name,
+                hit: []
+              }
+            ].slice(-spots)
+          ]
+        }
+        break
+      }
       case 'inflict':
         // Its own type's effect at the strength the lead's moves give it (at its weakest without one of the type).
         if (standing && roll(tr.chance)) {
@@ -2868,7 +3191,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
         // Shots, strikes and piercing shots leave it where they hit (blasts, waves and streams where they land - see there).
         const shape = hordeMoveShape(known.move)
         if (shape === 'shot' || shape === 'strike' || shape === 'pierce')
-          addZone(g, known, foe.x, foe.y, tr.reach * reachScale(known), dmg * tr.share, tr.ms, tr)
+          addZone(g, known, foe.x, foe.y, tr.reach * reachScale(g, known), dmg * tr.share, tr.ms, tr)
         break
       }
     }
@@ -2970,6 +3293,20 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
     }
   }
 
+  // Grass's Leech off a hit on a foe: HP back for a share of the damage, past full HP a shield with
+  // its bonus. Overgrowth (its mastery): twice the healing under half HP, and a higher shield.
+  // Rot (Grass + Poison): more from a poisoned foe.
+  function leech(g: Game, foe: Foe, dmg: number, potency: number, bonus: boolean, mastery: boolean): void {
+    const E = HORDE_EFFECT
+    const low = mastery && g.hp < g.maxHp / 2
+    const rot = duoOn(g, 'rot') && foe.fx.poison.some((p) => p.until > g.clock) ? HORDE_DUO.rotHeal : 1
+    const heal = Math.max(1, Math.round(dmg * E.leechShare * potency * (low ? E.overgrowthHeal : 1) * rot * (1 + heldOf(g, 'healing') / 100)))
+    const room = g.maxHp - g.hp
+    g.hp = Math.min(g.maxHp, g.hp + heal)
+    if (bonus && heal > room) addShield(g, heal - room, mastery ? E.overgrowthShieldMax : E.leechShieldMax)
+    leadPopup(g, `+${heal}`, 'heal')
+  }
+
   // A move's type effect going off on a foe it just hit for `dmg` (see HORDE_EFFECT).
   function applyEffect(g: Game, type: string, foe: Foe, dmg: number, potency: number, bonus: boolean): void {
     const fx = foe.fx
@@ -2980,11 +3317,19 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
     const share = foe.kind === 'elite' ? HORDE_ELITE_HOLD_SHARE : 1
     // With every move of the type, its mastery rule too.
     const mastery = effectRank(g, type).mastery
+    const D = HORDE_DUO
+    const duos = hordeActiveDuoIds(knownMoves(g))
     let onLead = false
     switch (type) {
       case 'Normal':
         if (!shrug) foe.cooldowns = foe.moves.map((m) => hordeMoveCooldown(m) * hordeFoeCooldownScale(g.elapsed) * share)
         if (bonus) fx.vulnerableUntil = c + E.flinchVulnerableMs
+        // Haymaker: a fully broken foe is knocked far back and stopped.
+        if (duos.has('haymaker') && !shrug && fx.guard && fx.guard.until > c && fx.guard.stacks >= E.breakStacks) {
+          push(g, foe, D.haymakerPush * share, false)
+          hold(g, foe, D.haymakerStopMs)
+          duoPopup(g, foe.x, foe.y, 'haymaker', 'Fighting')
+        }
         // Shockwave: every foe close to it flinches too (not bosses).
         if (mastery)
           for (const other of nearestTo(g, foe, Infinity, E.shockwaveReach)) {
@@ -2994,54 +3339,80 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
             if (bonus) other.fx.vulnerableUntil = c + E.flinchVulnerableMs
           }
         break
-      case 'Fire':
-        burn(g, foe, dmg * E.burnShare * potency)
-        break
-      case 'Water':
-        if (!shrug) push(g, foe, E.pushDistance * potency * share, bonus)
-        break
-      case 'Grass': {
-        // Overgrowth: twice the healing under half HP, and a higher shield.
-        const low = mastery && g.hp < g.maxHp / 2
-        const heal = Math.max(1, Math.round(dmg * E.leechShare * potency * (low ? E.overgrowthHeal : 1) * (1 + heldOf(g, 'healing') / 100)))
-        const room = g.maxHp - g.hp
-        g.hp = Math.min(g.maxHp, g.hp + heal)
-        if (bonus && heal > room) addShield(g, heal - room, mastery ? E.overgrowthShieldMax : E.leechShieldMax)
-        leadPopup(g, `+${heal}`, 'heal')
+      case 'Fire': {
+        // Thermal Shock: fire on a chilled foe bursts, ending the chill (and the burn).
+        if (duos.has('thermalShock') && fx.chill && fx.chill.until > c) {
+          fx.chill = null
+          fx.burn = null
+          damageFoe(g, foe, dmg * D.thermalShare, 'hit')
+          duoPopup(g, foe.x, foe.y, 'thermalShock', 'Fire')
+          return
+        }
+        // Inferno: each Rage stack makes the burn hotter.
+        const rage = duos.has('inferno') && g.rage && g.rage.until > c ? g.rage.stacks : 0
+        burn(g, foe, dmg * E.burnShare * potency * (1 + rage * D.infernoPerStack))
         break
       }
+      case 'Water': {
+        // Steam Burst: a burning foe's burn goes off all at once, splashing those nearby.
+        if (duos.has('steamBurst') && fx.burn && fx.burn.until > c) {
+          const steam = (fx.burn.dps * (fx.burn.until - c)) / 1000
+          fx.burn = null
+          g.flashes.push({ id: g.seq++, kind: 'blast', x: foe.x, y: foe.y, dx: 0, dy: 0, type: 'Water', born: g.now, reach: D.steamReach })
+          for (const other of nearestTo(g, foe, Infinity, D.steamReach + HORDE_FOE_HITBOX[foe.kind])) damageFoe(g, other, steam * D.steamSplash, 'hit')
+          damageFoe(g, foe, steam, 'hit')
+          duoPopup(g, foe.x, foe.y, 'steamBurst', 'Water')
+        }
+        // Conductor: soaked, for the chain to find.
+        if (duos.has('conductor')) fx.soakedUntil = c + D.soakMs
+        if (shrug || foe.faintedAt !== null) break
+        // Mudslide: further across mud.
+        const mud = duos.has('mudslide') && inMud(g, foe) ? D.mudPush : 1
+        const dragged = push(g, foe, E.pushDistance * potency * share * mud, bonus, duos.has('flashFreeze'))
+        // Monsoon: Leech's healing for the push, and again for each foe dragged along.
+        if (duos.has('monsoon')) {
+          const grass = effectRank(g, 'Grass')
+          for (let i = 0; i <= dragged; i++) leech(g, foe, dmg, grass.potency, grass.bonus, false)
+        }
+        break
+      }
+      case 'Grass':
+        leech(g, foe, dmg, potency, bonus, mastery)
+        break
       case 'Electric': {
-        // The hit jumps on to the nearest foe not hit yet, and on from there.
+        // The hit jumps on to the nearest foe not hit yet, and on from there. Conductor: a soaked
+        // foe first (from further off), hit harder. Magnetize: each jump shields the lead.
+        const conductor = duos.has('conductor')
+        const soaked = (f: Foe): boolean => (f.fx.soakedUntil ?? 0) > c
         const hit = new Set<Foe>([foe])
         let from = foe
         for (let jump = 0; jump < E.chainJumps + (bonus ? E.chainBonusJumps : 0); jump++) {
-          const next = nearestTo(g, from, g.foes.length, E.chainReach).find((f) => !hit.has(f))
+          const near = nearestTo(g, from, g.foes.length, E.chainReach * (conductor ? D.conductorReach : 1)).filter(
+            (f) => !hit.has(f) && (soaked(f) || dist(f.x, f.y, from.x, from.y) <= E.chainReach)
+          )
+          const next = (conductor ? near.find(soaked) : undefined) ?? near[0]
           if (!next) break
           hit.add(next)
           g.arcs.push({ id: g.seq++, x1: from.x, y1: from.y - 20, x2: next.x, y2: next.y - 20, type, born: g.now })
-          damageFoe(g, next, dmg * E.chainShare * potency, 'hit')
+          damageFoe(g, next, dmg * E.chainShare * potency * (conductor && soaked(next) ? D.conductorHit : 1), 'hit')
           // Overload: paralysed for a moment.
           if (mastery && next.kind !== 'boss') hold(g, next, E.overloadMs)
+          if (duos.has('magnetize')) addShield(g, g.maxHp * D.magnetizeShield, E.guardMax)
           from = next
         }
         break
       }
-      case 'Ice': {
-        const stacks = (fx.chill && fx.chill.until > c ? fx.chill.stacks : 0) + 1
-        const per = Math.max(fx.chill?.per ?? 0, E.chillSlow * potency)
-        // Frozen solid - an elite for half as long, a boss a quarter.
-        if (stacks >= E.chillStacks) {
-          fx.frozenUntil = Math.max(fx.frozenUntil, c + E.freezeMs * potency * HORDE_FREEZE_SHARE[foe.kind])
+      case 'Ice':
+        // Thermal Shock: ice on a burning foe bursts, ending the burn (and the chill).
+        if (duos.has('thermalShock') && fx.burn && fx.burn.until > c) {
+          fx.burn = null
           fx.chill = null
-        } else {
-          fx.chill = {
-            stacks: Math.min(stacks, E.chillStacks),
-            per,
-            until: c + E.chillMs
-          }
+          damageFoe(g, foe, dmg * D.thermalShare, 'hit')
+          duoPopup(g, foe.x, foe.y, 'thermalShock', 'Ice')
+          return
         }
+        chillFoe(g, foe, potency)
         break
-      }
       case 'Fighting': {
         const stacks = Math.min(E.breakStacks, (fx.guard && fx.guard.until > c ? fx.guard.stacks : 0) + 1)
         const per = Math.min(E.breakMaxPerStack, Math.max(fx.guard?.per ?? 0, E.breakPerStack * potency))
@@ -3070,6 +3441,20 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
           const ground = g.known.find((k) => k.move.type === 'Ground')
           if (ground) addZone(g, ground, foe.x, foe.y, E.sinkholeReach, 0, E.sinkholeMs, { slow: E.sinkholeSlow })
         }
+        // Mudslide: mud where it hit, slowing foes and letting Wash Away push them further.
+        if (duos.has('mudslide')) {
+          const ground = g.known.find((k) => k.move.type === 'Ground')
+          if (ground) addZone(g, ground, foe.x, foe.y, D.mudReach, 0, D.mudMs, { slow: D.mudSlow, mud: true })
+        }
+        // Landslide: a tremor by a rock spot throws shards at every foe on it.
+        if (duos.has('landslide'))
+          for (const rock of g.rocks) {
+            if (rock.until <= c || dist(rock.x, rock.y, foe.x, foe.y) > E.tremorReach + E.rockReach) continue
+            g.flashes.push({ id: g.seq++, kind: 'blast', x: rock.x, y: rock.y, dx: 0, dy: 0, type: 'Rock', born: g.now, reach: E.rockReach })
+            for (const other of standingFoes(g))
+              if (dist(rock.x, rock.y, other.x, other.y) <= E.rockReach) damageFoe(g, other, dmg * E.tremorShare * potency, 'hit')
+            duoPopup(g, rock.x, rock.y, 'landslide', 'Rock')
+          }
         break
       case 'Flying': {
         const active = g.tailwind && g.tailwind.until > c ? g.tailwind.speed : 0
@@ -3088,6 +3473,8 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
         if (!shrug) {
           fx.spookedUntil = Math.max(fx.spookedUntil, c + E.spookMs * potency * share)
           fx.spookCaught = false
+          // Swarm Front: each spook keeps Tailwind blowing a little longer.
+          if (duos.has('swarmFront') && g.tailwind && g.tailwind.until > c) g.tailwind.until += D.swarmFrontWindMs
         }
         break
       case 'Rock':
@@ -3101,7 +3488,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
             until: c + E.rockMs,
             hit: []
           }
-        ].slice(mastery ? -E.avalancheSpots : bonus ? -2 : -1)
+        ].slice(mastery ? -E.avalancheSpots : bonus ? -E.rockBonusSpots : -E.rockSpots)
         break
       case 'Dragon': {
         // Ascent: more stacks.
@@ -3308,10 +3695,14 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
     const focused = standing.find((f) => f.id === g.focusId)
     const nearest = standing.reduce((best, f) => (awayOf(g, f) < awayOf(g, best) ? f : best))
     let aim = focused ?? nearest
+    // Shots and strikes go for the nearest ranged foe first (with none picked) - they're the ones the lead can't just walk up to.
+    const shooters = standing.filter((f) => f.ranged)
+    const nearestShooter = shooters.length ? shooters.reduce((best, f) => (awayOf(g, f) < awayOf(g, best) ? f : best)) : null
     const shotFrom = { x: g.px, y: g.py - BODY_HEIGHT }
     const toward = awayFromLead(g, aim.x, aim.y)
     switch (shape) {
       case 'shot': {
+        aim = focused ?? nearestShooter ?? nearest
         const targets = withCount(g, known, withExtras(g, known, aim, standing.filter((f) => awayOf(g, f) <= spreadRadius(g)), 'near'), standing, 'near')
         // Every nth use, more shots at the next nearest foes (round again if there aren't enough).
         if (tr.kind === 'everyNth' && (known.uses ?? 0) % tr.n === 0) {
@@ -3336,10 +3727,11 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
         break
       }
       case 'strike': {
-        // On the picked foe, or else the nearest. Its extra strikes (from upgrades and
+        // On the picked foe, or else the nearest ranged one, or else the nearest. Its extra strikes (from upgrades and
         // Multi-target alike) come down on other foes on screen picked at random, one after
         // another - on that same foe again if there aren't enough, a Multi-target one then for a
         // share of the damage.
+        aim = focused ?? nearestShooter ?? nearest
         const extras = known.count
         const repeats = g.multi * HORDE_MULTI_TARGETS
         const others = randomFoes(standing.filter((f) => f !== aim), extras + repeats)
@@ -3392,7 +3784,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
         g.beams.push({ id: g.seq++, known, dx: toward.dx, dy: toward.dy, born: g.clock, pulses: 0, hit: new Set() })
         break
       case 'cone': {
-        const reach = S.coneReach * reachScale(known) * ownReach(known)
+        const reach = S.coneReach * reachScale(g, known) * ownReach(known)
         g.flashes.push({ id: g.seq++, kind: 'cone', x: g.px, y: g.py, dx: toward.dx, dy: toward.dy, type: move.type, born: g.now, reach })
         for (const foe of inCone(g, toward.dx, toward.dy, reach)) strike(g, known, foe, true)
         break
@@ -3403,7 +3795,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
           ...shotFrom,
           targetId: aim.id,
           known,
-          pierce: { dx: toward.dx, dy: toward.dy, size: HORDE_SHAPES.pierceBaseSize * hordePierceSize(known.range), hit: new Set() },
+          pierce: { dx: toward.dx, dy: toward.dy, size: HORDE_SHAPES.pierceBaseSize * hordePierceSize(launchRange(g, known)), hit: new Set() },
           share: repeatShare
         })
         break
@@ -3510,7 +3902,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
     const stab = leadForm(g).types.includes(move.type)
     // Each type among the lead's moves rolls for its effect on this hit.
     const procs =
-      opts.effect === false ? [] : hordeEffectTypes(moves).filter((type) => Math.random() * 100 < hordeEffectChance(move, type, moves))
+      opts.effect === false ? [] : hordeEffectTypes(moves).filter((type) => Math.random() * 100 < hordeEffectChance(move, type, moves, otherShare))
     // A critical hit, by its chance with Crit picks; Dark's Ambush makes the hit one, landing harder still.
     // Past 100% a hit can crit more than once, its crit damage multiplying again each time.
     // Assassin (Dark's mastery): every so many hits is a sure Ambush, and a crit on a foe under
@@ -3520,13 +3912,32 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       g.darkHits++
       if (g.darkHits % E.assassinEvery === 0 && !procs.includes('Dark')) procs.push('Dark')
     }
+    const duos = hordeActiveDuoIds(moves)
+    const D = HORDE_DUO
+    const confused = fx.confusedUntil > g.clock
+    // Nightmare: every hit on a confused foe is an Ambush. Inferno: fully enraged, every hit burns.
+    if (duos.has('nightmare') && opts.effect !== false && confused && !procs.includes('Dark')) procs.push('Dark')
+    if (duos.has('inferno') && opts.effect !== false && rage && rage.stacks >= E.rageStacks && !procs.includes('Fire')) procs.push('Fire')
     const ambush = procs.includes('Dark')
     let crits = Math.max(ambush || tr.kind === 'alwaysCrit' ? 1 : 0, hordeRollCrits(critChance(g) + (tr.kind === 'critUp' ? tr.chance : 0)))
     if (dark.mastery && crits > 0 && foe.hp < foe.maxHp * E.assassinLine) crits++
     const crit = crits > 0
+    // Nightmare: each crit keeps it confused a little longer.
+    if (duos.has('nightmare') && crit && confused)
+      fx.confusedUntil = Math.max(fx.confusedUntil, Math.min(fx.confusedUntil + D.nightmareMs, g.clock + E.confuseMs * D.nightmareMax))
+    // Siren: crits on a charmed foe land harder.
+    const siren = duos.has('siren') && !!fx.charm && fx.charm.until > g.clock ? D.sirenCrit : 0
     const critDamage =
-      (HORDE_CRIT_DAMAGE * (1 + (bonusOf(g, 'critDamage') + known.crit) / 100) + (ambush ? E.ambushCritDamage * effectRank(g, 'Dark').potency : 0)) ** crits
-    const guard = fx.guard && fx.guard.until > g.clock ? fx.guard : null
+      (HORDE_CRIT_DAMAGE * (1 + (bonusOf(g, 'critDamage') + known.crit) / 100) + (ambush ? E.ambushCritDamage * effectRank(g, 'Dark').potency : 0) + siren) ** crits
+    // Mind over Matter: a confused foe's Defense counts as fully broken.
+    const broken = fx.guard && fx.guard.until > g.clock ? fx.guard : null
+    const guard =
+      duos.has('mindOverMatter') && confused
+        ? {
+            stacks: E.breakStacks,
+            per: Math.min(E.breakMaxPerStack, Math.max(broken?.per ?? 0, E.breakPerStack * effectRank(g, 'Fighting').potency))
+          }
+        : broken
     let dmg = hordeDamage({
       level: g.level,
       power,
@@ -3544,15 +3955,16 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
     })
     // The Resisted damage tome: a resisted hit lands harder, per resist.
     dmg = Math.floor(dmg * hordeResistBoost(eff, bonusOf(g, 'resist')))
-    // What makes this hit land harder: a single-target move on a foe inside the spread ring,
-    // a flinched foe left open, Hex, a frozen foe shattering, Execute, or a boss shrugging
+    // What makes this hit land harder: a flinched foe left open, Hex, a frozen foe shattering, Execute, or a boss shrugging
     // off being held - and twice over while the Flame Orb lasts.
     let mult = 1 + (opts.bonus ?? 0)
-    if (!spread && dist(foe.x, foe.y, g.px, g.py) <= spreadRadius(g)) mult += HORDE_SPREAD_FOCUS_BONUS
     if (fx.vulnerableUntil > g.clock) mult += E.flinchVulnerable
-    if (move.type === 'Bug' && effectRank(g, 'Bug').bonus) mult += E.hexPerEffect * effectCount(fx, g.clock)
+    // Infestation: every poison stack counts for Hex.
+    const extraStacks = duos.has('infestation') ? Math.max(0, fx.poison.filter((p) => p.until > g.clock).length - 1) : 0
+    if (move.type === 'Bug' && effectRank(g, 'Bug').bonus) mult += E.hexPerEffect * (effectCount(fx, g.clock) + extraStacks)
     const ice = effectRank(g, 'Ice')
-    if (move.type === 'Ice' && ice.bonus && fx.frozenUntil > g.clock) {
+    // Thermal Shock: Fire moves shatter too (without needing Ice's bonus).
+    if (((move.type === 'Ice' && ice.bonus) || (move.type === 'Fire' && duos.has('thermalShock'))) && fx.frozenUntil > g.clock) {
       mult += E.shatterBonus
       fx.frozenUntil = 0
       // Permafrost: the foes right around it freeze solid.
@@ -3589,6 +4001,13 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
         (ghost.mastery && foe.kind === 'elite' && foe.hp <= foe.maxHp * E.hauntEliteKillLine))
     )
       dmg = foe.hp
+    // Reaper (Ghost + Dark): a crit leaving a wild foe under the Execute line finishes it, and the
+    // move comes round again at once.
+    if (duos.has('reaper') && crit && foe.kind === 'wild' && dmg < foe.hp && foe.hp - dmg <= foe.maxHp * E.executeLine) {
+      dmg = foe.hp
+      known.reapReady = true
+      duoPopup(g, foe.x, foe.y, 'reaper', 'Ghost')
+    }
     // Reaper Cloths: now and then a wild Pokemon (an elite less often, never a boss) is knocked out
     // outright, and each one leaves the lead a little more Attack for good.
     const reap = heldOf(g, 'execute') * (foe.kind === 'elite' ? HORDE_REAPER_ELITE_SHARE : foe.kind === 'boss' ? 0 : 1)
@@ -3605,6 +4024,12 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
     foe.flashUntil = g.now + 120
     addPopup(g, foe.x, foe.y, String(dmg), crit ? 'crit' : eff > 1 ? 'super' : eff < 1 ? 'weak' : 'hit')
     playHit(eff, 'horde')
+    // Possession (Ghost + Psychic): a confused wild foe knocked under the Execute line fights for the lead a while.
+    if (duos.has('possession') && foe.kind === 'wild' && foe.hp > 0 && confused && foe.hp <= foe.maxHp * E.executeLine && !((fx.possessedUntil ?? 0) > g.clock)) {
+      fx.possessedUntil = g.clock + D.possessMs
+      fx.confusedUntil = Math.max(fx.confusedUntil, fx.possessedUntil)
+      duoPopup(g, foe.x, foe.y, 'possession', 'Ghost')
+    }
     for (const type of procs) {
       if (type === 'Dark') effectPopup(g, foe.x, foe.y, 'Dark')
       else if (type !== 'Ghost' || executes) {
@@ -3630,7 +4055,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
   }
 
   // What held items do on any hit of the lead's: Cell Batteries call lightning down on another foe
-  // nearby, Never-Melt Ice freezes, Poison Barbs poison.
+  // nearby, Never-Melt Ice slows, Poison Barbs poison.
   function heldOnHit(g: Game, foe: Foe, dmg: number): void {
     if (Math.random() * 100 < heldOf(g, 'lightning')) {
       const near = nearestTo(g, foe, 3, HORDE_BATTERY_REACH)
@@ -3641,9 +4066,10 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       }
     }
     if (foe.faintedAt !== null || foe.hp <= 0) return
-    if (Math.random() * 100 < heldOf(g, 'freezeHit')) {
-      foe.fx.frozenUntil = Math.max(foe.fx.frozenUntil, g.clock + HORDE_ICE_FREEZE_MS * HORDE_FREEZE_SHARE[foe.kind])
-      twistPopup(g, foe.x, foe.y, t('horde.proc.frozen'), 'Ice')
+    const chill = Math.min(HORDE_ICE_SLOW_MAX, heldOf(g, 'slowHit')) / 100
+    if (chill > 0) {
+      const fx = foe.fx
+      fx.slow = { amount: Math.max(fx.slow && fx.slow.until > g.clock ? fx.slow.amount : 0, chill), until: Math.max(fx.slow?.until ?? 0, g.clock + HORDE_ICE_SLOW_MS) }
     }
     if (Math.random() * 100 < heldOf(g, 'poisonHit')) {
       const rank = effectRank(g, 'Poison')
@@ -3673,7 +4099,9 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
     // Iron Guard's bonus: less damage while shielded. The shield soaks up what it can first.
     if (g.shield > 0 && effectRank(g, 'Steel').bonus) dmg = Math.max(1, Math.round(dmg * (1 - HORDE_EFFECT.guardCut)))
     const soaked = Math.min(g.shield, dmg)
-    g.shield -= soaked
+    // Aegis (Steel + Fairy): a charmed foe's hit wears the shield down less.
+    const aegis = duoOn(g, 'aegis') && !!attacker?.fx.charm && attacker.fx.charm.until > g.clock ? HORDE_DUO.aegisWear : 1
+    g.shield -= Math.round(soaked * aegis)
     dmg -= soaked
     g.hp = Math.max(0, g.hp - dmg)
     g.hurtAt = g.now
@@ -3695,6 +4123,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       g.ejectReadyAt = g.clock + HORDE_EJECT_EVERY_MS
       g.safeUntil = Math.max(g.safeUntil, g.clock + HORDE_EJECT_SAFE_MS)
       g.flashes.push({ id: g.seq++, kind: 'blast', x: g.px, y: g.py, dx: 0, dy: 0, type: 'Normal', born: g.now, reach: HORDE_EJECT_REACH })
+      clearFoeShots(g, g.px, g.py, HORDE_EJECT_REACH)
       for (const foe of standingFoes(g))
         if (foe.kind !== 'boss' && awayOf(g, foe) <= HORDE_EJECT_REACH + HORDE_FOE_HITBOX[foe.kind])
           push(g, foe, HORDE_EJECT_PUSH * (foe.kind === 'elite' ? HORDE_ELITE_HOLD_SHARE : 1), false)
@@ -3727,8 +4156,10 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
         spread: false,
         crit: false
       })
-      // Mind Control (Psychic's mastery): it hits harder.
-      damageFoe(g, other, hit * (effectRank(g, 'Psychic').mastery ? HORDE_EFFECT.mindControlDamage : 1), 'hit', false)
+      // Mind Control (Psychic's mastery): it hits harder. Possessed (Ghost + Psychic), harder still, as the lead's own.
+      const possessed = (fx.possessedUntil ?? 0) > g.clock
+      const harder = (effectRank(g, 'Psychic').mastery ? HORDE_EFFECT.mindControlDamage : 1) * (possessed ? HORDE_DUO.possessDamage : 1)
+      damageFoe(g, other, hit * harder, 'hit', possessed)
       return
     }
     const charm = fx.charm && fx.charm.until > g.clock ? fx.charm : null
@@ -3740,6 +4171,21 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
     const eff = hordeEffectiveness(setup.typeChart, move.type, leadForm(g).types)
     // The hit lands on the lead's side facing the attacker.
     const toward = awayFromLead(g, foe.x, foe.y)
+    if (foe.ranged) {
+      // A ranged one fires a shot at where the lead stands now, its damage worked out as it's fired.
+      g.foeShots.push({
+        id: g.seq++,
+        x: foe.x,
+        y: foe.y - BODY_HEIGHT,
+        dx: -toward.dx,
+        dy: -toward.dy,
+        move,
+        dmg: foeHit(g, foe, move, eff, true),
+        fromId: foe.id,
+        until: g.clock + HORDE_FOE_SHOT_MS
+      })
+      return
+    }
     g.bursts.push({
       id: g.seq++,
       x: g.px + toward.dx * 20,
@@ -3748,19 +4194,25 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       spread: false,
       born: g.now
     })
+    hurtPlayer(g, foeHit(g, foe, move, eff), foe)
+  }
+
+  // What a wild Pokemon's move does to the lead - a ranged one's shot never crits and gets no same-type boost.
+  function foeHit(g: Game, foe: Foe, move: HordeMove, eff: number, shot = false): number {
+    const charm = foe.fx.charm && foe.fx.charm.until > g.clock ? foe.fx.charm : null
     const dmg = hordeDamage({
       level: foe.level,
       power: hordeFoeMovePower(move),
       attack: foe.stats.atk,
       defense: g.stats.def * (1 + leadMod(g, 'def')),
-      stab: foe.sp.types.includes(move.type),
+      stab: !shot && foe.sp.types.includes(move.type),
       effectiveness: eff,
       spread: false,
-      crit: Math.random() * 100 < HORDE_CRIT_CHANCE
+      crit: !shot && Math.random() * 100 < HORDE_CRIT_CHANCE
     })
     // Harder hits as the run goes on, lighter ones when charmed.
-    const hit = dmg * hordeFoeAttackScale(g.elapsed) * (charm ? 1 - charm.cut : 1) * (1 - foeDropOf(fx, 'atk', g.clock))
-    hurtPlayer(g, Math.max(1, Math.round(hit)), foe)
+    const hit = dmg * hordeFoeAttackScale(g.elapsed) * (charm ? 1 - charm.cut : 1) * (1 - foeDropOf(foe.fx, 'atk', g.clock))
+    return Math.max(1, Math.round(hit))
   }
 
   function step(g: Game, dt: number): void {
@@ -3768,6 +4220,8 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
     g.elapsed = g.endless ? g.elapsed + dt : Math.min(HORDE_DURATION_MS, g.elapsed + dt)
     g.clock += dt
     const E = HORDE_EFFECT
+    // Any duo synergy on now counts as had this run (see HordeResult's duos).
+    for (const id of hordeActiveDuoIds(knownMoves(g))) if (!g.duosSeen?.includes(id)) g.duosSeen = [...(g.duosSeen ?? []), id]
     // At 0:00 the final boss is out - beating it completes the run.
     if (!g.timeUp && g.elapsed >= HORDE_DURATION_MS) {
       g.timeUp = true
@@ -3833,7 +4287,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       // In endless mode more and more of them come as elites.
       const eliteShare = hordeWaveEliteShare(g.elapsed)
       // Now and then a horde of exploders comes instead.
-      if (setup.exploders?.length && Math.random() < HORDE_EXPLODER_CHANCE) spawnExploders(g, room)
+      if (setup.exploders?.length && Math.random() < HORDE_EXPLODER_CHANCE) spawnExploders(g)
       else
         for (let i = 0; i < Math.min(room, wave.size); i++) {
           const at = risePoint(g, side + (Math.random() - 0.5) * WAVE_SPREAD)
@@ -3909,15 +4363,16 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       placeShrines(g, 1)
     }
     // Totem Trials whose callers are all down are done; Tapu Ruins fill while the lead stands in
-    // them (waking their defenders the first time) and slowly drain while it's out.
+    // them (waking their defenders the first time) and keep what they've filled while it's out.
     for (const shrine of [...g.shrines]) {
       if (shrine.kind === 'totem') {
         if (shrine.started && !g.foes.some((f) => f.shrine === shrine.id && f.faintedAt === null)) finishTotem(g, shrine)
       } else if (dist(shrine.x, shrine.y, g.px, g.py) <= HORDE_TAPU_RADIUS) {
         if (!shrine.started) wakeTapu(g, shrine)
         shrine.heldMs += dt
+        if (!shrine.secondWave && shrine.heldMs >= HORDE_TAPU_HOLD_MS / 2) wakeTapu(g, shrine, true)
         if (shrine.heldMs >= HORDE_TAPU_HOLD_MS) finishTapu(g, shrine)
-      } else shrine.heldMs = Math.max(0, shrine.heldMs - dt * HORDE_TAPU_DRAIN)
+      }
     }
 
     // Damage over time, once a second: burns, poison and Stealth Rock.
@@ -3933,19 +4388,59 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
         leadPopup(g, `-${hurt}`, 'hurt')
       }
       g.rocks = keep(g.rocks, (r) => r.until > g.clock)
+      g.spikes = keep(g.spikes ?? [], (s) => s.until > g.clock)
       const toxic = effectRank(g, 'Poison').bonus
+      const duos = hordeActiveDuoIds(knownMoves(g))
+      const D = HORDE_DUO
+      // What burns dealt and how many foes are charmed this second (Ashes, Bloom).
+      let burned = 0
+      let charmed = 0
       for (const foe of standingFoes(g)) {
         const fx = foe.fx
         let dot = 0
-        if (fx.burn && fx.burn.until > g.clock) dot += fx.burn.dps
+        if (fx.burn && fx.burn.until > g.clock) {
+          dot += fx.burn.dps
+          burned += fx.burn.dps
+        }
+        if (fx.charm && fx.charm.until > g.clock) charmed++
         fx.poison = fx.poison.filter((p) => p.until > g.clock)
         for (const p of fx.poison) dot += p.dps * (toxic ? 1 + (E.toxicGrowth * (g.clock - p.from)) / 1000 : 1)
-        for (const rock of g.rocks) if (dist(rock.x, rock.y, foe.x, foe.y) <= E.rockReach) dot += rock.dps
+        let sharpest = 0
+        for (const rock of g.rocks)
+          if (dist(rock.x, rock.y, foe.x, foe.y) <= E.rockReach) {
+            dot += rock.dps
+            sharpest = Math.max(sharpest, rock.dps)
+          }
+        // Glacier (Ice + Rock): rocks chill whoever stands on them, and shatter one frozen there.
+        if (duos.has('glacier') && sharpest > 0) {
+          if (fx.frozenUntil > g.clock) {
+            fx.frozenUntil = 0
+            dot += sharpest * D.glacierShatter
+            duoPopup(g, foe.x, foe.y, 'glacier', 'Ice')
+          } else chillFoe(g, foe, effectRank(g, 'Ice').potency)
+        }
         if (dot > 0) damageFoe(g, foe, dot)
+        // Spikes and Toxic Spikes, each counting toward the move that left them.
+        for (const spike of g.spikes)
+          if (dist(spike.x, spike.y, foe.x, foe.y) <= E.rockReach) damageFoe(g, foe, spike.dps, 'dot', true, spike.move)
         // Ground moves left behind, each counting toward its move.
         for (const z of g.zones)
           if (z.dps > 0 && z.until > g.clock && dist(z.x, z.y, foe.x, foe.y) <= z.reach + HORDE_FOE_HITBOX[foe.kind])
             damageFoe(g, foe, z.dps, 'dot', true, z.known.move.name)
+      }
+      // Ashes (Fire + Grass): burns heal the lead. Bloom (Grass + Fairy): so does every charmed foe.
+      if (duos.has('ashes') && burned > 0) healLead(g, burned * E.leechShare * effectRank(g, 'Grass').potency * D.ashesShare)
+      if (duos.has('bloom') && charmed > 0) healLead(g, g.maxHp * Math.min(D.bloomMax, charmed * D.bloomHeal))
+      // Firestorm (Flying + Fire): while Tailwind blows, burning foes near the lead set those by them burning.
+      if (duos.has('firestorm') && g.tailwind && g.tailwind.until > g.clock) {
+        const near = standingFoes(g).filter((f) => awayOf(g, f) <= spreadRadius(g) * D.firestormRing)
+        for (const foe of near) {
+          const fire = foe.fx.burn
+          if (!fire || fire.until <= g.clock) continue
+          // Only onto foes not burning yet, so a crowd can't keep each other alight for good.
+          for (const other of nearestTo(g, foe, Infinity, E.burnSpreadReach))
+            if (!other.fx.burn || other.fx.burn.until <= g.clock) burn(g, other, fire.dps)
+        }
       }
     }
 
@@ -3954,6 +4449,8 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
     const windSlow = g.tailwind && g.tailwind.until > g.clock && effectRank(g, 'Flying').bonus ? E.tailwindFoeSlow : 0
     const rocksSlow = effectRank(g, 'Rock').bonus
     const bug = effectRank(g, 'Bug')
+    const duos = hordeActiveDuoIds(knownMoves(g))
+    const D = HORDE_DUO
     const standing = standingFoes(g)
     for (const foe of standing) {
       const fx = foe.fx
@@ -3964,12 +4461,33 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
         foe.x += foe.slide.dx * glide
         foe.y += foe.slide.dy * glide
         foe.slide.left -= glide
+        // Flash Freeze (Water + Ice): slamming into another foe freezes them both, and stops the slide.
+        if (foe.slide.freeze) {
+          const into = standing.find((o) => o !== foe && dist(o.x, o.y, foe.x, foe.y) <= HORDE_FOE_SPACING)
+          if (into) {
+            for (const f of [foe, into]) f.fx.frozenUntil = Math.max(f.fx.frozenUntil, g.clock + D.flashFreezeMs * HORDE_FREEZE_SHARE[f.kind])
+            duoPopup(g, foe.x, foe.y, 'flashFreeze', 'Ice')
+            foe.slide.left = 0
+          }
+        }
         if (foe.slide.left <= 0.5) foe.slide = null
         keepNear(g, foe)
       } else if (fx.spookedUntil > g.clock) {
-        foe.x += (away.dx * foe.walk * dt) / 1000
-        foe.y += (away.dy * foe.walk * dt) / 1000
+        // Swarm Front (Flying + Bug): it flees faster.
+        const flee = duos.has('swarmFront') ? D.swarmFrontFlee : 1
+        foe.x += (away.dx * foe.walk * flee * dt) / 1000
+        foe.y += (away.dy * foe.walk * flee * dt) / 1000
         keepNear(g, foe)
+        // Infestation (Poison + Bug): a poisoned one passes a stack to those it runs into.
+        const carried = duos.has('infestation') ? fx.poison.filter((p) => p.until > g.clock).pop() : undefined
+        if (carried)
+          for (const other of standing) {
+            if (other === foe || (other.fx.infestAt ?? -Infinity) > g.clock - D.infestEveryMs) continue
+            if (dist(other.x, other.y, foe.x, foe.y) > E.swarmReach + HORDE_FOE_HITBOX[other.kind]) continue
+            other.fx.infestAt = g.clock
+            other.fx.poison = [...other.fx.poison.filter((p) => p.until > g.clock), { ...carried }].slice(-E.poisonStacks)
+            effectPopup(g, other.x, other.y, 'Poison')
+          }
         // Swarm (Bug's mastery): it spooks those it runs into (who don't pass it on; bosses shrug it off).
         if (bug.mastery && !fx.spookCaught)
           for (const other of standing) {
@@ -3983,10 +4501,31 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
           fx.stopUntil > g.clock || fx.frozenUntil > g.clock || fx.confusedUntil > g.clock || foe.fuseAt !== undefined
         const onRock = rocksSlow && g.rocks.some((r) => dist(r.x, r.y, foe.x, foe.y) <= E.rockReach)
         const pace = held ? 0 : foePace(g, foe) * (1 - windSlow) * (onRock ? 1 - E.rockSlow : 1) * bossRamp(g, foe).walk
-        const gap = dist(foe.x, foe.y, g.px, g.py) - (HORDE_LEAD_HITBOX + HORDE_FOE_HITBOX[foe.kind] - HORDE_HITBOX_OVERLAP)
-        const stride = Math.min(Math.max(0, gap), (foe.walk * pace * dt) / 1000)
-        foe.x -= away.dx * stride
-        foe.y -= away.dy * stride
+        const reach = (foe.walk * pace * dt) / 1000
+        if (foe.ranged) {
+          // A ranged one walks in to its distance, backs off (slower) if the lead comes too close,
+          // and edges round the lead while there.
+          const gap = dist(foe.x, foe.y, g.px, g.py) - HORDE_RANGED_KEEP_AWAY
+          const pacing = gap < -20 ? reach * HORDE_RANGED_BACK_OFF : reach
+          const step = Math.abs(gap) > 20 ? Math.sign(gap) * Math.min(Math.abs(gap), pacing) : 0
+          const side = pacing * HORDE_RANGED_STRAFE * (foe.strafe ?? 1)
+          foe.x += -away.dx * step - away.dy * side
+          foe.y += -away.dy * step + away.dx * side
+        } else {
+          const gap = dist(foe.x, foe.y, g.px, g.py) - (HORDE_LEAD_HITBOX + HORDE_FOE_HITBOX[foe.kind] - HORDE_HITBOX_OVERLAP)
+          const stride = Math.min(Math.max(0, gap), reach)
+          foe.x -= away.dx * stride
+          foe.y -= away.dy * stride
+        }
+      }
+    }
+    // Toxic Spikes poison a foe the first time it steps on them.
+    for (const spike of g.spikes ?? []) {
+      if (!spike.toxic || spike.until <= g.clock) continue
+      for (const foe of standing) {
+        if (foe.faintedAt !== null || spike.hit.includes(foe.id) || dist(spike.x, spike.y, foe.x, foe.y) > E.rockReach) continue
+        spike.hit.push(foe.id)
+        foe.fx.poison = [...foe.fx.poison.filter((p) => p.until > g.clock), { dps: spike.poison, from: g.clock, until: g.clock + E.poisonMs }].slice(-E.poisonStacks)
       }
     }
     // Avalanche (Rock's mastery): a foe first stepping on rocks takes a burst.
@@ -4016,6 +4555,22 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       for (const foe of standing)
         if (foe.faintedAt === null && foe.kind !== 'boss' && awayOf(g, foe) <= E.galeReach + HORDE_FOE_HITBOX[foe.kind])
           push(g, foe, E.galePush * (foe.kind === 'elite' ? HORDE_ELITE_HOLD_SHARE : 1), false)
+    }
+    // Thunderstorm (Flying + Electric): while Tailwind blows, lightning strikes a foe near the lead
+    // every so often, as the strongest Electric move, and chains on from it.
+    if (duos.has('thunderstorm') && g.tailwind && g.tailwind.until > g.clock && g.clock >= (g.nextStormAt ?? 0) && !g.outcome) {
+      g.nextStormAt = g.clock + D.stormEveryMs
+      const bolt = g.known
+        .filter((k) => k.move.type === 'Electric')
+        .reduce<KnownMove | null>((best, k) => (!best || hordeMovePower(k.move, k.power) > hordeMovePower(best.move, best.power) ? k : best), null)
+      const near = hittable(g).filter((f) => awayOf(g, f) <= spreadRadius(g) * D.stormRing)
+      if (bolt && near.length) {
+        const target = pick(near)
+        g.flashes.push({ id: g.seq++, kind: 'bolt', anim: 'sky', x: target.x, y: target.y, dx: 0, dy: 0, type: 'Electric', born: g.now })
+        const dealt = strike(g, bolt, target, false, { share: D.stormShare, effect: false })
+        const electric = effectRank(g, 'Electric')
+        if (dealt > 0) applyEffect(g, 'Electric', target, dealt, electric.potency, electric.bonus)
+      }
     }
     // Then they shoulder each other apart so a crowd doesn't pile onto one spot (nothing shifts a boss).
     for (let i = 0; i < standing.length; i++) {
@@ -4048,19 +4603,21 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       foe.x = at.x
       foe.y = at.y
       foe.slide = null
-      foe.risingUntil = g.clock + HORDE_RISE_MS
-      foe.riseMs = undefined
+      foe.risingUntil = g.clock + riseMs(g)
+      foe.riseMs = riseMs(g)
     }
     // Close enough to attack: its hitbox touching the lead's.
     for (const foe of standing) {
       keepNear(g, foe)
       foe.stopped = dist(foe.x, foe.y, g.px, g.py) <= HORDE_LEAD_HITBOX + HORDE_FOE_HITBOX[foe.kind]
+      // A ranged one fires from its distance (a little past it), as long as it's on screen.
+      if (foe.ranged) foe.aiming = dist(foe.x, foe.y, g.px, g.py) <= HORDE_RANGED_KEEP_AWAY * 1.25 && onScreen(g, foe)
       // An exploder that's reached the lead lights its fuse and stands still.
       if (foe.exploder && foe.stopped && foe.fuseAt === undefined) foe.fuseAt = g.clock + HORDE_EXPLODER_FUSE_MS
     }
 
     // Ground left behind: it goes once it's had its time. A whirlwind wanders toward the nearest
-    // foe and drags those about it in (not bosses).
+    // foe; one with a pull drags those about it in (not bosses).
     g.zones = keep(g.zones, (z) => z.until > g.clock)
     for (const z of g.zones) {
       if (z.drift) {
@@ -4124,13 +4681,17 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
         }
         g.cooldowns[i] = leadCooldown(g, known)
       }
+      if (known.reapReady) {
+        known.reapReady = undefined
+        g.cooldowns[i] = 0
+      }
       const tired = exhaust && exhaust.moveId !== known.move.id ? 1 - exhaust.amount : 1
       g.cooldowns[i] = Math.max(0, g.cooldowns[i] - dt * speed * tired)
       if (g.cooldowns[i] === 0 && !g.outcome && playerAttack(g, known)) {
         // Rampaging, it goes off again and again.
         const tr = traitOf(known)
         g.cooldowns[i] = tr.kind === 'rampage' && known.rampUntil !== undefined && known.rampUntil > g.clock ? tr.everyMs : leadCooldown(g, known)
-        // Multi-shot makes a melee or piercing move (or Tri Attack) go off again, once more per pick, in a quick run.
+        // Multi-Attack makes a melee or piercing move (or Tri Attack) go off again, once more per pick, in a quick run.
         if (hordeRepeatsOnMulti(known.move))
           for (let n = 1; n <= g.multi * HORDE_MULTI_TARGETS; n++) g.repeats.push({ known, at: g.clock + n * HORDE_MULTI_REPEAT_MS })
       }
@@ -4146,6 +4707,22 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
     // until it runs into another foe or leaves the screen) and hits on arriving - a blast hitting everyone close by too; a piercing shot
     // flies straight on, hitting each foe it passes; a spread wave hits everyone in the ring
     // once fully out; a stream hits everything in it each pulse; a strike lands on its foe.
+    // Odd Keystones' ghosts: each fires a Shadow Ball at a foe close by every so often, and fades
+    // once it's fired them all (or after a while with no one to fire at).
+    g.ghosts = g.ghosts.filter((ghost) => {
+      if (g.clock - ghost.born > 15000) return false
+      if (ghost.nextShotAt > g.clock || g.outcome) return true
+      const x = g.px + ghost.ox
+      const y = g.py + ghost.oy
+      const near = hittable(g).filter((f) => dist(f.x, f.y, x, y) <= HORDE_GHOST_REACH)
+      if (!near.length) return true
+      const target = near[Math.floor(Math.random() * near.length)]
+      g.shots.push({ id: g.seq++, x, y: y - BODY_HEIGHT, targetId: target.id, known: GHOST_BALL })
+      ghost.shotsLeft--
+      ghost.nextShotAt = g.clock + HORDE_GHOST_SHOT_MS
+      return ghost.shotsLeft > 0
+    })
+
     const S = HORDE_SHAPES
     const flight = (HORDE_PROJECTILE_SPEED * dt) / 1000
     // Worked out once a frame for every shot, not once per shot: the foes by id, and the
@@ -4159,12 +4736,13 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       const many = hordeHitsMany(shot.known.move)
       const tr = traitOf(shot.known)
       if (shot.blast) {
-        const reach = S.blastReach * reachScale(shot.known) * (tr.kind === 'bigBlast' ? 1 + tr.bonus / 100 : 1)
+        const reach = S.blastReach * reachScale(g, shot.known) * (tr.kind === 'bigBlast' ? 1 + tr.bonus / 100 : 1)
         const caught = nearestTo(g, target, Infinity, reach)
         g.flashes.push({ id: g.seq++, kind: 'blast', x: target.x, y: target.y, dx: 0, dy: 0, type: shot.known.move.type, born: g.now, reach })
+        clearFoeShots(g, target.x, target.y, reach)
         let best = strike(g, shot.known, target, many)
         for (const foe of caught) best = Math.max(best, strike(g, shot.known, foe, many))
-        if (tr.kind === 'zone') addZone(g, shot.known, target.x, target.y, tr.reach * reachScale(shot.known), best * tr.share, tr.ms, tr)
+        if (tr.kind === 'zone') addZone(g, shot.known, target.x, target.y, tr.reach * reachScale(g, shot.known), best * tr.share, tr.ms, tr)
         // Fire Blast: the blast bursts into small streams in a star, as long and wide as the blast is big.
         if (tr.kind === 'starStreams') {
           const turn = Math.random() * Math.PI * 2
@@ -4296,6 +4874,20 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       return onScreen(g, shot)
     })
     if (flying.length > flyingCount) g.shots.push(...flying.slice(flyingCount))
+
+    // Ranged foes' shots fly straight on, hitting the lead if they pass close enough to its middle
+    // (the shooter counts as the attacker while it's still standing).
+    const foeFlight = (HORDE_FOE_SHOT_SPEED * dt) / 1000
+    g.foeShots = g.foeShots.filter((shot) => {
+      if (shot.until <= g.clock || g.outcome) return false
+      shot.x += shot.dx * foeFlight
+      shot.y += shot.dy * foeFlight
+      if (dist(shot.x, shot.y, g.px, g.py - BODY_HEIGHT) > HORDE_LEAD_HITBOX + HORDE_FOE_SHOT_HITBOX) return true
+      g.bursts.push({ id: g.seq++, x: shot.x, y: shot.y + BODY_HEIGHT, type: shot.move.type, spread: false, born: g.now })
+      const from = g.foes.find((f) => f.id === shot.fromId && f.faintedAt === null)
+      hurtPlayer(g, shot.dmg, from)
+      return false
+    })
     g.waves = g.waves.filter((wave) => {
       if (g.clock - wave.born < HORDE_SPREAD_WAVE_MS) return true
       if (g.outcome) return false
@@ -4328,8 +4920,8 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       const due = Math.min(pulses, Math.floor(((g.clock - beam.born) / runMs) * pulses) + 1)
       while (beam.pulses < due && !g.outcome) {
         beam.pulses++
-        const length = beam.length ?? S.beamLength * reachScale(beam.known) * ownReach(beam.known)
-        const width = beam.width ?? S.beamWidth * beamWidthScale(beam.known)
+        const length = beam.length ?? S.beamLength * reachScale(g, beam.known) * ownReach(beam.known)
+        const width = beam.width ?? S.beamWidth * beamWidthScale(g, beam.known)
         for (const foe of inBeam(g, beam.dx, beam.dy, length, width, beam.from)) {
           const first = !beam.hit.has(foe.id)
           beam.hit.add(foe.id)
@@ -4343,9 +4935,9 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       // Done: it leaves its ground along where it poured.
       const tr = traitOf(beam.known)
       if (!going && tr.kind === 'zone' && (beam.best ?? 0) > 0 && !g.outcome) {
-        const length = S.beamLength * reachScale(beam.known) * ownReach(beam.known)
+        const length = S.beamLength * reachScale(g, beam.known) * ownReach(beam.known)
         for (let i = 1; i <= 3; i++)
-          addZone(g, beam.known, g.px + beam.dx * length * (i / 3.4), g.py + beam.dy * length * (i / 3.4), tr.reach * beamWidthScale(beam.known), (beam.best ?? 0) / S.beamPulseShare * tr.share, tr.ms, tr)
+          addZone(g, beam.known, g.px + beam.dx * length * (i / 3.4), g.py + beam.dy * length * (i / 3.4), tr.reach * beamWidthScale(g, beam.known), (beam.best ?? 0) / S.beamPulseShare * tr.share, tr.ms, tr)
       }
       return going
     })
@@ -4386,6 +4978,8 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
     const pickupReach = pickupRange(g)
     const pull = (HORDE_PICKUP_PULL * dt) / 1000
     g.drops = g.drops.filter((drop) => {
+      // A chest opened along with another is gone.
+      if (drop.taken) return false
       // An item left lying a minute is gone - all but a chest, which waits to be picked up.
       if (drop.item && drop.item !== 'chest' && !drop.pulled && g.clock - drop.born >= HORDE_ITEM_LIFESPAN_MS) return false
       const d = dist(drop.x, drop.y, g.px, g.py)
@@ -4402,6 +4996,8 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       drop.y += ((g.py - drop.y) / d) * pull
       return true
     })
+    // Chests opened along with one further down the list, already kept before it arrived.
+    if (g.drops.some((d) => d.taken)) g.drops = g.drops.filter((d) => !d.taken)
 
     // The wild Pokemon's moves, once they've reached the lead - quicker as the clock runs.
     // A confused one attacks from wherever it stands (at its neighbours); a held, frozen or
@@ -4413,7 +5009,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       if (foe.faintedAt !== null || !risen(g, foe) || g.outcome || foe.exploder) continue
       const fx = foe.fx
       if (fx.stopUntil > g.clock || fx.frozenUntil > g.clock || fx.spookedUntil > g.clock) continue
-      const inReach = fx.confusedUntil > g.clock || foe.stopped
+      const inReach = fx.confusedUntil > g.clock || foe.stopped || !!foe.aiming
       const foeSpeed = hordeSpeedFactor(foe.stats.spe, foe.level) * foePace(g, foe) * bossRamp(g, foe).attack
       const next = foe.cooldowns.indexOf(Math.min(...foe.cooldowns))
       foe.moves.forEach((move, i) => {
@@ -4464,7 +5060,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
         step(g, dt)
         if (g.pendingChoices.length > 0 && !g.outcome) {
           stopped.current = true
-          const evolution = g.pendingChoices[0]
+          const evolution = g.pendingChoices[0].evolves
           // A Rare Candy is used up on the next level-up (not one where every card is already legendary).
           g.candyScreen = !evolution && (g.held.rareCandy ?? 0) > 0
           if (g.candyScreen) {
@@ -4495,6 +5091,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       g.width = Math.min(g.worldW, (HORDE_ARENA_HEIGHT * stage.clientWidth) / stage.clientHeight)
       g.unitPx = stage.clientHeight / HORDE_ARENA_HEIGHT
       followLead(g)
+      setFrame((f) => (f + 1) % 1_000_000)
     }
     fit()
     const observer = new ResizeObserver(fit)
@@ -4587,7 +5184,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
   // A chance in percent, to one decimal place at most.
   const percent = (chance: number): number => Math.round(chance * 10) / 10
   // A known move's chance to set off its own type's effect, as it plays.
-  const effectChance = (move: HordeMove): number => percent(hordeEffectChance(move, move.type, knownMoves(g)))
+  const effectChance = (move: HordeMove): number => percent(hordeEffectChance(move, move.type, knownMoves(g), otherShare))
   // A move's badges on its card: its shape, and its type's effect as it'll stand with the move
   // known - how many moves of the type, the chance a hit, and the bonus rule it unlocks.
   const moveTags = (move: HordeMove, learning: boolean): NonNullable<CardFace['tags']> => {
@@ -4601,17 +5198,28 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
         count: rank.moves,
         max: HORDE_EFFECT_MASTERY_MOVES,
         chance: percent(rank.chance),
-        other: percent(rank.chance * HORDE_EFFECT_OTHER_TYPE_SHARE)
+        other: percent(rank.chance * otherShare)
       })
     ]
     if (rank.bonus && !effectRank(g, move.type).bonus)
       effectTip.push(t('horde.effectUnlocks', { text: t(`horde.effectBonus.${move.type}` as MessageKey) }))
     if (rank.mastery && !effectRank(g, move.type).mastery)
       effectTip.push(t('horde.effectUnlocksMastery', { text: t(`horde.effectMastery.${move.type}` as MessageKey) }))
-    return [
+    const tags: NonNullable<CardFace['tags']> = [
       { label: info.badge, tip: [info.note] },
       { label: effect, tip: effectTip, color: typeColor(move.type), pips: Math.min(rank.moves, HORDE_EFFECT_MASTERY_MOVES) }
     ]
+    // A new move shows every duo it would complete - pairing its type with one the lead already has.
+    const before = hordeActiveDuoIds(knownMoves(g))
+    const completes = learning ? hordeActiveDuos([...knownMoves(g), move]).filter((duo) => !before.has(duo.id)) : []
+    for (const duo of completes)
+      tags.push({
+        label: t(`horde.duo.${duo.id}` as MessageKey),
+        tip: [t('horde.duoCompletes', { a: typeName(duo.types[0]), b: typeName(duo.types[1]) }), t(`horde.duoDesc.${duo.id}` as MessageKey)],
+        color: typeColor(duo.types[0]),
+        duo: [typeColor(duo.types[0]), typeColor(duo.types[1])]
+      })
+    return tags
   }
 
   // How a move goes off: its shape's name (for the card's badge) and what it does.
@@ -4680,13 +5288,13 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
         const range = hordeRangeUpgrade(choice.move, choice.rarity)
         changes.push(
           pierces
-            ? { label: t('horde.change.size'), after: sizePercent(up.range), bump: `+${Math.round((hordePierceSize(up.range) - 1) * 100)}%` }
-            : { label: t('horde.change.range'), after: reachPercent(range), bump: `+${range}%` }
+            ? { label: hordeBoostLabel(t, choice.move, 'range'), after: sizePercent(up.range), bump: `+${Math.round((hordePierceSize(up.range) - 1) * 100)}%` }
+            : { label: hordeBoostLabel(t, choice.move, 'range'), after: reachPercent(range), bump: `+${range}%` }
         )
       }
       if (b.includes('count')) {
         const more = hordeCountUpgrade(choice.move, choice.rarity)
-        changes.push({ label: t(COUNT_LABEL_KEYS[hordeCountKind(choice.move)]), after: hordeShownCount(choice.move, more), bump: `+${more}` })
+        changes.push({ label: hordeBoostLabel(t, choice.move, 'count'), after: hordeShownCount(choice.move, more), bump: `+${more}` })
       }
       if (b.includes('crit')) {
         const crit = hordeCritUpgrade(choice.rarity)
@@ -4715,7 +5323,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
         })
       if (b.includes('range') && hordeMoveShape(known.move) === 'pierce')
         changes.push({
-          label: t('horde.change.size'),
+          label: hordeBoostLabel(t, known.move, 'range'),
           before: sizePercent(known.range),
           after: sizePercent(known.range + hordeRangeUpgrade(known.move, choice.rarity, known.upgrades))
         })
@@ -4723,14 +5331,14 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
         // A melee move shows the reach all melee moves share.
         const from = hordeMoveShape(known.move) === 'melee' ? Math.round((meleeRadius(g) / HORDE_SHAPES.meleeReach - 1) * 100) : known.range
         changes.push({
-          label: t('horde.change.range'),
+          label: hordeBoostLabel(t, known.move, 'range'),
           before: reachPercent(from),
           after: reachPercent(from + hordeRangeUpgrade(known.move, choice.rarity, known.upgrades))
         })
       }
       if (b.includes('count'))
         changes.push({
-          label: t(COUNT_LABEL_KEYS[hordeCountKind(known.move)]),
+          label: hordeBoostLabel(t, known.move, 'count'),
           before: hordeShownCount(known.move, known.count),
           after: hordeShownCount(known.move, known.count + hordeCountUpgrade(known.move, choice.rarity))
         })
@@ -4753,7 +5361,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
           after: 1 + (g.multi + 1) * HORDE_MULTI_TARGETS
         }
       ]
-      lines = [t('horde.multiNote')]
+      lines = [t('horde.multiNote', { share: Math.round(HORDE_MULTI_REPEAT_SHARE * 100) })]
     } else if (choice.kind === 'gold') {
       kind = t('horde.choice.gold')
       title = t('horde.gold')
@@ -4788,10 +5396,19 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
           after: `+${bonusOf(g, stat, hordeBonusPercent(stat, choice.rarity, tomeRanks(stat)))}%`
         }
       ]
+      // Long Reach widens the pickup range a little too.
+      if (stat === 'reach') {
+        const reachAfter = hordeBonusPercent(stat, choice.rarity, tomeRanks(stat))
+        changes.push({
+          label: t('horde.stat.pickup'),
+          before: `+${Math.round((pickupRange(g) / HORDE_PICKUP_RANGE - 1) * 100)}%`,
+          after: `+${Math.round((pickupRange(g, reachAfter) / HORDE_PICKUP_RANGE - 1) * 100)}%`
+        })
+      }
       lines = [t(`horde.${stat}Note` as MessageKey)]
     } else if (choice.stat === 'curse') {
-      // Curse: HP and Defense up, the walk down.
-      const { up, down } = hordeCurseGain(choice.rarity, tomeRanks('curse'))
+      // Curse: HP and Defense up, a Speed debuff down.
+      const { up, down } = hordeCurseGain(choice.rarity, tomeRanks('curse'), g.curseSlow)
       const percents = statPercents(g)
       const after = leadStats(leadForm(g), g.level, { ...percents, hp: percents.hp + up, def: percents.def + up })
       after.hp = Math.round(after.hp * g.hpMult)
@@ -4804,13 +5421,13 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
         { label: t(STAT_KEYS.hp), before: g.stats.hp, after: after.hp, bump: `+${up}%` },
         { label: t(STAT_KEYS.def), before: g.stats.def, after: after.def, bump: `+${up}%` },
         {
-          label: t('horde.change.walk'),
-          before: `${Math.round(leadWalk(g) * 100)}%`,
-          after: `${Math.round(leadWalk(g, percents.spe - down) * 100)}%`,
-          bump: `-${down}%`
+          label: t(STAT_KEYS.spe),
+          before: Math.max(0, g.stats.spe - g.curseSlow),
+          after: Math.max(0, g.stats.spe - Math.min(HORDE_CURSE_MAX_SLOW, g.curseSlow + down)),
+          bump: `-${down}`
         }
       ]
-      lines = [t('horde.curseNote')]
+      lines = [t('horde.curseNote', { most: HORDE_CURSE_MAX_SLOW })]
     } else {
       const stat = choice.stat
       const percents = statPercents(g)
@@ -4826,14 +5443,14 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       kind = t('horde.kind.tome')
       rank = tomeRank(stat, isNew)
       title = t(ABILITY_KEYS[stat])
-      // Speed picks show the walk they bring (the slower the lead, the more).
+      // Speed picks show the Speed buff they add (and, below, how much faster that walks).
       changes =
         stat === 'spe'
           ? [
               {
-                label: t('horde.change.walk'),
-                before: `${Math.round(leadWalk(g) * 100)}%`,
-                after: `${Math.round(leadWalk(g, percents.spe + hordeBaseStatPercent('spe', choice.rarity, tomeRanks('spe'))) * 100)}%`
+                label: t(STAT_KEYS.spe),
+                before: Math.max(0, g.stats.spe - g.curseSlow),
+                after: Math.max(0, after.spe - g.curseSlow)
               }
             ]
           : [
@@ -4844,12 +5461,11 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
               }
             ]
       const gain = hordeBaseStatPercent(stat, choice.rarity, tomeRanks(stat))
-      changes[0].bump = `+${gain}%`
+      changes[0].bump = stat === 'spe' ? `+${gain}` : `+${gain}%`
       if (stat === 'spe') {
-        // The badge shows how much faster this lead really walks, since quick leads get only part of the pick.
-        const faster = Math.round((leadWalk(g, percents.spe + gain) / leadWalk(g) - 1) * 100)
-        changes[0].bump = `+${faster}%`
-        lines = [t('horde.walkPercent', { percent: gain, faster })]
+        // How much faster this lead walks for it - more for a slow lead (see hordeWalkFactor).
+        const faster = Math.round((hordeLeadWalk(after.spe, g.level, g.curseSlow) / leadWalk(g) - 1) * 1000) / 10
+        lines = [t('horde.walkPercent', { faster })]
       }
     }
     return { rarity: choice.rarity, kind, title, changes, lines, color, badge, isNew, group, type, tags, twist, rank }
@@ -4980,11 +5596,25 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
     const out = g.dash.reach * (k <= 1 ? k : 2 - k)
     return { x: g.dash.dx * out, y: g.dash.dy * out }
   })()
-  // Where something on the field sits, as a share of the field layer.
-  const place = (x: number, y: number): { left: string; top: string } => ({
+  // Where something on the field sits, as a share of the field layer - for things that set
+  // their own translate (Electric's chains, streams) and the minimap.
+  const placeAt = (x: number, y: number): { left: string; top: string } => ({
     left: `${(x / g.worldW) * 100}%`,
     top: `${(y / g.worldH) * 100}%`
   })
+  // Where something on the field sits: slid there from the field's corner with translate, which
+  // the browser moves without laying the page out again every frame.
+  const place = (x: number, y: number): React.CSSProperties => ({
+    left: 0,
+    top: 0,
+    translate: `${x * g.unitPx}px ${y * g.unitPx}px`
+  })
+  // Whether a spot is on screen, or near enough its edge to draw - nothing further off is drawn.
+  const inView = (at: { x: number; y: number }): boolean =>
+    at.x > g.camX - DRAW_MARGIN &&
+    at.x < g.camX + g.width + DRAW_MARGIN &&
+    at.y > g.camY - DRAW_MARGIN &&
+    at.y < g.camY + HORDE_ARENA_HEIGHT + DRAW_MARGIN * 2
   // A circle of this radius round a spot, sized by the field's height (arena units are square).
   const circle = (x: number, y: number, radius: number): React.CSSProperties => ({
     ...place(x, y),
@@ -5047,7 +5677,9 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
       )}
       {HORDE_STATS.filter((s): s is Exclude<HordeStat, 'curse'> => s !== 'curse' && (!isBonusStat(s) || bonusOf(g, s) > 0)).map((s) => (
         <span key={s}>
-          {t(STAT_KEYS[s])} <b>{s === 'luck' ? luckOf(g) : isBonusStat(s) ? `+${bonusOf(g, s)}%` : s === 'spe' ? `${g.stats.spe} · ${Math.round(leadWalk(g) * 100)}%` : g.stats[s]}</b>
+          {t(STAT_KEYS[s])} <b>{s === 'luck' ? luckOf(g) : isBonusStat(s) ? `+${bonusOf(g, s)}%` : s === 'spe' ? Math.max(0, g.stats.spe - g.curseSlow) : g.stats[s]}</b>
+          {/* Speed's net points: its buffs (picks, Carbos, upgrades) less Curse's debuff, 0 with neither. */}
+          {s === 'spe' && speedLabel(hordeNetSpeed(statPercents(g).spe, g.curseSlow))}
         </span>
       ))}
     </>
@@ -5125,6 +5757,26 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
     )
   }
 
+  // A duo synergy's tooltip: its two types, its name and what it does.
+  const duoTip = (id: string): React.JSX.Element | null => {
+    const duo = HORDE_DUOS.find((d) => d.id === id)
+    if (!duo) return null
+    return (
+      <div className="horde-tip-body" style={{ '--move-color': typeColor(duo.types[0]) } as React.CSSProperties}>
+        <span className="horde-tip-title">
+          {duo.types.map((type) => (
+            <span key={type} className={`type-badge type-${type.toLowerCase()}`}>
+              {typeName(type)}
+            </span>
+          ))}
+          <b>{t(`horde.duo.${duo.id}` as MessageKey)}</b>
+        </span>
+        <span className="horde-tip-text">{t(`horde.duoDesc.${duo.id}` as MessageKey)}</span>
+        <span className="horde-tip-note">{t('horde.duoNote')}</span>
+      </div>
+    )
+  }
+
   // A held item's tooltip: its name and what all its copies add.
   const heldTip = (id: HordeHeldId): React.JSX.Element => (
     <div className="horde-tip-body">
@@ -5150,20 +5802,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
   })
 
   // What an item picked up does, in words.
-  const itemDesc = (item: HordeItemId): string => {
-    const amount: Partial<Record<HordeItemId, number>> = {
-      choiceScarf: Math.round((HORDE_SCARF_WALK - 1) * 100),
-      boosterEnergy: Math.round(HORDE_BOOSTER_SPEED * 100),
-      flameOrb: Math.round((HORDE_FLAME_ORB_DAMAGE - 1) * 100),
-      icyRock: HORDE_ICY_ROCK_MS / 1000,
-      maxMushroom: HORDE_MAX_MUSHROOM_HP
-    }
-    return t(`horde.itemDesc.${item}` as MessageKey, {
-      n: amount[item] ?? 0,
-      s: HORDE_ITEM_BUFF_MS / 1000,
-      money: formatMoney(HORDE_BIG_NUGGET_MONEY)
-    })
-  }
+  const itemDesc = (item: HordeItemId): string => hordeItemDesc(t, item)
 
   // An item's tooltip in the effects row: its name and what it does.
   const itemTip = (item: HordeItemId): React.JSX.Element => (
@@ -5198,9 +5837,9 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
         : isBonusStat(stat)
           ? `+${bonusOf(g, stat)}%`
           : stat === 'spe'
-            ? `${t('horde.change.walk')} ${Math.round(leadWalk(g) * 100)}%`
+            ? `${t(STAT_KEYS.spe)} ${g.stats.spe} (+${Math.round(statPercents(g).spe)})`
             : stat === 'curse'
-              ? `${t(STAT_KEYS.hp)} ${g.stats.hp} · ${t(STAT_KEYS.def)} ${g.stats.def} · ${t('horde.change.walk')} ${Math.round(leadWalk(g) * 100)}%`
+              ? `${t(STAT_KEYS.hp)} ${g.stats.hp} · ${t(STAT_KEYS.def)} ${g.stats.def} · ${t(STAT_KEYS.spe)} -${g.curseSlow}`
               : `${g.stats[stat]} (+${statPercents(g)[stat]}%)`
     return (
       <div className="horde-tip-body" style={{ '--move-color': '#a98bff' } as React.CSSProperties}>
@@ -5211,7 +5850,9 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
         <span className="horde-tip-text">
           <b>{value}</b>
         </span>
-        {(stat === 'luck' || stat === 'curse' || isBonusStat(stat)) && <span className="horde-tip-text">{t(`horde.${stat}Note` as MessageKey)}</span>}
+        {(stat === 'luck' || stat === 'curse' || isBonusStat(stat)) && (
+          <span className="horde-tip-text">{t(`horde.${stat}Note` as MessageKey, { most: HORDE_CURSE_MAX_SLOW })}</span>
+        )}
       </div>
     )
   }
@@ -5240,8 +5881,11 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
     )
   }
 
-  // The lead's type effects, in the order its moves brought them.
+  // The lead's type effects, in the order its moves brought them, and the duo synergies its moves make.
   const effectTypes = hordeEffectTypes(knownMoves(g))
+  const activeDuos = hordeActiveDuos(knownMoves(g))
+  const duoStyle = (duo: (typeof HORDE_DUOS)[number]): React.CSSProperties =>
+    ({ '--move-color': typeColor(duo.types[0]), '--duo-a': typeColor(duo.types[0]), '--duo-b': typeColor(duo.types[1]) }) as React.CSSProperties
 
   // The pause menu's list of type effects - each opening up to its tooltip when tapped.
   const effectsList = (
@@ -5270,6 +5914,63 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
                   </span>
                 </span>
                 {openTip === key && effectTip(type)}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+
+  // The pause menu's list of duo synergies the lead's moves make or can still make: each with a pip
+  // for each of its two types, lit once a move of it is held (both make it), glowing once it's in -
+  // and opening up to what it does when tapped.
+  const duoProgress = hordeDuoProgress(knownMoves(g))
+  // The duos had on in a run before, or already in this one - each gets a tick.
+  const duosHad = new Set([...(setup.duosUsed ?? []), ...(g.duosSeen ?? [])])
+  const duoList = (
+    <div className="horde-log">
+      <span className="horde-log-title">{t('horde.duosTitle')}</span>
+      {!duoProgress.length ? (
+        <span className="horde-log-empty">{t('horde.duosNone')}</span>
+      ) : (
+        <div className="horde-log-list">
+          {duoProgress.map(({ duo, has }) => {
+            const key = `duo:${duo.id}`
+            const held = has.filter(Boolean).length
+            const on = held === 2
+            const had = duosHad.has(duo.id)
+            return (
+              <button
+                key={duo.id}
+                className={`horde-effect-row horde-duo-row${on ? ' horde-effect-row-duo' : ''}${openTip === key ? ' horde-effect-row-open' : ''}`}
+                style={duoStyle(duo)}
+                onClick={() => setOpenTip(openTip === key ? null : key)}
+              >
+                <span className="horde-effect-row-head">
+                  <span className="horde-duo-row-name">
+                    {duo.types.map((type) => (
+                      <span key={type} className={`type-badge type-${type.toLowerCase()}`}>
+                        {typeName(type)}
+                      </span>
+                    ))}
+                    <b>{t(`horde.duo.${duo.id}` as MessageKey)}</b>
+                    {had && (
+                      <span className="horde-duo-tick" title={t('horde.duoHad')}>
+                        ✓
+                      </span>
+                    )}
+                  </span>
+                  <span className="horde-duo-progress">
+                    <span className="horde-effect-pips">
+                      {duo.types.map((type, side) => (
+                        <span key={type} className={has[side] ? 'on' : ''} style={{ '--move-color': typeColor(type) } as React.CSSProperties} />
+                      ))}
+                    </span>
+                    <span className={on ? 'horde-duo-on' : 'horde-muted'}>{on ? t('horde.duoActive') : `${held}/2`}</span>
+                  </span>
+                </span>
+                {openTip === key && <span className="horde-tip-text">{t(`horde.duoDesc.${duo.id}` as MessageKey)}</span>}
               </button>
             )
           })}
@@ -5381,7 +6082,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
         </div>
       </div>
       {/* The effects on the lead right now - a row of its own across the window, kept even when empty so nothing shifts. */}
-      <div className="horde-hud-effects">
+      <div className="horde-hud-effects" {...effectsDragHandlers}>
         {itemBuffs.map(
           (buff) =>
             buff.until > g.clock && (
@@ -5398,6 +6099,13 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
             {item.text}
           </span>
         ))}
+        {/* The Metronome's power from moves used since the lead was last hit, and its stacks. */}
+        {!!g.held.metronome && g.metronome > 0 && (
+          <span className="horde-hud-buff horde-hud-item" title={itemName(HORDE_HELD_ITEMS.metronome.name)}>
+            <ItemSprite spritenum={HORDE_HELD_ITEMS.metronome.spritenum} />
+            {t('horde.growDamage', { n: tenth(g.metronome * heldOf(g, 'metronome')) })} ({g.metronome}/{HORDE_METRONOME_STACKS})
+          </span>
+        )}
         {/* The Eject Pack's rush after being hit, with the time left. */}
         {!!g.held.ejectPack && g.rushUntil > g.clock && (
           <span className="horde-hud-buff horde-hud-item">
@@ -5614,9 +6322,21 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
             `${base}${rings ? '' : ' horde-ring-hidden'}${ring && flashing(ring) ? ' horde-ring-flash' : ''}`
           const hot = g.foes.some((f) => f.faintedAt === null && f.stopped)
           const hasMelee = g.known.some((k) => hordeMoveShape(k.move) === 'melee')
+          // The spread ring, only while something uses it: wave and blast moves, shots' Multi-target
+          // extras, the Far twist's bonus past it, and Firestorm and Thunderstorm round the lead.
+          const hasSpread =
+            g.known.some((k) => {
+              const shape = hordeMoveShape(k.move)
+              return shape === 'nova' || shape === 'blast' || (shape === 'shot' && g.multi > 0) || traitOf(k).kind === 'far'
+            }) ||
+            duoOn(g, 'firestorm') ||
+            duoOn(g, 'thunderstorm')
           return (
             <>
-              <div className={ringClass('horde-spread-ring', 'spread')} style={circle(g.px, g.py, spreadRadius(g))} />
+              {/* How far spread moves reach - only with something using it. */}
+              {hasSpread && (
+                <div className={ringClass('horde-spread-ring', 'spread')} style={circle(g.px, g.py, spreadRadius(g))} />
+              )}
               {/* How far melee moves reach - only with one known. */}
               {hasMelee && (
                 <div
@@ -5640,7 +6360,8 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
         {g.foes.map(
           (foe) =>
             foe.faintedAt === null &&
-            risen(g, foe) && (
+            risen(g, foe) &&
+            inView(foe) && (
               <div
                 key={foe.id}
                 className={`horde-hitbox${foe.stopped ? ' horde-hitbox-hot' : ''}`}
@@ -5665,7 +6386,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
         ))}
 
         {/* Experience and items on the ground. */}
-        {g.drops.map((drop) =>
+        {g.drops.filter(inView).map((drop) =>
           drop.item ? (
             <span
               key={drop.id}
@@ -5757,7 +6478,22 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
           </span>
         ))}
 
-        {g.foes.map((foe) => {
+        {/* Spikes and Toxic Spikes: the battle screen's caltrops (poison ones for Toxic Spikes) on the spot. */}
+        {(g.spikes ?? []).map((spike) => (
+          <span key={spike.id} className="horde-rock horde-spikes" style={place(spike.x, spike.y)}>
+            {SPIKE_PIECES.map((p, i) => (
+              <img
+                key={i}
+                src={`./battle/fx/${spike.toxic ? 'poisoncaltrop' : 'caltrop'}.png`}
+                alt=""
+                draggable={false}
+                style={{ left: `calc(50% + ${p.dx}px)`, top: `calc(50% + ${p.dy}px)`, width: 20 }}
+              />
+            ))}
+          </span>
+        ))}
+
+        {g.foes.filter(inView).map((foe) => {
           const on = foe.faintedAt === null ? effectTypesOn(foe.fx, g.clock) : []
           return (
             <div
@@ -5770,7 +6506,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
                 foe.faintedAt === null && foe.stopped ? ' horde-in-reach' : ''
               }${foe.slide ? ' horde-sliding' : ''}${foe.faintedAt === null && !risen(g, foe) ? ' horde-rising' : ''}${
                 foe.exploder ? ' horde-foe-exploder' : ''
-              }${foe.fuseAt !== undefined && foe.faintedAt === null ? ' horde-fusing' : ''}`}
+              }${foe.ranged ? ' horde-foe-ranged' : ''}${foe.fuseAt !== undefined && foe.faintedAt === null ? ' horde-fusing' : ''}`}
               style={
                 {
                   ...place(foe.x, foe.y),
@@ -5788,6 +6524,10 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
             >
               {/* Coming up out of the ground: a patch of dirt under it, kicking up dust. */}
               {!risen(g, foe) && <span className="horde-rise-dirt" />}
+              {/* A lit fuse: a red glow pulsing behind it. */}
+              {foe.fuseAt !== undefined && foe.faintedAt === null && <span className="horde-fuse-glow" />}
+              {/* Elites, bosses and frozen or held foes: a soft glow behind them. */}
+              {(foe.kind !== 'wild' || foe.fx.frozenUntil > g.clock || foe.fx.stopUntil > g.clock) && <span className="horde-aura" />}
               <SpriteImage style={spriteStyle} spriteId={foe.sp.spriteId} gmax={foe.gmax} className="horde-sprite" draggable={false} />
               <div className="horde-foe-hp">
                 <div style={{ width: `${(foe.hp / foe.maxHp) * 100}%` }} />
@@ -5805,7 +6545,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
         })}
 
         {/* Knocked-out exploders' bodies, burning down. */}
-        {g.bombs.map((bomb) => (
+        {g.bombs.filter(inView).map((bomb) => (
           <div
             key={bomb.id}
             className={`horde-unit horde-foe horde-foe-${bomb.kind} horde-size-${bomb.sp.size.toLowerCase()} horde-foe-exploder horde-fusing horde-bomb`}
@@ -5817,10 +6557,11 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
               } as React.CSSProperties
             }
           >
+            <span className="horde-fuse-glow" />
             <SpriteImage style={spriteStyle} spriteId={bomb.sp.spriteId} className="horde-sprite" draggable={false} />
           </div>
         ))}
-        {g.bombs.map((bomb) => (
+        {g.bombs.filter(inView).map((bomb) => (
           <div
             key={`fuse-${bomb.id}`}
             className="horde-fuse-ring"
@@ -5833,7 +6574,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
           />
         ))}
         {/* A lit exploder's blast reach, filling in as its fuse burns down. */}
-        {g.foes.map((foe) =>
+        {g.foes.filter(inView).map((foe) =>
           foe.fuseAt !== undefined && foe.faintedAt === null ? (
             <div
               key={`fuse-${foe.id}`}
@@ -5847,15 +6588,28 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
             />
           ) : null
         )}
-        {moveAnims && g.shots.map((shot) => (
+        {/* Odd Keystones' ghosts, floating by the lead while they fire. */}
+        {g.ghosts.map((ghost) => (
+          <div
+            key={ghost.id}
+            className="horde-unit horde-size-s horde-ghost"
+            style={{ ...place(g.px + ghost.ox, g.py + ghost.oy), zIndex: depth(g.py + ghost.oy) }}
+          >
+            <SpriteImage style={spriteStyle} spriteId="gastly" className="horde-sprite" draggable={false} />
+          </div>
+        ))}
+        {moveAnims && g.shots.filter(inView).map((shot) => (
           <span
             key={shot.id}
             className={`horde-shot horde-shot-${hordeMoveBand(shot.known.move)}${hordeShotClass(animOf(shot.known))}${shot.small ? ' horde-shot-small' : ''}${
               shot.blast ? ' horde-shot-blast' : ''
-            }${shot.pierce ? ' horde-shot-pierce' : ''}${shot.hitIds ? ' horde-shot-hop' : ''}`}
+            }${shot.pierce ? ' horde-shot-pierce' : ''}${shot.hitIds ? ' horde-shot-hop' : ''}${
+              shot.known.move.type === 'Fire' && !shot.pierce ? ' horde-shot-fire' : ''
+            }`}
             style={
               {
                 ...place(shot.x, shot.y),
+                '--shot-turn': shot.heading ? `${Math.atan2(shot.heading.dy, shot.heading.dx)}rad` : '0rad',
                 // Centred first, then turned and grown round its middle (the separate rotate/scale
                 // properties would also grow the centring offset and pull a big shot off its spot).
                 transform: shot.pierce
@@ -5866,15 +6620,41 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
             }
           />
         ))}
+        {/* Ranged foes' shots show even with move animations off - they have to be dodged. */}
+        {g.foeShots.filter(inView).map((shot) => (
+          <span
+            key={shot.id}
+            className={`horde-shot horde-shot-foe horde-shot-${hordeMoveBand(shot.move)}${shot.move.type === 'Fire' ? ' horde-shot-fire' : ''}`}
+            style={
+              {
+                ...place(shot.x, shot.y),
+                '--move-color': typeColor(shot.move.type),
+                '--shot-turn': `${Math.atan2(shot.dy, shot.dx)}rad`
+              } as React.CSSProperties
+            }
+          />
+        ))}
         {moveAnims &&
           g.orbs.flatMap((orb) =>
-            orbSpots(g, orb).map((at, i) => (
-              <span
-                key={`${orb.id}-${i}`}
-                className="horde-fx-orb"
-                style={{ ...place(at.x, at.y), '--move-color': typeColor(orb.known.move.type) } as React.CSSProperties}
-              />
-            ))
+            orbSpots(g, orb).map((at, i) =>
+              // Stealth Rock and Spikes circle as the battle screen's rock pieces or caltrops, turning as they go.
+              ORBIT_PIECES[animOf(orb.known) ?? 'orb'] ? (
+                <img
+                  key={`${orb.id}-${i}`}
+                  className="horde-fx-orb-rock"
+                  src={`./battle/fx/${ORBIT_PIECES[animOf(orb.known) ?? 'orb']![i % ORBIT_PIECES[animOf(orb.known) ?? 'orb']!.length]}.png`}
+                  alt=""
+                  draggable={false}
+                  style={{ ...place(at.x, at.y), '--spin': `${((g.clock - orb.born) * 0.4 + i * 90) % 360}deg` } as React.CSSProperties}
+                />
+              ) : (
+                <span
+                  key={`${orb.id}-${i}`}
+                  className={animOf(orb.known) === 'steam' ? 'horde-fx-orb horde-fx-orb-steam' : 'horde-fx-orb'}
+                  style={{ ...place(at.x, at.y), '--move-color': typeColor(orb.known.move.type) } as React.CSSProperties}
+                />
+              )
+            )
           )}
         {moveAnims && g.arcs.map((arc) => (
           <span
@@ -5882,7 +6662,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
             className="horde-arc"
             style={
               {
-                ...place(arc.x1, arc.y1),
+                ...placeAt(arc.x1, arc.y1),
                 width: `${dist(arc.x1, arc.y1, arc.x2, arc.y2) * g.unitPx}px`,
                 rotate: `${Math.atan2(arc.y2 - arc.y1, arc.x2 - arc.x1)}rad`,
                 '--move-color': typeColor(arc.type)
@@ -5903,15 +6683,40 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
             }
           />
         ))}
-        {moveAnims && g.beams.map((beam) => (
+        {moveAnims && g.beams.map((beam) => FIRE_STREAMS.has(beam.known.move.id) ? (
+          <span
+            key={beam.id}
+            className="horde-beam horde-beam-fire"
+            style={
+              {
+                ...(beam.from ? placeAt(beam.from.x, beam.from.y) : placeAt(g.px, g.py - BODY_HEIGHT)),
+                width: `${(beam.length ?? HORDE_SHAPES.beamLength * reachScale(g, beam.known) * ownReach(beam.known)) * g.unitPx}px`,
+                height: `${(beam.width ?? HORDE_SHAPES.beamWidth * beamWidthScale(g, beam.known)) * g.unitPx}px`,
+                rotate: `${Math.atan2(beam.dy, beam.dx)}rad`,
+                '--beam-ms': `${HORDE_SHAPES.beamMs * (beam.part ?? 1)}ms`
+              } as React.CSSProperties
+            }
+          >
+            {/* A rush of fire: puffs of flame pour from the lead to the end of its reach, swelling
+                and reddening as they go, with a tongue of flame licking out at the lead's end. */}
+            {Array.from({ length: FIRE_PUFFS }, (_, i) => (
+              <span
+                key={i}
+                className={`horde-fire-puff horde-fire-puff-${i % 2}`}
+                style={{ '--puff': i, '--puff-spin': `${(i * 137) % 360}deg` } as React.CSSProperties}
+              />
+            ))}
+            <span className="horde-fire-mouth" />
+          </span>
+        ) : (
           <span
             key={beam.id}
             className="horde-beam"
             style={
               {
-                ...(beam.from ? place(beam.from.x, beam.from.y) : place(g.px, g.py - BODY_HEIGHT)),
-                width: `${(beam.length ?? HORDE_SHAPES.beamLength * reachScale(beam.known) * ownReach(beam.known)) * g.unitPx}px`,
-                height: `${(beam.width ?? HORDE_SHAPES.beamWidth * beamWidthScale(beam.known)) * g.unitPx}px`,
+                ...(beam.from ? placeAt(beam.from.x, beam.from.y) : placeAt(g.px, g.py - BODY_HEIGHT)),
+                width: `${(beam.length ?? HORDE_SHAPES.beamLength * reachScale(g, beam.known) * ownReach(beam.known)) * g.unitPx}px`,
+                height: `${(beam.width ?? HORDE_SHAPES.beamWidth * beamWidthScale(g, beam.known)) * g.unitPx}px`,
                 rotate: `${Math.atan2(beam.dy, beam.dx)}rad`,
                 '--move-color': typeColor(beam.known.move.type),
                 '--beam-ms': `${HORDE_SHAPES.beamMs * (beam.part ?? 1)}ms`
@@ -6104,17 +6909,17 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
             }}
           />
           {g.chests.map((c) => (
-            <span key={c.id} className="horde-minimap-dot horde-minimap-chest" style={place(c.x, c.y)} />
+            <span key={c.id} className="horde-minimap-dot horde-minimap-chest" style={placeAt(c.x, c.y)} />
           ))}
           {g.shrines.map((s) => (
-            <span key={s.id} className={`horde-minimap-dot horde-minimap-shrine horde-minimap-shrine-${s.kind}`} style={place(s.x, s.y)} />
+            <span key={s.id} className={`horde-minimap-dot horde-minimap-shrine horde-minimap-shrine-${s.kind}`} style={placeAt(s.x, s.y)} />
           ))}
           {g.foes.map(
             (f) =>
               f.kind !== 'wild' &&
-              f.faintedAt === null && <span key={f.id} className={`horde-minimap-dot horde-minimap-${f.kind}`} style={place(f.x, f.y)} />
+              f.faintedAt === null && <span key={f.id} className={`horde-minimap-dot horde-minimap-${f.kind}`} style={placeAt(f.x, f.y)} />
           )}
-          <span className="horde-minimap-dot horde-minimap-lead" style={place(g.px, g.py)} />
+          <span className="horde-minimap-dot horde-minimap-lead" style={placeAt(g.px, g.py)} />
         </div>
       </div>
 
@@ -6197,9 +7002,10 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
             )
           })}
         </div>
-        {/* The type effects its moves bring, by name - hovering one shows what it does at each count of moves. */}
+        {/* The type effects its moves bring, by name - hovering one shows what it does at each count of moves -
+            then its duo synergies. Dragged (or the wheel) to slide along once there are more than fit. */}
         {effectTypes.length > 0 && (
-          <div className="horde-effects">
+          <div className="horde-effects horde-effects-slide" {...effectsDragHandlers}>
             {effectTypes.map((type) => {
               const rank = effectRank(g, type)
               return (
@@ -6218,6 +7024,11 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
                 </span>
               )
             })}
+            {activeDuos.map((duo) => (
+              <span key={duo.id} className="horde-effect horde-effect-duo" style={duoStyle(duo)} {...tipHandlers(`duo:${duo.id}`)}>
+                <span className="horde-effect-name">{t(`horde.duo.${duo.id}` as MessageKey)}</span>
+              </span>
+            ))}
           </div>
         )}
       </div>
@@ -6228,6 +7039,8 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
         >
           {tipItem
             ? itemTip(tipItem)
+            : loadoutTip.key.startsWith('duo:')
+            ? duoTip(loadoutTip.key.slice('duo:'.length))
             : loadoutTip.key.startsWith('effect:')
             ? effectTip(loadoutTip.key.slice('effect:'.length))
             : loadoutTip.key.startsWith('tome:')
@@ -6255,7 +7068,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
               {choices.evolution
                 ? t('horde.evolvedTitle', { name: g.form.species })
                 : t('horde.levelUp', {
-                    level: g.level - g.pendingChoices.length + 1
+                    level: g.pendingChoices[0]?.level ?? g.level
                   })}
             </h2>
             {choices.evolution && <p className="horde-choices-note">{t('horde.evolvedNote')}</p>}
@@ -6461,6 +7274,7 @@ function HordeArena({ setup, resume, giveUp, onExit }: Props): React.JSX.Element
                 ) : (
                   <div className="horde-pause-effects-items">
                     {effectsList}
+                    {duoList}
                     {heldList}
                   </div>
                 )}

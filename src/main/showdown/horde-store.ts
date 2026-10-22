@@ -6,8 +6,13 @@ import { addMoney, getMoney, spendMoney } from './money-store'
 import { countAchievement, recordAchievementBest } from './achievement-progress'
 import { hasTitle } from './title-perks'
 import { recordMission } from './mission-store'
-import { addMonOfSpecies } from './box-store'
-import { CENTURION_MONEY_MULTIPLIER, SCHOOLING_EXTRA_REROLLS, SHAPESHIFTER_MOVE_DELETES } from '../../shared/titles'
+import { addMonOfSpecies, hasRegisteredSpecies } from './box-store'
+import {
+  CENTURION_MONEY_MULTIPLIER,
+  MASTER_OF_ELEMENTS_OTHER_TYPE_SHARE,
+  SCHOOLING_EXTRA_REROLLS,
+  SHAPESHIFTER_MOVE_DELETES
+} from '../../shared/titles'
 import {
   bstOf,
   generateRandomWildMon,
@@ -37,10 +42,12 @@ import {
   hordeFoeLevel,
   hordeMoney,
   HORDE_MOVE_DEFS,
+  HORDE_DUOS,
   hordeMoveCatalog,
   hordeMoveOf,
   hordeNoUpgrades,
   hordeUpgradeCost,
+  type HordeDuoId,
   type HordeEvolution,
   type HordeHeld,
   type HordeHistoryEntry,
@@ -86,6 +93,8 @@ interface StoredHorde {
   // The Pokemon offered to pick from, kept until a run counts (see payOut) - closing the
   // picker or the game doesn't deal a new lot.
   lineup: StoredLineup | null
+  // Every duo synergy that's been on in a finished run (the Master of Elements achievement wants them all).
+  duosUsed: HordeDuoId[]
 }
 
 // The area and the Pokemon offered, and each one's evolutions and Mega forms, rolled with
@@ -126,7 +135,8 @@ function load(): StoredHorde {
       upgrades: { ...hordeNoUpgrades(), ...upgrades, spe: upgrades.spe ?? walk ?? 0 },
       saved: parsed.saved ?? null,
       history: parsed.history ?? [],
-      lineup: parsed.lineup ?? null
+      lineup: parsed.lineup ?? null,
+      duosUsed: parsed.duosUsed ?? []
     }
     if (choices) {
       addMoney(HORDE_CHOICES_REFUND)
@@ -136,7 +146,7 @@ function load(): StoredHorde {
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code
     if (code !== 'ENOENT') console.error('[horde-store] failed to load horde.json:', e)
-    return { top: [], runs: 0, upgrades: hordeNoUpgrades(), saved: null, history: [], lineup: null }
+    return { top: [], runs: 0, upgrades: hordeNoUpgrades(), saved: null, history: [], lineup: null, duosUsed: [] }
   }
 }
 
@@ -178,7 +188,8 @@ function speciesInfo(name: string): HordeSpecies {
     types: [...dex.types],
     baseStats: hordeBaseStats(dex.baseStats),
     ...(dex.canGigantamax ? { canGmax: true } : {}),
-    ...(canExplode(dex.name) ? { explodes: true } : {})
+    ...(canExplode(dex.name) ? { explodes: true } : {}),
+    ...(dex.baseStats.spa > dex.baseStats.atk ? { special: true } : {})
   }
 }
 
@@ -332,7 +343,7 @@ function megasOf(species: string, evolutions: HordeEvolution[]): Record<string, 
  */
 export function offerHorde(): HordeOffer {
   const s = getState()
-  if (s.lineup) return s.lineup.offer
+  if (s.lineup) return withRegistered(s.lineup.offer)
   const seen = new Set<string>()
   const starters: HordeStarter[] = []
   const lines: StoredLineup['lines'] = {}
@@ -363,7 +374,19 @@ export function offerHorde(): HordeOffer {
   const location: WildLocationId = HORDE_LOCATIONS[Math.floor(Math.random() * HORDE_LOCATIONS.length)].id
   s.lineup = { offer: { location, starters }, lines }
   persist()
-  return s.lineup.offer
+  return withRegistered(s.lineup.offer)
+}
+
+// Each card marked if what it shows is in the Pokedex - checked fresh every time, as a kept lot
+// can have been dealt before the player caught one.
+function withRegistered(offer: HordeOffer): HordeOffer {
+  return {
+    ...offer,
+    starters: offer.starters.map((p) => ({
+      ...p,
+      registered: hasRegisteredSpecies((p.mega ?? p.finalForm ?? p).species)
+    }))
+  }
 }
 
 /** A new lot to pick from, for Poke Dollars (the same price every time). */
@@ -439,8 +462,18 @@ export function startHorde(species: string): HordeSetup {
     moveDeletes: hasTitle('Shapeshifter') ? SHAPESHIFTER_MOVE_DELETES : 1,
     // The Schooling title starts the run with extra rerolls.
     extraRerolls: hasTitle('Schooling') ? SCHOOLING_EXTRA_REROLLS : undefined,
+    ...duoSetup(),
     best: getState().top[0] ?? null,
     upgrades: { ...getState().upgrades }
+  }
+}
+
+// What a run needs to know about duo synergies: the share of a type effect's chance moves of other
+// types get (more with the Master of Elements title), and the duos already had on (for their ticks).
+function duoSetup(): Pick<HordeSetup, 'otherTypeShare' | 'duosUsed'> {
+  return {
+    otherTypeShare: hasTitle('Master of Elements') ? MASTER_OF_ELEMENTS_OTHER_TYPE_SHARE : undefined,
+    duosUsed: [...getState().duosUsed]
   }
 }
 
@@ -491,8 +524,15 @@ function checkResult(run: ActiveRun, result: HordeResult): HordeResult {
     damage: checkDamage(result.damage),
     tomes: checkTomes(result.tomes),
     held: checkHeld(result.held),
-    chests: Math.max(0, Math.min(1000, Math.floor(Number(result.chests) || 0)))
+    chests: Math.max(0, Math.min(1000, Math.floor(Number(result.chests) || 0))),
+    duos: checkDuos(result.duos)
   }
+}
+
+/** The duo synergies a run reports were on: real ones only, each once. */
+function checkDuos(duos: unknown): HordeDuoId[] {
+  if (!Array.isArray(duos)) return []
+  return HORDE_DUOS.map((d) => d.id).filter((id) => duos.includes(id))
 }
 
 /** The tomes a run reports it held: real stats, each once, no more than the slots, sane ranks. */
@@ -563,6 +603,9 @@ function payOut(run: Pick<ActiveRun, 'shiny' | 'species' | 'location'>, checked:
   if (checked.megaEvolved && survivedMs >= HORDE_MEGA_RUSH_MS) countAchievement('hordeMegaRuns')
   const s = getState()
   s.runs += 1
+  // The duo synergies it had on join those had before (Master of Elements counts them).
+  s.duosUsed = HORDE_DUOS.map((d) => d.id).filter((id) => s.duosUsed.includes(id) || (checked.duos ?? []).includes(id))
+  recordAchievementBest('hordeDuosUsed', s.duosUsed.length)
   // A cleared run keeps its lead: the Pokemon picked (not what it became), at level 1,
   // shiny if it was. Its battle-only form (Minior's Meteor) joins as its usual form.
   let caught: HordeReward['caught']
@@ -655,7 +698,7 @@ export function resumeHorde(): HordeSave {
     canMega: Object.keys(saved.save.setup.megas ?? {}).length > 0,
     location: saved.save.setup.location
   }
-  return { ...saved.save, setup: { ...saved.save.setup, token, best: s.top[0] ?? null, upgrades: { ...s.upgrades } } }
+  return { ...saved.save, setup: { ...saved.save.setup, token, ...duoSetup(), best: s.top[0] ?? null, upgrades: { ...s.upgrades } } }
 }
 
 /** Ends the saved run without playing on - paid for as it stood, as if given up. */
@@ -681,6 +724,11 @@ export function getHordeHistory(): HordeHistoryEntry[] {
 
 export function getHordeUpgrades(): HordeUpgrades {
   return getState().upgrades
+}
+
+/** Every duo synergy that's been on in a finished run, for the Codex's ticks. */
+export function getHordeDuos(): HordeDuoId[] {
+  return getState().duosUsed
 }
 
 /** Buys the next rank of an upgrade, if it isn't maxed and there's the money for it. */

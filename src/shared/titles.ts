@@ -42,6 +42,7 @@ export type Title =
   | 'Centurion'
   | 'Shapeshifter'
   | 'Schooling'
+  | 'Master of Elements'
 
 // What each title does, for the title pickers.
 export const TITLE_PERKS: Record<Title, string> = {
@@ -81,7 +82,8 @@ export const TITLE_PERKS: Record<Title, string> = {
   AFK: "A missed check doesn't knock a TM search back a step",
   Centurion: '10% more money from Horde runs',
   Shapeshifter: 'The Move Deleter can be used twice per Horde run',
-  Schooling: 'Horde runs start with 2 extra rerolls'
+  Schooling: 'Horde runs start with 2 extra rerolls',
+  'Master of Elements': "In Horde runs, moves of other types set off a type's effect 70% as often (instead of 50%)"
 }
 
 /**
@@ -182,6 +184,8 @@ export const CENTURION_MONEY_MULTIPLIER = 1.1
 export const SHAPESHIFTER_MOVE_DELETES = 2
 // Schooling: extra level-up rerolls a Horde run starts with.
 export const SCHOOLING_EXTRA_REROLLS = 2
+// Master of Elements: the share of a type effect's chance a Horde move of another type gets (half without it).
+export const MASTER_OF_ELEMENTS_OTHER_TYPE_SHARE = 0.7
 
 // What the Game Corner's games need to know about the player's title.
 export interface GameCornerPerks {

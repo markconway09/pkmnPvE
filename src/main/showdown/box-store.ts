@@ -462,6 +462,23 @@ function mergeEvolutionFor(
   return { ready: true, items }
 }
 
+// An evolution it can't take as it is, but could with a Friendship Petal (a friendship
+// evolution) and/or Rare Candies (a level one, up to the level cap) from the bag - what it
+// would use up, evolution item included. Null if it's ready already or still out of reach.
+function boostedEvolutionFor(
+  mon: StoredMon,
+  targetSpecies: string
+): { items: string[]; petals: number; candies: number } | null {
+  if (mon.everstone) return null
+  if (evolutionOptionsFor(mon.set).some((o) => o.species === targetSpecies)) return null
+  const plan = mergeEvolutionFor(mon.set, targetSpecies, new Map(), { petals: true, candies: true })
+  if (!plan.ready) return null
+  const petals = plan.items.filter((id) => id === FRIENDSHIP_PETAL_ITEM_ID).length
+  const candies = plan.items.filter((id) => id === RARE_CANDY_ITEM_ID).length
+  if (petals === 0 && candies === 0) return null
+  return { items: plan.items, petals, candies }
+}
+
 function toView(mon: StoredMon, arrival: number, groups?: Map<string, StoredMon[]>): BoxPokemonView {
   const { percent } = expProgressForLevel(mon.set.species, mon.set.level, mon.exp)
   // An Everstone-locked one never evolves.
@@ -498,11 +515,16 @@ function toView(mon: StoredMon, arrival: number, groups?: Map<string, StoredMon[
     eligibleEvolutions,
     evolutionItems,
     registeredEvolutions: eligibleEvolutions.filter(hasRegisteredSpecies),
-    evolutionPaths: evolutionPathsFor(mon.set).map((path) => ({
-      ...path,
-      ready: eligibleEvolutions.includes(path.species),
-      registered: hasRegisteredSpecies(path.species)
-    })),
+    evolutionPaths: evolutionPathsFor(mon.set).map((path) => {
+      const ready = eligibleEvolutions.includes(path.species)
+      const boost = ready || mon.everstone ? null : boostedEvolutionFor(mon, path.species)
+      return {
+        ...path,
+        ready,
+        registered: hasRegisteredSpecies(path.species),
+        boost: boost ? { petals: boost.petals, candies: boost.candies } : undefined
+      }
+    }),
     canLevelUpWithCandy,
     canUseShinyPatch,
     shinyPatches: canUseShinyPatch ? getItemQuantity(SHINY_PATCH_ITEM_ID) : undefined,
@@ -1226,7 +1248,22 @@ export function evolveMon(id: string, targetSpecies: string): BoxState {
   if (!mon) throw new Error(t('err.unknownPokemonId', { a: id }))
   if (mon.everstone) throw new Error(t('err.isLockedWithAnEverstoneIt', { a: mon.set.species }))
   const chosen = evolutionOptionsFor(mon.set).find((o) => o.species === targetSpecies)
-  if (!chosen) throw new Error(t('err.cannotEvolveIntoRightNow', { a: mon.set.species, b: targetSpecies }))
+  if (!chosen) {
+    // Not ready as it is: the edit window's evolve button can spend a Friendship Petal and/or
+    // Rare Candies to get it there, the same way merging does (see boostedEvolutionFor).
+    const boost = boostedEvolutionFor(mon, targetSpecies)
+    if (!boost) throw new Error(t('err.cannotEvolveIntoRightNow', { a: mon.set.species, b: targetSpecies }))
+    for (const itemId of boost.items) {
+      if (!removeItem(itemId, 1)) throw new Error(t('err.youDonTHaveTheItem'))
+    }
+    if (boost.petals > 0) mon.set.happiness = MAX_HAPPINESS
+    mon.set.level += boost.candies
+    mon.set = evolveSet(mon.set, rollMilceryCream(targetSpecies))
+    if (boost.candies > 0) mon.exp = totalExpForSpeciesLevel(mon.set.species, mon.set.level)
+    persist()
+    countAchievement('evolutions')
+    return getBoxState()
+  }
   if (chosen.requiredItems) {
     // Any one of the accepted items will do (Milcery takes any Sweet) - spend
     // whichever the player actually has.

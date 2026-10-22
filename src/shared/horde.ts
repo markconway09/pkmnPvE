@@ -60,6 +60,20 @@ export const HORDE_EXPLODER_HP = 1.5
 export const HORDE_EXPLODER_POWER = 250
 // After a blast hits the lead, more blasts can't for this long - a chain hurts, but not six times over.
 export const HORDE_EXPLODER_LEAD_GRACE_MS = 500
+// Ranged wild Pokemon: one whose Sp. Atk is higher than its Attack has this chance of being one
+// (elites, bosses and exploders never are). It keeps about this far from the lead (feet to feet),
+// edging round it at this share of its pace and backing off (at this share of its pace) if the lead
+// comes too close, and fires
+// its moves as shots at where the lead stood - slow enough to step out of the way. A shot hits if
+// it passes this close to the lead's middle and fades after this long; a blast move landing, an
+// exploder's blast or the Eject Button wipes out the shots caught in it.
+export const HORDE_RANGED_CHANCE = 0.25
+export const HORDE_RANGED_KEEP_AWAY = 320
+export const HORDE_RANGED_STRAFE = 0.45
+export const HORDE_RANGED_BACK_OFF = 0.5
+export const HORDE_FOE_SHOT_SPEED = 260
+export const HORDE_FOE_SHOT_HITBOX = 12
+export const HORDE_FOE_SHOT_MS = 3000
 // Each area's exploders, by evolution line: a third of the run picks one of its lines at random
 // and brings that line's Pokemon for it (the first third its first one, and so on).
 // The ocean's Pyukumuku can't learn Explosion, but fits the beach too well to leave out.
@@ -120,6 +134,8 @@ export const HORDE_FOE_LEASH = 1.6
 export const HORDE_RISE_NEAR = 0.55
 export const HORDE_RISE_FAR = 0.85
 export const HORDE_RISE_MS = 700
+// In endless mode they rise twice as fast.
+export const HORDE_ENDLESS_RISE_FAST = 2
 // How fast the lead walks, in arena units a second (its Speed makes it quicker or slower - see hordeWalkFactor).
 export const HORDE_PLAYER_WALK = 190
 // Hitboxes: a circle round each Pokemon's feet, this wide (radius). A wild Pokemon can hit the
@@ -131,10 +147,8 @@ export const HORDE_HITBOX_OVERLAP = 8
 // Pokemon can hit from), then fly to the lead at this pace.
 export const HORDE_PICKUP_RANGE = HORDE_LEAD_HITBOX + HORDE_FOE_HITBOX.wild
 export const HORDE_PICKUP_PULL = 650
-// Spread moves hit every wild Pokemon within this of the lead; single-target moves reach anywhere,
-// and hit harder on a foe inside that ring.
+// Spread moves hit every wild Pokemon within this of the lead; single-target moves reach anywhere.
 export const HORDE_SPREAD_RADIUS = 150
-export const HORDE_SPREAD_FOCUS_BONUS = 0.2
 // How fast a single-target move flies to its target (arena units a second), and how long a
 // spread move's wave takes to roll out - the damage lands when they get there.
 export const HORDE_PROJECTILE_SPEED = 1100
@@ -144,10 +158,8 @@ export const HORDE_FOE_OFFTYPE_CHANCE = 0.1
 // Wild Pokemon shoulder each other apart to at least this far (bosses take more room).
 export const HORDE_FOE_SPACING = 46
 export const HORDE_BOSS_SPACING = 90
-// What each level heals, as a share of max HP, and a berry dropped by a KO.
+// What each level heals, as a share of max HP.
 export const HORDE_LEVEL_HEAL = 0.1
-export const HORDE_BERRY_CHANCE = 0.04
-export const HORDE_BERRY_HEAL = 0.15
 // How many Pokemon to pick from at the start.
 export const HORDE_STARTER_CHOICES = 10
 // The chance a lot of them has a legendary-class one in it - one roll per lot, and never
@@ -407,13 +419,19 @@ export const HORDE_EFFECT = {
   // Mastery (Swarm): a fleeing foe spooks those it runs into, and spooked foes take more damage from every move.
   swarmReach: 40,
   swarmBonus: 0.25,
-  // Rock - Stealth Rock: rocks left on the ground hurt foes standing on them every second (grows). Bonus: two spots at once, and rocks slow.
+  // Rock - Stealth Rock: rocks left on the ground hurt foes standing on them every second (grows), two spots at once. Bonus: three spots, and rocks slow.
   rockShare: 0.25,
-  rockMs: 6000,
+  rockMs: 9000,
+  rockSpots: 2,
+  rockBonusSpots: 3,
   rockReach: 50,
   rockSlow: 0.2,
-  // Mastery (Avalanche): up to 4 spots, and a foe first stepping on rocks takes a burst (times their damage a second).
-  avalancheSpots: 4,
+  // Mastery (Avalanche): up to 6 spots, and a foe first stepping on rocks takes a burst (times their damage a second).
+  avalancheSpots: 6,
+  // Spikes and Toxic Spikes (from moves) last as long as rocks and as many lie about at once - by the
+  // lead's rank in Ground for Spikes, in Poison for Toxic Spikes. Spikes hurt as rocks do; Toxic Spikes
+  // hurt for this smaller share and poison a foe the first time it steps on them.
+  toxicSpikeShare: 0.08,
   avalancheBurst: 3,
   // Ghost - Execute: more damage to a foe low on HP (grows). Bonus: a wild Pokemon (not an elite or boss) that low faints outright.
   executeBonus: 0.4,
@@ -478,10 +496,165 @@ export function hordeEffectTypes(known: HordeMove[]): string[] {
   return [...new Set(known.map((m) => m.type))]
 }
 
-/** A move's chance (percent) to set off a type's effect with these moves known - half for a move of another type, half again for one that hits a crowd. */
-export function hordeEffectChance(move: HordeMove, type: string, known: HordeMove[]): number {
+/**
+ * A move's chance (percent) to set off a type's effect with these moves known - half for a move of
+ * another type (otherShare of it, with the Master of Elements title), half again for one that hits a crowd.
+ */
+export function hordeEffectChance(move: HordeMove, type: string, known: HordeMove[], otherShare = HORDE_EFFECT_OTHER_TYPE_SHARE): number {
   const crowd = HORDE_EFFECT_CROWD_SHAPES.includes(hordeMoveShape(move)) ? HORDE_EFFECT_CROWD_SHARE : 1
-  return hordeTypeEffect(known, type).chance * (move.type === type ? 1 : HORDE_EFFECT_OTHER_TYPE_SHARE) * crowd
+  // A move with an effectBoost for the type (Stealth Rock for Rock) sets it off that many times as often.
+  const tr = hordeMoveDef(move).trait
+  const boost = tr.kind === 'effectBoost' && tr.type === type ? tr.times : 1
+  return hordeTypeEffect(known, type).chance * (move.type === type ? 1 : otherShare) * crowd * boost
+}
+
+// Duo synergies: a lead holding at least 1 move of each of a pair's two types gets that pair's
+// own rule on top of its type effects - several at once, one for every pair its moves cover.
+export type HordeDuoId =
+  | 'steamBurst'
+  | 'thermalShock'
+  | 'conductor'
+  | 'flashFreeze'
+  | 'monsoon'
+  | 'ashes'
+  | 'glacier'
+  | 'mudslide'
+  | 'landslide'
+  | 'thunderstorm'
+  | 'firestorm'
+  | 'swarmFront'
+  | 'infestation'
+  | 'rot'
+  | 'nightmare'
+  | 'mindOverMatter'
+  | 'haymaker'
+  | 'siren'
+  | 'reaper'
+  | 'possession'
+  | 'inferno'
+  | 'magnetize'
+  | 'aegis'
+  | 'bloom'
+
+export const HORDE_DUOS: { id: HordeDuoId; types: [string, string] }[] = [
+  { id: 'steamBurst', types: ['Fire', 'Water'] },
+  { id: 'thermalShock', types: ['Fire', 'Ice'] },
+  { id: 'conductor', types: ['Water', 'Electric'] },
+  { id: 'flashFreeze', types: ['Water', 'Ice'] },
+  { id: 'monsoon', types: ['Water', 'Grass'] },
+  { id: 'ashes', types: ['Fire', 'Grass'] },
+  { id: 'glacier', types: ['Ice', 'Rock'] },
+  { id: 'mudslide', types: ['Ground', 'Water'] },
+  { id: 'landslide', types: ['Ground', 'Rock'] },
+  { id: 'thunderstorm', types: ['Flying', 'Electric'] },
+  { id: 'firestorm', types: ['Flying', 'Fire'] },
+  { id: 'swarmFront', types: ['Flying', 'Bug'] },
+  { id: 'infestation', types: ['Poison', 'Bug'] },
+  { id: 'rot', types: ['Grass', 'Poison'] },
+  { id: 'nightmare', types: ['Psychic', 'Dark'] },
+  { id: 'mindOverMatter', types: ['Fighting', 'Psychic'] },
+  { id: 'haymaker', types: ['Normal', 'Fighting'] },
+  { id: 'siren', types: ['Dark', 'Fairy'] },
+  { id: 'reaper', types: ['Ghost', 'Dark'] },
+  { id: 'possession', types: ['Ghost', 'Psychic'] },
+  { id: 'inferno', types: ['Dragon', 'Fire'] },
+  { id: 'magnetize', types: ['Electric', 'Steel'] },
+  { id: 'aegis', types: ['Steel', 'Fairy'] },
+  { id: 'bloom', types: ['Grass', 'Fairy'] }
+]
+
+// What each duo does.
+export const HORDE_DUO = {
+  // Steam Burst (Fire + Water): washing away a burning foe deals the rest of its burn at once,
+  // and splashes this share of it onto foes this close.
+  steamSplash: 0.5,
+  steamReach: 90,
+  // Thermal Shock (Fire + Ice): burning a chilled foe (or chilling a burning one) bursts for this
+  // share of the hit and ends both. Fire moves shatter frozen foes as Ice moves do.
+  thermalShare: 1,
+  // Conductor (Water + Electric): a washed-away foe is soaked this long; a chain picks soaked foes
+  // first, reaches them this much further, and hits them this much harder.
+  soakMs: 3000,
+  conductorReach: 1.5,
+  conductorHit: 2,
+  // Flash Freeze (Water + Ice): a washed-away foe that slams into another freezes both this long.
+  flashFreezeMs: 1000,
+  // Monsoon (Water + Grass): each Wash Away heals the Leech share of the hit, once more for each foe it drags along.
+  // Ashes (Fire + Grass): burns heal the lead this share of the Leech share of their damage.
+  ashesShare: 0.5,
+  // Glacier (Ice + Rock): a foe on rocks is chilled every second; a frozen one shatters for this many times the rocks' damage.
+  glacierShatter: 3,
+  // Mudslide (Ground + Water): tremors leave mud this big that slows this much for this long, and
+  // Wash Away pushes foes on mud this much further.
+  mudReach: 60,
+  mudSlow: 0.3,
+  mudMs: 2000,
+  mudPush: 1.5,
+  // Landslide (Ground + Rock): a tremor by a rock spot hits every foe on it for the tremor share again.
+  // Thunderstorm (Flying + Electric): while Tailwind blows, lightning every so often on a foe this
+  // many spread rings out, hitting for this share of the strongest Electric move and setting off a chain.
+  stormEveryMs: 1500,
+  stormRing: 1.5,
+  stormShare: 0.5,
+  // Firestorm (Flying + Fire): while Tailwind blows, burning foes this many spread rings out set those
+  // near them burning every second.
+  firestormRing: 1,
+  // Swarm Front (Flying + Bug): spooked foes flee this much faster, and each spook adds this long to Tailwind.
+  swarmFrontFlee: 2,
+  swarmFrontWindMs: 500,
+  // Infestation (Poison + Bug): every poison stack counts as an effect for Hex, and a fleeing foe gives
+  // 1 poison stack to foes it runs into (each one no more than once this often).
+  infestEveryMs: 1000,
+  // Rot (Grass + Poison): Leech heals this many times as much from a poisoned foe.
+  rotHeal: 2,
+  // Nightmare (Psychic + Dark): every hit on a confused foe is an Ambush, and each crit adds this
+  // long to the confusion (no more than this many times its usual length ahead).
+  nightmareMs: 500,
+  nightmareMax: 2,
+  // Mind over Matter (Fighting + Psychic): a confused foe's Defense counts as fully broken.
+  // Haymaker (Normal + Fighting): a flinch on a fully broken foe knocks it this far back and stops it this long.
+  haymakerPush: 120,
+  haymakerStopMs: 1000,
+  // Siren (Dark + Fairy): crits on a charmed foe land this much harder.
+  sirenCrit: 0.5,
+  // Reaper (Ghost + Dark): a crit leaving a wild foe under the Execute line finishes it, and its move comes round at once.
+  // Possession (Ghost + Psychic): a confused wild foe knocked under the Execute line fights for the
+  // lead this long - its hits on other wild Pokemon this many times as hard, and counted as the lead's.
+  possessMs: 5000,
+  possessDamage: 2,
+  // Inferno (Dragon + Fire): each Rage stack raises burns this much, and fully enraged every hit burns.
+  infernoPerStack: 0.15,
+  // Magnetize (Electric + Steel): each chain jump gives a shield of this share of max HP.
+  magnetizeShield: 0.02,
+  // Aegis (Steel + Fairy): a charmed foe's hits wear the shield down only this share as much.
+  aegisWear: 0.5,
+  // Bloom (Grass + Fairy): each charmed foe heals the lead this share of max HP a second, no more than this in all.
+  bloomHeal: 0.003,
+  bloomMax: 0.03
+}
+
+/** The duos these moves make: every pair with at least 1 move of each of its types. */
+export function hordeActiveDuos(known: HordeMove[]): (typeof HORDE_DUOS)[number][] {
+  const types = hordeEffectTypes(known)
+  return HORDE_DUOS.filter((duo) => duo.types.every((type) => types.includes(type)))
+}
+
+/** The ids of the duos these moves make. */
+export function hordeActiveDuoIds(known: HordeMove[]): Set<HordeDuoId> {
+  return new Set(hordeActiveDuos(known).map((duo) => duo.id))
+}
+
+/**
+ * The duos these moves make or can still make, each with whether a move of each of its two types
+ * is held - those made first, then those a move short. One needing more moves than the free slots
+ * hold is out of reach.
+ */
+export function hordeDuoProgress(known: HordeMove[]): { duo: (typeof HORDE_DUOS)[number]; has: [boolean, boolean] }[] {
+  const types = hordeEffectTypes(known)
+  const free = HORDE_MAX_MOVES - known.length
+  return HORDE_DUOS.map((duo) => ({ duo, has: [types.includes(duo.types[0]), types.includes(duo.types[1])] as [boolean, boolean] }))
+    .filter(({ has }) => has.filter((h) => !h).length <= free)
+    .sort((a, b) => b.has.filter(Boolean).length - a.has.filter(Boolean).length)
 }
 
 // Each upgrade a move already has makes the next a little weaker: its power, cooldown and
@@ -544,7 +717,7 @@ export const HORDE_SHAPES = {
   // Each pulse hits for this share of the move's damage.
   beamPulseShare: 0.3,
   // A cone: how deep, how wide an angle, and the share of the lead's Attack it hits with.
-  coneReach: 260,
+  coneReach: 156,
   coneAngle: (70 * Math.PI) / 180,
   // A piercing shot flies on until it leaves the arena; its reach upgrades make it bigger
   // instead - in full up to the first size, at half the rate up to the second, and by less and
@@ -686,8 +859,9 @@ export function hordeRollBoosts(move: HordeMove, rarity: RarityTier): HordeMoveB
 }
 
 // The stats Horde mode uses - Attack covers Sp. Atk, Defense covers Sp. Def. The rest
-// aren't a Pokemon's own: they start at nothing and only come from level-up picks - Range
-// ('area': spread moves' and melee moves' reach alike), Haste (every cooldown shorter), Pickup (how
+// aren't a Pokemon's own: they start at nothing and only come from level-up picks - Mega Launcher
+// ('area': the spread ring, and cones, blasts, streams, piercing shots and orbits by half as much),
+// Long Reach ('reach': melee moves' reach, and a little pickup range), Haste (every cooldown shorter), Pickup (how
 // far off experience and items are picked up), Crit chance (percentage points onto the
 // chance of a critical hit), Crit damage (percent onto how hard one lands), Experience (percent
 // more from every gem), Resisted damage (percent onto a hit a foe resists, see hordeResistBoost),
@@ -696,27 +870,46 @@ export function hordeRollBoosts(move: HordeMove, rarity: RarityTier): HordeMoveB
 export type HordeBaseStat = 'hp' | 'atk' | 'def' | 'spe'
 export const HORDE_BASE_STATS: HordeBaseStat[] = ['hp', 'atk', 'def', 'spe']
 export type HordeStats = Record<HordeBaseStat, number>
-export type HordeBonusStat = 'area' | 'haste' | 'pickup' | 'critChance' | 'critDamage' | 'exp' | 'resist' | 'regen' | 'goldGain'
-export const HORDE_BONUS_STATS: HordeBonusStat[] = ['area', 'haste', 'pickup', 'critChance', 'critDamage', 'exp', 'resist', 'regen', 'goldGain']
+export type HordeBonusStat = 'area' | 'reach' | 'haste' | 'pickup' | 'critChance' | 'critDamage' | 'exp' | 'resist' | 'regen' | 'goldGain'
+export const HORDE_BONUS_STATS: HordeBonusStat[] = ['area', 'reach', 'haste', 'pickup', 'critChance', 'critDamage', 'exp', 'resist', 'regen', 'goldGain']
 // Curse is an ability of its own rather than a stat: more HP and Defense, but slower (see hordeCurseGain).
 export type HordeStat = HordeBaseStat | HordeBonusStat | 'luck' | 'curse'
 // The abilities a level-up can offer (each named after a Pokemon ability, see horde.ability.*):
 // every stat but HP, plus Curse.
-export const HORDE_STATS: HordeStat[] = ['atk', 'def', 'spe', 'area', 'haste', 'pickup', 'critChance', 'critDamage', 'exp', 'resist', 'luck', 'regen', 'goldGain', 'curse']
+export const HORDE_STATS: HordeStat[] = ['atk', 'def', 'spe', 'area', 'reach', 'haste', 'pickup', 'critChance', 'critDamage', 'exp', 'resist', 'luck', 'regen', 'goldGain', 'curse']
 // A pick of one of those adds this many times a stat pick's percent (Haste's comes off every
 // move's cooldown, added to each move's own upgrades, with the same diminishing returns).
 // Regenerator: 0.2% of max HP a second for a common pick up to 1% for a legendary one.
 // Good as Gold: +8% gold for a common pick up to +40% for a legendary one.
-export const HORDE_BONUS_SCALE: Record<HordeBonusStat, number> = { area: 0.875, haste: 1, pickup: 4, critChance: 0.6, critDamage: 1.7, exp: 1, resist: 2.5, regen: 0.04, goldGain: 1.6 }
+export const HORDE_BONUS_SCALE: Record<HordeBonusStat, number> = { area: 0.875, reach: 0.875, haste: 1, pickup: 4, critChance: 0.6, critDamage: 1.7, exp: 1, resist: 2.5, regen: 0.04, goldGain: 1.6 }
+// Mega Launcher: cones, blasts, streams, piercing shots and orbits grow by this share of what it adds to the spread ring.
+export const HORDE_LAUNCHER_SHARE = 0.5
+// Long Reach: pickup range grows by a third of what a Magnet Pull pick of the same rarity would add.
+export const HORDE_REACH_PICKUP_SHARE = HORDE_BONUS_SCALE.pickup / 3 / HORDE_BONUS_SCALE.reach
+// Mega Launcher's shapes (beside waves, which live in the spread ring), and Long Reach's.
+const HORDE_LAUNCHER_SHAPES: HordeMoveShape[] = ['nova', 'cone', 'blast', 'beam', 'pierce', 'orbit']
+// A new Mega Launcher or Long Reach while no known move makes use of it turns up this much as often as other abilities.
+export const HORDE_UNUSED_TOME_WEIGHT = 1 / 3
+
+/** Whether a new ability does anything for these moves - Mega Launcher and Long Reach only once a move of theirs is known. */
+export function hordeTomeUseful(stat: HordeStat, known: HordeMove[]): boolean {
+  if (stat === 'area') return known.some((m) => HORDE_LAUNCHER_SHAPES.includes(hordeMoveShape(m)))
+  if (stat === 'reach') return known.some((m) => hordeMoveShape(m) === 'melee')
+  return true
+}
+
 // Curse: each pick adds this many times a stat pick's percent to HP and Defense alike (+8% to
-// +40%), and takes this many times that off the walking pace (3% to 15%).
+// +40%), and takes this many times that off the lead's Speed (3 to 15 points) - never past the
+// most, and once there it's no longer offered (the pick that reaches it gives only its share of HP and Defense).
 export const HORDE_CURSE_SCALE = 1.6
 export const HORDE_CURSE_SLOW = 0.375
+export const HORDE_CURSE_MAX_SLOW = 50
 // Any HP back over time (Regenerator, Leftovers) waits this long after the lead is hit, so
 // stacking it with Defense can't make the lead outheal everything.
 export const HORDE_REGEN_DELAY_MS = 1500
-// The same for the four base stats: Speed tomes add half a stat pick's percent.
-export const HORDE_BASE_SCALE: Record<HordeBaseStat, number> = { hp: 1, atk: 1, def: 1, spe: 0.5 }
+// The same for the four base stats. Speed tomes add flat Speed points instead of a percent:
+// 5 for a common pick up to 25 for a legendary one (see hordeWalkFactor for what they're worth).
+export const HORDE_BASE_SCALE: Record<HordeBaseStat, number> = { hp: 1, atk: 1, def: 1, spe: 1 }
 // A critical hit's chance (percent) and how much harder it lands, before any picks.
 export const HORDE_CRIT_CHANCE = 4
 export const HORDE_CRIT_DAMAGE = 1.5
@@ -746,14 +939,14 @@ export function hordeRollCrits(chance: number): number {
 
 // Some tomes give less with each rank already held: a pick adds its percent divided by
 // 1 + this much per rank. Crit damage: half at the 6th pick. Resisted damage: half at the 6th too.
-// Experience, Attack, Defense, Speed, Regenerator, Good as Gold and Curse: half at the 11th. Never under 1% (0.1% for Regenerator).
+// Experience, Attack, Defense, Regenerator, Good as Gold and Curse: half at the 11th. Never under 1% (0.1% for Regenerator).
+// Speed has none: each Speed point already walks less faster the more Speed the lead has.
 export const HORDE_TOME_FALLOFF: Partial<Record<HordeStat, number>> = {
   exp: 0.1,
   critDamage: 0.2,
   resist: 0.2,
   atk: 0.1,
   def: 0.1,
-  spe: 0.1,
   regen: 0.1,
   goldGain: 0.1,
   curse: 0.1
@@ -780,10 +973,13 @@ export function hordeBonusPercent(stat: HordeBonusStat, rarity: RarityTier, rank
   return divisor === 1 ? Math.round(full) : Math.max(1, Math.round(full / divisor))
 }
 
-/** What a Curse pick adds to HP and Defense (each) and takes off the walking pace, in percent. */
-export function hordeCurseGain(rarity: RarityTier, ranksHeld = 0): { up: number; down: number } {
+/** What a Curse pick adds to HP and Defense (each) and its Speed debuff, in percent - with this much slow already on. */
+export function hordeCurseGain(rarity: RarityTier, ranksHeld = 0, slowHeld = 0): { up: number; down: number } {
   const up = Math.max(1, Math.round((HORDE_STAT_PERCENT[rarity] * HORDE_CURSE_SCALE) / hordeTomeDivisor('curse', ranksHeld)))
-  return { up, down: Math.max(1, Math.round(up * HORDE_CURSE_SLOW)) }
+  const down = Math.max(1, Math.round(up * HORDE_CURSE_SLOW))
+  const room = Math.max(0, HORDE_CURSE_MAX_SLOW - slowHeld)
+  if (down <= room) return { up, down }
+  return { up: Math.round((up * room) / down), down: room }
 }
 
 // Items a KO sometimes drops (a wild Pokemon now and then, an elite often, a boss always),
@@ -826,7 +1022,7 @@ export const HORDE_FLAME_ORB_DAMAGE = 2
 export const HORDE_ICY_ROCK_MS = 10000
 export const HORDE_BIG_NUGGET_MONEY = 5000
 // What a Max Mushroom adds to the lead's max HP, in percent.
-export const HORDE_MAX_MUSHROOM_HP = 20
+export const HORDE_MAX_MUSHROOM_HP = 10
 // Items on the ground last a minute, flashing through the last 10 seconds (a dropped chest stays till it's picked up).
 export const HORDE_ITEM_LIFESPAN_MS = 60000
 export const HORDE_ITEM_FLASH_MS = 50000
@@ -881,14 +1077,14 @@ export const HORDE_TOTEM_PILES = 10
 // The totem and its ring rise out of the ground this many times slower than other foes, so the
 // lead has time to slip out of the ring before it closes.
 export const HORDE_TOTEM_RISE = 3
-// A Tapu Ruin fills while the lead stands in its circle, and slowly drains (this share of the
-// filling pace) while the lead is out of it. The first time the lead steps in, this many elites
-// rise round it to defend it, this many levels above the run's elites. Once full it raises one
+// A Tapu Ruin fills while the lead stands in its circle, and keeps what it has filled while the
+// lead is out of it. The first time the lead steps in, this many elites
+// rise round it to defend it, this many levels above the run's elites (and as many again the
+// first time it's half full). Once full it raises one
 // stat at random for good - by this many times a legendary pick of it, without taking an
 // ability slot.
 export const HORDE_TAPU_RADIUS = 180
-export const HORDE_TAPU_HOLD_MS = 20000
-export const HORDE_TAPU_DRAIN = 0.25
+export const HORDE_TAPU_HOLD_MS = 30000
 export const HORDE_TAPU_DEFENDERS = 3
 export const HORDE_TAPU_DEFENDER_LEVELS = 10
 export const HORDE_TAPU_BOOST = 1.5
@@ -896,7 +1092,7 @@ export const HORDE_TAPU_BOOST = 1.5
 export const HORDE_SHRINE_GOLD = 100
 export const HORDE_SHRINE_GOLD_CHESTS = 1.5
 // What a Tapu Ruin can raise: every stat but Curse, HP included.
-export const HORDE_TAPU_STATS: Exclude<HordeStat, 'curse'>[] = ['hp', 'atk', 'def', 'spe', 'area', 'haste', 'pickup', 'critChance', 'critDamage', 'exp', 'resist', 'luck', 'regen', 'goldGain']
+export const HORDE_TAPU_STATS: Exclude<HordeStat, 'curse'>[] = ['hp', 'atk', 'def', 'spe', 'area', 'reach', 'haste', 'pickup', 'critChance', 'critDamage', 'exp', 'resist', 'luck', 'regen', 'goldGain']
 // The shrines' look: the achievements icon.
 export const HORDE_SHRINE_ICON = './icons/nav/achievements.png'
 
@@ -931,13 +1127,15 @@ export type HordeHeldStat =
   | 'bigHit'
   | 'lightning'
   | 'koBlast'
-  | 'freezeHit'
+  | 'slowHit'
   | 'poisonHit'
   | 'dodge'
   | 'hurtRush'
   | 'speedDamage'
   | 'candy'
   | 'koAttack'
+  | 'reroll'
+  | 'ghosts'
 export type HordeHeldId =
   | 'hpUp'
   | 'protein'
@@ -980,12 +1178,15 @@ export type HordeHeldId =
   | 'quickPowder'
   | 'rareCandy'
   | 'spellTag'
+  | 'loadedDice'
+  | 'oddKeystone'
 // A one-time item (unique) turns up in a chest only while the lead hasn't got it - one copy a run.
+// One-time items are all legendary, and items whose bonus grows over the run are mythical (epic).
 export const HORDE_HELD_ITEMS: Record<HordeHeldId, { name: string; rarity: RarityTier; stat: HordeHeldStat; amount: number; spritenum: number; unique?: boolean }> = {
   hpUp: { name: 'HP Up', rarity: 'common', stat: 'hp', amount: 2, spritenum: -33 },
   protein: { name: 'Protein', rarity: 'common', stat: 'atk', amount: 2, spritenum: -34 },
   iron: { name: 'Iron', rarity: 'common', stat: 'def', amount: 2, spritenum: -35 },
-  carbos: { name: 'Carbos', rarity: 'common', stat: 'spe', amount: 2, spritenum: -36 },
+  carbos: { name: 'Carbos', rarity: 'common', stat: 'spe', amount: 4, spritenum: -36 },
   quickClaw: { name: 'Quick Claw', rarity: 'uncommon', stat: 'haste', amount: 5, spritenum: 373 },
   scopeLens: { name: 'Scope Lens', rarity: 'uncommon', stat: 'critChance', amount: 3, spritenum: 429 },
   wideLens: { name: 'Wide Lens', rarity: 'uncommon', stat: 'area', amount: 6, spritenum: 537 },
@@ -995,34 +1196,36 @@ export const HORDE_HELD_ITEMS: Record<HordeHeldId, { name: string; rarity: Rarit
   razorClaw: { name: 'Razor Claw', rarity: 'rare', stat: 'critDamage', amount: 15, spritenum: 382 },
   leftovers: { name: 'Leftovers', rarity: 'rare', stat: 'regen', amount: 0.5, spritenum: 242 },
   magnet: { name: 'Magnet', rarity: 'rare', stat: 'pickup', amount: 25, spritenum: 273 },
-  choiceBand: { name: 'Choice Band', rarity: 'epic', stat: 'atk', amount: 5, spritenum: 68 },
-  assaultVest: { name: 'Assault Vest', rarity: 'epic', stat: 'def', amount: 5, spritenum: 581 },
-  expertBelt: { name: 'Expert Belt', rarity: 'epic', stat: 'stab', amount: 10, spritenum: 132 },
-  lifeOrb: { name: 'Life Orb', rarity: 'legendary', stat: 'atk', amount: 10, spritenum: 249 },
-  luckyPunch: { name: 'Lucky Punch', rarity: 'legendary', stat: 'luck', amount: 3, spritenum: 261 },
+  choiceBand: { name: 'Choice Band', rarity: 'epic', stat: 'atk', amount: 10, spritenum: 68 },
+  assaultVest: { name: 'Assault Vest', rarity: 'epic', stat: 'def', amount: 10, spritenum: 581 },
+  expertBelt: { name: 'Expert Belt', rarity: 'epic', stat: 'stab', amount: 15, spritenum: 132 },
+  lifeOrb: { name: 'Life Orb', rarity: 'legendary', stat: 'atk', amount: 20, spritenum: 249 },
+  luckyPunch: { name: 'Lucky Punch', rarity: 'epic', stat: 'luck', amount: 3, spritenum: 261 },
   kingsRock: { name: "King's Rock", rarity: 'uncommon', stat: 'flinch', amount: 2, spritenum: 236 },
   bigRoot: { name: 'Big Root', rarity: 'uncommon', stat: 'healing', amount: 5, spritenum: 29 },
   shellBell: { name: 'Shell Bell', rarity: 'rare', stat: 'lifesteal', amount: 0.3, spritenum: 438 },
   rockyHelmet: { name: 'Rocky Helmet', rarity: 'rare', stat: 'helmet', amount: 2, spritenum: 417 },
-  clearAmulet: { name: 'Clear Amulet', rarity: 'rare', stat: 'amulet', amount: 100, spritenum: 747, unique: true },
-  ejectButton: { name: 'Eject Button', rarity: 'epic', stat: 'eject', amount: 1, spritenum: 118, unique: true },
+  clearAmulet: { name: 'Clear Amulet', rarity: 'legendary', stat: 'amulet', amount: 100, spritenum: 747, unique: true },
+  ejectButton: { name: 'Eject Button', rarity: 'legendary', stat: 'eject', amount: 1, spritenum: 118, unique: true },
   metronome: { name: 'Metronome', rarity: 'epic', stat: 'metronome', amount: 1, spritenum: 289 },
   focusSash: { name: 'Focus Sash', rarity: 'legendary', stat: 'sash', amount: 1, spritenum: 151 },
-  relicCrown: { name: 'Relic Crown', rarity: 'rare', stat: 'chestDamage', amount: 1.5, spritenum: -42, unique: true },
-  luckIncense: { name: 'Luck Incense', rarity: 'rare', stat: 'chestLuck', amount: 1, spritenum: -43 },
-  reaperCloth: { name: 'Reaper Cloth', rarity: 'epic', stat: 'execute', amount: 0.5, spritenum: 385 },
+  relicCrown: { name: 'Relic Crown', rarity: 'legendary', stat: 'chestDamage', amount: 1.5, spritenum: -42, unique: true },
+  luckIncense: { name: 'Luck Incense', rarity: 'legendary', stat: 'chestLuck', amount: 1, spritenum: -43, unique: true },
+  reaperCloth: { name: 'Reaper Cloth', rarity: 'legendary', stat: 'execute', amount: 0.5, spritenum: 385, unique: true },
   cardKey: { name: 'Card Key', rarity: 'rare', stat: 'freeChest', amount: 10, spritenum: -44 },
-  pearlString: { name: 'Pearl String', rarity: 'rare', stat: 'goldDamage', amount: 1, spritenum: -45 },
-  muscleBand: { name: 'Muscle Band', rarity: 'epic', stat: 'bigHit', amount: 2, spritenum: 297 },
+  pearlString: { name: 'Pearl String', rarity: 'epic', stat: 'goldDamage', amount: 1, spritenum: -45 },
+  muscleBand: { name: 'Muscle Band', rarity: 'epic', stat: 'bigHit', amount: 1, spritenum: 297 },
   cellBattery: { name: 'Cell Battery', rarity: 'uncommon', stat: 'lightning', amount: 4, spritenum: 60 },
   charcoal: { name: 'Charcoal', rarity: 'uncommon', stat: 'koBlast', amount: 8, spritenum: 61 },
-  neverMeltIce: { name: 'Never-Melt Ice', rarity: 'uncommon', stat: 'freezeHit', amount: 2, spritenum: 305 },
+  neverMeltIce: { name: 'Never-Melt Ice', rarity: 'uncommon', stat: 'slowHit', amount: 2, spritenum: 305 },
   poisonBarb: { name: 'Poison Barb', rarity: 'uncommon', stat: 'poisonHit', amount: 5, spritenum: 343 },
   brightPowder: { name: 'Bright Powder', rarity: 'rare', stat: 'dodge', amount: 5, spritenum: 51 },
-  ejectPack: { name: 'Eject Pack', rarity: 'uncommon', stat: 'hurtRush', amount: 30, spritenum: 714, unique: true },
-  quickPowder: { name: 'Quick Powder', rarity: 'rare', stat: 'speedDamage', amount: 0.5, spritenum: 374 },
+  ejectPack: { name: 'Eject Pack', rarity: 'legendary', stat: 'hurtRush', amount: 30, spritenum: 714, unique: true },
+  quickPowder: { name: 'Quick Powder', rarity: 'epic', stat: 'speedDamage', amount: 0.25, spritenum: 374 },
   rareCandy: { name: 'Rare Candy', rarity: 'epic', stat: 'candy', amount: 1, spritenum: -2 },
-  spellTag: { name: 'Spell Tag', rarity: 'epic', stat: 'koAttack', amount: 0.5, spritenum: 461 }
+  spellTag: { name: 'Spell Tag', rarity: 'legendary', stat: 'koAttack', amount: 0.5, spritenum: 461, unique: true },
+  loadedDice: { name: 'Loaded Dice', rarity: 'legendary', stat: 'reroll', amount: 1, spritenum: 751 },
+  oddKeystone: { name: 'Odd Keystone', rarity: 'epic', stat: 'ghosts', amount: 4, spritenum: -46 }
 }
 // King's Rock: its flinch works as a move's own (no bosses; an elite's attacks start over for half as long).
 // Shell Bell: what it heals in any one second tops out at this share of max HP, however many are held.
@@ -1037,6 +1240,11 @@ export const HORDE_EJECT_EVERY_MS = 20000
 export const HORDE_EJECT_REACH = 260
 export const HORDE_EJECT_PUSH = 220
 export const HORDE_EJECT_SAFE_MS = 1000
+// A level-up knocks every foe (but a boss) this close this far away, and nothing lands on the lead
+// for this long once play goes on - so the crowd can't finish it off while the cards were up.
+export const HORDE_LEVEL_PUSH_REACH = 260
+export const HORDE_LEVEL_PUSH = 220
+export const HORDE_LEVEL_SAFE_MS = 1000
 // Metronome: each use of any move while the lead goes unhit adds a stack (up to this many), each
 // stack its percent more power; being hit drops them all.
 export const HORDE_METRONOME_STACKS = 10
@@ -1045,14 +1253,14 @@ export const HORDE_METRONOME_STACKS = 10
 export const HORDE_SASH_SAFE_MS = 2000
 export const HORDE_SASH_COOLDOWN_MS = 15000
 // Relic Crown: its percent more damage for every chest opened this run (dropped and free ones too);
-// Luck Incense: its Luck for every one.
-// Reaper Cloth: its percent a hit to knock a wild Pokemon out outright (an elite half as often, a boss
-// never), each one adding this much Attack (percent) for the rest of the run, however many are held.
+// Luck Incense (one a run): its Luck for every one opened after it was found.
+// Reaper Cloth (one a run): its percent a hit to knock a wild Pokemon out outright (an elite half as often, a boss
+// never), each one adding this much Attack (percent) for the rest of the run.
 export const HORDE_REAPER_ELITE_SHARE = 0.5
 export const HORDE_REAPER_ATTACK = 0.5
 // Pearl String: its percent more damage for every this much gold held, up to this much (percent) in all.
-export const HORDE_PEARL_GOLD = 100
-export const HORDE_PEARL_MAX = 300
+export const HORDE_PEARL_GOLD = 1000
+export const HORDE_PEARL_MAX = 100
 // Muscle Band: its percent a hit to land this many times harder.
 export const HORDE_MUSCLE_BAND_MULT = 10
 // Cell Battery: its percent a hit to call lightning down on a foe this close to the one hit, for
@@ -1062,13 +1270,21 @@ export const HORDE_BATTERY_SHARE = 1
 // Charcoal: its percent a foe knocked out explodes, hitting those this close for this share of the hit that finished it.
 export const HORDE_CHARCOAL_REACH = 100
 export const HORDE_CHARCOAL_SHARE = 0.75
-// Never-Melt Ice: its percent a hit to freeze the foe this long (an elite half, a boss a quarter - see HORDE_FREEZE_SHARE).
-export const HORDE_ICE_FREEZE_MS = 1500
+// Never-Melt Ice: every hit slows the foe by its percent (all copies together, up to this much) for this long.
+export const HORDE_ICE_SLOW_MAX = 50
+export const HORDE_ICE_SLOW_MS = 2000
 // Eject Pack (one a run): its percent quicker walk for this long after the lead is hit.
 export const HORDE_RUSH_MS = 3000
-// Quick Powder: its percent more damage for each percent of walking speed bonus (Speed picks, Carbos, upgrades).
+// Quick Powder: its percent more damage for each point of Speed buff (Speed picks, Carbos, upgrades) - Curse's
+// slow doesn't take any off.
 // Spell Tag: its percent more Attack for every this many KOs this run.
 export const HORDE_SPELL_TAG_KOS = 100
+// Loaded Dice: one more level-up reroll each, and each one deals a level-up's cards again for free
+// when none of them is legendary.
+// Odd Keystone: buying a field chest, starting a Totem Trial or filling a Tapu Ruin calls up a ghost
+// for each one, which fires its many Shadow Balls at the foes this close, this far apart, and fades.
+export const HORDE_GHOST_REACH = 450
+export const HORDE_GHOST_SHOT_MS = 300
 // Rare Candy: the next level-up's cards (rerolls included) come one rarity higher, and the candy is
 // used up (not on an all-legendary one, when the lead evolves).
 
@@ -1085,7 +1301,7 @@ export function hordeStackedChance(id: HordeHeldId, copies: number): number {
 }
 
 // The held stats shown as a plain count rather than a percent.
-export const HORDE_HELD_COUNT_STATS: HordeHeldStat[] = ['luck', 'sash', 'chestLuck', 'candy']
+export const HORDE_HELD_COUNT_STATS: HordeHeldStat[] = ['luck', 'sash', 'chestLuck', 'candy', 'spe', 'reroll', 'ghosts']
 export const HORDE_HELD_IDS = Object.keys(HORDE_HELD_ITEMS) as HordeHeldId[]
 // Gold's own icon (Relic Gold) and the chests' (a Machine Part).
 export const HORDE_GOLD_SPRITE = -39
@@ -1143,9 +1359,8 @@ export const HORDE_MEGA_MS = 30000
 export const HORDE_MEGA_SPEED = 0.2
 
 // Gigantamax: now and then a boss comes Gigantamax (one of the Pokemon with that form), with
-// twice the HP but walking half as fast, and drops a Max Mushroom when beaten.
+// walking half as fast, and drops a Max Mushroom when beaten.
 export const HORDE_GMAX_CHANCE = 0.3
-export const HORDE_GMAX_HP = 2
 export const HORDE_GMAX_WALK = 0.5
 
 /** Which item a drop is, by the items' weights. */
@@ -1172,6 +1387,8 @@ export interface HordeStarter {
   // What it evolves into last in the run, and the Mega form it can reach - if any.
   finalForm?: { species: string; spriteId: string; types?: string[] }
   mega?: { species: string; spriteId: string }
+  // Whether the Pokemon the card shows (its last form, or its Mega) is in the player's Pokedex.
+  registered?: boolean
 }
 
 /** What Start deals: the area the run is in (its wild Pokemon, its backdrop) and the Pokemon to pick from. */
@@ -1193,6 +1410,8 @@ export interface HordeSpecies {
   // It can learn Explosion or Self-Destruct (or is one of an area's exploders): as a wild
   // Pokemon it may be an exploder (see HORDE_EXPLODER_WILD_CHANCE).
   explodes?: boolean
+  // Its Sp. Atk is higher than its Attack: as a wild Pokemon it may be a ranged one (see HORDE_RANGED_CHANCE).
+  special?: boolean
 }
 
 /** A stage the lead evolves into, and the level it does so at. */
@@ -1238,6 +1457,10 @@ export interface HordeSetup {
   moveDeletes?: number
   // Schooling: extra level-up rerolls the run starts with.
   extraRerolls?: number
+  // Master of Elements: the share of a type effect's chance moves of other types get (half without it).
+  otherTypeShare?: number
+  // The duo synergies the player has had on in a run before (see HORDE_DUOS) - none in runs saved before them.
+  duosUsed?: HordeDuoId[]
   best: HordeRecord | null
   // The upgrades bought on the Horde page, as they were when the run started.
   upgrades: HordeUpgrades
@@ -1285,6 +1508,8 @@ export interface HordeResult {
   tomes?: HordeTome[]
   held?: HordeHeld
   chests?: number
+  // Every duo synergy that was on at some point in the run.
+  duos?: HordeDuoId[]
 }
 
 /** An ability held: which stat, and how many times it's been picked (the first included). */
@@ -1387,35 +1612,32 @@ export function hordeSpeedFactor(speed: number, level: number): number {
   return Math.min(1.5, Math.max(0.75, 0.6 + 0.4 * ratio))
 }
 
-/** How much faster (above 1) or slower the lead walks for its Speed at its level. */
-// Speed is the lead's only walking stat. There's no top to it, but past an even pace each
-// bit more counts for less (doubling the plain figure walks about 1.8 times as fast).
+// The lead's walk from its Speed: an even pace (1) at a Speed of its level + 50, never under
+// HORDE_WALK_FLOOR and never reaching HORDE_WALK_FLOOR + 1. Each Speed point counts for less the
+// more Speed there is: at level 50, 40 -> 50 Speed walks about 5% faster, 500 -> 600 about 2%,
+// and doubling an even pace's Speed walks only about 1.2 times as fast.
+const HORDE_WALK_FLOOR = 0.6
+const HORDE_WALK_BEND = 1.5
+
+/** How much faster (above 1) or slower the lead walks for its Speed (buffs and Curse included) at its level. */
 export function hordeWalkFactor(speed: number, level: number): number {
-  const raw = 0.6 + 0.4 * (speed / (level + 50))
-  if (raw <= 1) return Math.max(HORDE_WALK_SLOWEST, raw)
-  return 1 + 2 * (Math.sqrt(raw) - 1)
+  const ratio = Math.max(0, speed) / (level + 50)
+  return HORDE_WALK_FLOOR + ratio / (ratio + HORDE_WALK_BEND)
 }
 
-// The slowest the lead ever walks on its own Speed.
+// A slow lead's pace: Electro Ball and Gyro Ball measure the walk against it.
 export const HORDE_WALK_SLOWEST = 0.75
-// Speed picks, Carbos and the Speed upgrade quicken the walk itself, not the Speed stat, and
-// count for more the slower the lead is on its own: in full at the slowest pace, under half at
-// an even pace, about a quarter for a quick lead and an eighth for the very fastest.
-const HORDE_WALK_BONUS_FALLOFF = 3
 
-/** The share of its Speed bonus a lead gets, for how fast it walks on its own (1 at the slowest pace). */
-export function hordeWalkBonusShare(ownWalk: number): number {
-  return Math.min(1, (HORDE_WALK_SLOWEST / ownWalk) ** HORDE_WALK_BONUS_FALLOFF)
+/** The lead's net Speed points: its Speed buff (picks, Carbos, upgrades) less Curse's debuff - 0 with neither. */
+export function hordeNetSpeed(buff: number, debuff = 0): number {
+  return Math.max(0, buff) - Math.min(HORDE_CURSE_MAX_SLOW, Math.max(0, debuff))
 }
 
 /**
- * How fast the lead walks: its own Speed at its level, quickened by its Speed bonus (percent, see
- * above). A bonus below nothing (from Curse) slows it by that much in full, down to half its pace.
+ * How fast the lead walks: its Speed (buffs already in it) less Curse's debuff, at its level.
  */
-export function hordeLeadWalk(speed: number, level: number, bonusPercent: number): number {
-  const own = hordeWalkFactor(speed, level)
-  if (bonusPercent < 0) return own * Math.max(0.5, 1 + bonusPercent / 100)
-  return own * (1 + (bonusPercent / 100) * hordeWalkBonusShare(own))
+export function hordeLeadWalk(speed: number, level: number, debuff = 0): number {
+  return hordeWalkFactor(speed - Math.min(HORDE_CURSE_MAX_SLOW, Math.max(0, debuff)), level)
 }
 
 /**
@@ -1510,6 +1732,15 @@ export function hordeFoeHpScale(elapsedMs: number): number {
   )
 }
 
+/**
+ * Extra Defense on wild Pokemon in endless mode, on top of their levels - growing as their HP
+ * does there, 8x every 10 minutes (1 before endless mode).
+ */
+export function hordeFoeDefScale(elapsedMs: number): number {
+  const endless = minutes(Math.max(0, elapsedMs - HORDE_DURATION_MS))
+  return Math.pow(HORDE_ENDLESS_HP_GROWTH_PER_10_MINUTES, endless / 10)
+}
+
 /** The most wild Pokemon in the arena at once, now. */
 export function hordeMaxFoes(elapsedMs: number): number {
   return Math.min(HORDE_MOST_FOES, HORDE_MAX_FOES + Math.floor(HORDE_FOES_PER_MINUTE * paceMinutes(elapsedMs)))
@@ -1568,8 +1799,8 @@ export function hordeFoeWalkScale(elapsedMs: number): number {
 }
 
 // In endless mode every foe on the field (bosses too) walks quicker still, by this much more
-// each minute into it - twice its pace by 20 minutes in, three times by 40.
-const HORDE_ENDLESS_WALK_PER_MINUTE = 1 / 20
+// each minute into it - 15% a minute, so twice its pace by about 7 minutes in, three times by 13.
+const HORDE_ENDLESS_WALK_PER_MINUTE = 0.15
 
 /** How much quicker every foe walks for how long endless mode has been going (1 before it). */
 export function hordeEndlessWalkScale(elapsedMs: number): number {
@@ -1629,6 +1860,8 @@ export type HordeLearnSource = 'level' | 'taught'
 // much likelier than others, ones it can only be taught a bit less so, and types it can't
 // learn at all still turn up now and then.
 export const HORDE_LEARN_WEIGHT: Record<HordeLearnSource | 'none', number> = { level: 8, taught: 4, none: 1 }
+// ...and a type that would complete a duo synergy with a known move's type this many times as likely.
+export const HORDE_LEARN_DUO_WEIGHT = 1.25
 
 // A new move's card only knows which types it draws from until its rarity is rolled: the
 // lead's own, the ones it'll gain later, or any other.
@@ -1702,7 +1935,9 @@ export function hordeLevelChoices(
   futureTypes: string[] = [],
   tomes: HordeStat[] = [],
   banished: string[] = [],
-  learnTypes: Record<string, HordeLearnSource> = {}
+  learnTypes: Record<string, HordeLearnSource> = {},
+  // Tomes held that can't go any higher (Curse at its most slow) - not offered again.
+  maxed: HordeStat[] = []
 ): HordeChoice[] {
   const banishedSet = new Set(banished)
   const isBanished = (key: string): boolean => banishedSet.has(key)
@@ -1721,10 +1956,19 @@ export function hordeLevelChoices(
     }
   }
   known.forEach((_, slot) => pool.push({ kind: 'upgrade', slot }))
-  for (const stat of tomes) pool.push({ kind: 'stat', stat, isNew: false })
-  if (tomes.length < HORDE_MAX_TOMES)
-    for (const stat of shuffled(HORDE_STATS.filter((s) => !tomes.includes(s) && !isBanished(`stat:${s}`))).slice(0, 2))
-      pool.push({ kind: 'stat', stat, isNew: true })
+  for (const stat of tomes) if (!maxed.includes(stat)) pool.push({ kind: 'stat', stat, isNew: false })
+  // Two new tomes - Mega Launcher and Long Reach less often while no known move makes use of them.
+  if (tomes.length < HORDE_MAX_TOMES) {
+    const open = HORDE_STATS.filter((s) => !tomes.includes(s) && !isBanished(`stat:${s}`))
+    for (let i = 0; i < 2 && open.length; i++) {
+      const weights = open.map((s) => (hordeTomeUseful(s, known) ? 1 : HORDE_UNUSED_TOME_WEIGHT))
+      let roll = Math.random() * weights.reduce((sum, w) => sum + w, 0)
+      let at = weights.findIndex((w) => (roll -= w) < 0)
+      if (at < 0) at = open.length - 1
+      pool.push({ kind: 'stat', stat: open[at], isNew: true })
+      open.splice(at, 1)
+    }
+  }
   // Multi-target only while it knows a move it helps (its legendary roll comes below).
   const helped = known.some((m) => !hordeHitsMany(m) || hordeRepeatsOnMulti(m))
   if (helped && multiPicks < HORDE_MAX_MULTI && !isBanished('multi')) pool.push({ kind: 'multi' })
@@ -1741,7 +1985,14 @@ export function hordeLevelChoices(
     const from = typed.length ? typed : open
     const allowed = from.filter((m) => rarityRank(moveRarity(m)) <= rarityRank(rarity))
     if (!allowed.length) return null
-    const typeWeights = [...new Set(allowed.map((m) => m.type))].map((type) => ({ type, weight: HORDE_LEARN_WEIGHT[learnTypes[type] ?? 'none'] }))
+    // A type that would complete a duo synergy with a move already known is a little likelier.
+    const knownTypes = hordeEffectTypes(known)
+    const pairs = (type: string): boolean =>
+      !knownTypes.includes(type) && HORDE_DUOS.some((d) => d.types.includes(type) && d.types.some((other) => other !== type && knownTypes.includes(other)))
+    const typeWeights = [...new Set(allowed.map((m) => m.type))].map((type) => ({
+      type,
+      weight: HORDE_LEARN_WEIGHT[learnTypes[type] ?? 'none'] * (pairs(type) ? HORDE_LEARN_DUO_WEIGHT : 1)
+    }))
     let roll = Math.random() * typeWeights.reduce((sum, w) => sum + w.weight, 0)
     const type = (typeWeights.find((w) => (roll -= w.weight) < 0) ?? typeWeights[typeWeights.length - 1]).type
     const ofType = allowed.filter((m) => m.type === type)
@@ -1858,7 +2109,7 @@ export const HORDE_UPGRADES: HordeUpgradeDef[] = [
   { id: 'exp', per: 1, max: 20, cost: 4000, step: 3000 },
   // Percent off every move's cooldown (the same as Haste picks).
   { id: 'haste', per: 0.5, max: 20, cost: 4000, step: 3000 },
-  // Percent more Speed, so a quicker walk (the same as Speed picks).
+  // Speed points, so a quicker walk (the same as Speed picks).
   { id: 'spe', per: 1, max: 25, cost: 2500, step: 1000 },
   // Percent wider pickup range (the same as Pickup picks).
   { id: 'pickup', per: 10, max: 10, cost: 4000, step: 3000 },
@@ -1868,7 +2119,7 @@ export const HORDE_UPGRADES: HordeUpgradeDef[] = [
   { id: 'luck', per: 1, max: 10, cost: 25000, step: 15000 },
   // One banish a run (runs start with none): a level-up card thrown out, and what it offered
   // never offered again that run.
-  { id: 'banish', per: 1, max: 9, cost: 10000, step: 10000 }
+  { id: 'banish', per: 1, max: 15, cost: 10000, step: 10000 }
 ]
 export type HordeUpgrades = Record<HordeUpgradeId, number>
 

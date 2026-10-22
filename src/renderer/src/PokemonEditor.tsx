@@ -124,6 +124,16 @@ function MergeProgress({ copies, tier }: { copies: number; tier: RarityTier | un
 
 // The Rare Candy's icon (see ItemSprite).
 const RARE_CANDY_SPRITENUM = -2
+// The Friendship Petal's icon (see ItemSprite).
+const FRIENDSHIP_PETAL_SPRITENUM = -31
+
+// What a not-yet-ready evolution would use up: "Uses a Friendship Petal + 12 Rare Candies".
+function boostText(boost: { petals: number; candies: number }): string {
+  const parts: string[] = []
+  if (boost.petals > 0) parts.push(t('editor.boostPetal'))
+  if (boost.candies > 0) parts.push(boost.candies === 1 ? t('editor.boostCandy') : t('editor.boostCandies', { n: boost.candies }))
+  return t('editor.boostUses', { items: parts.join(' + ') })
+}
 // The Poke Ball item icon - an evolution already in the Pokedex.
 const POKE_BALL_SPRITENUM = 345
 
@@ -855,14 +865,16 @@ function PokemonEditor({
                         <button
                           key={evo.species}
                           type="button"
-                          className={`editor-evolution${evo.ready ? '' : ' editor-evolution-locked'}`}
-                          disabled={!evo.ready}
+                          className={`editor-evolution${evo.ready || evo.boost ? '' : ' editor-evolution-locked'}`}
+                          disabled={!evo.ready && !evo.boost}
                           title={
                             everstone?.locked
                               ? t('editor.lockedNever')
                               : evo.ready
                                 ? t('pm.evolveInto', { name: evo.species })
-                                : t('editor.notYet', { method: evo.method })
+                                : evo.boost
+                                  ? `${t('pm.evolveInto', { name: evo.species })} - ${boostText(evo.boost)}`
+                                  : t('editor.notYet', { method: evo.method })
                           }
                           onClick={() => onEvolve(evo.species)}
                         >
@@ -882,7 +894,16 @@ function PokemonEditor({
                                 </span>
                               )}
                             </span>
-                            <span className="editor-evolution-method">{evo.method}</span>
+                            {evo.boost ? (
+                              // Not ready yet: which items evolving now uses up.
+                              <span className="editor-evolution-method editor-evolution-boost">
+                                {evo.boost.petals > 0 && <ItemSprite spritenum={FRIENDSHIP_PETAL_SPRITENUM} />}
+                                {evo.boost.candies > 0 && <ItemSprite spritenum={RARE_CANDY_SPRITENUM} />}
+                                {boostText(evo.boost)}
+                              </span>
+                            ) : (
+                              <span className="editor-evolution-method">{evo.method}</span>
+                            )}
                           </span>
                         </button>
                       ))}
